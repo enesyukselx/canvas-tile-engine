@@ -1,0 +1,22 @@
+{
+  "name": "canvas-grid-map",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "pnpm --filter @canvas-grid-map/core build",
+    "dev": "concurrently \"pnpm dev:lib\" \"pnpm dev:app\"",
+    "dev:lib": "pnpm --filter @canvas-grid-map/core dev",
+    "dev:app": "pnpm --filter vanilla-js dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.23.0",
+  "dependencies": {
+    "concurrently": "^9.2.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}
