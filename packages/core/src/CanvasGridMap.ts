@@ -2,6 +2,7 @@ import { CanvasGridMapConfig, Coords } from "./types";
 import drawCoordsOnMap from "./utils/drawCoordsOnMap";
 import getInitialXCoord from "./utils/getInitialXCoord";
 import getInitialYCoord from "./utils/getInitialYCoord";
+import { worldToScreen } from "./utils/worldToScreen";
 
 export class CanvasGridMap {
     canvas: HTMLCanvasElement;
@@ -11,12 +12,20 @@ export class CanvasGridMap {
     isDragging: boolean = false;
     lastPos: Coords = { x: 0, y: 0 };
 
+    private drawFunctions: Array<
+        (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasGridMapConfig>) => void
+    > = [];
+
     constructor(canvas: HTMLCanvasElement, config: CanvasGridMapConfig, coords: Coords = { x: 0, y: 0 }) {
         this.canvas = canvas;
+        canvas.width = config.size.width;
+        canvas.height = config.size.height;
         const canvasContext = this.canvas.getContext("2d");
+
         if (!canvasContext) {
             throw new Error("Failed to get 2D context from canvas");
         }
+
         this.canvasContext = canvasContext;
 
         // Set default configuration
@@ -50,13 +59,113 @@ export class CanvasGridMap {
     private wrapper?: HTMLDivElement;
     private resizeObserver?: ResizeObserver;
 
+    /** Add a custom draw function to be called in draw() */
+    addDrawFunction(
+        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasGridMapConfig>) => void
+    ) {
+        this.drawFunctions.push(fn);
+    }
+
+    /** Add a rectangle to be drawn */
+    drawRect(x: number, y: number, style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number }) {
+        this.addDrawFunction((ctx) => {
+            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+            ctx.beginPath();
+            ctx.rect(
+                worldToScreen(x, y, this.coords, this.config.scale).x,
+                worldToScreen(x, y, this.coords, this.config.scale).y,
+                this.config.scale,
+                this.config.scale
+            );
+            if (style?.fillStyle) ctx.fill();
+            if (style?.strokeStyle) ctx.stroke();
+        });
+    }
+
+    /** Add a line to be drawn */
+    drawLine(x1: number, y1: number, x2: number, y2: number, style?: { strokeStyle?: string; lineWidth?: number }) {
+        this.addDrawFunction((ctx) => {
+            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+            ctx.beginPath();
+            const start = worldToScreen(x1, y1, this.coords, this.config.scale);
+            const end = worldToScreen(x2, y2, this.coords, this.config.scale);
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+        });
+    }
+
+    /** Add a circle to be drawn */
+    drawCircle(
+        x: number,
+        y: number,
+        radius: number,
+        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number }
+    ) {
+        this.addDrawFunction((ctx) => {
+            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+            ctx.beginPath();
+            const center = worldToScreen(x + 0.5, y + 0.5, this.coords, this.config.scale);
+            const maxRadius = Math.min(this.config.size.width, this.config.size.height) / 2 / this.config.scale;
+            const safeRadius = Math.min(radius, maxRadius);
+            ctx.arc(center.x, center.y, safeRadius * this.config.scale, 0, 2 * Math.PI);
+            if (style?.fillStyle) ctx.fill();
+            if (style?.strokeStyle) ctx.stroke();
+        });
+    }
+
+    drawText(
+        text: string,
+        x: number,
+        y: number,
+        style?: { font?: string; fillStyle?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline }
+    ) {
+        this.addDrawFunction((ctx) => {
+            if (style?.font) ctx.font = style.font;
+            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+            ctx.textAlign = style?.textAlign ?? "center";
+            ctx.textBaseline = style?.textBaseline ?? "middle";
+            const pos = worldToScreen(x + 0.5, y + 0.5, this.coords, this.config.scale);
+            ctx.fillText(text, pos.x, pos.y);
+        });
+    }
+
+    /** Add a path to be drawn (array of grid coords) */
+    drawPath(points: Array<{ x: number; y: number }>, style?: { strokeStyle?: string; lineWidth?: number }) {
+        this.addDrawFunction((ctx) => {
+            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+            if (!points.length) {
+                return;
+            }
+            ctx.beginPath();
+            // First point
+            const first = worldToScreen(points[0].x + 0.5, points[0].y + 0.5, this.coords, this.config.scale);
+            ctx.moveTo(first.x, first.y);
+            // Draw the other points
+            for (let i = 1; i < points.length; i++) {
+                const p = worldToScreen(points[i].x + 0.5, points[i].y + 0.5, this.coords, this.config.scale);
+                ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+        });
+    }
+
+    drawImage() {
+        // To be implemented
+    }
+
     setupEvents() {
         // Drag (Mouse)
         this.canvas.addEventListener("mousedown", this.onMouseDown);
         this.canvas.addEventListener("mousemove", this.onMouseMove);
         this.canvas.addEventListener("mouseup", this.onMouseUp);
         this.canvas.addEventListener("mouseleave", this.onMouseUp);
-
         // Drag (Touch)
         this.canvas.addEventListener("touchstart", this.onTouchStart, { passive: false });
         this.canvas.addEventListener("touchmove", this.onTouchMove, { passive: false });
@@ -125,6 +234,7 @@ export class CanvasGridMap {
             this.wrapper.parentNode.insertBefore(this.canvas, this.wrapper);
             this.wrapper.parentNode.removeChild(this.wrapper);
         }
+
         this.wrapper = undefined;
         this.resizeObserver = undefined;
     }
@@ -133,6 +243,7 @@ export class CanvasGridMap {
         if (!this.config.events.drag) {
             return;
         }
+
         this.isDragging = true;
         this.lastPos = { x: e.clientX, y: e.clientY };
         this.canvas.style.cursor = "grabbing";
@@ -142,11 +253,13 @@ export class CanvasGridMap {
         if (!this.isDragging) {
             return;
         }
+
         const dx = e.clientX - this.lastPos.x;
         const dy = e.clientY - this.lastPos.y;
         this.coords.x -= dx / this.config.scale;
         this.coords.y -= dy / this.config.scale;
         this.lastPos = { x: e.clientX, y: e.clientY };
+
         this.render();
     };
 
@@ -174,14 +287,17 @@ export class CanvasGridMap {
         if (!this.isDragging || e.touches.length !== 1) {
             return;
         }
+
+        e.preventDefault();
+
         const touch = e.touches[0];
         const dx = touch.clientX - this.lastPos.x;
         const dy = touch.clientY - this.lastPos.y;
         this.coords.x -= dx / this.config.scale;
         this.coords.y -= dy / this.config.scale;
         this.lastPos = { x: touch.clientX, y: touch.clientY };
+
         this.render();
-        e.preventDefault();
     };
 
     onTouchEnd = (e: TouchEvent) => {
@@ -193,7 +309,9 @@ export class CanvasGridMap {
         if (!this.config.events.zoom) {
             return;
         }
+
         e.preventDefault();
+
         const zoomSensitivity = 0.001;
         const scaleFactor = Math.exp(-Math.min(Math.max(e.deltaY, -100), 100) * zoomSensitivity);
         const currentScale = this.config.scale;
@@ -209,13 +327,21 @@ export class CanvasGridMap {
         this.coords.y += mouseY * (1 / currentScale - 1 / newScale);
 
         this.config.scale = newScale;
+
         this.render();
     };
 
     render() {
-        // Background
+        // Clear canvas
+        this.canvasContext.clearRect(0, 0, this.config.size.width, this.config.size.height);
+        // Draw background
         this.canvasContext.fillStyle = this.config.backgroundColor;
         this.canvasContext.fillRect(0, 0, this.config.size.width, this.config.size.height);
+        // Call all draw functions
+
+        for (const fn of this.drawFunctions) {
+            fn(this.canvasContext, this.coords, this.config);
+        }
 
         // Coordinates
         if (this.config.showCoordinates && this.config.scale >= this.config.minScaleShowCoordinates) {
