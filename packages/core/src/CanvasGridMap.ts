@@ -7,6 +7,16 @@ import getInitialYCoord from "./utils/getInitialYCoord";
 import { worldToScreen } from "./utils/worldToScreen";
 
 export class CanvasGridMap {
+    updateCoords(newCoords: Coords) {
+        const newX = getInitialXCoord(this.canvas.width, this.config.scale, newCoords.x);
+        const newY = getInitialYCoord(this.canvas.height, this.config.scale, newCoords.y);
+        if (this.coords.x === newX && this.coords.y === newY) {
+            return;
+        }
+        this.coords = { x: newX, y: newY };
+        this.emitCenteredCoordsChange();
+        this.render();
+    }
     private emitCenteredCoordsChange() {
         if (this.onCoordsChange) {
             this.onCoordsChange({
