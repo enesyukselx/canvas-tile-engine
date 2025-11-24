@@ -1,4 +1,4 @@
-import { CanvasGridMapConfig, Coords } from "./types";
+import { CanvasGridMapConfig, CanvasGridMapDrawCallback, Coords } from "./types";
 import drawCoordsOnMap from "./utils/drawCoordsOnMap";
 import getCenterXCoord from "./utils/getCenterXCoord";
 import getCenterYCoord from "./utils/getCenterYCoord";
@@ -7,6 +7,20 @@ import getInitialYCoord from "./utils/getInitialYCoord";
 import { worldToScreen } from "./utils/worldToScreen";
 
 export class CanvasGridMap {
+    getCenterCoords(): Coords {
+        return {
+            x: getCenterXCoord(this.canvas.width, this.config.scale, this.coords.x),
+            y: getCenterYCoord(this.canvas.height, this.config.scale, this.coords.y),
+        };
+    }
+
+    getInitialCoords(): Coords {
+        return { x: this.coords.x, y: this.coords.y };
+    }
+
+    getConfig(): Required<CanvasGridMapConfig> {
+        return this.config;
+    }
     updateCoords(newCoords: Coords) {
         const newX = getInitialXCoord(this.canvas.width, this.config.scale, newCoords.x);
         const newY = getInitialYCoord(this.canvas.height, this.config.scale, newCoords.y);
@@ -33,7 +47,10 @@ export class CanvasGridMap {
     coords: Coords;
     isDragging: boolean = false;
     lastPos: Coords = { x: 0, y: 0 };
-
+    /** Optional custom draw callback */
+    onDraw?: CanvasGridMapDrawCallback;
+    /** User-defined resize callback */
+    onResize?: () => void;
     private drawFunctions: Array<
         (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasGridMapConfig>) => void
     > = [];
@@ -230,6 +247,10 @@ export class CanvasGridMap {
                     this.config.size.height = height;
                     this.canvas.width = width;
                     this.canvas.height = height;
+                    // Invoke user-defined resize callback
+                    if (this.onResize) {
+                        this.onResize();
+                    }
                     this.render();
                 }
             });
@@ -368,10 +389,20 @@ export class CanvasGridMap {
         // Draw background
         this.canvasContext.fillStyle = this.config.backgroundColor;
         this.canvasContext.fillRect(0, 0, this.config.size.width, this.config.size.height);
-        // Call all draw functions
 
+        // Call all draw functions
         for (const fn of this.drawFunctions) {
             fn(this.canvasContext, this.coords, this.config);
+        }
+
+        // User-defined draw callback
+        if (this.onDraw) {
+            this.onDraw(this.canvasContext, {
+                scale: this.config.scale,
+                width: this.config.size.width,
+                height: this.config.size.height,
+                coords: this.coords,
+            });
         }
 
         // Coordinates

@@ -18,6 +18,11 @@ export type CanvasGridMapConfig = {
     minScaleShowCoordinates?: number;
 };
 
+export type CanvasGridMapDrawCallback = (
+    ctx: CanvasRenderingContext2D,
+    opts: { scale: number; width: number; height: number; coords: Coords }
+) => void;
+
 export type Coords = {
     x: number;
     y: number;
