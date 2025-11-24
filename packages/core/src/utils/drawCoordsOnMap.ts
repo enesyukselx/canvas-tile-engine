@@ -10,9 +10,9 @@ const drawCoordsOnMap = ({
     mapConfig: CanvasGridMapConfig;
 }) => {
     const scale = mapConfig.scale || 1;
-    const coordsMinScale = mapConfig.minScale ?? 0;
+    const coordsMinScale = mapConfig.minScaleShowCoordinates ?? 0;
 
-    // Sadece scale yeterince büyükse koordinatları göster
+    // if the scale is less than the minimum scale for showing coordinates
     if (scale < coordsMinScale) {
         return;
     }
@@ -32,7 +32,7 @@ const drawCoordsOnMap = ({
     // Set text properties for coordinates
     ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
 
-    // Font boyutunu scale'e göre ayarla (min 8px, max 12px)
+    // Adjust font size based on scale (min 8px, max 12px)
     const fontSize = Math.min(12, Math.max(8, scale * 0.25));
     ctx.font = `${fontSize}px Arial`;
     ctx.textAlign = "center";
