@@ -1,16 +1,14 @@
 import { CanvasGridMapConfig, CanvasGridMapDrawCallback, Coords } from "./types";
+import { centerToTopLeftX, centerToTopLeftY } from "./utils/centerToTopLeft";
 import drawCoordsOnMap from "./utils/drawCoordsOnMap";
-import getCenterXCoord from "./utils/getCenterXCoord";
-import getCenterYCoord from "./utils/getCenterYCoord";
-import getInitialXCoord from "./utils/getInitialXCoord";
-import getInitialYCoord from "./utils/getInitialYCoord";
+import { topLeftToCenterX, topLeftToCenterY } from "./utils/topLeftToCenter";
 import { worldToScreen } from "./utils/worldToScreen";
 
 export class CanvasGridMap {
     getCenterCoords(): Coords {
         return {
-            x: getCenterXCoord(this.canvas.width, this.config.scale, this.coords.x),
-            y: getCenterYCoord(this.canvas.height, this.config.scale, this.coords.y),
+            x: topLeftToCenterX(this.canvas.width, this.config.scale, this.coords.x),
+            y: topLeftToCenterY(this.canvas.height, this.config.scale, this.coords.y),
         };
     }
 
@@ -22,8 +20,8 @@ export class CanvasGridMap {
         return this.config;
     }
     updateCoords(newCoords: Coords) {
-        const newX = getInitialXCoord(this.canvas.width, this.config.scale, newCoords.x);
-        const newY = getInitialYCoord(this.canvas.height, this.config.scale, newCoords.y);
+        const newX = centerToTopLeftX(this.canvas.width, this.config.scale, newCoords.x);
+        const newY = centerToTopLeftY(this.canvas.height, this.config.scale, newCoords.y);
         if (this.coords.x === newX && this.coords.y === newY) {
             return;
         }
@@ -34,8 +32,8 @@ export class CanvasGridMap {
     private emitCenteredCoordsChange() {
         if (this.onCoordsChange) {
             this.onCoordsChange({
-                x: getCenterXCoord(this.canvas.width, this.config.scale, this.coords.x),
-                y: getCenterYCoord(this.canvas.height, this.config.scale, this.coords.y),
+                x: topLeftToCenterX(this.canvas.width, this.config.scale, this.coords.x),
+                y: topLeftToCenterY(this.canvas.height, this.config.scale, this.coords.y),
             });
         }
     }
@@ -90,8 +88,8 @@ export class CanvasGridMap {
 
         // Initialize coordinates centered on provided coords or default
         this.coords = {
-            x: getInitialXCoord(this.config.size.width, this.config.scale, coords.x),
-            y: getInitialYCoord(this.config.size.height, this.config.scale, coords.y),
+            x: centerToTopLeftX(this.config.size.width, this.config.scale, coords.x),
+            y: centerToTopLeftY(this.config.size.height, this.config.scale, coords.y),
         };
     }
 
