@@ -10,9 +10,9 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
 import { CanvasGridMap } from "@canvas-grid-map/core";
 
-const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-const miniCanvas = document.getElementById("mini-canvas") as HTMLCanvasElement;
-
+// ───────────────────────────────────────────────
+// TEST DATA
+// ───────────────────────────────────────────────
 const items = [
     { x: 0, y: 0, color: "blue" },
     { x: 3, y: 1, color: "green" },
@@ -21,6 +21,11 @@ const items = [
     { x: 4, y: 3, color: "orange" },
     { x: 2, y: 2, color: "pink" },
 ];
+
+// ───────────────────────────────────────────────
+// MAIN CANVAS
+// ───────────────────────────────────────────────
+const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 
 const gridMap = new CanvasGridMap(
     canvas,
@@ -41,6 +46,11 @@ const gridMap = new CanvasGridMap(
     { x: 0, y: 0 }
 );
 
+// ───────────────────────────────────────────────
+// MINI MAP
+// ───────────────────────────────────────────────
+const miniCanvas = document.getElementById("mini-canvas") as HTMLCanvasElement;
+
 const miniGridMap = new CanvasGridMap(
     miniCanvas,
     {
@@ -48,10 +58,10 @@ const miniGridMap = new CanvasGridMap(
         minScale: 5,
         maxScale: 20,
         size: { width: 300, height: 300 },
-        backgroundColor: "red",
+        backgroundColor: "#ddd",
         events: {
             drag: true,
-            zoom: false,
+            zoom: false, // ❗ mini map zoom yok
             resize: true,
         },
         showCoordinates: false,
@@ -59,65 +69,77 @@ const miniGridMap = new CanvasGridMap(
     { x: 0, y: 0 }
 );
 
-miniGridMap.setupEvents();
+// ───────────────────────────────────────────────
+// DRAW OBJECTS ON BOTH MAPS
+// ───────────────────────────────────────────────
 items.forEach((item) => {
-    miniGridMap.drawRect(item.x, item.y, { fillStyle: item.color });
+    gridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 0.7);
+    miniGridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 0.7);
 });
+
+let isSyncing = false;
+
+// ───────────────────────────────────────────────
+// MINI MAP → MAIN MAP SYNC
+// ───────────────────────────────────────────────
+
 miniGridMap.onCoordsChange = (coords) => {
+    if (isSyncing) return;
+    isSyncing = true;
+
     gridMap.updateCoords(coords);
+    gridMap.render();
+
+    isSyncing = false;
 };
-miniGridMap.render();
 
-gridMap.setupEvents();
-
-items.forEach((item) => {
-    gridMap.drawRect(item.x, item.y, { fillStyle: item.color });
-});
-
+// ───────────────────────────────────────────────
+// MAIN MAP → MINI MAP VIEWPORT UPDATE
+// ───────────────────────────────────────────────
 gridMap.onCoordsChange = (coords) => {
+    if (isSyncing) return;
+    isSyncing = true;
+
     miniGridMap.updateCoords(coords);
-};
-
-gridMap.onResize = () => {
-    //
-    const gridMapConfig = gridMap.getConfig();
-
-    miniGridMap.onDraw = (ctx, opts) => {
-        ctx.fillStyle = "black";
-        ctx.font = "12px Arial";
-        ctx.fillText(`Scale: ${opts.scale.toFixed(2)}`, 10, 20);
-        ctx.fillText(
-            `Coords: (${gridMap.getCenterCoords().x.toFixed(2)}, ${gridMap.getCenterCoords().y.toFixed(2)})`,
-            10,
-            40
-        );
-
-        const ratio = miniGridMap.getConfig().scale / gridMapConfig.scale;
-
-        const x = opts.width / 2 - (gridMapConfig.size.width * ratio) / 2;
-        const y = opts.height / 2 - (gridMapConfig.size.height * ratio) / 2;
-
-        ctx.strokeStyle = "blue";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, gridMapConfig.size.width * ratio, gridMapConfig.size.height * ratio);
-    };
-
     miniGridMap.render();
+
+    isSyncing = false;
 };
+
+// ───────────────────────────────────────────────
+// MINI MAP VIEWPORT RECTANGLE DRAWING
+// ───────────────────────────────────────────────
+miniGridMap.onDraw = (ctx, opts) => {
+    const mainCfg = gridMap.getConfig();
+    const miniCfg = miniGridMap.getConfig();
+
+    // SCALE RATIO
+    const ratio = miniCfg.scale / mainCfg.scale;
+
+    // MAIN VIEWPORT → MINI MAP SIZE
+    const rectWidth = mainCfg.size.width * ratio;
+    const rectHeight = mainCfg.size.height * ratio;
+
+    // ALWAYS CENTERED
+    const rectX = miniCfg.size.width / 2 - rectWidth / 2;
+    const rectY = miniCfg.size.height / 2 - rectHeight / 2;
+
+    ctx.strokeStyle = "blue";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+
+    // OPTIONAL DEBUG
+    ctx.fillStyle = "black";
+    ctx.font = "12px Arial";
+    ctx.fillText(`Scale: ${mainCfg.scale.toFixed(2)}`, 10, 20);
+    ctx.fillText(`Rect: ${rectWidth.toFixed(1)}x${rectHeight.toFixed(1)}`, 10, 40);
+};
+
+// ───────────────────────────────────────────────
+// EVENTS & INITIAL RENDER
+// ───────────────────────────────────────────────
+gridMap.setupEvents();
+miniGridMap.setupEvents();
 
 gridMap.render();
-
-// gridMap.drawRect(0, 0, { fillStyle: "blue" });
-// gridMap.drawRect(3, 0, { fillStyle: "blue" });
-// gridMap.drawCircle(0, 0, { fillStyle: "yellow" }, 1);
-// gridMap.drawText("Hello World", 0, 0, { fillStyle: "black", font: "10px Arial" });
-// gridMap.drawPath(
-//     [
-//         { x: 1, y: 2 },
-//         { x: 2, y: 2 },
-//         { x: 3, y: 4 },
-//         { x: 4, y: 11 },
-//     ],
-//     { strokeStyle: "black", lineWidth: 2 }
-// );
-// gridMap.drawLine(0, 0, 3, 0, { strokeStyle: "green", lineWidth: 3 });
+miniGridMap.render();
