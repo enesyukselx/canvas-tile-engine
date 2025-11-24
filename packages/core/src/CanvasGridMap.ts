@@ -67,18 +67,20 @@ export class CanvasGridMap {
     }
 
     /** Add a rectangle to be drawn */
-    drawRect(x: number, y: number, style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number }) {
+    drawRect(
+        x: number,
+        y: number,
+        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
+        size: number = 1
+    ) {
         this.addDrawFunction((ctx) => {
             if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
             ctx.beginPath();
-            ctx.rect(
-                worldToScreen(x, y, this.coords, this.config.scale).x,
-                worldToScreen(x, y, this.coords, this.config.scale).y,
-                this.config.scale,
-                this.config.scale
-            );
+            const center = worldToScreen(x, y, this.coords, this.config.scale);
+            const halfSize = (size * this.config.scale) / 2;
+            ctx.rect(center.x - halfSize, center.y - halfSize, size * this.config.scale, size * this.config.scale);
             if (style?.fillStyle) ctx.fill();
             if (style?.strokeStyle) ctx.stroke();
         });
@@ -102,18 +104,18 @@ export class CanvasGridMap {
     drawCircle(
         x: number,
         y: number,
-        radius: number,
-        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number }
+        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
+        size: number = 1
     ) {
         this.addDrawFunction((ctx) => {
             if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
             ctx.beginPath();
-            const center = worldToScreen(x + 0.5, y + 0.5, this.coords, this.config.scale);
-            const maxRadius = Math.min(this.config.size.width, this.config.size.height) / 2 / this.config.scale;
-            const safeRadius = Math.min(radius, maxRadius);
-            ctx.arc(center.x, center.y, safeRadius * this.config.scale, 0, 2 * Math.PI);
+            const center = worldToScreen(x, y, this.coords, this.config.scale);
+            const maxRadius = this.config.scale / 2;
+            const safeRadius = Math.min(size * maxRadius, maxRadius);
+            ctx.arc(center.x, center.y, safeRadius, 0, 2 * Math.PI);
             if (style?.fillStyle) ctx.fill();
             if (style?.strokeStyle) ctx.stroke();
         });
@@ -130,7 +132,7 @@ export class CanvasGridMap {
             if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
             ctx.textAlign = style?.textAlign ?? "center";
             ctx.textBaseline = style?.textBaseline ?? "middle";
-            const pos = worldToScreen(x + 0.5, y + 0.5, this.coords, this.config.scale);
+            const pos = worldToScreen(x, y, this.coords, this.config.scale);
             ctx.fillText(text, pos.x, pos.y);
         });
     }
@@ -145,11 +147,11 @@ export class CanvasGridMap {
             }
             ctx.beginPath();
             // First point
-            const first = worldToScreen(points[0].x + 0.5, points[0].y + 0.5, this.coords, this.config.scale);
+            const first = worldToScreen(points[0].x, points[0].y, this.coords, this.config.scale);
             ctx.moveTo(first.x, first.y);
             // Draw the other points
             for (let i = 1; i < points.length; i++) {
-                const p = worldToScreen(points[i].x + 0.5, points[i].y + 0.5, this.coords, this.config.scale);
+                const p = worldToScreen(points[i].x, points[i].y, this.coords, this.config.scale);
                 ctx.lineTo(p.x, p.y);
             }
             ctx.stroke();
