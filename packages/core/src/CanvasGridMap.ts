@@ -1,10 +1,22 @@
 import { CanvasGridMapConfig, Coords } from "./types";
 import drawCoordsOnMap from "./utils/drawCoordsOnMap";
+import getCenterXCoord from "./utils/getCenterXCoord";
+import getCenterYCoord from "./utils/getCenterYCoord";
 import getInitialXCoord from "./utils/getInitialXCoord";
 import getInitialYCoord from "./utils/getInitialYCoord";
 import { worldToScreen } from "./utils/worldToScreen";
 
 export class CanvasGridMap {
+    private emitCenteredCoordsChange() {
+        if (this.onCoordsChange) {
+            this.onCoordsChange({
+                x: getCenterXCoord(this.canvas.width, this.config.scale, this.coords.x),
+                y: getCenterYCoord(this.canvas.height, this.config.scale, this.coords.y),
+            });
+        }
+    }
+    /** Callback: when coordinates change */
+    onCoordsChange?: (coords: Coords) => void;
     canvas: HTMLCanvasElement;
     canvasContext: CanvasRenderingContext2D;
     config: Required<CanvasGridMapConfig>;
@@ -199,6 +211,11 @@ export class CanvasGridMap {
             this.resizeObserver = new ResizeObserver((entries) => {
                 for (let entry of entries) {
                     const { width, height } = entry.contentRect;
+                    const diffWidth = width - this.config.size.width;
+                    const diffHeight = height - this.config.size.height;
+                    // Adjust coords to keep center position
+                    this.coords.x -= diffWidth / (2 * this.config.scale);
+                    this.coords.y -= diffHeight / (2 * this.config.scale);
                     this.config.size.width = width;
                     this.config.size.height = height;
                     this.canvas.width = width;
@@ -262,6 +279,7 @@ export class CanvasGridMap {
         this.coords.y -= dy / this.config.scale;
         this.lastPos = { x: e.clientX, y: e.clientY };
 
+        this.emitCenteredCoordsChange();
         this.render();
     };
 
@@ -299,6 +317,7 @@ export class CanvasGridMap {
         this.coords.y -= dy / this.config.scale;
         this.lastPos = { x: touch.clientX, y: touch.clientY };
 
+        this.emitCenteredCoordsChange();
         this.render();
     };
 
@@ -329,7 +348,7 @@ export class CanvasGridMap {
         this.coords.y += mouseY * (1 / currentScale - 1 / newScale);
 
         this.config.scale = newScale;
-
+        this.emitCenteredCoordsChange();
         this.render();
     };
 
