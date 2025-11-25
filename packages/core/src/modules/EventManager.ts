@@ -109,7 +109,6 @@ export class EventManager {
         this.isDragging = true;
         this.shouldPreventClick = false;
         this.lastPos = { x: e.clientX, y: e.clientY };
-        this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
     };
 
     private onMouseMove = (e: MouseEvent) => {
@@ -130,6 +129,7 @@ export class EventManager {
         const dy = e.clientY - this.lastPos.y;
 
         if (dx !== 0 || dy !== 0) {
+            this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
             this.shouldPreventClick = true;
         }
 
@@ -156,8 +156,8 @@ export class EventManager {
 
         const t = e.touches[0];
         this.isDragging = true;
+        this.shouldPreventClick = false;
         this.lastPos = { x: t.clientX, y: t.clientY };
-        this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
     };
 
     private onTouchMove = (e: TouchEvent) => {
@@ -169,6 +169,11 @@ export class EventManager {
         const t = e.touches[0];
         const dx = t.clientX - this.lastPos.x;
         const dy = t.clientY - this.lastPos.y;
+
+        if (dx !== 0 || dy !== 0) {
+            this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
+            this.shouldPreventClick = true;
+        }
 
         this.camera.pan(dx, dy);
         this.lastPos = { x: t.clientX, y: t.clientY };
