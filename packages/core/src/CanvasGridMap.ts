@@ -5,6 +5,7 @@ import { ConfigManager } from "./modules/ConfigManager";
 import { LayerManager } from "./modules/LayerManager";
 import { Renderer } from "./modules/Renderer";
 import { EventManager } from "./modules/EventManager";
+import { ImageManager } from "./modules/ImageManager";
 
 export class CanvasGridMap {
     private configManager: ConfigManager;
@@ -13,6 +14,7 @@ export class CanvasGridMap {
     private layers: LayerManager;
     private renderer: Renderer;
     private events: EventManager;
+    public images: ImageManager;
 
     public canvas: HTMLCanvasElement;
 
@@ -71,6 +73,7 @@ export class CanvasGridMap {
         this.transformer = new CoordinateTransformer(this.camera);
         this.layers = new LayerManager();
         this.renderer = new Renderer(this.canvas, this.camera, this.transformer, this.configManager, this.layers);
+        this.images = new ImageManager();
 
         this.events = new EventManager(this.canvas, this.camera, this.configManager, this.transformer, () => {
             this.handleCameraChange();
@@ -219,6 +222,31 @@ export class CanvasGridMap {
                 ctx.lineTo(p.x, p.y);
             }
             ctx.stroke();
+        });
+    }
+
+    drawImage(img: HTMLImageElement, x: number, y: number, size: number = 1, layer: number = 1) {
+        this.layers.add(layer, ({ ctx, transformer, camera }) => {
+            const pos = transformer.worldToScreen(x, y);
+
+            const pxSize = size * camera.scale;
+
+            // image aspect ratio
+            const aspect = img.width / img.height;
+
+            let drawW = pxSize;
+            let drawH = pxSize;
+
+            // adjust width and height based on aspect ratio
+            if (aspect > 1) {
+                // wide image → width pxSize, height adjusted
+                drawH = pxSize / aspect;
+            } else {
+                // tall image → height pxSize, width adjusted
+                drawW = pxSize * aspect;
+            }
+
+            ctx.drawImage(img, pos.x - drawW / 2, pos.y - drawH / 2, drawW, drawH);
         });
     }
 

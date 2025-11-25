@@ -1,4 +1,5 @@
 import "./style.css";
+import villageImage from "../public/village1.webp";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div class="canvas-container">
@@ -35,7 +36,7 @@ const gridMap = new CanvasGridMap(
         minScale: 5,
         maxScale: 100,
         size: { width: 500, height: 500 },
-        backgroundColor: "red",
+        backgroundColor: "gray",
         events: {
             drag: true,
             zoom: true,
@@ -120,6 +121,29 @@ gridMap.onHover = (coords, mouse, client) => {
     console.log("Mouse position relative to canvas:", mouse);
     console.log("Client position relative to viewport:", client);
 };
+
+gridMap.drawImage(
+    await gridMap.images.load(villageImage),
+    4,
+    2,
+    1, // world-size
+    1 // layer
+);
+
+gridMap.drawImage(
+    await gridMap.images.load(villageImage),
+    5,
+    4,
+    1, // world-size
+    1 // layer
+);
+gridMap.drawImage(
+    await gridMap.images.load(villageImage),
+    1,
+    2,
+    1, // world-size
+    1 // layer
+);
 
 // ───────────────────────────────────────────────
 // MINI MAP VIEWPORT RECTANGLE DRAWING
