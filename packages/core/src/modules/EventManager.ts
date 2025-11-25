@@ -12,8 +12,8 @@ export class EventManager {
     private resizeObserver?: ResizeObserver;
 
     public onResize?: () => void;
-    public onClick?: (coords: Coords) => void;
-    public onHover?: (coords: Coords) => void;
+    public onClick?: (coords: Coords, mouse: Coords, client: Coords) => void;
+    public onHover?: (coords: Coords, mouse: Coords, client: Coords) => void;
 
     constructor(
         private canvas: HTMLCanvasElement,
@@ -81,11 +81,16 @@ export class EventManager {
             return;
         }
 
+        const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
+        const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
+
         this.onClick(
-            this.transformer.screenToWorld(
-                e.clientX - this.canvas.getBoundingClientRect().left,
-                e.clientY - this.canvas.getBoundingClientRect().top
-            )
+            this.transformer.screenToWorld(mouseX, mouseY),
+            {
+                x: mouseX,
+                y: mouseY,
+            },
+            { x: e.clientX, y: e.clientY }
         );
     };
 
@@ -103,13 +108,16 @@ export class EventManager {
 
     private onMouseMove = (e: MouseEvent) => {
         if (!this.isDragging) {
-            if (this.onHover) {
-                this.onHover(
-                    this.transformer.screenToWorld(
-                        e.clientX - this.canvas.getBoundingClientRect().left,
-                        e.clientY - this.canvas.getBoundingClientRect().top
-                    )
-                );
+            if (this.onHover && this.configManager.get().events.hover) {
+                const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
+                const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
+
+                this.transformer.screenToWorld(mouseX, mouseY),
+                    {
+                        x: mouseX,
+                        y: mouseY,
+                    },
+                    { x: e.clientX, y: e.clientY };
             }
             return;
         }

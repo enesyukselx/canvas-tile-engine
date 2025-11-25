@@ -19,20 +19,20 @@ export class CanvasGridMap {
     /** Callback: center coordinates change */
     public onCoordsChange?: (coords: Coords) => void;
 
-    private _onClick?: (coords: Coords) => void;
-    public get onClick(): ((coords: Coords) => void) | undefined {
+    private _onClick?: (coords: Coords, mouse: Coords, client: Coords) => void;
+    public get onClick(): ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined {
         return this._onClick;
     }
-    public set onClick(cb: ((coords: Coords) => void) | undefined) {
+    public set onClick(cb: ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined) {
         this._onClick = cb;
         this.events.onClick = cb;
     }
 
-    private _onHover?: (coords: Coords) => void;
-    public get onHover(): ((coords: Coords) => void) | undefined {
+    private _onHover?: (coords: Coords, mouse: Coords, client: Coords) => void;
+    public get onHover(): ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined {
         return this._onHover;
     }
-    public set onHover(cb: ((coords: Coords) => void) | undefined) {
+    public set onHover(cb: ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined) {
         this._onHover = cb;
         this.events.onHover = cb;
     }
@@ -203,11 +203,7 @@ export class CanvasGridMap {
         });
     }
 
-    drawPath(
-        points: Array<{ x: number; y: number }>,
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
-    ) {
+    drawPath(points: Array<Coords>, style?: { strokeStyle?: string; lineWidth?: number }, layer: number = 1) {
         this.layers.add(layer, ({ ctx, transformer }) => {
             if (!points.length) return;
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
