@@ -1,4 +1,4 @@
-import type { CanvasGridMapConfig, CanvasGridMapDrawCallback, Coords } from "./types";
+import type { CanvasGridMapConfig, CanvasGridMapDrawCallback, Coords, onClickCallback, onHoverCallback } from "./types";
 import { Camera } from "./modules/Camera";
 import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { ConfigManager } from "./modules/ConfigManager";
@@ -19,20 +19,21 @@ export class CanvasGridMap {
     /** Callback: center coordinates change */
     public onCoordsChange?: (coords: Coords) => void;
 
-    private _onClick?: (coords: Coords, mouse: Coords, client: Coords) => void;
-    public get onClick(): ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined {
+    private _onClick?: onClickCallback;
+
+    public get onClick(): onClickCallback | undefined {
         return this._onClick;
     }
-    public set onClick(cb: ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined) {
+    public set onClick(cb: onClickCallback | undefined) {
         this._onClick = cb;
         this.events.onClick = cb;
     }
 
-    private _onHover?: (coords: Coords, mouse: Coords, client: Coords) => void;
-    public get onHover(): ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined {
+    private _onHover?: onHoverCallback;
+    public get onHover(): onHoverCallback | undefined {
         return this._onHover;
     }
-    public set onHover(cb: ((coords: Coords, mouse: Coords, client: Coords) => void) | undefined) {
+    public set onHover(cb: onHoverCallback | undefined) {
         this._onHover = cb;
         this.events.onHover = cb;
     }

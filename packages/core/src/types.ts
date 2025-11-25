@@ -31,3 +31,20 @@ export type Coords = {
     x: number;
     y: number;
 };
+
+export type onClickCallback = (
+    coords: {
+        raw: Coords;
+        snapped: Coords;
+    },
+    mouse: {
+        raw: Coords;
+        snapped: Coords;
+    },
+    client: {
+        raw: Coords;
+        snapped: Coords;
+    }
+) => void;
+
+export type onHoverCallback = onClickCallback;

@@ -1,4 +1,4 @@
-import { Coords } from "../types";
+import { onClickCallback, onHoverCallback } from "../types";
 import { Camera } from "./Camera";
 import { ConfigManager } from "./ConfigManager";
 import { CoordinateTransformer } from "./CoordinateTransformer";
@@ -12,8 +12,8 @@ export class EventManager {
     private resizeObserver?: ResizeObserver;
 
     public onResize?: () => void;
-    public onClick?: (coords: Coords, mouse: Coords, client: Coords) => void;
-    public onHover?: (coords: Coords, mouse: Coords, client: Coords) => void;
+    public onClick?: onClickCallback;
+    public onHover?: onHoverCallback;
 
     constructor(
         private canvas: HTMLCanvasElement,
@@ -89,13 +89,30 @@ export class EventManager {
         const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
         const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
 
+        const worldCoords = this.transformer.screenToWorld(mouseX, mouseY);
+
         this.onClick(
-            this.transformer.screenToWorld(mouseX, mouseY),
             {
-                x: mouseX,
-                y: mouseY,
+                raw: worldCoords,
+                snapped: {
+                    x: Math.floor(worldCoords.x),
+                    y: Math.floor(worldCoords.y),
+                },
             },
-            { x: e.clientX, y: e.clientY }
+            {
+                raw: { x: mouseX, y: mouseY },
+                snapped: {
+                    x: Math.round(mouseX / this.configManager.get().scale) * this.configManager.get().scale,
+                    y: Math.round(mouseY / this.configManager.get().scale) * this.configManager.get().scale,
+                },
+            },
+            {
+                raw: { x: e.clientX, y: e.clientY },
+                snapped: {
+                    x: Math.round(e.clientX / this.configManager.get().scale) * this.configManager.get().scale,
+                    y: Math.round(e.clientY / this.configManager.get().scale) * this.configManager.get().scale,
+                },
+            }
         );
     };
 
@@ -117,9 +134,27 @@ export class EventManager {
                 const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
                 const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
                 this.onHover(
-                    this.transformer.screenToWorld(mouseX, mouseY),
-                    { x: mouseX, y: mouseY },
-                    { x: e.clientX, y: e.clientY }
+                    {
+                        raw: this.transformer.screenToWorld(mouseX, mouseY),
+                        snapped: {
+                            x: Math.floor(this.transformer.screenToWorld(mouseX, mouseY).x),
+                            y: Math.floor(this.transformer.screenToWorld(mouseX, mouseY).y),
+                        },
+                    },
+                    {
+                        raw: { x: mouseX, y: mouseY },
+                        snapped: {
+                            x: Math.round(mouseX / this.configManager.get().scale) * this.configManager.get().scale,
+                            y: Math.round(mouseY / this.configManager.get().scale) * this.configManager.get().scale,
+                        },
+                    },
+                    {
+                        raw: { x: e.clientX, y: e.clientY },
+                        snapped: {
+                            x: Math.round(e.clientX / this.configManager.get().scale) * this.configManager.get().scale,
+                            y: Math.round(e.clientY / this.configManager.get().scale) * this.configManager.get().scale,
+                        },
+                    }
                 );
             }
             return;
