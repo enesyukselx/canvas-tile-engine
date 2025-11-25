@@ -1,98 +1,130 @@
 import "./style.css";
-import villageImage from "/village1.webp";
+import villageImage1 from "/village1.webp";
+import barbarVillageImage1 from "/village1_barbar.webp";
+import villageImage4 from "/village4.webp";
+import barbarVillageImage4 from "/village4_barbar.webp";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <div class="canvas-container">
-    <canvas id="canvas"></canvas>
-    <br />
-    <canvas id="mini-canvas"></canvas>
-  </div>
+    <div class="canvas-container" style="display: flex; gap: 16px;">
+        <canvas id="canvas"></canvas>
+        <canvas id="mini-canvas"></canvas>
+        <div id="popup" style="display:none; position:absolute; left:0; top:0; background:white; border:1px solid #ccc; padding:8px; z-index:10;"></div>
+    </div>
 `;
+
+const popup = document.getElementById("popup");
 
 import { CanvasGridMap } from "@canvas-grid-map/core";
 
+const VILLAGE_TYPES = {
+    barbar_1: {
+        color: "darkgray",
+        image: barbarVillageImage1,
+    },
+    normal_1: {
+        color: "blue",
+        image: villageImage1,
+    },
+    barbar_4: {
+        color: "darkgray",
+        image: barbarVillageImage4,
+    },
+    normal_4: {
+        color: "red",
+        image: villageImage4,
+    },
+};
+
 // ───────────────────────────────────────────────
-// TEST DATA
+// DATA
 // ───────────────────────────────────────────────
-const items = [
-    { x: 0, y: 0, color: "blue" },
-    { x: 0, y: 1, color: "green" },
-    { x: 3, y: 1, color: "green" },
-    { x: 5, y: 2, color: "yellow" },
-    { x: 1, y: 4, color: "purple" },
-    { x: 4, y: 3, color: "orange" },
-    { x: 2, y: 2, color: "pink" },
-];
+type VillageItem = {
+    x: number;
+    y: number;
+    color: string;
+    image: string;
+};
+
+function generateRandomItems(count: number): VillageItem[] {
+    const types = Object.values(VILLAGE_TYPES);
+    const items: VillageItem[] = [];
+    for (let i = 0; i < count; i++) {
+        const x = Math.floor(Math.random() * 21) - 10;
+        const y = Math.floor(Math.random() * 21) - 10;
+        const type = types[Math.floor(Math.random() * types.length)];
+        items.push({ x, y, ...type });
+    }
+    return items;
+}
+
+const items = generateRandomItems(150);
+
+const startingCoords = { x: 0, y: 0 };
+
+const mainMapOptions = {
+    scale: 50,
+    minScale: 5,
+    maxScale: 100,
+    size: { width: 500, height: 500 },
+    backgroundColor: "#337426ff",
+    events: {
+        drag: true,
+        zoom: true,
+        resize: true,
+        click: true,
+        hover: true,
+    },
+    showCoordinates: true,
+    minScaleShowCoordinates: 10,
+};
+
+const miniMapOptions = {
+    scale: 10,
+    minScale: 5,
+    maxScale: 20,
+    size: { width: 300, height: 300 },
+    backgroundColor: "#337426ff",
+    events: {
+        drag: true,
+        zoom: false,
+        resize: true,
+    },
+    showCoordinates: false,
+};
 
 // ───────────────────────────────────────────────
 // MAIN CANVAS
 // ───────────────────────────────────────────────
-const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-
-const gridMap = new CanvasGridMap(
-    canvas,
-    {
-        scale: 50,
-        minScale: 5,
-        maxScale: 100,
-        size: { width: 500, height: 500 },
-        backgroundColor: "gray",
-        events: {
-            drag: true,
-            zoom: true,
-            resize: true,
-            click: true,
-            hover: false,
-        },
-        showCoordinates: true,
-        minScaleShowCoordinates: 10,
-    },
-    { x: 0, y: 0 }
-);
+const mainMapCanvas = document.getElementById("canvas") as HTMLCanvasElement;
+const mainMap = new CanvasGridMap(mainMapCanvas, mainMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
 // MINI MAP
 // ───────────────────────────────────────────────
-const miniCanvas = document.getElementById("mini-canvas") as HTMLCanvasElement;
 
-const miniGridMap = new CanvasGridMap(
-    miniCanvas,
-    {
-        scale: 10,
-        minScale: 5,
-        maxScale: 20,
-        size: { width: 300, height: 300 },
-        backgroundColor: "#ddd",
-        events: {
-            drag: true,
-            zoom: false, //
-            resize: true,
-        },
-        showCoordinates: false,
-    },
-    { x: 0, y: 0 }
-);
+const miniMapCanvas = document.getElementById("mini-canvas") as HTMLCanvasElement;
+const miniMap = new CanvasGridMap(miniMapCanvas, miniMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
 // DRAW OBJECTS ON BOTH MAPS
 // ───────────────────────────────────────────────
-items.forEach((item) => {
-    gridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 1);
-    miniGridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 1);
+items.forEach(async (item) => {
+    mainMap.drawImage(await mainMap.images.load(item.image), item.x, item.y, 1, 0.7);
+    miniMap.drawRect(item.x, item.y, { fillStyle: item.color }, 0.7);
 });
-
-let isSyncing = false;
 
 // ───────────────────────────────────────────────
 // MINI MAP → MAIN MAP SYNC
 // ───────────────────────────────────────────────
 
-miniGridMap.onCoordsChange = (coords) => {
+let isSyncing = false;
+
+miniMap.onCoordsChange = (coords) => {
     if (isSyncing) return;
     isSyncing = true;
 
-    gridMap.updateCoords(coords);
-    gridMap.render();
+    mainMap.updateCoords(coords);
+    mainMap.render();
 
     isSyncing = false;
 };
@@ -100,57 +132,46 @@ miniGridMap.onCoordsChange = (coords) => {
 // ───────────────────────────────────────────────
 // MAIN MAP → MINI MAP VIEWPORT UPDATE
 // ───────────────────────────────────────────────
-gridMap.onCoordsChange = (coords) => {
+mainMap.onCoordsChange = (coords) => {
     if (isSyncing) return;
     isSyncing = true;
-
-    miniGridMap.updateCoords(coords);
-    miniGridMap.render();
+    popup!.style.display = "none";
+    miniMap.updateCoords(coords);
+    miniMap.render();
 
     isSyncing = false;
 };
 
-gridMap.onClick = (coords, mouse, client) => {
-    console.log("Main Map Clicked at:", coords);
-    console.log("Mouse position relative to canvas:", mouse);
-    console.log("Client position relative to viewport:", client);
+mainMap.onClick = (coords, _mouse, _client) => {
+    if (items.some((item) => item.x === coords.snapped.x && item.y === coords.snapped.y)) {
+        alert(`Clicked on village at (${coords.snapped.x}, ${coords.snapped.y})`);
+        popup!.style.display = "none";
+    }
 };
 
-gridMap.onHover = (coords, mouse, client) => {
-    console.log("Main Map Hover at:", coords);
-    console.log("Mouse position relative to canvas:", mouse);
-    console.log("Client position relative to viewport:", client);
+mainMap.onHover = (coords, _mouse, client) => {
+    if (items.some((item) => item.x === coords.snapped.x && item.y === coords.snapped.y)) {
+        mainMapCanvas.style.cursor = "pointer";
+        if (popup) {
+            popup.style.display = "block";
+            popup.style.left = client.raw.x + 10 + "px";
+            popup.style.top = client.raw.y + 10 + "px";
+            popup.innerHTML = `<span style="color: black;">Village at (${coords.snapped.x}, ${coords.snapped.y})</span>`;
+        }
+    } else {
+        mainMapCanvas.style.cursor = "default";
+        if (popup) {
+            popup.style.display = "none";
+        }
+    }
 };
-
-gridMap.drawImage(
-    await gridMap.images.load(villageImage),
-    4,
-    2,
-    1, // world-size
-    1 // layer
-);
-
-gridMap.drawImage(
-    await gridMap.images.load(villageImage),
-    5,
-    4,
-    1, // world-size
-    1 // layer
-);
-gridMap.drawImage(
-    await gridMap.images.load(villageImage),
-    1,
-    2,
-    1, // world-size
-    1 // layer
-);
 
 // ───────────────────────────────────────────────
 // MINI MAP VIEWPORT RECTANGLE DRAWING
 // ───────────────────────────────────────────────
-miniGridMap.onDraw = (ctx, opts) => {
-    const mainCfg = gridMap.getConfig();
-    const miniCfg = miniGridMap.getConfig();
+miniMap.onDraw = (ctx) => {
+    const mainCfg = mainMap.getConfig();
+    const miniCfg = miniMap.getConfig();
 
     // SCALE RATIO
     const ratio = miniCfg.scale / mainCfg.scale;
@@ -166,19 +187,36 @@ miniGridMap.onDraw = (ctx, opts) => {
     ctx.strokeStyle = "blue";
     ctx.lineWidth = 2;
     ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
-
     // OPTIONAL DEBUG
-    ctx.fillStyle = "black";
-    ctx.font = "12px Arial";
+    ctx.fillStyle = "white";
+    ctx.font = "16px Arial";
+
     ctx.fillText(`Scale: ${mainCfg.scale.toFixed(2)}`, 10, 20);
     ctx.fillText(`Rect: ${rectWidth.toFixed(1)}x${rectHeight.toFixed(1)}`, 10, 40);
+    ctx.fillText(
+        `Center: (${(mainMap.getCenterCoords().x - 0.5).toFixed(2)}, ${(mainMap.getCenterCoords().y - 0.5).toFixed(
+            2
+        )})`,
+        10,
+        60
+    );
+};
+
+mainMap.onDraw = (ctx) => {
+    const mainCfg = mainMap.getConfig();
+    const rectWidth = mainCfg.size.width;
+    const rectHeight = mainCfg.size.height;
+    const rectX = mainCfg.size.width / 2 - rectWidth / 2;
+    const rectY = mainCfg.size.height / 2 - rectHeight / 2;
+    ctx.fillStyle = "black";
+    ctx.fillRect(rectX + rectWidth / 2 - 5 / 2, rectY + rectHeight / 2 - 5 / 2, 5, 5);
 };
 
 // ───────────────────────────────────────────────
 // EVENTS & INITIAL RENDER
 // ───────────────────────────────────────────────
-gridMap.setupEvents();
-miniGridMap.setupEvents();
+mainMap.setupEvents();
+miniMap.setupEvents();
 
-gridMap.render();
-miniGridMap.render();
+mainMap.render();
+miniMap.render();
