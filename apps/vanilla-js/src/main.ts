@@ -15,6 +15,7 @@ import { CanvasGridMap } from "@canvas-grid-map/core";
 // ───────────────────────────────────────────────
 const items = [
     { x: 0, y: 0, color: "blue" },
+    { x: 0, y: 1, color: "green" },
     { x: 3, y: 1, color: "green" },
     { x: 5, y: 2, color: "yellow" },
     { x: 1, y: 4, color: "purple" },
@@ -39,6 +40,7 @@ const gridMap = new CanvasGridMap(
             drag: true,
             zoom: true,
             resize: true,
+            click: true,
         },
         showCoordinates: true,
         minScaleShowCoordinates: 10,
@@ -73,8 +75,8 @@ const miniGridMap = new CanvasGridMap(
 // DRAW OBJECTS ON BOTH MAPS
 // ───────────────────────────────────────────────
 items.forEach((item) => {
-    gridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 0.7);
-    miniGridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 0.7);
+    gridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 1);
+    miniGridMap.drawRect(item.x, item.y, { fillStyle: item.color }, 1);
 });
 
 let isSyncing = false;
@@ -104,6 +106,10 @@ gridMap.onCoordsChange = (coords) => {
     miniGridMap.render();
 
     isSyncing = false;
+};
+
+gridMap.onClick = (coords) => {
+    console.log("Main Map Clicked at:", coords);
 };
 
 // ───────────────────────────────────────────────

@@ -13,8 +13,8 @@ export class CoordinateTransformer {
 
     screenToWorld(screenX: number, screenY: number): Coords {
         return {
-            x: this.camera.x - 0.5 + screenX / this.camera.scale,
-            y: this.camera.y - 0.5 + screenY / this.camera.scale,
+            x: this.camera.x + screenX / this.camera.scale,
+            y: this.camera.y + screenY / this.camera.scale,
         };
     }
 }

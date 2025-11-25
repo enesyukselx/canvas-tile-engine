@@ -9,8 +9,8 @@ export class Camera {
     readonly maxScale: number;
 
     constructor(initialTopLeft: Coords, scale = 1, minScale = 0.1, maxScale = 10) {
-        this.x = initialTopLeft.x;
-        this.y = initialTopLeft.y;
+        this.x = initialTopLeft.x + 0.5; // Center of the pixel
+        this.y = initialTopLeft.y + 0.5;
         this.scale = scale;
         this.minScale = minScale;
         this.maxScale = maxScale;

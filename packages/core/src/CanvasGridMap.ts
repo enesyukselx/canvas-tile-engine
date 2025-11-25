@@ -1,4 +1,3 @@
-// CanvasGridMap.ts
 import type { CanvasGridMapConfig, CanvasGridMapDrawCallback, Coords } from "./types";
 import { Camera } from "./modules/Camera";
 import { CoordinateTransformer } from "./modules/CoordinateTransformer";
@@ -19,6 +18,15 @@ export class CanvasGridMap {
 
     /** Callback: center coordinates change */
     public onCoordsChange?: (coords: Coords) => void;
+
+    private _onClick?: (coords: Coords) => void;
+    public get onClick(): ((coords: Coords) => void) | undefined {
+        return this._onClick;
+    }
+    public set onClick(cb: ((coords: Coords) => void) | undefined) {
+        this._onClick = cb;
+        this.events.onClick = cb;
+    }
 
     private _onDraw?: CanvasGridMapDrawCallback;
     public get onDraw(): CanvasGridMapDrawCallback | undefined {
@@ -54,7 +62,7 @@ export class CanvasGridMap {
         this.layers = new LayerManager();
         this.renderer = new Renderer(this.canvas, this.camera, this.transformer, this.configManager, this.layers);
 
-        this.events = new EventManager(this.canvas, this.camera, this.configManager, () => {
+        this.events = new EventManager(this.canvas, this.camera, this.configManager, this.transformer, () => {
             this.handleCameraChange();
         });
     }

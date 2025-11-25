@@ -1,6 +1,8 @@
 // core/EventManager.ts
+import { Coords } from "../types";
 import { Camera } from "./Camera";
 import { ConfigManager } from "./ConfigManager";
+import { CoordinateTransformer } from "./CoordinateTransformer";
 
 export class EventManager {
     private isDragging = false;
@@ -10,16 +12,21 @@ export class EventManager {
     private resizeObserver?: ResizeObserver;
 
     public onResize?: () => void;
+    public onClick?: (coords: Coords) => void;
 
     constructor(
         private canvas: HTMLCanvasElement,
         private camera: Camera,
         private configManager: ConfigManager,
+        private transformer: CoordinateTransformer,
         private onCameraChange: () => void
     ) {}
 
     setupEvents() {
         const config = this.configManager.get();
+
+        // Click
+        this.canvas.addEventListener("click", this.onMouseClick);
 
         // Drag (Mouse)
         this.canvas.addEventListener("mousedown", this.onMouseDown);
@@ -66,6 +73,20 @@ export class EventManager {
         this.wrapper = undefined;
         this.resizeObserver = undefined;
     }
+
+    // ── Click ────────────────────────────────────
+    private onMouseClick = (e: MouseEvent) => {
+        if (!this.configManager.get().events.click || !this.onClick) {
+            return;
+        }
+
+        this.onClick(
+            this.transformer.screenToWorld(
+                e.clientX - this.canvas.getBoundingClientRect().left,
+                e.clientY - this.canvas.getBoundingClientRect().top
+            )
+        );
+    };
 
     // ── Mouse Drag ────────────────────────────────
 
@@ -189,7 +210,9 @@ export class EventManager {
                 this.canvas.width = width;
                 this.canvas.height = height;
 
-                if (this.onResize) this.onResize();
+                if (this.onResize) {
+                    this.onResize();
+                }
                 this.onCameraChange();
             }
         });
