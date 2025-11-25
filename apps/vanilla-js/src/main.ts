@@ -41,7 +41,7 @@ const gridMap = new CanvasGridMap(
             zoom: true,
             resize: true,
             click: true,
-            hover: true,
+            hover: false,
         },
         showCoordinates: true,
         minScaleShowCoordinates: 10,

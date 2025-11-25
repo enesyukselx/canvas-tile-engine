@@ -16,6 +16,10 @@ export type CanvasGridMapConfig = {
     };
     showCoordinates?: boolean;
     minScaleShowCoordinates?: number;
+    cursor?: {
+        default?: string;
+        move?: string;
+    };
 };
 
 export type CanvasGridMapDrawCallback = (

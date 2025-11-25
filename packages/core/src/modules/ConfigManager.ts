@@ -22,6 +22,10 @@ export class ConfigManager {
             },
             showCoordinates: config.showCoordinates ?? false,
             minScaleShowCoordinates: config.minScaleShowCoordinates ?? 0,
+            cursor: {
+                default: config.cursor?.default ?? "default",
+                move: config.cursor?.move ?? "move",
+            },
         };
     }
 

@@ -109,7 +109,7 @@ export class EventManager {
         this.isDragging = true;
         this.shouldPreventClick = false;
         this.lastPos = { x: e.clientX, y: e.clientY };
-        this.canvas.style.cursor = "grabbing";
+        this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
     };
 
     private onMouseMove = (e: MouseEvent) => {
@@ -141,7 +141,7 @@ export class EventManager {
 
     private onMouseUp = () => {
         this.isDragging = false;
-        this.canvas.style.cursor = "grab";
+        this.canvas.style.cursor = this.configManager.get().cursor.default || "default";
     };
 
     // ── Touch Drag ────────────────────────────────
@@ -157,7 +157,7 @@ export class EventManager {
         const t = e.touches[0];
         this.isDragging = true;
         this.lastPos = { x: t.clientX, y: t.clientY };
-        this.canvas.style.cursor = "grabbing";
+        this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
     };
 
     private onTouchMove = (e: TouchEvent) => {
@@ -178,7 +178,7 @@ export class EventManager {
 
     private onTouchEnd = () => {
         this.isDragging = false;
-        this.canvas.style.cursor = "grab";
+        this.canvas.style.cursor = this.configManager.get().cursor.default || "default";
     };
 
     // ── Wheel Zoom ────────────────────────────────
