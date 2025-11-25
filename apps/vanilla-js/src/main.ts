@@ -41,6 +41,7 @@ const gridMap = new CanvasGridMap(
             zoom: true,
             resize: true,
             click: true,
+            hover: true,
         },
         showCoordinates: true,
         minScaleShowCoordinates: 10,
@@ -110,6 +111,10 @@ gridMap.onCoordsChange = (coords) => {
 
 gridMap.onClick = (coords) => {
     console.log("Main Map Clicked at:", coords);
+};
+
+gridMap.onHover = (coords) => {
+    console.log("Main Map Hover at:", coords);
 };
 
 // ───────────────────────────────────────────────

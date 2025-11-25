@@ -13,6 +13,7 @@ export class EventManager {
 
     public onResize?: () => void;
     public onClick?: (coords: Coords) => void;
+    public onHover?: (coords: Coords) => void;
 
     constructor(
         private canvas: HTMLCanvasElement,
@@ -102,6 +103,14 @@ export class EventManager {
 
     private onMouseMove = (e: MouseEvent) => {
         if (!this.isDragging) {
+            if (this.onHover) {
+                this.onHover(
+                    this.transformer.screenToWorld(
+                        e.clientX - this.canvas.getBoundingClientRect().left,
+                        e.clientY - this.canvas.getBoundingClientRect().top
+                    )
+                );
+            }
             return;
         }
 

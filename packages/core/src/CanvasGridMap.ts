@@ -28,6 +28,15 @@ export class CanvasGridMap {
         this.events.onClick = cb;
     }
 
+    private _onHover?: (coords: Coords) => void;
+    public get onHover(): ((coords: Coords) => void) | undefined {
+        return this._onHover;
+    }
+    public set onHover(cb: ((coords: Coords) => void) | undefined) {
+        this._onHover = cb;
+        this.events.onHover = cb;
+    }
+
     private _onDraw?: CanvasGridMapDrawCallback;
     public get onDraw(): CanvasGridMapDrawCallback | undefined {
         return this._onDraw;
