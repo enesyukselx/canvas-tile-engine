@@ -194,9 +194,7 @@ miniMap.onDraw = (ctx) => {
     ctx.fillText(`Scale: ${mainCfg.scale.toFixed(2)}`, 10, 20);
     ctx.fillText(`Rect: ${rectWidth.toFixed(1)}x${rectHeight.toFixed(1)}`, 10, 40);
     ctx.fillText(
-        `Center: (${(mainMap.getCenterCoords().x - 0.5).toFixed(2)}, ${(mainMap.getCenterCoords().y - 0.5).toFixed(
-            2
-        )})`,
+        `Center: (${mainMap.getCenterCoords().x.toFixed(2)}, ${mainMap.getCenterCoords().y.toFixed(2)})`,
         10,
         60
     );

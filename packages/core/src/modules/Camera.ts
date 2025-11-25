@@ -10,7 +10,7 @@ export class Camera {
 
     constructor(initialTopLeft: Coords, scale = 1, minScale = 0.1, maxScale = 10) {
         this.x = initialTopLeft.x + 0.5; // Center of the pixel
-        this.y = initialTopLeft.y + 0.5;
+        this.y = initialTopLeft.y + 0.5; // Center of the pixel
         this.scale = scale;
         this.minScale = minScale;
         this.maxScale = maxScale;
@@ -47,14 +47,14 @@ export class Camera {
     /** Canvas center coordinates */
     getCenter(canvasWidth: number, canvasHeight: number): Coords {
         return {
-            x: this.x + canvasWidth / (2 * this.scale),
-            y: this.y + canvasHeight / (2 * this.scale),
+            x: this.x + canvasWidth / (2 * this.scale) - 0.5,
+            y: this.y + canvasHeight / (2 * this.scale) - 0.5,
         };
     }
 
     /** Sets the camera's top-left coordinates based on an external center point */
     setCenter(center: Coords, canvasWidth: number, canvasHeight: number) {
-        this.x = center.x - canvasWidth / (2 * this.scale);
-        this.y = center.y - canvasHeight / (2 * this.scale);
+        this.x = center.x - canvasWidth / (2 * this.scale) + 0.5;
+        this.y = center.y - canvasHeight / (2 * this.scale) + 0.5;
     }
 }
