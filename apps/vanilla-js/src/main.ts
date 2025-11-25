@@ -1,5 +1,5 @@
 import "./style.css";
-import villageImage from "../public/village1.webp";
+import villageImage from "/village1.webp";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <div class="canvas-container">
