@@ -41,7 +41,7 @@ const gridMap = new CanvasGridMap(
             zoom: true,
             resize: true,
             click: true,
-            hover: false,
+            hover: true,
         },
         showCoordinates: true,
         minScaleShowCoordinates: 10,
@@ -64,7 +64,7 @@ const miniGridMap = new CanvasGridMap(
         backgroundColor: "#ddd",
         events: {
             drag: true,
-            zoom: false, // ❗ mini map zoom yok
+            zoom: false, //
             resize: true,
         },
         showCoordinates: false,

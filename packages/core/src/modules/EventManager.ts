@@ -1,4 +1,3 @@
-// core/EventManager.ts
 import { Coords } from "../types";
 import { Camera } from "./Camera";
 import { ConfigManager } from "./ConfigManager";
@@ -6,6 +5,7 @@ import { CoordinateTransformer } from "./CoordinateTransformer";
 
 export class EventManager {
     private isDragging = false;
+    private shouldPreventClick = false;
     private lastPos = { x: 0, y: 0 };
 
     private wrapper?: HTMLDivElement;
@@ -77,6 +77,11 @@ export class EventManager {
 
     // ── Click ────────────────────────────────────
     private onMouseClick = (e: MouseEvent) => {
+        if (this.shouldPreventClick) {
+            this.shouldPreventClick = false;
+            return;
+        }
+
         if (!this.configManager.get().events.click || !this.onClick) {
             return;
         }
@@ -102,6 +107,7 @@ export class EventManager {
         }
 
         this.isDragging = true;
+        this.shouldPreventClick = false;
         this.lastPos = { x: e.clientX, y: e.clientY };
         this.canvas.style.cursor = "grabbing";
     };
@@ -124,6 +130,10 @@ export class EventManager {
 
         const dx = e.clientX - this.lastPos.x;
         const dy = e.clientY - this.lastPos.y;
+
+        if (dx !== 0 || dy !== 0) {
+            this.shouldPreventClick = true;
+        }
 
         this.camera.pan(dx, dy);
         this.lastPos = { x: e.clientX, y: e.clientY };
