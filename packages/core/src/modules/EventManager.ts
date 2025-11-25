@@ -117,13 +117,11 @@ export class EventManager {
             if (this.onHover && this.configManager.get().events.hover) {
                 const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
                 const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
-
-                this.transformer.screenToWorld(mouseX, mouseY),
-                    {
-                        x: mouseX,
-                        y: mouseY,
-                    },
-                    { x: e.clientX, y: e.clientY };
+                this.onHover(
+                    this.transformer.screenToWorld(mouseX, mouseY),
+                    { x: mouseX, y: mouseY },
+                    { x: e.clientX, y: e.clientY }
+                );
             }
             return;
         }
