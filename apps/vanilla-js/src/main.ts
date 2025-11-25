@@ -109,8 +109,27 @@ const miniMap = new CanvasGridMap(miniMapCanvas, miniMapOptions, startingCoords)
 // DRAW OBJECTS ON BOTH MAPS
 // ───────────────────────────────────────────────
 items.forEach(async (item) => {
-    mainMap.drawImage(await mainMap.images.load(item.image), item.x, item.y, 1, 0.7);
-    miniMap.drawRect(item.x, item.y, { fillStyle: item.color }, 0.7);
+    mainMap.drawImage(await mainMap.images.load(item.image), item.x, item.y, {
+        size: 1,
+    });
+    mainMap.drawCircle(
+        item.x,
+        item.y,
+        {
+            size: 0.1,
+            origin: {
+                mode: "cell",
+                x: 0.1,
+                y: 0.1,
+            },
+            style: { fillStyle: item.color },
+        },
+        1
+    );
+    miniMap.drawRect(item.x, item.y, {
+        size: 0.5,
+        style: { fillStyle: item.color },
+    });
 });
 
 // ───────────────────────────────────────────────

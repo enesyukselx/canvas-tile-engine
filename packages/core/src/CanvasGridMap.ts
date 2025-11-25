@@ -135,21 +135,38 @@ export class CanvasGridMap {
     drawRect(
         x: number,
         y: number,
-        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
-        size: number = 1,
+        options?: {
+            size?: number;
+            origin?: {
+                mode?: "cell" | "self";
+                x?: number; // 0 to 1
+                y?: number; // 0 to 1
+            };
+            style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+        },
         layer: number = 1
     ) {
         this.layers.add(layer, ({ ctx, transformer, camera }) => {
+            const size = options?.size || 1;
+            const origin = {
+                mode: options?.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                x: options?.origin?.x ?? 0.5,
+                y: options?.origin?.y ?? 0.5,
+            };
+            const style = options?.style;
+
             const pos = transformer.worldToScreen(x, y);
             const pxSize = size * camera.scale;
             const half = pxSize / 2;
+
+            const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, camera);
 
             if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
 
             ctx.beginPath();
-            ctx.rect(pos.x - half, pos.y - half, pxSize, pxSize);
+            ctx.rect(drawX, drawY, pxSize, pxSize);
             if (style?.fillStyle) ctx.fill();
             if (style?.strokeStyle) ctx.stroke();
         });
@@ -160,15 +177,15 @@ export class CanvasGridMap {
         y1: number,
         x2: number,
         y2: number,
-        style?: { strokeStyle?: string; lineWidth?: number },
+        options?: { style?: { strokeStyle?: string; lineWidth?: number } },
         layer: number = 1
     ) {
         this.layers.add(layer, ({ ctx, transformer }) => {
             const a = transformer.worldToScreen(x1, y1);
             const b = transformer.worldToScreen(x2, y2);
 
-            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+            if (options?.style?.strokeStyle) ctx.strokeStyle = options.style.strokeStyle;
+            if (options?.style?.lineWidth) ctx.lineWidth = options.style.lineWidth;
 
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
@@ -180,20 +197,38 @@ export class CanvasGridMap {
     drawCircle(
         x: number,
         y: number,
-        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
-        size: number = 1,
+        options?: {
+            size?: number;
+            origin?: {
+                mode?: "cell" | "self";
+                x?: number;
+                y?: number;
+            };
+            style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+        },
         layer: number = 1
     ) {
         this.layers.add(layer, ({ ctx, transformer, camera }) => {
+            const size = options?.size ?? 1;
+            const origin = {
+                mode: options?.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                x: options?.origin?.x ?? 0.5,
+                y: options?.origin?.y ?? 0.5,
+            };
+            const style = options?.style;
+
             const pos = transformer.worldToScreen(x, y);
-            const radius = (size * camera.scale) / 2;
+            const pxSize = size * camera.scale;
+            const radius = pxSize / 2;
+
+            const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, camera);
 
             if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
 
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, radius, 0, 2 * Math.PI);
+            ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
             if (style?.fillStyle) ctx.fill();
             if (style?.strokeStyle) ctx.stroke();
         });
@@ -203,24 +238,37 @@ export class CanvasGridMap {
         text: string,
         x: number,
         y: number,
-        style?: { font?: string; fillStyle?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
+        options?: {
+            style?: {
+                font?: string;
+                fillStyle?: string;
+                textAlign?: CanvasTextAlign;
+                textBaseline?: CanvasTextBaseline;
+            };
+        },
         layer: number = 2
     ) {
         this.layers.add(layer, ({ ctx, transformer }) => {
             const pos = transformer.worldToScreen(x, y);
-            if (style?.font) ctx.font = style.font;
-            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
-            ctx.textAlign = style?.textAlign ?? "center";
-            ctx.textBaseline = style?.textBaseline ?? "middle";
+            if (options?.style?.font) ctx.font = options.style.font;
+            if (options?.style?.fillStyle) ctx.fillStyle = options.style.fillStyle;
+            ctx.textAlign = options?.style?.textAlign ?? "center";
+            ctx.textBaseline = options?.style?.textBaseline ?? "middle";
             ctx.fillText(text, pos.x, pos.y);
         });
     }
 
-    drawPath(points: Array<Coords>, style?: { strokeStyle?: string; lineWidth?: number }, layer: number = 1) {
+    drawPath(
+        points: Array<Coords>,
+        options?: {
+            style?: { strokeStyle?: string; lineWidth?: number };
+        },
+        layer: number = 1
+    ) {
         this.layers.add(layer, ({ ctx, transformer }) => {
             if (!points.length) return;
-            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+            if (options?.style?.strokeStyle) ctx.strokeStyle = options.style.strokeStyle;
+            if (options?.style?.lineWidth) ctx.lineWidth = options.style.lineWidth;
 
             ctx.beginPath();
             const first = transformer.worldToScreen(points[0].x, points[0].y);
@@ -234,29 +282,68 @@ export class CanvasGridMap {
         });
     }
 
-    drawImage(img: HTMLImageElement, x: number, y: number, size: number = 1, layer: number = 1) {
+    drawImage(
+        img: HTMLImageElement,
+        x: number,
+        y: number,
+        options?: {
+            size?: number; // world size
+            origin?: {
+                mode?: "cell" | "self";
+                x?: number;
+                y?: number;
+            };
+        },
+        layer: number = 1
+    ) {
         this.layers.add(layer, ({ ctx, transformer, camera }) => {
-            const pos = transformer.worldToScreen(x, y);
+            const size = options?.size ?? 1;
+            const origin = {
+                mode: options?.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                x: options?.origin?.x ?? 0.5,
+                y: options?.origin?.y ?? 0.5,
+            };
 
+            const pos = transformer.worldToScreen(x, y);
             const pxSize = size * camera.scale;
 
-            // image aspect ratio
+            // preserve aspect
             const aspect = img.width / img.height;
 
             let drawW = pxSize;
             let drawH = pxSize;
 
-            // adjust width and height based on aspect ratio
-            if (aspect > 1) {
-                // wide image → width pxSize, height adjusted
-                drawH = pxSize / aspect;
-            } else {
-                // tall image → height pxSize, width adjusted
-                drawW = pxSize * aspect;
-            }
+            if (aspect > 1) drawH = pxSize / aspect;
+            else drawW = pxSize * aspect;
 
-            ctx.drawImage(img, pos.x - drawW / 2, pos.y - drawH / 2, drawW, drawH);
+            // origin SELF/CELL
+            const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, camera);
+
+            const offsetX = baseX + (pxSize - drawW) / 2;
+            const offsetY = baseY + (pxSize - drawH) / 2;
+
+            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
         });
+    }
+
+    private computeOriginOffset(
+        pos: Coords,
+        pxSize: number,
+        origin: { mode: "cell" | "self"; x: number; y: number },
+        camera: Camera
+    ) {
+        if (origin.mode === "cell") {
+            const cell = camera.scale;
+            return {
+                x: pos.x - cell / 2 + origin.x * cell - pxSize / 2,
+                y: pos.y - cell / 2 + origin.y * cell - pxSize / 2,
+            };
+        }
+
+        return {
+            x: pos.x - origin.x * pxSize,
+            y: pos.y - origin.y * pxSize,
+        };
     }
 
     // ─── Internal ───────────────────────────────
