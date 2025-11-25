@@ -14,6 +14,7 @@ export class EventManager {
     public onResize?: () => void;
     public onClick?: onClickCallback;
     public onHover?: onHoverCallback;
+    public onMouseLeave?: () => void;
 
     constructor(
         private canvas: HTMLCanvasElement,
@@ -175,6 +176,9 @@ export class EventManager {
     };
 
     private onMouseUp = () => {
+        if (!this.isDragging && this.onMouseLeave) {
+            this.onMouseLeave();
+        }
         this.isDragging = false;
         this.canvas.style.cursor = this.configManager.get().cursor.default || "default";
     };

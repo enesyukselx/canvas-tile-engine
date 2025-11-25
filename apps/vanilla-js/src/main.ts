@@ -149,6 +149,10 @@ mainMap.onClick = (coords, _mouse, _client) => {
     }
 };
 
+mainMap.onMouseLeave = () => {
+    popup!.style.display = "none";
+};
+
 mainMap.onHover = (coords, _mouse, client) => {
     if (items.some((item) => item.x === coords.snapped.x && item.y === coords.snapped.y)) {
         mainMapCanvas.style.cursor = "pointer";

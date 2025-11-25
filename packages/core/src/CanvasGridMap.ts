@@ -40,6 +40,15 @@ export class CanvasGridMap {
         this.events.onHover = cb;
     }
 
+    private _onMouseLeave?: () => void;
+    public get onMouseLeave(): (() => void) | undefined {
+        return this._onMouseLeave;
+    }
+    public set onMouseLeave(cb: (() => void) | undefined) {
+        this._onMouseLeave = cb;
+        this.events.onMouseLeave = cb;
+    }
+
     private _onDraw?: CanvasGridMapDrawCallback;
     public get onDraw(): CanvasGridMapDrawCallback | undefined {
         return this._onDraw;
