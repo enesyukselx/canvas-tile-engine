@@ -1,5 +1,5 @@
 {
-  "name": "@canvas-grid-map/core",
+  "name": "@grid-engine/core",
   "version": "0.0.1",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",

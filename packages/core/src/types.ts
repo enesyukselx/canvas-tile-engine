@@ -1,36 +1,59 @@
-export type CanvasGridMapConfig = {
+export type GridEngineConfig = {
+    renderer?: "canvas";
     scale: number;
     maxScale: number;
     minScale: number;
+    backgroundColor?: string;
     size: {
         width: number;
         height: number;
+        minWidth?: number;
+        minHeight?: number;
+        maxWidth?: number;
+        maxHeight?: number;
     };
-    backgroundColor?: string;
-    events: {
+    eventHandlers?: {
         click?: boolean;
         hover?: boolean;
         drag?: boolean;
         zoom?: boolean;
         resize?: boolean;
     };
-    showCoordinates?: boolean;
-    minScaleShowCoordinates?: number;
+    coordinates?: {
+        enabled?: boolean;
+        shownScaleRange?: { min: number; max: number };
+    };
     cursor?: {
         default?: string;
         move?: string;
     };
+    debug?: {
+        enabled?: boolean;
+        hud?: {
+            topLeftCoordinates?: boolean;
+            coordinates?: boolean;
+            scale?: boolean;
+            tilesInView?: boolean;
+        };
+        eventHandlers?: {
+            click?: boolean;
+            hover?: boolean;
+            drag?: boolean;
+            zoom?: boolean;
+            resize?: boolean;
+        };
+    };
 };
-
-export type CanvasGridMapDrawCallback = (
-    ctx: CanvasRenderingContext2D,
-    opts: { scale: number; width: number; height: number; coords: Coords }
-) => void;
 
 export type Coords = {
     x: number;
     y: number;
 };
+
+export type onDrawCallback = (
+    ctx: CanvasRenderingContext2D,
+    info: { scale: number; width: number; height: number; coords: Coords }
+) => void;
 
 export type onClickCallback = (
     coords: {

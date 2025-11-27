@@ -1,1 +1,1 @@
-export { CanvasGridMap } from "./CanvasGridMap";
+export { GridEngine } from "./GridEngine";
