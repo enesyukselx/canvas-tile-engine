@@ -1,12 +1,12 @@
 {
-  "name": "canvas-grid-map",
+  "name": "grid-engine",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "pnpm --filter @canvas-grid-map/core build",
+    "build": "pnpm --filter @grid-engine/core build",
     "dev": "concurrently \"pnpm dev:lib\" \"pnpm dev:app\"",
-    "dev:lib": "pnpm --filter @canvas-grid-map/core dev",
+    "dev:lib": "pnpm --filter @grid-engine/core dev",
     "dev:app": "pnpm --filter vanilla-js dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

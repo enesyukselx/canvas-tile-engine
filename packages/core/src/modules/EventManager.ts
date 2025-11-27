@@ -1,8 +1,12 @@
 import { onClickCallback, onHoverCallback } from "../types";
-import { Camera } from "./Camera";
-import { ConfigManager } from "./ConfigManager";
+import { Camera, ICamera } from "./Camera";
+import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 
+/**
+ * Attaches input events to the canvas and updates camera/config accordingly.
+ * @internal
+ */
 export class EventManager {
     private isDragging = false;
     private shouldPreventClick = false;
@@ -16,17 +20,25 @@ export class EventManager {
     public onHover?: onHoverCallback;
     public onMouseLeave?: () => void;
 
+    /**
+     * @param canvas Target canvas element.
+     * @param camera Camera to move/zoom.
+     * @param config Normalized config store.
+     * @param coordinateTransformer World/screen transformer.
+     * @param onCameraChange Callback when camera changes.
+     */
     constructor(
         private canvas: HTMLCanvasElement,
-        private camera: Camera,
-        private configManager: ConfigManager,
-        private transformer: CoordinateTransformer,
+        private camera: ICamera,
+        private config: Config,
+        private coordinateTransformer: CoordinateTransformer,
         private onCameraChange: () => void
     ) {}
 
+    /**
+     * Bind all configured event listeners.
+     */
     setupEvents() {
-        const config = this.configManager.get();
-
         // Click
         this.canvas.addEventListener("click", this.onMouseClick);
 
@@ -45,12 +57,17 @@ export class EventManager {
         this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
 
         // Resize
-        if (config.events.resize) {
+        if (this.config.get().eventHandlers.resize) {
             this.setupResizeObserver();
         }
     }
 
+    /**
+     * Remove all listeners and teardown helpers.
+     */
     destroy() {
+        this.canvas.removeEventListener("click", this.onMouseClick);
+
         this.canvas.removeEventListener("mousedown", this.onMouseDown);
         this.canvas.removeEventListener("mousemove", this.onMouseMove);
         this.canvas.removeEventListener("mouseup", this.onMouseUp);
@@ -77,20 +94,21 @@ export class EventManager {
     }
 
     // ── Click ────────────────────────────────────
+    /** Handle click and emit mapped world/screen coords if enabled. */
     private onMouseClick = (e: MouseEvent) => {
         if (this.shouldPreventClick) {
             this.shouldPreventClick = false;
             return;
         }
 
-        if (!this.configManager.get().events.click || !this.onClick) {
+        if (!this.config.get().eventHandlers.click || !this.onClick) {
             return;
         }
 
         const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
         const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
 
-        const worldCoords = this.transformer.screenToWorld(mouseX, mouseY);
+        const worldCoords = this.coordinateTransformer.screenToWorld(mouseX, mouseY);
 
         this.onClick(
             {
@@ -103,15 +121,15 @@ export class EventManager {
             {
                 raw: { x: mouseX, y: mouseY },
                 snapped: {
-                    x: Math.round(mouseX / this.configManager.get().scale) * this.configManager.get().scale,
-                    y: Math.round(mouseY / this.configManager.get().scale) * this.configManager.get().scale,
+                    x: Math.round(mouseX / this.config.get().scale) * this.config.get().scale,
+                    y: Math.round(mouseY / this.config.get().scale) * this.config.get().scale,
                 },
             },
             {
                 raw: { x: e.clientX, y: e.clientY },
                 snapped: {
-                    x: Math.round(e.clientX / this.configManager.get().scale) * this.configManager.get().scale,
-                    y: Math.round(e.clientY / this.configManager.get().scale) * this.configManager.get().scale,
+                    x: Math.round(e.clientX / this.config.get().scale) * this.config.get().scale,
+                    y: Math.round(e.clientY / this.config.get().scale) * this.config.get().scale,
                 },
             }
         );
@@ -119,8 +137,9 @@ export class EventManager {
 
     // ── Mouse Drag ────────────────────────────────
 
+    /** Start mouse drag for panning. */
     private onMouseDown = (e: MouseEvent) => {
-        if (!this.configManager.get().events.drag) {
+        if (!this.config.get().eventHandlers.drag) {
             return;
         }
 
@@ -129,31 +148,32 @@ export class EventManager {
         this.lastPos = { x: e.clientX, y: e.clientY };
     };
 
+    /** Move camera during drag; forward hover events when not dragging. */
     private onMouseMove = (e: MouseEvent) => {
         if (!this.isDragging) {
-            if (this.onHover && this.configManager.get().events.hover) {
+            if (this.onHover && this.config.get().eventHandlers.hover) {
                 const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
                 const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
                 this.onHover(
                     {
-                        raw: this.transformer.screenToWorld(mouseX, mouseY),
+                        raw: this.coordinateTransformer.screenToWorld(mouseX, mouseY),
                         snapped: {
-                            x: Math.floor(this.transformer.screenToWorld(mouseX, mouseY).x),
-                            y: Math.floor(this.transformer.screenToWorld(mouseX, mouseY).y),
+                            x: Math.floor(this.coordinateTransformer.screenToWorld(mouseX, mouseY).x),
+                            y: Math.floor(this.coordinateTransformer.screenToWorld(mouseX, mouseY).y),
                         },
                     },
                     {
                         raw: { x: mouseX, y: mouseY },
                         snapped: {
-                            x: Math.round(mouseX / this.configManager.get().scale) * this.configManager.get().scale,
-                            y: Math.round(mouseY / this.configManager.get().scale) * this.configManager.get().scale,
+                            x: Math.round(mouseX / this.config.get().scale) * this.config.get().scale,
+                            y: Math.round(mouseY / this.config.get().scale) * this.config.get().scale,
                         },
                     },
                     {
                         raw: { x: e.clientX, y: e.clientY },
                         snapped: {
-                            x: Math.round(e.clientX / this.configManager.get().scale) * this.configManager.get().scale,
-                            y: Math.round(e.clientY / this.configManager.get().scale) * this.configManager.get().scale,
+                            x: Math.round(e.clientX / this.config.get().scale) * this.config.get().scale,
+                            y: Math.round(e.clientY / this.config.get().scale) * this.config.get().scale,
                         },
                     }
                 );
@@ -165,7 +185,7 @@ export class EventManager {
         const dy = e.clientY - this.lastPos.y;
 
         if (dx !== 0 || dy !== 0) {
-            this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
+            this.canvas.style.cursor = this.config.get().cursor.move || "move";
             this.shouldPreventClick = true;
         }
 
@@ -175,18 +195,20 @@ export class EventManager {
         this.onCameraChange();
     };
 
+    /** End drag and reset cursor. */
     private onMouseUp = () => {
         if (!this.isDragging && this.onMouseLeave) {
             this.onMouseLeave();
         }
         this.isDragging = false;
-        this.canvas.style.cursor = this.configManager.get().cursor.default || "default";
+        this.canvas.style.cursor = this.config.get().cursor.default || "default";
     };
 
     // ── Touch Drag ────────────────────────────────
 
+    /** Start touch drag for panning. */
     private onTouchStart = (e: TouchEvent) => {
-        if (!this.configManager.get().events.drag) {
+        if (!this.config.get().eventHandlers.drag) {
             return;
         }
         if (e.touches.length !== 1) {
@@ -199,6 +221,7 @@ export class EventManager {
         this.lastPos = { x: t.clientX, y: t.clientY };
     };
 
+    /** Move camera during touch drag. */
     private onTouchMove = (e: TouchEvent) => {
         if (!this.isDragging || e.touches.length !== 1) {
             return;
@@ -210,7 +233,7 @@ export class EventManager {
         const dy = t.clientY - this.lastPos.y;
 
         if (dx !== 0 || dy !== 0) {
-            this.canvas.style.cursor = this.configManager.get().cursor.move || "move";
+            this.canvas.style.cursor = this.config.get().cursor.move || "move";
             this.shouldPreventClick = true;
         }
 
@@ -220,24 +243,25 @@ export class EventManager {
         this.onCameraChange();
     };
 
+    /** End touch drag and reset cursor. */
     private onTouchEnd = () => {
         this.isDragging = false;
-        this.canvas.style.cursor = this.configManager.get().cursor.default || "default";
+        this.canvas.style.cursor = this.config.get().cursor.default || "default";
     };
 
     // ── Wheel Zoom ────────────────────────────────
 
+    /** Handle wheel zoom and sync scale to config. */
     private onWheel = (e: WheelEvent) => {
-        if (!this.configManager.get().events.zoom) {
+        if (!this.config.get().eventHandlers.zoom) {
             return;
         }
 
         e.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
-        const config = this.configManager.get();
 
         this.camera.zoom(e.clientX, e.clientY, e.deltaY, rect);
-        this.configManager.setScale(this.camera.scale);
+        this.config.setScale(this.camera.scale);
 
         this.onCameraChange();
     };
@@ -245,14 +269,13 @@ export class EventManager {
     // ── Resize Observer ──────────────────────────
 
     private setupResizeObserver() {
-        const config = this.configManager.get();
-
         const wrapper = document.createElement("div");
+
         Object.assign(wrapper.style, {
             resize: "both",
             overflow: "hidden",
-            width: `${config.size.width}px`,
-            height: `${config.size.height}px`,
+            width: `${this.config.get().size.width}px`,
+            height: `${this.config.get().size.height}px`,
             touchAction: "none",
             position: "relative",
         });
@@ -267,15 +290,14 @@ export class EventManager {
         this.resizeObserver = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 const { width, height } = entry.contentRect;
-                const prev = this.configManager.get();
+                const prev = this.config.get();
                 const diffW = width - prev.size.width;
                 const diffH = height - prev.size.height;
 
                 // Center adjustment
-                this.camera.x -= diffW / (2 * this.camera.scale);
-                this.camera.y -= diffH / (2 * this.camera.scale);
+                this.camera.adjustForResize(diffW, diffH);
 
-                this.configManager.setSize(width, height);
+                this.config.setSize(width, height);
                 this.canvas.width = width;
                 this.canvas.height = height;
 

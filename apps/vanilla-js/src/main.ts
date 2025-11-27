@@ -14,7 +14,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
 const popup = document.getElementById("popup");
 
-import { CanvasGridMap } from "@canvas-grid-map/core";
+import { GridEngine } from "@grid-engine/core";
 
 const VILLAGE_TYPES = {
     barbar_1: {
@@ -67,43 +67,55 @@ const mainMapOptions = {
     maxScale: 100,
     size: { width: 500, height: 500 },
     backgroundColor: "#337426ff",
-    events: {
+    eventHandlers: {
         drag: true,
         zoom: true,
         resize: true,
         click: true,
         hover: true,
     },
-    showCoordinates: true,
-    minScaleShowCoordinates: 10,
+    renderer: "canvas" as const, // Use literal type
+    coordinates: {
+        enabled: true,
+    },
+    debug: {
+        enabled: true,
+        grid: true,
+        hud: {
+            enabled: true,
+            topLeftCoordinates: true,
+            coordinates: true,
+            scale: true,
+            tilesInView: true,
+        },
+    },
 };
-
 const miniMapOptions = {
     scale: 10,
     minScale: 5,
     maxScale: 20,
     size: { width: 300, height: 300 },
     backgroundColor: "#337426ff",
-    events: {
+    eventHandlers: {
         drag: true,
         zoom: false,
         resize: true,
     },
-    showCoordinates: false,
+    renderer: "canvas" as const, // Use literal type
 };
 
 // ───────────────────────────────────────────────
 // MAIN CANVAS
 // ───────────────────────────────────────────────
 const mainMapCanvas = document.getElementById("canvas") as HTMLCanvasElement;
-const mainMap = new CanvasGridMap(mainMapCanvas, mainMapOptions, startingCoords);
+const mainMap = new GridEngine(mainMapCanvas, mainMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
 // MINI MAP
 // ───────────────────────────────────────────────
 
 const miniMapCanvas = document.getElementById("mini-canvas") as HTMLCanvasElement;
-const miniMap = new CanvasGridMap(miniMapCanvas, miniMapOptions, startingCoords);
+const miniMap = new GridEngine(miniMapCanvas, miniMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
 // DRAW OBJECTS ON BOTH MAPS
