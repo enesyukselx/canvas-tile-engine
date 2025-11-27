@@ -3,10 +3,11 @@ import { Camera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { LayerManager } from "./LayerManager";
 import { ConfigManager } from "./ConfigManager";
-import drawCoordsOnMap from "../utils/drawCoordsOnMap";
+import { CoordinateOverlay } from "./CoordinateOverlay";
 
 export class Renderer {
     private ctx: CanvasRenderingContext2D;
+    private coordinateOverlay: CoordinateOverlay;
     public onDraw?: CanvasGridMapDrawCallback;
 
     constructor(
@@ -23,6 +24,7 @@ export class Renderer {
         const config = this.configManager.get();
         this.canvas.width = config.size.width;
         this.canvas.height = config.size.height;
+        this.coordinateOverlay = new CoordinateOverlay(this.ctx, this.camera, config);
     }
 
     getContext(): CanvasRenderingContext2D {
@@ -59,11 +61,7 @@ export class Renderer {
 
         // Coordinates overlay
         if (config.showCoordinates && this.camera.scale >= config.minScaleShowCoordinates) {
-            drawCoordsOnMap({
-                ctx: this.ctx,
-                coords: topLeft,
-                mapConfig: config,
-            });
+            this.coordinateOverlay.draw();
         }
     }
 }
