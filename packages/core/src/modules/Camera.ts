@@ -1,4 +1,5 @@
 import { Coords } from "../types";
+import { computePan, computeZoom } from "../utils/viewport";
 
 /**
  * Camera contract used by rendering and coordinate transforms.
@@ -84,31 +85,23 @@ export class Camera implements ICamera {
     }
 
     pan(deltaScreenX: number, deltaScreenY: number) {
-        this._x -= deltaScreenX / this._scale;
-        this._y -= deltaScreenY / this._scale;
+        const next = computePan({ x: this._x, y: this._y }, this._scale, deltaScreenX, deltaScreenY);
+        this._x = next.x;
+        this._y = next.y;
     }
 
     zoom(mouseX: number, mouseY: number, deltaY: number, canvasRect: DOMRect) {
-        const zoomSensitivity = 0.001;
-        const oldScale = this._scale;
-
-        const limitedDelta = Math.min(Math.max(deltaY, -100), 100);
-        const scaleFactor = Math.exp(-limitedDelta * zoomSensitivity);
-        const newScale = Math.min(this.maxScale, Math.max(this.minScale, oldScale * scaleFactor));
-
-        if (newScale === oldScale) {
-            return;
-        }
-
         // Mouse position relative to canvas
         const mx = mouseX - canvasRect.left;
         const my = mouseY - canvasRect.top;
 
-        // world offset correction to keep the point under the mouse stationary
-        this._x += mx * (1 / oldScale - 1 / newScale);
-        this._y += my * (1 / oldScale - 1 / newScale);
-
-        this._scale = newScale;
+        const next = computeZoom({ x: this._x, y: this._y }, this._scale, deltaY, this.minScale, this.maxScale, {
+            x: mx,
+            y: my,
+        });
+        this._x = next.topLeft.x;
+        this._y = next.topLeft.y;
+        this._scale = next.scale;
     }
 
     getCenter(canvasWidth: number, canvasHeight: number): Coords {
