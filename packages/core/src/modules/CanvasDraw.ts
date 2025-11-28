@@ -1,4 +1,4 @@
-import { Coords, GridEngineConfig } from "../types";
+import { Coords, DrawObject, GridEngineConfig } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer } from "./Layer";
@@ -15,6 +15,17 @@ export class CanvasDraw {
      * @param fn Callback invoked during render.
      * @param layer Layer order (lower draws first).
      */
+
+    private isVisible(x: number, y: number, sizeWorld: number, topLeft: Coords, config: Required<GridEngineConfig>) {
+        const viewW = config.size.width / config.scale;
+        const viewH = config.size.height / config.scale;
+        const minX = topLeft.x - 1;
+        const minY = topLeft.y - 1;
+        const maxX = topLeft.x + viewW + 1;
+        const maxY = topLeft.y + viewH + 1;
+        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
+    }
+
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<GridEngineConfig>) => void,
         layer: number = 1
@@ -24,234 +35,206 @@ export class CanvasDraw {
         });
     }
 
-    drawRect(
-        x: number,
-        y: number,
-        options?: {
-            size?: number;
-            origin?: {
-                mode?: "cell" | "self";
-                x?: number; // 0 to 1
-                y?: number; // 0 to 1
-            };
-            style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
-        },
-        layer: number = 1
-    ) {
-        this.layers.add(layer, ({ ctx }) => {
-            const size = options?.size || 1;
-            const origin = {
-                mode: options?.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
-                x: options?.origin?.x ?? 0.5,
-                y: options?.origin?.y ?? 0.5,
-            };
-            const style = options?.style;
+    drawRect(items: Array<DrawObject> | DrawObject, layer: number = 1) {
+        const list = Array.isArray(items) ? items : [items];
 
-            const pos = this.transformer.worldToScreen(x, y);
-            const pxSize = size * this.camera.scale;
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            for (const item of list) {
+                const size = item.size ?? 1;
+                const origin = {
+                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    x: item.origin?.x ?? 0.5,
+                    y: item.origin?.y ?? 0.5,
+                };
+                const style = item.style;
 
-            const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+                if (!this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
 
-            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
-            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+                const pos = this.transformer.worldToScreen(item.x, item.y);
+                const pxSize = size * this.camera.scale;
 
-            ctx.beginPath();
-            ctx.rect(drawX, drawY, pxSize, pxSize);
-            if (style?.fillStyle) ctx.fill();
-            if (style?.strokeStyle) ctx.stroke();
+                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+
+                ctx.save();
+                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+                if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+                if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+
+                ctx.beginPath();
+                ctx.rect(drawX, drawY, pxSize, pxSize);
+                if (style?.fillStyle) ctx.fill();
+                if (style?.strokeStyle) ctx.stroke();
+                ctx.restore();
+            }
         });
     }
 
-    /**
-     * Draw a line between two world points.
-     * @param x1 Start x in world space.
-     * @param y1 Start y in world space.
-     * @param x2 End x in world space.
-     * @param y2 End y in world space.
-     * @param options Line style.
-     * @param layer Layer order.
-     */
     drawLine(
-        x1: number,
-        y1: number,
-        x2: number,
-        y2: number,
-        options?: { style?: { strokeStyle?: string; lineWidth?: number } },
+        items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
+        style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ) {
-        this.layers.add(layer, ({ ctx }) => {
-            const a = this.transformer.worldToScreen(x1, y1);
-            const b = this.transformer.worldToScreen(x2, y2);
+        const list = Array.isArray(items) ? items : [items];
 
-            if (options?.style?.strokeStyle) ctx.strokeStyle = options.style.strokeStyle;
-            if (options?.style?.lineWidth) ctx.lineWidth = options.style.lineWidth;
-
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.stroke();
-        });
-    }
-
-    /**
-     * Draw a circle sized in world units.
-     * @param x Center x in world space.
-     * @param y Center y in world space.
-     * @param options Size/origin/style overrides.
-     * @param layer Layer order.
-     */
-    drawCircle(
-        x: number,
-        y: number,
-        options?: {
-            size?: number;
-            origin?: {
-                mode?: "cell" | "self";
-                x?: number;
-                y?: number;
-            };
-            style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
-        },
-        layer: number = 1
-    ) {
-        this.layers.add(layer, ({ ctx }) => {
-            const size = options?.size ?? 1;
-            const origin = {
-                mode: options?.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
-                x: options?.origin?.x ?? 0.5,
-                y: options?.origin?.y ?? 0.5,
-            };
-            const style = options?.style;
-
-            const pos = this.transformer.worldToScreen(x, y);
-            const pxSize = size * this.camera.scale;
-            const radius = pxSize / 2;
-
-            const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
-
-            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
 
             ctx.beginPath();
-            ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
-            if (style?.fillStyle) ctx.fill();
-            if (style?.strokeStyle) ctx.stroke();
-        });
-    }
+            for (const item of list) {
+                const centerX = (item.from.x + item.to.x) / 2;
+                const centerY = (item.from.y + item.to.y) / 2;
+                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-    /**
-     * Draw text at a world position.
-     * @param text Text content.
-     * @param x World x.
-     * @param y World y.
-     * @param options Text style overrides.
-     * @param layer Layer order.
-     */
-    drawText(
-        text: string,
-        x: number,
-        y: number,
-        options?: {
-            style?: {
-                font?: string;
-                fillStyle?: string;
-                textAlign?: CanvasTextAlign;
-                textBaseline?: CanvasTextBaseline;
-            };
-        },
-        layer: number = 2
-    ) {
-        this.layers.add(layer, ({ ctx }) => {
-            const pos = this.transformer.worldToScreen(x, y);
-            if (options?.style?.font) ctx.font = options.style.font;
-            if (options?.style?.fillStyle) ctx.fillStyle = options.style.fillStyle;
-            ctx.textAlign = options?.style?.textAlign ?? "center";
-            ctx.textBaseline = options?.style?.textBaseline ?? "middle";
-            ctx.fillText(text, pos.x, pos.y);
-        });
-    }
+                const a = this.transformer.worldToScreen(item.from.x, item.from.y);
+                const b = this.transformer.worldToScreen(item.to.x, item.to.y);
 
-    /**
-     * Draw a polyline through world points.
-     * @param points World-space points.
-     * @param options Stroke style overrides.
-     * @param layer Layer order.
-     */
-    drawPath(
-        points: Array<Coords>,
-        options?: {
-            style?: { strokeStyle?: string; lineWidth?: number };
-        },
-        layer: number = 1
-    ) {
-        this.layers.add(layer, ({ ctx }) => {
-            if (!points.length) return;
-            if (options?.style?.strokeStyle) ctx.strokeStyle = options.style.strokeStyle;
-            if (options?.style?.lineWidth) ctx.lineWidth = options.style.lineWidth;
-
-            ctx.beginPath();
-            const first = this.transformer.worldToScreen(points[0].x, points[0].y);
-            ctx.moveTo(first.x, first.y);
-
-            for (let i = 1; i < points.length; i++) {
-                const p = this.transformer.worldToScreen(points[i].x, points[i].y);
-                ctx.lineTo(p.x, p.y);
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
             }
             ctx.stroke();
+            ctx.restore();
         });
     }
 
-    /**
-     * Draw an image scaled in world units.
-     * @param img Loaded image.
-     * @param x World x.
-     * @param y World y.
-     * @param options Size/origin overrides.
-     * @param layer Layer order.
-     */
-    drawImage(
-        img: HTMLImageElement,
-        x: number,
-        y: number,
-        options?: {
-            size?: number; // world size
-            origin?: {
-                mode?: "cell" | "self";
-                x?: number;
-                y?: number;
-            };
-        },
+    drawCircle(items: Array<DrawObject> | DrawObject, layer: number = 1) {
+        const list = Array.isArray(items) ? items : [items];
+
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            for (const item of list) {
+                const size = item.size ?? 1;
+                const origin = {
+                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    x: item.origin?.x ?? 0.5,
+                    y: item.origin?.y ?? 0.5,
+                };
+                const style = item.style;
+
+                if (!this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+
+                const pos = this.transformer.worldToScreen(item.x, item.y);
+                const pxSize = size * this.camera.scale;
+                const radius = pxSize / 2;
+
+                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+
+                ctx.save();
+                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+                if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+                if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+
+                ctx.beginPath();
+                ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
+                if (style?.fillStyle) ctx.fill();
+                if (style?.strokeStyle) ctx.stroke();
+                ctx.restore();
+            }
+        });
+    }
+
+    drawText(
+        items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
+        style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
+        layer: number = 2
+    ) {
+        const list = Array.isArray(items) ? items : [items];
+
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            ctx.save();
+            if (style?.font) ctx.font = style.font;
+            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+            ctx.textAlign = style?.textAlign ?? "center";
+            ctx.textBaseline = style?.textBaseline ?? "middle";
+
+            for (const item of list) {
+                if (!this.isVisible(item.coords.x, item.coords.y, 0, topLeft, config)) continue;
+                const pos = this.transformer.worldToScreen(item.coords.x, item.coords.y);
+                ctx.fillText(item.text, pos.x, pos.y);
+            }
+            ctx.restore();
+        });
+    }
+
+    drawPath(
+        items: Array<Coords[]> | Coords[],
+        style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ) {
-        this.layers.add(layer, ({ ctx }) => {
-            const size = options?.size ?? 1;
-            const origin = {
-                mode: options?.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
-                x: options?.origin?.x ?? 0.5,
-                y: options?.origin?.y ?? 0.5,
-            };
+        const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
-            const pos = this.transformer.worldToScreen(x, y);
-            const pxSize = size * this.camera.scale;
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            ctx.save();
+            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
 
-            // preserve aspect
-            const aspect = img.width / img.height;
+            ctx.beginPath();
+            for (const points of list) {
+                if (!points.length) continue;
+                const xs = points.map((p) => p.x);
+                const ys = points.map((p) => p.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-            let drawW = pxSize;
-            let drawH = pxSize;
+                const first = this.transformer.worldToScreen(points[0].x, points[0].y);
+                ctx.moveTo(first.x, first.y);
 
-            if (aspect > 1) drawH = pxSize / aspect;
-            else drawW = pxSize * aspect;
+                for (let i = 1; i < points.length; i++) {
+                    const p = this.transformer.worldToScreen(points[i].x, points[i].y);
+                    ctx.lineTo(p.x, p.y);
+                }
+            }
+            ctx.stroke();
+            ctx.restore();
+        });
+    }
 
-            // origin SELF/CELL
-            const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+    drawImage(
+        items:
+            | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
+            | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
+        layer: number = 1
+    ) {
+        const list = Array.isArray(items) ? items : [items];
 
-            const offsetX = baseX + (pxSize - drawW) / 2;
-            const offsetY = baseY + (pxSize - drawH) / 2;
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            for (const item of list) {
+                const size = item.size ?? 1;
+                const origin = {
+                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    x: item.origin?.x ?? 0.5,
+                    y: item.origin?.y ?? 0.5,
+                };
 
-            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+                if (!this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+
+                const pos = this.transformer.worldToScreen(item.x, item.y);
+                const pxSize = size * this.camera.scale;
+
+                // preserve aspect
+                const aspect = item.img.width / item.img.height;
+
+                let drawW = pxSize;
+                let drawH = pxSize;
+
+                if (aspect > 1) drawH = pxSize / aspect;
+                else drawW = pxSize * aspect;
+
+                // origin SELF/CELL
+                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+
+                const offsetX = baseX + (pxSize - drawW) / 2;
+                const offsetY = baseY + (pxSize - drawH) / 2;
+
+                ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+            }
         });
     }
 

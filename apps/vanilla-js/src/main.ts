@@ -5,13 +5,23 @@ import villageImage4 from "/village4.webp";
 import barbarVillageImage4 from "/village4_barbar.webp";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-    <div class="canvas-container" style="display: flex; gap: 16px; align-items: flex-start;">
-        <canvas id="canvas"></canvas>
-        <canvas id="mini-canvas"></canvas>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-            <button id="go-to-10-10" style="padding: 8px 12px;">Go to (10, 10)</button>
+    <div class="canvas-container" style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">
+        <div style="display: flex; gap: 16px; align-items: flex-start;">
+            <canvas id="canvas"></canvas>
+            <canvas id="mini-canvas"></canvas>
+            <div id="popup" style="display:none; position:absolute; left:0; top:0; background:white; border:1px solid #ccc; padding:8px; z-index:10;"></div>
         </div>
-        <div id="popup" style="display:none; position:absolute; left:0; top:0; background:white; border:1px solid #ccc; padding:8px; z-index:10;"></div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <label style="display:flex; gap:4px; align-items:center;">
+                <span style="color:white;">X</span>
+                <input id="coord-x" type="number" value="0" style="width: 80px; padding: 4px;" />
+            </label>
+            <label style="display:flex; gap:4px; align-items:center;">
+                <span style="color:white;">Y</span>
+                <input id="coord-y" type="number" value="0" style="width: 80px; padding: 4px;" />
+            </label>
+            <button id="go-to-coords" style="padding: 8px 12px;">Go</button>
+        </div>
     </div>
 `;
 
@@ -52,15 +62,15 @@ function generateRandomItems(count: number): VillageItem[] {
     const types = Object.values(VILLAGE_TYPES);
     const items: VillageItem[] = [];
     for (let i = 0; i < count; i++) {
-        const x = Math.floor(Math.random() * 21) - 10;
-        const y = Math.floor(Math.random() * 21) - 10;
+        const x = Math.floor(Math.random() * 400) - 200;
+        const y = Math.floor(Math.random() * 400) - 200;
         const type = types[Math.floor(Math.random() * types.length)];
         items.push({ x, y, ...type });
     }
     return items;
 }
 
-const items = generateRandomItems(150);
+const items = generateRandomItems(200000);
 
 const startingCoords = { x: 0, y: 0 };
 
@@ -85,16 +95,16 @@ const mainMapOptions: GridEngineConfig = {
     debug: {
         enabled: true,
         grid: {
-            enabled: true,
+            enabled: false,
             color: "rgba(0, 0, 0, 0.3)",
             lineWidth: 1,
         },
         hud: {
             enabled: true,
-            topLeftCoordinates: true,
+            topLeftCoordinates: false,
             coordinates: true,
             scale: true,
-            tilesInView: true,
+            tilesInView: false,
         },
     },
 };
@@ -109,9 +119,8 @@ const miniMapOptions = {
         zoom: false,
         resize: true,
     },
-    renderer: "canvas" as const, // Use literal type
     debug: {
-        enabled: true,
+        enabled: false,
         grid: {
             enabled: true,
             color: "rgba(0, 0, 0, 0.3)",
@@ -151,29 +160,35 @@ const drawItems = async () => {
         }))
     );
 
-    loaded.forEach(({ item, img }) => {
-        mainMap.drawImage(img, item.x, item.y, {
-            size: 1,
-        });
-        mainMap.drawCircle(
-            item.x,
-            item.y,
-            {
-                size: 0.1,
-                origin: {
-                    mode: "cell",
-                    x: 0.1,
-                    y: 0.1,
-                },
-                style: { fillStyle: item.color },
-            },
-            1
-        );
-        miniMap.drawRect(item.x, item.y, {
-            size: 0.5,
-            style: { fillStyle: item.color },
-        });
-    });
+    const imageItems = loaded.map(({ item, img }) => ({
+        img,
+        x: item.x,
+        y: item.y,
+        size: 1,
+    }));
+
+    const circleItems = loaded.map(({ item }) => ({
+        x: item.x,
+        y: item.y,
+        size: 0.1,
+        origin: {
+            mode: "cell" as const,
+            x: 0.1,
+            y: 0.1,
+        },
+        style: { fillStyle: item.color },
+    }));
+
+    const miniMapRects = loaded.map(({ item }) => ({
+        x: item.x,
+        y: item.y,
+        size: 0.5,
+        style: { fillStyle: item.color },
+    }));
+
+    mainMap.drawImage(imageItems);
+    mainMap.drawCircle(circleItems, 1);
+    miniMap.drawRect(miniMapRects);
 };
 
 // ───────────────────────────────────────────────
@@ -233,10 +248,17 @@ mainMap.onHover = (coords, _mouse, client) => {
     }
 };
 
-const goToBtn = document.getElementById("go-to-10-10");
+const goToBtn = document.getElementById("go-to-coords") as HTMLButtonElement | null;
+const xInput = document.getElementById("coord-x") as HTMLInputElement | null;
+const yInput = document.getElementById("coord-y") as HTMLInputElement | null;
 goToBtn?.addEventListener("click", () => {
-    mainMap.goCoords(10, 10, 500);
-    // miniMap.goCoords(10, 10, 500);
+    const x = xInput ? Number(xInput.value) : NaN;
+    const y = yInput ? Number(yInput.value) : NaN;
+    if (Number.isNaN(x) || Number.isNaN(y)) {
+        alert("Please enter valid numbers for X and Y.");
+        return;
+    }
+    mainMap.goCoords(x, y, 500);
 });
 
 // ───────────────────────────────────────────────
@@ -260,17 +282,6 @@ miniMap.onDraw = (ctx) => {
     ctx.strokeStyle = "blue";
     ctx.lineWidth = 2;
     ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
-    // OPTIONAL DEBUG
-    ctx.fillStyle = "white";
-    ctx.font = "16px Arial";
-
-    ctx.fillText(`Scale: ${mainCfg.scale.toFixed(2)}`, 10, 20);
-    ctx.fillText(`Rect: ${rectWidth.toFixed(1)}x${rectHeight.toFixed(1)}`, 10, 40);
-    ctx.fillText(
-        `Center: (${mainMap.getCenterCoords().x.toFixed(2)}, ${mainMap.getCenterCoords().y.toFixed(2)})`,
-        10,
-        60
-    );
 };
 
 mainMap.onDraw = (ctx) => {

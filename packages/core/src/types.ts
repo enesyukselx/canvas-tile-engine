@@ -77,3 +77,15 @@ export type onClickCallback = (
 ) => void;
 
 export type onHoverCallback = onClickCallback;
+
+export type DrawObject = {
+    x: number;
+    y: number;
+    size?: number;
+    origin?: {
+        mode?: "cell" | "self";
+        x?: number; // 0 to 1
+        y?: number; // 0 to 1
+    };
+    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+};

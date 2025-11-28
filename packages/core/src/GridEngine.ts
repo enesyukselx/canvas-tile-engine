@@ -8,7 +8,14 @@ import { Layer } from "./modules/Layer";
 import { ViewportState } from "./modules/ViewportState";
 import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
-import { Coords, GridEngineConfig, onClickCallback, onDrawCallback, onHoverCallback } from "./types";
+import {
+    Coords,
+    DrawObject,
+    GridEngineConfig,
+    onClickCallback,
+    onDrawCallback,
+    onHoverCallback,
+} from "./types";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
@@ -214,137 +221,73 @@ export class GridEngine {
     }
 
     /**
-     * Draw a rectangle in world space (canvas renderer only).
-     * @param x World x.
-     * @param y World y.
-     * @param options Size/origin/style overrides.
+     * Draw one or many rectangles in world space (canvas renderer only).
+     * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      */
-    drawRect(
-        x: number,
-        y: number,
-        options?: {
-            size?: number;
-            origin?: {
-                mode?: "cell" | "self";
-                x?: number; // 0 to 1
-                y?: number; // 0 to 1
-            };
-            style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
-        },
-        layer: number = 1
-    ) {
-        this.ensureCanvasDraw().drawRect(x, y, options, layer);
+    drawRect(items: DrawObject | Array<DrawObject>, layer: number = 1) {
+        this.ensureCanvasDraw().drawRect(items, layer);
     }
 
     /**
-     * Draw a line between two world points (canvas renderer only).
-     * @param x1 Start x in world space.
-     * @param y1 Start y in world space.
-     * @param x2 End x in world space.
-     * @param y2 End y in world space.
-     * @param options Line style overrides.
+     * Draw one or many lines between world points (canvas renderer only).
+     * @param items Line segments.
+     * @param style Line style overrides.
      * @param layer Layer order.
      */
     drawLine(
-        x1: number,
-        y1: number,
-        x2: number,
-        y2: number,
-        options?: { style?: { strokeStyle?: string; lineWidth?: number } },
+        items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
+        style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ) {
-        this.ensureCanvasDraw().drawLine(x1, y1, x2, y2, options, layer);
+        this.ensureCanvasDraw().drawLine(items, style, layer);
     }
 
     /**
-     * Draw a circle sized in world units (canvas renderer only).
-     * @param x Center x in world space.
-     * @param y Center y in world space.
-     * @param options Size/origin/style overrides.
+     * Draw one or many circles sized in world units (canvas renderer only).
+     * @param items Circle definitions.
      * @param layer Layer order.
      */
-    drawCircle(
-        x: number,
-        y: number,
-        options?: {
-            size?: number;
-            origin?: {
-                mode?: "cell" | "self";
-                x?: number;
-                y?: number;
-            };
-            style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
-        },
-        layer: number = 1
-    ) {
-        this.ensureCanvasDraw().drawCircle(x, y, options, layer);
+    drawCircle(items: DrawObject | Array<DrawObject>, layer: number = 1) {
+        this.ensureCanvasDraw().drawCircle(items, layer);
     }
 
     /**
-     * Draw text at a world position (canvas renderer only).
-     * @param text Text content.
-     * @param x World x.
-     * @param y World y.
-     * @param options Text style overrides.
+     * Draw one or many texts at world positions (canvas renderer only).
+     * @param items Text definitions.
+     * @param style Text style overrides.
      * @param layer Layer order.
      */
     drawText(
-        text: string,
-        x: number,
-        y: number,
-        options?: {
-            style?: {
-                font?: string;
-                fillStyle?: string;
-                textAlign?: CanvasTextAlign;
-                textBaseline?: CanvasTextBaseline;
-            };
-        },
+        items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
+        style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
         layer: number = 2
     ) {
-        this.ensureCanvasDraw().drawText(text, x, y, options, layer);
+        this.ensureCanvasDraw().drawText(items, style, layer);
     }
 
     /**
-     * Draw a polyline through world points (canvas renderer only).
-     * @param points World-space points.
-     * @param options Stroke style overrides.
+     * Draw one or many polylines through world points (canvas renderer only).
+     * @param items Polyline point collections.
+     * @param style Stroke style overrides.
      * @param layer Layer order.
      */
-    drawPath(
-        points: Array<Coords>,
-        options?: {
-            style?: { strokeStyle?: string; lineWidth?: number };
-        },
-        layer: number = 1
-    ) {
-        this.ensureCanvasDraw().drawPath(points, options, layer);
+    drawPath(items: Array<Coords[]> | Coords[], style?: { strokeStyle?: string; lineWidth?: number }, layer: number = 1) {
+        this.ensureCanvasDraw().drawPath(items, style, layer);
     }
 
     /**
-     * Draw an image scaled in world units (canvas renderer only).
-     * @param img Loaded image.
-     * @param x World x.
-     * @param y World y.
-     * @param options Size/origin overrides.
+     * Draw one or many images scaled in world units (canvas renderer only).
+     * @param items Image definitions.
      * @param layer Layer order.
      */
     drawImage(
-        img: HTMLImageElement,
-        x: number,
-        y: number,
-        options?: {
-            size?: number; // world size
-            origin?: {
-                mode?: "cell" | "self";
-                x?: number;
-                y?: number;
-            };
-        },
+        items:
+            | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
+            | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
         layer: number = 1
     ) {
-        this.ensureCanvasDraw().drawImage(img, x, y, options, layer);
+        this.ensureCanvasDraw().drawImage(items, layer);
     }
 
     /**
