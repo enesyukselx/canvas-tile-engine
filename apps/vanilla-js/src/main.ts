@@ -14,7 +14,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
 const popup = document.getElementById("popup");
 
-import { GridEngine } from "@grid-engine/core";
+import { GridEngine, type GridEngineConfig } from "@grid-engine/core";
 
 const VILLAGE_TYPES = {
     barbar_1: {
@@ -61,7 +61,7 @@ const items = generateRandomItems(150);
 
 const startingCoords = { x: 0, y: 0 };
 
-const mainMapOptions = {
+const mainMapOptions: GridEngineConfig = {
     scale: 50,
     minScale: 5,
     maxScale: 100,
@@ -77,10 +77,15 @@ const mainMapOptions = {
     renderer: "canvas" as const, // Use literal type
     coordinates: {
         enabled: true,
+        shownScaleRange: { min: 30, max: 100 },
     },
     debug: {
         enabled: true,
-        grid: true,
+        grid: {
+            enabled: true,
+            color: "rgba(0, 0, 0, 0.3)",
+            lineWidth: 5,
+        },
         hud: {
             enabled: true,
             topLeftCoordinates: true,

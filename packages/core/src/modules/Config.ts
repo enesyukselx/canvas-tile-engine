@@ -45,7 +45,13 @@ export class Config {
 
             debug: {
                 enabled: config.debug?.enabled ?? false,
+                grid: {
+                    enabled: config.debug?.grid?.enabled ?? false,
+                    color: config.debug?.grid?.color ?? "rgba(255,255,255,0.25)",
+                    lineWidth: config.debug?.grid?.lineWidth ?? 1,
+                },
                 hud: {
+                    enabled: config.debug?.hud?.enabled ?? false,
                     topLeftCoordinates: config.debug?.hud?.topLeftCoordinates ?? false,
                     coordinates: config.debug?.hud?.coordinates ?? false,
                     scale: config.debug?.hud?.scale ?? false,

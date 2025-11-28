@@ -29,7 +29,13 @@ export type GridEngineConfig = {
     };
     debug?: {
         enabled?: boolean;
+        grid?: {
+            enabled?: boolean;
+            color?: string;
+            lineWidth?: number;
+        };
         hud?: {
+            enabled?: boolean;
             topLeftCoordinates?: boolean;
             coordinates?: boolean;
             scale?: boolean;

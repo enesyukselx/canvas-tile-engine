@@ -25,6 +25,12 @@ export class CanvasDebug {
     }
 
     private drawGrid() {
+        const config = this.config.get();
+
+        if (!config.debug.grid?.enabled) {
+            return;
+        }
+
         const tile = this.camera.scale;
 
         const left = Math.floor(this.camera.x);
@@ -32,8 +38,8 @@ export class CanvasDebug {
         const top = Math.floor(this.camera.y);
         const bottom = Math.ceil(this.camera.y + this.config.get().size.height / tile);
 
-        this.ctx.strokeStyle = "rgba(255,255,255,0.25)";
-        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = config.debug.grid?.color ?? "rgba(255,255,255,0.25)";
+        this.ctx.lineWidth = config.debug.grid?.lineWidth ?? 1;
 
         for (let gx = left; gx <= right; gx++) {
             for (let gy = top; gy <= bottom; gy++) {
@@ -47,6 +53,10 @@ export class CanvasDebug {
         const config = this.config.get();
 
         if (!config.debug.hud) {
+            return;
+        }
+
+        if (!config.debug.hud.enabled) {
             return;
         }
 
