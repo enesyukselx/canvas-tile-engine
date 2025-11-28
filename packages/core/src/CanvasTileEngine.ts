@@ -9,6 +9,7 @@ import { ViewportState } from "./modules/ViewportState";
 import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
 import { Coords, DrawObject, CanvasTileEngineConfig, onClickCallback, onDrawCallback, onHoverCallback } from "./types";
+import { SizeController } from "./modules/SizeController";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
@@ -24,7 +25,9 @@ export class CanvasTileEngine {
     private draw?: CanvasDraw;
     public images: ImageLoader;
     private moveAnimationId?: number;
+    private sizeController: SizeController;
 
+    public canvasWrapper: HTMLDivElement;
     public canvas: HTMLCanvasElement;
 
     /** Callback: center coordinates change */
@@ -81,8 +84,9 @@ export class CanvasTileEngine {
      * @param config Initial engine configuration.
      * @param center Initial center in world space.
      */
-    constructor(canvas: HTMLCanvasElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
-        this.canvas = canvas;
+    constructor(canvasWrapper: HTMLDivElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
+        this.canvasWrapper = canvasWrapper;
+        this.canvas = canvasWrapper.querySelector("canvas")!;
 
         this.config = new Config(config);
 
@@ -100,16 +104,23 @@ export class CanvasTileEngine {
         this.images = new ImageLoader();
 
         this.events = new EventManager(
+            this.canvasWrapper,
             this.canvas,
             this.camera,
             this.viewport,
             this.config,
             this.coordinateTransformer,
-            () => {
-                this.handleCameraChange();
-            }
+            () => this.handleCameraChange()
         );
-
+        this.sizeController = new SizeController(
+            this.canvasWrapper,
+            this.canvas,
+            this.camera,
+            this.renderer,
+            this.viewport,
+            this.config,
+            () => this.handleCameraChange()
+        );
         this.events.setupEvents();
     }
 
@@ -123,6 +134,24 @@ export class CanvasTileEngine {
     /** Render a frame using the active renderer. */
     render() {
         this.renderer.render();
+    }
+
+    /**
+     * Manually update canvas size (e.g., user-driven select). Keeps view centered.
+     * @param width New canvas width in pixels.
+     * @param height New canvas height in pixels.
+     * @param durationMs Animation duration in ms (default 500). Use 0 for instant resize.
+     */
+    resize(width: number, height: number, durationMs: number = 500) {
+        this.sizeController.resize(width, height, durationMs);
+    }
+
+    /**
+     * Current canvas size.
+     * @returns Current `{ width, height }` in pixels.
+     */
+    getSize() {
+        return this.viewport.getSize();
     }
 
     /** Snapshot of current normalized config. */

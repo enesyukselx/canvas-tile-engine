@@ -21,6 +21,10 @@ export class Config {
             size: {
                 width: config.size.width,
                 height: config.size.height,
+                maxHeight: config.size.maxHeight ?? Infinity,
+                maxWidth: config.size.maxWidth ?? Infinity,
+                minHeight: config.size.minHeight ?? 100,
+                minWidth: config.size.minWidth ?? 100,
             },
 
             backgroundColor: config.backgroundColor ?? "#ffffff",

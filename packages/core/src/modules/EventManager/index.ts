@@ -41,6 +41,7 @@ export class EventManager {
     }
 
     constructor(
+        private canvasWrapper: HTMLDivElement,
         private canvas: HTMLCanvasElement,
         private camera: ICamera,
         private viewport: ViewportState,
@@ -75,7 +76,14 @@ export class EventManager {
         this.binder.attach();
         this.attached = true;
         if (this.config.get().eventHandlers.resize && this.camera instanceof Camera) {
-            this.resizeWatcher = new ResizeWatcher(this.canvas, this.viewport, this.camera, this.onCameraChange);
+            this.resizeWatcher = new ResizeWatcher(
+                this.canvasWrapper,
+                this.canvas,
+                this.viewport,
+                this.camera,
+                this.config,
+                this.onCameraChange
+            );
             this.resizeWatcher.onResize = () => {
                 if (this.onResize) {
                     this.onResize();

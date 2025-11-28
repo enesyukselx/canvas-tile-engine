@@ -7,8 +7,12 @@ import barbarVillageImage4 from "/village4_barbar.webp";
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <div class="canvas-container" style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">
         <div style="display: flex; gap: 16px; align-items: flex-start;">
-            <canvas id="canvas"></canvas>
-            <canvas id="mini-canvas"></canvas>
+            <div id="canvas">
+                <canvas />
+            </div>
+            <div id="mini-canvas">
+                <canvas />
+            </div>
             <div id="popup" style="display:none; position:absolute; left:0; top:0; background:white; border:1px solid #ccc; padding:8px; z-index:10;"></div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
@@ -21,6 +25,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
                 <input id="coord-y" type="number" value="0" style="width: 80px; padding: 4px;" />
             </label>
             <button id="go-to-coords" style="padding: 8px 12px;">Go</button>
+            <button id="resize-canvas" style="padding: 8px 12px;">Resize Canvas to 800x600</button>
         </div>
     </div>
 `;
@@ -78,7 +83,7 @@ const mainMapOptions: CanvasTileEngineConfig = {
     scale: 50,
     minScale: 5,
     maxScale: 100,
-    size: { width: 500, height: 500 },
+    size: { width: 500, height: 500, maxHeight: 500, maxWidth: 650 },
     backgroundColor: "#337426ff",
     eventHandlers: {
         drag: true,
@@ -139,14 +144,14 @@ const miniMapOptions = {
 // ───────────────────────────────────────────────
 // MAIN CANVAS
 // ───────────────────────────────────────────────
-const mainMapCanvas = document.getElementById("canvas") as HTMLCanvasElement;
+const mainMapCanvas = document.getElementById("canvas") as HTMLDivElement;
 const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
 // MINI MAP
 // ───────────────────────────────────────────────
 
-const miniMapCanvas = document.getElementById("mini-canvas") as HTMLCanvasElement;
+const miniMapCanvas = document.getElementById("mini-canvas") as HTMLDivElement;
 const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
@@ -249,6 +254,10 @@ mainMap.onHover = (coords, _mouse, client) => {
 };
 
 const goToBtn = document.getElementById("go-to-coords") as HTMLButtonElement | null;
+const resizeBtn = document.getElementById("resize-canvas") as HTMLButtonElement | null;
+resizeBtn?.addEventListener("click", () => {
+    mainMap.resize(800, 600);
+});
 const xInput = document.getElementById("coord-x") as HTMLInputElement | null;
 const yInput = document.getElementById("coord-y") as HTMLInputElement | null;
 goToBtn?.addEventListener("click", () => {

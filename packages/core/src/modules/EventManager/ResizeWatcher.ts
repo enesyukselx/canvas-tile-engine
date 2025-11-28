@@ -7,41 +7,58 @@ import { ViewportState } from "../ViewportState";
  * @internal
  */
 export class ResizeWatcher {
-    private wrapper?: HTMLDivElement;
     private resizeObserver?: ResizeObserver;
 
     public onResize?: () => void;
 
     constructor(
+        private wrapper: HTMLDivElement,
         private canvas: HTMLCanvasElement,
         private viewport: ViewportState,
         private camera: Camera,
+        private config: Config,
         private onCameraChange: () => void
     ) {}
 
     start() {
-        const wrapper = document.createElement("div");
         const size = this.viewport.getSize();
 
-        Object.assign(wrapper.style, {
+        const configSize = this.config.get().size;
+
+        const maxWidth = configSize?.maxWidth;
+        const maxHeight = configSize?.maxHeight;
+
+        const minWidth = configSize?.minWidth;
+        const minHeight = configSize?.minHeight;
+
+        size.width = this.clamp(size.width, minWidth, maxWidth);
+        size.height = this.clamp(size.height, minHeight, maxHeight);
+
+        Object.assign(this.wrapper.style, {
             resize: "both",
             overflow: "hidden",
             width: `${size.width}px`,
             height: `${size.height}px`,
             touchAction: "none",
             position: "relative",
+            maxWidth: maxWidth ? `${maxWidth}px` : "",
+            maxHeight: maxHeight ? `${maxHeight}px` : "",
+            minWidth: minWidth ? `${minWidth}px` : "",
+            minHeight: minHeight ? `${minHeight}px` : "",
         });
 
-        if (this.canvas.parentNode) {
-            this.canvas.parentNode.insertBefore(wrapper, this.canvas);
-            wrapper.appendChild(this.canvas);
-        }
-
-        this.wrapper = wrapper;
         this.resizeObserver = new ResizeObserver((entries) => {
             for (const entry of entries) {
-                const { width, height } = entry.contentRect;
+                const { width: rawW, height: rawH } = entry.contentRect;
+                const width = this.clamp(rawW, minWidth, maxWidth);
+                const height = this.clamp(rawH, minHeight, maxHeight);
                 const prev = this.viewport.getSize();
+
+                if (width === prev.width && height === prev.height) {
+                    // No effective size change after clamping
+                    continue;
+                }
+
                 const diffW = width - prev.width;
                 const diffH = height - prev.height;
 
@@ -49,6 +66,8 @@ export class ResizeWatcher {
                 this.viewport.setSize(width, height);
                 this.canvas.width = width;
                 this.canvas.height = height;
+                this.wrapper.style.width = `${width}px`;
+                this.wrapper.style.height = `${height}px`;
 
                 if (this.onResize) {
                     this.onResize();
@@ -57,21 +76,22 @@ export class ResizeWatcher {
             }
         });
 
-        this.resizeObserver.observe(wrapper);
+        this.resizeObserver.observe(this.wrapper);
     }
 
     stop() {
-        if (this.resizeObserver && this.wrapper) {
+        if (this.resizeObserver) {
             this.resizeObserver.unobserve(this.wrapper);
             this.resizeObserver.disconnect();
         }
 
-        if (this.wrapper && this.wrapper.parentNode) {
-            this.wrapper.parentNode.insertBefore(this.canvas, this.wrapper);
-            this.wrapper.parentNode.removeChild(this.wrapper);
-        }
-
-        this.wrapper = undefined;
         this.resizeObserver = undefined;
+    }
+
+    private clamp(value: number, min?: number, max?: number) {
+        let result = value;
+        if (min !== undefined) result = Math.max(min, result);
+        if (max !== undefined) result = Math.min(max, result);
+        return result;
     }
 }
