@@ -23,6 +23,7 @@ export class GridEngine {
     private events: EventManager;
     private draw?: CanvasDraw;
     public images: ImageLoader;
+    private moveAnimationId?: number;
 
     public canvas: HTMLCanvasElement;
 
@@ -150,6 +151,52 @@ export class GridEngine {
         const size = this.viewport.getSize();
         this.camera.setCenter(newCenter, size.width, size.height);
         this.handleCameraChange();
+    }
+
+    /**
+     * Smoothly move the camera center to target coordinates over the given duration.
+     * @param x Target world x.
+     * @param y Target world y.
+     * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
+     */
+    goCoords(x: number, y: number, durationMs: number = 500) {
+        if (this.moveAnimationId !== undefined) {
+            cancelAnimationFrame(this.moveAnimationId);
+        }
+
+        if (durationMs <= 0) {
+            const size = this.viewport.getSize();
+            this.camera.setCenter({ x, y }, size.width, size.height);
+            this.handleCameraChange();
+            this.moveAnimationId = undefined;
+            return;
+        }
+
+        const startCenter = this.getCenterCoords();
+        const target = { x, y };
+        const size = this.viewport.getSize();
+        const start = performance.now();
+
+        const step = (now: number) => {
+            const elapsed = now - start;
+            const t = Math.min(1, elapsed / durationMs);
+
+            const nextCenter = {
+                x: startCenter.x + (target.x - startCenter.x) * t,
+                y: startCenter.y + (target.y - startCenter.y) * t,
+            };
+
+            this.camera.setCenter(nextCenter, size.width, size.height);
+            this.handleCameraChange();
+
+            if (t < 1) {
+                this.moveAnimationId = requestAnimationFrame(step);
+            } else {
+                this.moveAnimationId = undefined;
+            }
+        };
+
+        this.moveAnimationId = requestAnimationFrame(step);
     }
 
     // ─── Draw helpers (canvas renderer only) ───────────

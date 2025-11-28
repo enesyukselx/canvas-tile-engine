@@ -5,9 +5,12 @@ import villageImage4 from "/village4.webp";
 import barbarVillageImage4 from "/village4_barbar.webp";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-    <div class="canvas-container" style="display: flex; gap: 16px;">
+    <div class="canvas-container" style="display: flex; gap: 16px; align-items: flex-start;">
         <canvas id="canvas"></canvas>
         <canvas id="mini-canvas"></canvas>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button id="go-to-10-10" style="padding: 8px 12px;">Go to (10, 10)</button>
+        </div>
         <div id="popup" style="display:none; position:absolute; left:0; top:0; background:white; border:1px solid #ccc; padding:8px; z-index:10;"></div>
     </div>
 `;
@@ -220,6 +223,12 @@ mainMap.onHover = (coords, _mouse, client) => {
         }
     }
 };
+
+const goToBtn = document.getElementById("go-to-10-10");
+goToBtn?.addEventListener("click", () => {
+    mainMap.goCoords(10, 10, 0);
+    // miniMap.goCoords(10, 10, 500);
+});
 
 // ───────────────────────────────────────────────
 // MINI MAP VIEWPORT RECTANGLE DRAWING
