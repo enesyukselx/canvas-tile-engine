@@ -143,29 +143,38 @@ const miniMap = new GridEngine(miniMapCanvas, miniMapOptions, startingCoords);
 // ───────────────────────────────────────────────
 // DRAW OBJECTS ON BOTH MAPS
 // ───────────────────────────────────────────────
-items.forEach(async (item) => {
-    mainMap.drawImage(await mainMap.images.load(item.image), item.x, item.y, {
-        size: 1,
-    });
-    mainMap.drawCircle(
-        item.x,
-        item.y,
-        {
-            size: 0.1,
-            origin: {
-                mode: "cell",
-                x: 0.1,
-                y: 0.1,
-            },
-            style: { fillStyle: item.color },
-        },
-        1
+const drawItems = async () => {
+    const loaded = await Promise.all(
+        items.map(async (item) => ({
+            item,
+            img: await mainMap.images.load(item.image),
+        }))
     );
-    miniMap.drawRect(item.x, item.y, {
-        size: 0.5,
-        style: { fillStyle: item.color },
+
+    loaded.forEach(({ item, img }) => {
+        mainMap.drawImage(img, item.x, item.y, {
+            size: 1,
+        });
+        mainMap.drawCircle(
+            item.x,
+            item.y,
+            {
+                size: 0.1,
+                origin: {
+                    mode: "cell",
+                    x: 0.1,
+                    y: 0.1,
+                },
+                style: { fillStyle: item.color },
+            },
+            1
+        );
+        miniMap.drawRect(item.x, item.y, {
+            size: 0.5,
+            style: { fillStyle: item.color },
+        });
     });
-});
+};
 
 // ───────────────────────────────────────────────
 // MINI MAP → MAIN MAP SYNC
@@ -226,7 +235,7 @@ mainMap.onHover = (coords, _mouse, client) => {
 
 const goToBtn = document.getElementById("go-to-10-10");
 goToBtn?.addEventListener("click", () => {
-    mainMap.goCoords(10, 10, 0);
+    mainMap.goCoords(10, 10, 500);
     // miniMap.goCoords(10, 10, 500);
 });
 
@@ -280,5 +289,7 @@ mainMap.onDraw = (ctx) => {
 mainMap.setupEvents();
 miniMap.setupEvents();
 
-mainMap.render();
-miniMap.render();
+drawItems().then(() => {
+    mainMap.render();
+    miniMap.render();
+});
