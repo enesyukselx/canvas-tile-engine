@@ -81,9 +81,9 @@ const startingCoords = { x: 0, y: 0 };
 
 const mainMapOptions: CanvasTileEngineConfig = {
     scale: 50,
-    minScale: 5,
-    maxScale: 100,
-    size: { width: 500, height: 500, maxHeight: 500, maxWidth: 650 },
+    minScale: 40,
+    maxScale: 60,
+    size: { width: 500, height: 500, maxHeight: 700, maxWidth: 700, minHeight: 300, minWidth: 300 },
     backgroundColor: "#337426ff",
     eventHandlers: {
         drag: true,
