@@ -84,7 +84,7 @@ const mainMapOptions: GridEngineConfig = {
         grid: {
             enabled: true,
             color: "rgba(0, 0, 0, 0.3)",
-            lineWidth: 5,
+            lineWidth: 1,
         },
         hud: {
             enabled: true,
@@ -107,6 +107,21 @@ const miniMapOptions = {
         resize: true,
     },
     renderer: "canvas" as const, // Use literal type
+    debug: {
+        enabled: true,
+        grid: {
+            enabled: true,
+            color: "rgba(0, 0, 0, 0.3)",
+            lineWidth: 1,
+        },
+        hud: {
+            enabled: true,
+            topLeftCoordinates: true,
+            coordinates: true,
+            scale: true,
+            tilesInView: true,
+        },
+    },
 };
 
 // ───────────────────────────────────────────────

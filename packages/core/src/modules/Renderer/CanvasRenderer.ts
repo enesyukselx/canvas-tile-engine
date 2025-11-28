@@ -5,6 +5,7 @@ import { CoordinateOverlayRenderer } from "../CoordinateOverlayRenderer";
 import { CoordinateTransformer } from "../CoordinateTransformer";
 import { CanvasDebug } from "../CanvasDebug";
 import { Layer } from "../Layer";
+import { ViewportState } from "../ViewportState";
 import { IRenderer } from "./Renderer";
 
 /**
@@ -31,6 +32,7 @@ export class CanvasRenderer implements IRenderer {
         private camera: ICamera,
         private coordinateTransformer: CoordinateTransformer,
         private config: Config,
+        private viewport: ViewportState,
         private layers: Layer
     ) {
         const context = canvas.getContext("2d");
@@ -40,9 +42,15 @@ export class CanvasRenderer implements IRenderer {
 
         this.ctx = context;
         this.applyCanvasSize();
-        this.coordinateOverlayRenderer = new CoordinateOverlayRenderer(this.ctx, this.camera, this.config);
+        this.coordinateOverlayRenderer = new CoordinateOverlayRenderer(this.ctx, this.camera, this.config, this.viewport);
         if (this.config.get().debug?.enabled) {
-            this.debugOverlay = new CanvasDebug(this.ctx, this.camera, this.coordinateTransformer, this.config);
+            this.debugOverlay = new CanvasDebug(
+                this.ctx,
+                this.camera,
+                this.coordinateTransformer,
+                this.config,
+                this.viewport
+            );
         }
     }
 
@@ -51,13 +59,14 @@ export class CanvasRenderer implements IRenderer {
     }
 
     private applyCanvasSize() {
-        const config = this.config.get();
-        this.canvas.width = config.size.width;
-        this.canvas.height = config.size.height;
+        const size = this.viewport.getSize();
+        this.canvas.width = size.width;
+        this.canvas.height = size.height;
     }
 
     render(): void {
-        const config = this.config.get();
+        const size = this.viewport.getSize();
+        const config = { ...this.config.get(), size: { ...size }, scale: this.camera.scale };
         const topLeft: Coords = { x: this.camera.x, y: this.camera.y };
 
         // Clear background
@@ -90,13 +99,20 @@ export class CanvasRenderer implements IRenderer {
         // Debug overlay
         if (config.debug?.enabled) {
             if (!this.debugOverlay) {
-                this.debugOverlay = new CanvasDebug(this.ctx, this.camera, this.coordinateTransformer, this.config);
+                this.debugOverlay = new CanvasDebug(
+                    this.ctx,
+                    this.camera,
+                    this.coordinateTransformer,
+                    this.config,
+                    this.viewport
+                );
             }
             this.debugOverlay.draw();
         }
     }
 
     resize(width: number, height: number): void {
+        this.viewport.setSize(width, height);
         this.canvas.width = width;
         this.canvas.height = height;
     }

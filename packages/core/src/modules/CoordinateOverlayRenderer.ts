@@ -1,6 +1,6 @@
-import { GridEngineConfig } from "../types";
 import { Config } from "./Config";
 import { ICamera } from "./Camera";
+import { ViewportState } from "./ViewportState";
 
 /**
  * Renders a coordinate overlay (axes and labels) on top of the canvas.
@@ -10,16 +10,19 @@ export class CoordinateOverlayRenderer {
     private ctx: CanvasRenderingContext2D;
     private camera: ICamera;
     private config: Config;
+    private viewport: ViewportState;
 
     /**
      * @param ctx Canvas context to draw on.
      * @param camera Active camera for position/scale.
      * @param config Normalized grid engine configuration store.
+     * @param viewport Mutable viewport size store.
      */
-    constructor(ctx: CanvasRenderingContext2D, camera: ICamera, config: Config) {
+    constructor(ctx: CanvasRenderingContext2D, camera: ICamera, config: Config, viewport: ViewportState) {
         this.ctx = ctx;
         this.camera = camera;
         this.config = config;
+        this.viewport = viewport;
     }
 
     /**
@@ -33,11 +36,11 @@ export class CoordinateOverlayRenderer {
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
 
         // Draw left border - 20px wide, full height
-        const config = this.config.get();
-        this.ctx.fillRect(0, 0, 20, config.size.height);
+        const { width, height } = this.viewport.getSize();
+        this.ctx.fillRect(0, 0, 20, height);
 
         // Draw bottom border - full width, 20px high
-        this.ctx.fillRect(20, config.size.height - 20, config.size.width, 20);
+        this.ctx.fillRect(20, height - 20, width, 20);
 
         // Set text properties for coordinates
         this.ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
@@ -49,8 +52,8 @@ export class CoordinateOverlayRenderer {
         this.ctx.textBaseline = "middle";
 
         const cordGap = this.camera.scale;
-        const visibleAreaWidthInCords = config.size.width / cordGap;
-        const visibleAreaHeightInCords = config.size.height / cordGap;
+        const visibleAreaWidthInCords = width / cordGap;
+        const visibleAreaHeightInCords = height / cordGap;
 
         // Draw Y coordinates (left side)
         for (let i = 0 - (this.camera.y % 1); i <= visibleAreaHeightInCords + 1; i++) {
@@ -62,7 +65,7 @@ export class CoordinateOverlayRenderer {
             this.ctx.fillText(
                 Math.round(this.camera.x + i).toString(),
                 cordGap * i + cordGap / 2,
-                config.size.height - 10
+                height - 10
             );
         }
 

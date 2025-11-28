@@ -1,7 +1,8 @@
 import { onClickCallback, onHoverCallback } from "../types";
-import { Camera, ICamera } from "./Camera";
+import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
+import { ViewportState } from "./ViewportState";
 
 /**
  * Attaches input events to the canvas and updates camera/config accordingly.
@@ -30,6 +31,7 @@ export class EventManager {
     constructor(
         private canvas: HTMLCanvasElement,
         private camera: ICamera,
+        private viewport: ViewportState,
         private config: Config,
         private coordinateTransformer: CoordinateTransformer,
         private onCameraChange: () => void
@@ -121,15 +123,15 @@ export class EventManager {
             {
                 raw: { x: mouseX, y: mouseY },
                 snapped: {
-                    x: Math.round(mouseX / this.config.get().scale) * this.config.get().scale,
-                    y: Math.round(mouseY / this.config.get().scale) * this.config.get().scale,
+                    x: Math.round(mouseX / this.camera.scale) * this.camera.scale,
+                    y: Math.round(mouseY / this.camera.scale) * this.camera.scale,
                 },
             },
             {
                 raw: { x: e.clientX, y: e.clientY },
                 snapped: {
-                    x: Math.round(e.clientX / this.config.get().scale) * this.config.get().scale,
-                    y: Math.round(e.clientY / this.config.get().scale) * this.config.get().scale,
+                    x: Math.round(e.clientX / this.camera.scale) * this.camera.scale,
+                    y: Math.round(e.clientY / this.camera.scale) * this.camera.scale,
                 },
             }
         );
@@ -165,15 +167,15 @@ export class EventManager {
                     {
                         raw: { x: mouseX, y: mouseY },
                         snapped: {
-                            x: Math.round(mouseX / this.config.get().scale) * this.config.get().scale,
-                            y: Math.round(mouseY / this.config.get().scale) * this.config.get().scale,
+                            x: Math.round(mouseX / this.camera.scale) * this.camera.scale,
+                            y: Math.round(mouseY / this.camera.scale) * this.camera.scale,
                         },
                     },
                     {
                         raw: { x: e.clientX, y: e.clientY },
                         snapped: {
-                            x: Math.round(e.clientX / this.config.get().scale) * this.config.get().scale,
-                            y: Math.round(e.clientY / this.config.get().scale) * this.config.get().scale,
+                            x: Math.round(e.clientX / this.camera.scale) * this.camera.scale,
+                            y: Math.round(e.clientY / this.camera.scale) * this.camera.scale,
                         },
                     }
                 );
@@ -261,7 +263,6 @@ export class EventManager {
         const rect = this.canvas.getBoundingClientRect();
 
         this.camera.zoom(e.clientX, e.clientY, e.deltaY, rect);
-        this.config.setScale(this.camera.scale);
 
         this.onCameraChange();
     };
@@ -274,8 +275,8 @@ export class EventManager {
         Object.assign(wrapper.style, {
             resize: "both",
             overflow: "hidden",
-            width: `${this.config.get().size.width}px`,
-            height: `${this.config.get().size.height}px`,
+            width: `${this.viewport.getSize().width}px`,
+            height: `${this.viewport.getSize().height}px`,
             touchAction: "none",
             position: "relative",
         });
@@ -290,14 +291,14 @@ export class EventManager {
         this.resizeObserver = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 const { width, height } = entry.contentRect;
-                const prev = this.config.get();
-                const diffW = width - prev.size.width;
-                const diffH = height - prev.size.height;
+                const prev = this.viewport.getSize();
+                const diffW = width - prev.width;
+                const diffH = height - prev.height;
 
                 // Center adjustment
                 this.camera.adjustForResize(diffW, diffH);
 
-                this.config.setSize(width, height);
+                this.viewport.setSize(width, height);
                 this.canvas.width = width;
                 this.canvas.height = height;
 

@@ -5,6 +5,7 @@ import { CanvasDraw } from "./modules/CanvasDraw";
 import { EventManager } from "./modules/EventManager";
 import { ImageLoader } from "./modules/ImageLoader";
 import { Layer } from "./modules/Layer";
+import { ViewportState } from "./modules/ViewportState";
 import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
 import { Coords, GridEngineConfig, onClickCallback, onDrawCallback, onHoverCallback } from "./types";
@@ -15,6 +16,7 @@ import { Coords, GridEngineConfig, onClickCallback, onDrawCallback, onHoverCallb
 export class GridEngine {
     private config: Config;
     private camera: Camera;
+    private viewport: ViewportState;
     private coordinateTransformer: CoordinateTransformer;
     private layers?: Layer;
     private renderer: IRenderer;
@@ -89,15 +91,23 @@ export class GridEngine {
             y: center.y - config.size.height / (2 * config.scale),
         };
 
+        this.viewport = new ViewportState(config.size.width, config.size.height);
         this.camera = new Camera(initialTopLeft, config.scale, config.minScale, config.maxScale);
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
         this.renderer = this.createRenderer(rendererType);
 
         this.images = new ImageLoader();
 
-        this.events = new EventManager(this.canvas, this.camera, this.config, this.coordinateTransformer, () => {
-            this.handleCameraChange();
-        });
+        this.events = new EventManager(
+            this.canvas,
+            this.camera,
+            this.viewport,
+            this.config,
+            this.coordinateTransformer,
+            () => {
+                this.handleCameraChange();
+            }
+        );
     }
 
     // ─── PUBLIC API ──────────────────────────────
@@ -119,19 +129,26 @@ export class GridEngine {
 
     /** Snapshot of current normalized config. */
     getConfig(): Required<GridEngineConfig> {
-        return this.config.get();
+        const base = this.config.get();
+        const size = this.viewport.getSize();
+        return {
+            ...base,
+            scale: this.camera.scale,
+            size: { ...size },
+        };
     }
 
     /** Center coordinates of the map. */
     getCenterCoords(): Coords {
         const cfg = this.config.get();
-        return this.camera.getCenter(cfg.size.width, cfg.size.height);
+        const size = this.viewport.getSize();
+        return this.camera.getCenter(size.width, size.height);
     }
 
     /** Set center coordinates from outside (adjusts the camera accordingly). */
     updateCoords(newCenter: Coords) {
-        const cfg = this.config.get();
-        this.camera.setCenter(newCenter, cfg.size.width, cfg.size.height);
+        const size = this.viewport.getSize();
+        this.camera.setCenter(newCenter, size.width, size.height);
         this.handleCameraChange();
     }
 
@@ -297,6 +314,7 @@ export class GridEngine {
                     this.camera,
                     this.coordinateTransformer,
                     this.config,
+                    this.viewport,
                     this.layers
                 );
             }

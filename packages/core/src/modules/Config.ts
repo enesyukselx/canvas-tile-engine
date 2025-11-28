@@ -12,7 +12,7 @@ export class Config {
      * @param config Incoming configuration values.
      */
     constructor(config: GridEngineConfig) {
-        this.config = {
+        const base: Required<GridEngineConfig> = {
             renderer: "canvas",
             scale: config.scale,
             minScale: config.minScale,
@@ -66,6 +66,22 @@ export class Config {
                 },
             },
         };
+        this.config = Object.freeze({
+            ...base,
+            size: Object.freeze(base.size),
+            eventHandlers: Object.freeze(base.eventHandlers),
+            coordinates: Object.freeze({
+                ...base.coordinates,
+                shownScaleRange: Object.freeze(base.coordinates.shownScaleRange),
+            }),
+            cursor: Object.freeze(base.cursor),
+            debug: Object.freeze({
+                enabled: base.debug.enabled,
+                grid: Object.freeze(base.debug.grid),
+                hud: Object.freeze(base.debug.hud),
+                eventHandlers: Object.freeze(base.debug.eventHandlers),
+            }),
+        });
     }
 
     /**
@@ -73,36 +89,6 @@ export class Config {
      * @returns Normalized configuration snapshot e.g. `{ scale: 1, size: { width: 800, height: 600 }, ... }`.
      */
     get(): Readonly<Required<GridEngineConfig>> {
-        return {
-            ...this.config,
-            size: { ...this.config.size },
-            eventHandlers: { ...this.config.eventHandlers },
-            coordinates: {
-                ...this.config.coordinates,
-                shownScaleRange: {
-                    min: this.config.coordinates.shownScaleRange?.min ?? 0,
-                    max: this.config.coordinates.shownScaleRange?.max ?? Infinity,
-                },
-            },
-            cursor: { ...this.config.cursor },
-        };
-    }
-
-    /**
-     * Update canvas size in pixels.
-     * @param width Canvas width.
-     * @param height Canvas height.
-     */
-    setSize(width: number, height: number) {
-        this.config.size.width = width;
-        this.config.size.height = height;
-    }
-
-    /**
-     * Update current scale factor.
-     * @param scale New scale value.
-     */
-    setScale(scale: number) {
-        this.config.scale = scale;
+        return this.config;
     }
 }

@@ -1,6 +1,7 @@
 import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
+import { ViewportState } from "./ViewportState";
 
 /**
  * Canvas-only debug overlay: draws grid and HUD information.
@@ -11,12 +12,20 @@ export class CanvasDebug {
     private camera: ICamera;
     private transformer: CoordinateTransformer;
     private config: Config;
+    private viewport: ViewportState;
 
-    constructor(ctx: CanvasRenderingContext2D, camera: ICamera, transformer: CoordinateTransformer, config: Config) {
+    constructor(
+        ctx: CanvasRenderingContext2D,
+        camera: ICamera,
+        transformer: CoordinateTransformer,
+        config: Config,
+        viewport: ViewportState
+    ) {
         this.ctx = ctx;
         this.camera = camera;
         this.transformer = transformer;
         this.config = config;
+        this.viewport = viewport;
     }
 
     draw() {
@@ -32,11 +41,14 @@ export class CanvasDebug {
         }
 
         const tile = this.camera.scale;
+        const { width, height } = this.viewport.getSize();
+        const camX = this.camera.x;
+        const camY = this.camera.y;
 
-        const left = Math.floor(this.camera.x);
-        const right = Math.ceil(this.camera.x + this.config.get().size.width / tile);
-        const top = Math.floor(this.camera.y);
-        const bottom = Math.ceil(this.camera.y + this.config.get().size.height / tile);
+        const left = Math.floor(camX);
+        const right = Math.ceil(camX + width / tile);
+        const top = Math.floor(camY);
+        const bottom = Math.ceil(camY + height / tile);
 
         this.ctx.strokeStyle = config.debug.grid?.color ?? "rgba(255,255,255,0.25)";
         this.ctx.lineWidth = config.debug.grid?.lineWidth ?? 1;
@@ -69,7 +81,8 @@ export class CanvasDebug {
         }
 
         if (config.debug.hud.coordinates) {
-            const center = this.camera.getCenter(config.size.width, config.size.height);
+            const { width, height } = this.viewport.getSize();
+            const center = this.camera.getCenter(width, height);
             datas.push(`Coords: ${center.x.toFixed(2)}, ${center.y.toFixed(2)}`);
         }
 
@@ -78,25 +91,25 @@ export class CanvasDebug {
         }
 
         if (config.debug.hud.tilesInView) {
+            const { width, height } = this.viewport.getSize();
             datas.push(
-                `Tiles in view: ${Math.ceil(config.size.width / this.camera.scale)} x ${Math.ceil(
-                    config.size.height / this.camera.scale
-                )}`
+                `Tiles in view: ${Math.ceil(width / this.camera.scale)} x ${Math.ceil(height / this.camera.scale)}`
             );
         }
 
         const panelWidth = 160;
         const margin = 8;
+        const { width } = this.viewport.getSize();
 
         this.ctx.save();
         this.ctx.fillStyle = "rgba(0,0,0,0.5)";
-        this.ctx.fillRect(config.size.width - panelWidth - margin, margin / 2, panelWidth, datas.length * 14 + margin);
+        this.ctx.fillRect(width - panelWidth - margin, margin / 2, panelWidth, datas.length * 14 + margin);
 
         this.ctx.fillStyle = "#00ff99";
         this.ctx.font = "12px monospace";
 
         for (let i = 0; i < datas.length; i++) {
-            this.ctx.fillText(datas[i], config.size.width - panelWidth - margin + 5, 18 + i * 14);
+            this.ctx.fillText(datas[i], width - panelWidth - margin + 5, 18 + i * 14);
         }
 
         this.ctx.restore();
