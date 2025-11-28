@@ -16,7 +16,6 @@ export class ResizeWatcher {
         private canvas: HTMLCanvasElement,
         private viewport: ViewportState,
         private camera: Camera,
-        private config: Config,
         private onCameraChange: () => void
     ) {}
 
