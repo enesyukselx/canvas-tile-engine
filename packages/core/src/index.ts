@@ -1,2 +1,2 @@
-export { GridEngine } from "./GridEngine";
-export type { GridEngineConfig } from "./types";
+export { CanvasTileEngine } from "./CanvasTileEngine";
+export type { CanvasTileEngineConfig } from "./types";

@@ -8,19 +8,12 @@ import { Layer } from "./modules/Layer";
 import { ViewportState } from "./modules/ViewportState";
 import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
-import {
-    Coords,
-    DrawObject,
-    GridEngineConfig,
-    onClickCallback,
-    onDrawCallback,
-    onHoverCallback,
-} from "./types";
+import { Coords, DrawObject, CanvasTileEngineConfig, onClickCallback, onDrawCallback, onHoverCallback } from "./types";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
  */
-export class GridEngine {
+export class CanvasTileEngine {
     private config: Config;
     private camera: Camera;
     private viewport: ViewportState;
@@ -88,7 +81,7 @@ export class GridEngine {
      * @param config Initial engine configuration.
      * @param center Initial center in world space.
      */
-    constructor(canvas: HTMLCanvasElement, config: GridEngineConfig, center: Coords = { x: 0, y: 0 }) {
+    constructor(canvas: HTMLCanvasElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
         this.canvas = canvas;
 
         this.config = new Config(config);
@@ -136,7 +129,7 @@ export class GridEngine {
     }
 
     /** Snapshot of current normalized config. */
-    getConfig(): Required<GridEngineConfig> {
+    getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
         const size = this.viewport.getSize();
         return {
@@ -214,7 +207,7 @@ export class GridEngine {
      * @param layer Layer order (lower draws first).
      */
     addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<GridEngineConfig>) => void,
+        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
     ) {
         this.ensureCanvasDraw().addDrawFunction(fn, layer);
@@ -272,7 +265,11 @@ export class GridEngine {
      * @param style Stroke style overrides.
      * @param layer Layer order.
      */
-    drawPath(items: Array<Coords[]> | Coords[], style?: { strokeStyle?: string; lineWidth?: number }, layer: number = 1) {
+    drawPath(
+        items: Array<Coords[]> | Coords[],
+        style?: { strokeStyle?: string; lineWidth?: number },
+        layer: number = 1
+    ) {
         this.ensureCanvasDraw().drawPath(items, style, layer);
     }
 
@@ -294,7 +291,7 @@ export class GridEngine {
      * Build the active renderer based on config.
      * @param type Renderer type requested.
      */
-    private createRenderer(type: GridEngineConfig["renderer"]): IRenderer {
+    private createRenderer(type: CanvasTileEngineConfig["renderer"]): IRenderer {
         switch (type) {
             case "canvas": {
                 this.layers = new Layer();

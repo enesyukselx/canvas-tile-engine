@@ -1,18 +1,18 @@
-import { GridEngineConfig } from "../types";
+import { CanvasTileEngineConfig } from "../types";
 
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
  * @internal
  */
 export class Config {
-    private readonly config: Required<GridEngineConfig>;
+    private readonly config: Required<CanvasTileEngineConfig>;
 
     /**
      * Create a config store with defaults merged from the provided partial config.
      * @param config Incoming configuration values.
      */
-    constructor(config: GridEngineConfig) {
-        const base: Required<GridEngineConfig> = {
+    constructor(config: CanvasTileEngineConfig) {
+        const base: Required<CanvasTileEngineConfig> = {
             renderer: "canvas",
             scale: config.scale,
             minScale: config.minScale,
@@ -88,7 +88,7 @@ export class Config {
      * Get a defensive copy of the current configuration.
      * @returns Normalized configuration snapshot e.g. `{ scale: 1, size: { width: 800, height: 600 }, ... }`.
      */
-    get(): Readonly<Required<GridEngineConfig>> {
+    get(): Readonly<Required<CanvasTileEngineConfig>> {
         return this.config;
     }
 }

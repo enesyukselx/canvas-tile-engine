@@ -1,4 +1,4 @@
-import { Coords, GridEngineConfig } from "../types";
+import { Coords, CanvasTileEngineConfig } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 
@@ -6,7 +6,7 @@ type DrawContext = {
     ctx: CanvasRenderingContext2D;
     camera: ICamera;
     transformer: CoordinateTransformer;
-    config: Required<GridEngineConfig>;
+    config: Required<CanvasTileEngineConfig>;
     topLeft: Coords;
 };
 

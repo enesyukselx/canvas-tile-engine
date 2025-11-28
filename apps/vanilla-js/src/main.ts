@@ -27,7 +27,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
 const popup = document.getElementById("popup");
 
-import { GridEngine, type GridEngineConfig } from "@grid-engine/core";
+import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 
 const VILLAGE_TYPES = {
     barbar_1: {
@@ -74,7 +74,7 @@ const items = generateRandomItems(200000);
 
 const startingCoords = { x: 0, y: 0 };
 
-const mainMapOptions: GridEngineConfig = {
+const mainMapOptions: CanvasTileEngineConfig = {
     scale: 50,
     minScale: 5,
     maxScale: 100,
@@ -140,14 +140,14 @@ const miniMapOptions = {
 // MAIN CANVAS
 // ───────────────────────────────────────────────
 const mainMapCanvas = document.getElementById("canvas") as HTMLCanvasElement;
-const mainMap = new GridEngine(mainMapCanvas, mainMapOptions, startingCoords);
+const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
 // MINI MAP
 // ───────────────────────────────────────────────
 
 const miniMapCanvas = document.getElementById("mini-canvas") as HTMLCanvasElement;
-const miniMap = new GridEngine(miniMapCanvas, miniMapOptions, startingCoords);
+const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, startingCoords);
 
 // ───────────────────────────────────────────────
 // DRAW OBJECTS ON BOTH MAPS

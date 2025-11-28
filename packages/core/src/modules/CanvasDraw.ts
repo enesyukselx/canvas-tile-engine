@@ -1,4 +1,4 @@
-import { Coords, DrawObject, GridEngineConfig } from "../types";
+import { Coords, DrawObject, CanvasTileEngineConfig } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer } from "./Layer";
@@ -16,7 +16,13 @@ export class CanvasDraw {
      * @param layer Layer order (lower draws first).
      */
 
-    private isVisible(x: number, y: number, sizeWorld: number, topLeft: Coords, config: Required<GridEngineConfig>) {
+    private isVisible(
+        x: number,
+        y: number,
+        sizeWorld: number,
+        topLeft: Coords,
+        config: Required<CanvasTileEngineConfig>
+    ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
         const minX = topLeft.x - 1;
@@ -27,7 +33,7 @@ export class CanvasDraw {
     }
 
     addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<GridEngineConfig>) => void,
+        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
     ) {
         this.layers.add(layer, ({ ctx, config, topLeft }) => {
