@@ -109,14 +109,11 @@ export class CanvasTileEngine {
                 this.handleCameraChange();
             }
         );
+
+        this.events.setupEvents();
     }
 
     // ─── PUBLIC API ──────────────────────────────
-
-    /** Attach event listeners configured in `eventHandlers`. */
-    setupEvents() {
-        this.events.setupEvents();
-    }
 
     /** Tear down listeners and observers. */
     destroy() {

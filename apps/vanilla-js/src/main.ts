@@ -297,9 +297,6 @@ mainMap.onDraw = (ctx) => {
 // ───────────────────────────────────────────────
 // EVENTS & INITIAL RENDER
 // ───────────────────────────────────────────────
-mainMap.setupEvents();
-miniMap.setupEvents();
-
 drawItems().then(() => {
     mainMap.render();
     miniMap.render();

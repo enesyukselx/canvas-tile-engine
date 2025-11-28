@@ -15,6 +15,7 @@ export class EventManager {
     private binder: EventBinder;
     private gestures: GestureController;
     private resizeWatcher?: ResizeWatcher;
+    private attached = false;
 
     public onResize?: () => void;
 
@@ -70,7 +71,9 @@ export class EventManager {
     }
 
     setupEvents() {
+        if (this.attached) return;
         this.binder.attach();
+        this.attached = true;
         if (this.config.get().eventHandlers.resize && this.camera instanceof Camera) {
             this.resizeWatcher = new ResizeWatcher(
                 this.canvas,
@@ -89,7 +92,10 @@ export class EventManager {
     }
 
     destroy() {
+        if (!this.attached) return;
         this.binder.detach();
         this.resizeWatcher?.stop();
+        this.resizeWatcher = undefined;
+        this.attached = false;
     }
 }
