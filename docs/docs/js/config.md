@@ -20,8 +20,8 @@ sidebar_position: 2
 | ------------------------------ | -------------- | -------------------------------------------------------------------------- | --------------------------- |
 | `renderer`                     | `"canvas"`     | Rendering backend (only canvas today).                                     | `"canvas"`                  |
 | `backgroundColor`              | string         | Canvas background color.                                                   | `#ffffff`                   |
-| `minScale`                     | number         | Lowest allowed zoom; clamped (must be > 0).                                | —                           |
-| `maxScale`                     | number         | Highest allowed zoom; clamped (must be > 0).                               | —                           |
+| `minScale`                     | number         | Lowest allowed zoom; clamped (must be > 0).                                | scale \* 0.5                |
+| `maxScale`                     | number         | Highest allowed zoom; clamped (must be > 0).                               | scale \* 2                  |
 | `size.minWidth` / `minHeight`  | number         | Min viewport size in px.                                                   | `100`                       |
 | `size.maxWidth` / `maxHeight`  | number         | Max viewport size in px.                                                   | `Infinity`                  |
 | `eventHandlers.click`          | boolean        | Enable click events.                                                       | `false`                     |

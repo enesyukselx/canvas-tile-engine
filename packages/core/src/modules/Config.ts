@@ -15,8 +15,8 @@ export class Config {
         const base: Required<CanvasTileEngineConfig> = {
             renderer: "canvas",
             scale: config.scale,
-            minScale: config.minScale,
-            maxScale: config.maxScale,
+            minScale: config.minScale ?? config.scale * 0.5,
+            maxScale: config.maxScale ?? config.scale * 2,
 
             size: {
                 width: config.size.width,
