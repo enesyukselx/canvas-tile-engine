@@ -7,31 +7,19 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>vanilla-js</title>
     </head>
-    <body class="bg-amber-100">
+    <body class="bg-zinc-100">
         <div class="flex flex-wrap justify-center gap-4 p-4">
-            <div class="p-6 rounded">
-                <div>
-                    <button id="right-btn" class="absolute top-1/2 right-0 -translate-y-1/2 text-lg">></button>
-                    <button id="left-btn" class="absolute top-1/2 left-0 -translate-y-1/2 text-lg"><</button>
-                    <button id="up-btn" class="absolute top-0 left-1/2 -translate-x-1/2 text-lg">^</button>
-                    <button id="down-btn" class="absolute bottom-0 left-1/2 -translate-x-1/2 text-lg">v</button>
-                </div>
-                <div id="main-map-wrapper">
-                    <canvas></canvas>
-                </div>
-            </div>
-
-            <div class="bg-amber-600 p-2 rounded h-fit">
-                <div id="mini-map-wrapper">
+            <div>
+                <div id="main-map-wrapper" class="rounded-lg">
                     <canvas></canvas>
                 </div>
                 <div class="flex flex-wrap gap-2 mt-2 items-center">
                     <div>
-                        <label class="text-white font-semibold" for="x">X</label>
+                        <label class="text-black font-semibold" for="x">X</label>
                         <input class="bg-white w-16 rounded-2xl px-2 font-semibold" id="x" type="number" />
                     </div>
                     <div>
-                        <label class="text-white font-semibold" for="y">Y</label>
+                        <label class="text-black font-semibold" for="y">Y</label>
                         <input class="bg-white w-16 rounded-2xl px-2 font-semibold" id="y" type="number" />
                     </div>
                     <div>
@@ -44,7 +32,11 @@
                     </div>
                 </div>
             </div>
+            <div id="mini-map-wrapper" class="rounded-lg">
+                <canvas></canvas>
+            </div>
         </div>
+
         <div id="village-popup" class="hidden absolute top-0 left-0 m-4">
             <div
                 class="w-80 rounded-3xl border border-amber-500/50 bg-slate-950/80 p-5 text-slate-100 shadow-[0_20px_45px_rgba(0,0,0,0.45)] backdrop-blur supports-backdrop-filter:bg-slate-950/70"

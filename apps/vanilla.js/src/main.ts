@@ -14,10 +14,6 @@ const popupCoordinatessElem = document.getElementById("popup-coordinates");
 const inputX = document.getElementById("x") as HTMLInputElement;
 const inputY = document.getElementById("y") as HTMLInputElement;
 const goToCoordsBtn = document.getElementById("go-to-coords") as HTMLButtonElement;
-const leftBtn = document.getElementById("left-btn") as HTMLButtonElement;
-const rightBtn = document.getElementById("right-btn") as HTMLButtonElement;
-const upBtn = document.getElementById("up-btn") as HTMLButtonElement;
-const downBtn = document.getElementById("down-btn") as HTMLButtonElement;
 
 inputX.value = INITIAL_COORDS.x.toString();
 inputY.value = INITIAL_COORDS.y.toString();
@@ -161,11 +157,21 @@ mainMap.onHover = (coords, _mouse, client) => {
         const item = items.find((item) => item.x === coords.snapped.x && item.y === coords.snapped.y);
         console.log(item);
         if (item) {
-            if (popupPlayerNameElem) popupPlayerNameElem.textContent = `Player: Joe Doe`;
-            if (popupNameElem) popupNameElem.textContent = `Village: Joe's Village`;
-            if (popupVillageTypeElem) popupVillageTypeElem.textContent = item.type;
-            if (popupPointsElem) popupPointsElem.textContent = `Points: ${Math.floor(Math.random() * 1000)}`;
-            if (popupCoordinatessElem) popupCoordinatessElem.textContent = `${item.x} · ${item.y}`;
+            if (popupPlayerNameElem) {
+                popupPlayerNameElem.textContent = `Player: Joe`;
+            }
+            if (popupNameElem) {
+                popupNameElem.textContent = `Village: Joe's Village`;
+            }
+            if (popupVillageTypeElem) {
+                popupVillageTypeElem.textContent = item.type;
+            }
+            if (popupPointsElem) {
+                popupPointsElem.textContent = `Points: ${Math.floor(Math.random() * 1000)}`;
+            }
+            if (popupCoordinatessElem) {
+                popupCoordinatessElem.textContent = `${item.x} · ${item.y}`;
+            }
         }
     } else {
         popup?.classList.add("hidden");
@@ -184,26 +190,6 @@ goToCoordsBtn.addEventListener("click", () => {
         return;
     }
     mainMap.goCoords(x, y, 500);
-});
-
-leftBtn.addEventListener("click", () => {
-    const currentCoords = mainMap.getCenterCoords();
-    mainMap.goCoords(currentCoords.x - 5, currentCoords.y, 300);
-});
-
-rightBtn.addEventListener("click", () => {
-    const currentCoords = mainMap.getCenterCoords();
-    mainMap.goCoords(currentCoords.x + 5, currentCoords.y, 300);
-});
-
-upBtn.addEventListener("click", () => {
-    const currentCoords = mainMap.getCenterCoords();
-    mainMap.goCoords(currentCoords.x, currentCoords.y - 5, 300);
-});
-
-downBtn.addEventListener("click", () => {
-    const currentCoords = mainMap.getCenterCoords();
-    mainMap.goCoords(currentCoords.x, currentCoords.y + 5, 300);
 });
 
 drawItems().then(() => {
