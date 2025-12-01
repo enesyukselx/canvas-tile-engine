@@ -3,7 +3,8 @@ import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engi
 import { generateMapObjects } from "./generateMapObjects";
 
 const INITIAL_COORDS = { x: 0, y: 0 };
-
+const INITIAL_MAIN_MAP_SIZE = 500;
+const INITIAL_MINI_MAP_SIZE = 300;
 // Popup elements
 const popup = document.getElementById("village-popup");
 const popupPlayerNameElem = document.getElementById("popup-player-name");
@@ -17,6 +18,35 @@ const inputX = document.getElementById("x") as HTMLInputElement;
 const inputY = document.getElementById("y") as HTMLInputElement;
 const goToCoordsBtn = document.getElementById("go-to-coords") as HTMLButtonElement;
 
+// Event listeners for resizing maps
+// Mini map size input event listener
+const miniMapSizeInput = document.getElementById("minimap-size-select") as HTMLInputElement;
+miniMapSizeInput.value = INITIAL_MINI_MAP_SIZE.toString();
+miniMapSizeInput.addEventListener("change", () => {
+    const newSize = Number(miniMapSizeInput.value);
+    if (Number.isNaN(newSize) || newSize < 100 || newSize > 700) {
+        alert("Please enter a valid size between 100 and 700.");
+        miniMapSizeInput.value = INITIAL_MINI_MAP_SIZE.toString();
+        return;
+    }
+    miniMap.resize(newSize, newSize, 300);
+    miniMap.render();
+});
+
+// Main map size input event listener
+const mainMapSizeInput = document.getElementById("mainmap-size-select") as HTMLInputElement;
+mainMapSizeInput.value = INITIAL_MAIN_MAP_SIZE.toString();
+mainMapSizeInput.addEventListener("change", () => {
+    const newSize = Number(mainMapSizeInput.value);
+    if (Number.isNaN(newSize) || newSize < 200 || newSize > 800) {
+        alert("Please enter a valid size between 200 and 800.");
+        mainMapSizeInput.value = INITIAL_MAIN_MAP_SIZE.toString();
+        return;
+    }
+    mainMap.resize(newSize, newSize, 300);
+    mainMap.render();
+});
+
 // Set initial values for input fields
 inputX.value = INITIAL_COORDS.x.toString();
 inputY.value = INITIAL_COORDS.y.toString();
@@ -24,9 +54,12 @@ inputY.value = INITIAL_COORDS.y.toString();
 // Main map configuration
 const mainMapOptions: CanvasTileEngineConfig = {
     scale: 50,
-    size: { width: 500, height: 500, maxHeight: 700, maxWidth: 700, minHeight: 200, minWidth: 200 },
+    minScale: 40,
+    maxScale: 60,
+    size: { width: 500, height: 500, maxHeight: 800, maxWidth: 800, minHeight: 200, minWidth: 200 },
     backgroundColor: "#337426ff",
     eventHandlers: {
+        zoom: true,
         drag: true,
         resize: true,
         click: true,
@@ -34,7 +67,7 @@ const mainMapOptions: CanvasTileEngineConfig = {
     },
     coordinates: {
         enabled: true,
-        shownScaleRange: { min: 50, max: 50 },
+        shownScaleRange: { min: 40, max: 60 },
     },
 };
 
@@ -167,6 +200,15 @@ miniMap.onDraw = (ctx) => {
     ctx.lineWidth = 1;
     ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
 };
+
+// Custom draw function on the main map to draw a red square at the center
+// This draw function is added with a priority of 3 (to be drawn after other elements)
+mainMap.addDrawFunction((ctx) => {
+    const centerX = mainMap.getConfig().size.width / 2;
+    const centerY = mainMap.getConfig().size.height / 2;
+    ctx.fillStyle = "red";
+    ctx.fillRect(centerX - 5, centerY - 5, 5, 5);
+}, 3);
 
 // Handle hover events on the main map
 // coords: The coordinates of the hover event
