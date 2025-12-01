@@ -1,170 +1,109 @@
 import "./style.css";
-import villageImage1 from "/village1.webp";
-import barbarVillageImage1 from "/village1_barbar.webp";
-import villageImage4 from "/village4.webp";
-import barbarVillageImage4 from "/village4_barbar.webp";
-
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-    <div class="canvas-container" style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">
-        <div style="display: flex; gap: 16px; align-items: flex-start;">
-            <div id="canvas">
-                <canvas />
-            </div>
-            <div id="mini-canvas">
-                <canvas />
-            </div>
-            <div id="popup" style="display:none; position:absolute; left:0; top:0; background:white; border:1px solid #ccc; padding:8px; z-index:10;"></div>
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <label style="display:flex; gap:4px; align-items:center;">
-                <span style="color:white;">X</span>
-                <input id="coord-x" type="number" value="0" style="width: 80px; padding: 4px;" />
-            </label>
-            <label style="display:flex; gap:4px; align-items:center;">
-                <span style="color:white;">Y</span>
-                <input id="coord-y" type="number" value="0" style="width: 80px; padding: 4px;" />
-            </label>
-            <button id="go-to-coords" style="padding: 8px 12px;">Go</button>
-            <button id="resize-canvas" style="padding: 8px 12px;">Resize Canvas to 800x600</button>
-        </div>
-    </div>
-`;
-
-const popup = document.getElementById("popup");
-
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
+import { generateMapObjects } from "./generateMapObjects";
 
-const VILLAGE_TYPES = {
-    barbar_1: {
-        color: "darkgray",
-        image: barbarVillageImage1,
-    },
-    normal_1: {
-        color: "blue",
-        image: villageImage1,
-    },
-    barbar_4: {
-        color: "darkgray",
-        image: barbarVillageImage4,
-    },
-    normal_4: {
-        color: "red",
-        image: villageImage4,
-    },
-};
+const INITIAL_COORDS = { x: 0, y: 0 };
+const INITIAL_MAIN_MAP_SIZE = 500;
+const INITIAL_MINI_MAP_SIZE = 300;
+// Popup elements
+const popup = document.getElementById("village-popup");
+const popupPlayerNameElem = document.getElementById("popup-player-name");
+const popupNameElem = document.getElementById("popup-village-name");
+const popupVillageTypeElem = document.getElementById("popup-village-type");
+const popupPointsElem = document.getElementById("popup-village-points");
+const popupCoordinatesElem = document.getElementById("popup-coordinates");
 
-// ───────────────────────────────────────────────
-// DATA
-// ───────────────────────────────────────────────
-type VillageItem = {
-    x: number;
-    y: number;
-    color: string;
-    image: string;
-};
+// Input elements for coordinates and button to go to coordinates
+const inputX = document.getElementById("x") as HTMLInputElement;
+const inputY = document.getElementById("y") as HTMLInputElement;
+const goToCoordsBtn = document.getElementById("go-to-coords") as HTMLButtonElement;
 
-function generateRandomItems(count: number): VillageItem[] {
-    const types = Object.values(VILLAGE_TYPES);
-    const items: VillageItem[] = [];
-    for (let i = 0; i < count; i++) {
-        const x = Math.floor(Math.random() * 400) - 200;
-        const y = Math.floor(Math.random() * 400) - 200;
-        const type = types[Math.floor(Math.random() * types.length)];
-        items.push({ x, y, ...type });
+// Event listeners for resizing maps
+// Mini map size input event listener
+const miniMapSizeInput = document.getElementById("minimap-size-select") as HTMLInputElement;
+miniMapSizeInput.value = INITIAL_MINI_MAP_SIZE.toString();
+miniMapSizeInput.addEventListener("change", () => {
+    const newSize = Number(miniMapSizeInput.value);
+    if (Number.isNaN(newSize) || newSize < 100 || newSize > 700) {
+        alert("Please enter a valid size between 100 and 700.");
+        miniMapSizeInput.value = INITIAL_MINI_MAP_SIZE.toString();
+        return;
     }
-    return items;
-}
+    miniMap.resize(newSize, newSize, 300);
+    miniMap.render();
+});
 
-const items = generateRandomItems(200000);
+// Main map size input event listener
+const mainMapSizeInput = document.getElementById("mainmap-size-select") as HTMLInputElement;
+mainMapSizeInput.value = INITIAL_MAIN_MAP_SIZE.toString();
+mainMapSizeInput.addEventListener("change", () => {
+    const newSize = Number(mainMapSizeInput.value);
+    if (Number.isNaN(newSize) || newSize < 200 || newSize > 800) {
+        alert("Please enter a valid size between 200 and 800.");
+        mainMapSizeInput.value = INITIAL_MAIN_MAP_SIZE.toString();
+        return;
+    }
+    mainMap.resize(newSize, newSize, 300);
+    mainMap.render();
+});
 
-const startingCoords = { x: 0, y: 0 };
+// Set initial values for input fields
+inputX.value = INITIAL_COORDS.x.toString();
+inputY.value = INITIAL_COORDS.y.toString();
 
+// Main map configuration
 const mainMapOptions: CanvasTileEngineConfig = {
     scale: 50,
     minScale: 40,
     maxScale: 60,
-    size: { width: 500, height: 500, maxHeight: 700, maxWidth: 700, minHeight: 300, minWidth: 300 },
+    size: { width: 500, height: 500, maxHeight: 800, maxWidth: 800, minHeight: 200, minWidth: 200 },
     backgroundColor: "#337426ff",
     eventHandlers: {
-        drag: true,
         zoom: true,
+        drag: true,
         resize: true,
         click: true,
         hover: true,
     },
-    renderer: "canvas" as const, // Use literal type
     coordinates: {
         enabled: true,
-        shownScaleRange: { min: 30, max: 100 },
-    },
-    debug: {
-        enabled: true,
-        grid: {
-            enabled: false,
-            color: "rgba(0, 0, 0, 0.3)",
-            lineWidth: 1,
-        },
-        hud: {
-            enabled: true,
-            topLeftCoordinates: false,
-            coordinates: true,
-            scale: true,
-            tilesInView: false,
-        },
+        shownScaleRange: { min: 40, max: 60 },
     },
 };
-const miniMapOptions = {
+
+// Mini map configuration
+const miniMapOptions: CanvasTileEngineConfig = {
     scale: 10,
-    minScale: 5,
-    maxScale: 20,
-    size: { width: 300, height: 300 },
+    size: { width: 300, height: 300, maxWidth: 700, maxHeight: 700, minWidth: 100, minHeight: 100 },
     backgroundColor: "#337426ff",
     eventHandlers: {
         drag: true,
-        zoom: false,
         resize: true,
-    },
-    debug: {
-        enabled: false,
-        grid: {
-            enabled: true,
-            color: "rgba(0, 0, 0, 0.3)",
-            lineWidth: 1,
-        },
-        hud: {
-            enabled: true,
-            topLeftCoordinates: true,
-            coordinates: true,
-            scale: true,
-            tilesInView: true,
-        },
     },
 };
 
-// ───────────────────────────────────────────────
-// MAIN CANVAS
-// ───────────────────────────────────────────────
-const mainMapCanvas = document.getElementById("canvas") as HTMLDivElement;
-const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, startingCoords);
+// Canvas-wrapper elements for main and mini maps
+const mainMapCanvas = document.getElementById("main-map-wrapper") as HTMLDivElement;
+const miniMapCanvas = document.getElementById("mini-map-wrapper") as HTMLDivElement;
 
-// ───────────────────────────────────────────────
-// MINI MAP
-// ───────────────────────────────────────────────
+// Initialize maps
+const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, INITIAL_COORDS);
+const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, INITIAL_COORDS);
 
-const miniMapCanvas = document.getElementById("mini-canvas") as HTMLDivElement;
-const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, startingCoords);
+// Generate map objects
+const items = generateMapObjects(5000, 0, 0, 1.2);
 
-// ───────────────────────────────────────────────
-// DRAW OBJECTS ON BOTH MAPS
-// ───────────────────────────────────────────────
+// Function to draw items on both maps
 const drawItems = async () => {
+    // Load all images
     const loaded = await Promise.all(
         items.map(async (item) => ({
             item,
-            img: await mainMap.images.load(item.image),
+            img: await mainMap.images.load(item.imageUrl),
         }))
     );
 
+    // Prepare image items for main map
     const imageItems = loaded.map(({ item, img }) => ({
         img,
         x: item.x,
@@ -172,18 +111,7 @@ const drawItems = async () => {
         size: 1,
     }));
 
-    const circleItems = loaded.map(({ item }) => ({
-        x: item.x,
-        y: item.y,
-        size: 0.1,
-        origin: {
-            mode: "cell" as const,
-            x: 0.1,
-            y: 0.1,
-        },
-        style: { fillStyle: item.color },
-    }));
-
+    // Prepare rectangle items for mini map
     const miniMapRects = loaded.map(({ item }) => ({
         x: item.x,
         y: item.y,
@@ -191,88 +119,68 @@ const drawItems = async () => {
         style: { fillStyle: item.color },
     }));
 
+    // Draw images on main map
     mainMap.drawImage(imageItems);
-    mainMap.drawCircle(circleItems, 1);
+
+    // Draw circles with object colors on main map
+    loaded.forEach(({ item }) => {
+        if (item.type === "terrain") {
+            return;
+        }
+
+        mainMap.drawCircle(
+            {
+                x: item.x,
+                y: item.y,
+                size: 0.1,
+                origin: {
+                    mode: "cell" as const,
+                    x: 0.1,
+                    y: 0.1,
+                },
+                style: { fillStyle: item.color },
+            },
+            1
+        );
+    });
+
+    // Draw rectangles on mini map
     miniMap.drawRect(miniMapRects);
 };
 
-// ───────────────────────────────────────────────
-// MINI MAP → MAIN MAP SYNC
-// ───────────────────────────────────────────────
-
+// Synchronization logic between main map and mini map
 let isSyncing = false;
 
 miniMap.onCoordsChange = (coords) => {
-    if (isSyncing) return;
+    if (isSyncing) {
+        return;
+    }
     isSyncing = true;
-
+    inputX.value = Math.round(coords.x).toString();
+    inputY.value = Math.round(coords.y).toString();
     mainMap.updateCoords(coords);
     mainMap.render();
 
     isSyncing = false;
 };
 
-// ───────────────────────────────────────────────
-// MAIN MAP → MINI MAP VIEWPORT UPDATE
-// ───────────────────────────────────────────────
 mainMap.onCoordsChange = (coords) => {
-    if (isSyncing) return;
+    if (isSyncing) {
+        return;
+    }
+    popup?.classList.add("hidden");
+    inputX.value = Math.round(coords.x).toString();
+    inputY.value = Math.round(coords.y).toString();
     isSyncing = true;
-    popup!.style.display = "none";
     miniMap.updateCoords(coords);
     miniMap.render();
 
     isSyncing = false;
 };
 
-mainMap.onClick = (coords, _mouse, _client) => {
-    if (items.some((item) => item.x === coords.snapped.x && item.y === coords.snapped.y)) {
-        alert(`Clicked on village at (${coords.snapped.x}, ${coords.snapped.y})`);
-        popup!.style.display = "none";
-    }
-};
-
-mainMap.onMouseLeave = () => {
-    popup!.style.display = "none";
-};
-
-mainMap.onHover = (coords, _mouse, client) => {
-    if (items.some((item) => item.x === coords.snapped.x && item.y === coords.snapped.y)) {
-        mainMapCanvas.style.cursor = "pointer";
-        if (popup) {
-            popup.style.display = "block";
-            popup.style.left = client.raw.x + 10 + "px";
-            popup.style.top = client.raw.y + 10 + "px";
-            popup.innerHTML = `<span style="color: black;">Village at (${coords.snapped.x}, ${coords.snapped.y})</span>`;
-        }
-    } else {
-        mainMapCanvas.style.cursor = "default";
-        if (popup) {
-            popup.style.display = "none";
-        }
-    }
-};
-
-const goToBtn = document.getElementById("go-to-coords") as HTMLButtonElement | null;
-const resizeBtn = document.getElementById("resize-canvas") as HTMLButtonElement | null;
-resizeBtn?.addEventListener("click", () => {
-    mainMap.resize(800, 600);
-});
-const xInput = document.getElementById("coord-x") as HTMLInputElement | null;
-const yInput = document.getElementById("coord-y") as HTMLInputElement | null;
-goToBtn?.addEventListener("click", () => {
-    const x = xInput ? Number(xInput.value) : NaN;
-    const y = yInput ? Number(yInput.value) : NaN;
-    if (Number.isNaN(x) || Number.isNaN(y)) {
-        alert("Please enter valid numbers for X and Y.");
-        return;
-    }
-    mainMap.goCoords(x, y, 500);
-});
-
-// ───────────────────────────────────────────────
-// MINI MAP VIEWPORT RECTANGLE DRAWING
-// ───────────────────────────────────────────────
+// Mini map viewport rectangle
+// Draws a rectangle on the mini map representing the current viewport of the main map
+// "onDraw" is a callback for custom drawing on the map's canvas
 miniMap.onDraw = (ctx) => {
     const mainCfg = mainMap.getConfig();
     const miniCfg = miniMap.getConfig();
@@ -288,24 +196,90 @@ miniMap.onDraw = (ctx) => {
     const rectX = miniCfg.size.width / 2 - rectWidth / 2;
     const rectY = miniCfg.size.height / 2 - rectHeight / 2;
 
-    ctx.strokeStyle = "blue";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1;
     ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
 };
 
-mainMap.onDraw = (ctx) => {
-    const mainCfg = mainMap.getConfig();
-    const rectWidth = mainCfg.size.width;
-    const rectHeight = mainCfg.size.height;
-    const rectX = mainCfg.size.width / 2 - rectWidth / 2;
-    const rectY = mainCfg.size.height / 2 - rectHeight / 2;
-    ctx.fillStyle = "black";
-    ctx.fillRect(rectX + rectWidth / 2 - 5 / 2, rectY + rectHeight / 2 - 5 / 2, 5, 5);
+// Custom draw function on the main map to draw a red square at the center
+// This draw function is added with a priority of 3 (to be drawn after other elements)
+mainMap.addDrawFunction((ctx) => {
+    const centerX = mainMap.getConfig().size.width / 2;
+    const centerY = mainMap.getConfig().size.height / 2;
+    ctx.fillStyle = "red";
+    ctx.fillRect(centerX - 5, centerY - 5, 5, 5);
+}, 3);
+
+// Handle hover events on the main map
+// coords: The coordinates of the hover event
+// mouse: The mouse event object
+// client: The client coordinates of the mouse event
+mainMap.onHover = (coords, _mouse, client) => {
+    // Check if any item exists at the hovered coordinates and is not of type "terrain"
+    const item = items.find(
+        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
+    );
+
+    if (item) {
+        popup?.classList.remove("hidden");
+        if (popup) {
+            popup.style.left = `${client.raw.x - 120}px`;
+            popup.style.top = `${client.raw.y + 15}px`;
+        }
+
+        // Update popup content
+        if (popupPlayerNameElem) {
+            popupPlayerNameElem.textContent = `${item.playerName}`;
+        }
+        if (popupNameElem) {
+            popupNameElem.textContent = `${item.villageName}`;
+        }
+        if (popupVillageTypeElem) {
+            popupVillageTypeElem.textContent = item.type.toUpperCase();
+        }
+        if (popupPointsElem) {
+            popupPointsElem.textContent = `Points: 500`;
+        }
+        if (popupCoordinatesElem) {
+            popupCoordinatesElem.textContent = `${item.x} | ${item.y}`;
+        }
+    } else {
+        popup?.classList.add("hidden");
+    }
 };
 
-// ───────────────────────────────────────────────
-// EVENTS & INITIAL RENDER
-// ───────────────────────────────────────────────
+// Handle click events on the main map
+mainMap.onClick = (coords, _mouse, _client) => {
+    // Check if any item exists at the clicked coordinates and is not of type "terrain"
+    const item = items.find(
+        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
+    );
+
+    if (item) {
+        alert(
+            `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`
+        );
+    }
+};
+
+// Handle mouse leave event on the main map
+mainMap.onMouseLeave = () => {
+    popup?.classList.add("hidden");
+};
+
+// Handle click event on the "Go To Coordinates" button
+goToCoordsBtn.addEventListener("click", () => {
+    const x = Number(inputX.value);
+    const y = Number(inputY.value);
+    if (Number.isNaN(x) || Number.isNaN(y)) {
+        alert("Please enter valid numbers for X and Y.");
+        return;
+    }
+    mainMap.goCoords(x, y, 500);
+});
+
+// Initial drawing of items and rendering of maps
+// Image loading is asynchronous, so we wait for it to complete before rendering
 drawItems().then(() => {
     mainMap.render();
     miniMap.render();

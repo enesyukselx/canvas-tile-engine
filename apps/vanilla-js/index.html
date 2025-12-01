@@ -1,13 +1,93 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>vanilla-js</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <link rel="stylesheet" href="/style.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>vanilla-js</title>
+    </head>
+    <body class="bg-zinc-800">
+        <div class="flex flex-wrap justify-center gap-4 p-4">
+            <div>
+                <div id="main-map-wrapper" class="rounded-lg">
+                    <canvas></canvas>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-2 items-center">
+                    <div>
+                        <label class="text-white font-semibold" for="x">X</label>
+                        <input class="bg-white w-16 rounded-lg px-2 font-semibold" id="x" type="number" />
+                    </div>
+                    <div>
+                        <label class="text-white font-semibold" for="y">Y</label>
+                        <input class="bg-white w-16 rounded-lg px-2 font-semibold" id="y" type="number" />
+                    </div>
+                    <div>
+                        <button
+                            id="go-to-coords"
+                            class="cursor-pointer bg-zinc-600 hover:bg-zinc-700 text-white font-semibold px-2 py-1 rounded-lg"
+                        >
+                            Go
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div id="mini-map-wrapper" class="rounded-lg">
+                    <canvas></canvas>
+                </div>
+                <div class="mt-4">
+                    <label for="minimap-size-select" class="text-white font-semibold"> Mini Size </label>
+                    <select id="minimap-size-select" class="ml-3 bg-white rounded p-1">
+                        <option value="100">100x100</option>
+                        <option value="200">200x200</option>
+                        <option value="300">300x300</option>
+                        <option value="400">400x400</option>
+                        <option value="500">500x500</option>
+                    </select>
+                </div>
+                <div class="mt-4">
+                    <label for="mainmap-size-select" class="text-white font-semibold"> Main Size </label>
+                    <select id="mainmap-size-select" class="ml-2 bg-white rounded p-1">
+                        <option value="300">300x300</option>
+                        <option value="400">400x400</option>
+                        <option value="500">500x500</option>
+                        <option value="600">600x600</option>
+                        <option value="700">700x700</option>
+                        <option value="800">800x800</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="village-popup" class="hidden absolute top-0 left-0 m-4">
+            <div
+                class="w-80 rounded-3xl border border-amber-500/50 bg-slate-950/80 p-5 text-slate-100 shadow-[0_20px_45px_rgba(0,0,0,0.45)] backdrop-blur supports-backdrop-filter:bg-slate-950/70"
+            >
+                <div class="grid gap-3 rounded-2xl border border-white/5 bg-white/5 p-4 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Player</span>
+                        <span id="popup-player-name" class="font-semibold text-white">Joe Doe</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Village name</span>
+                        <span id="popup-village-name" class="font-semibold text-white">Joe Doe's village</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Type</span>
+                        <span id="popup-village-type" class="font-semibold text-white">Normal</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Coordinates</span>
+                        <span
+                            id="popup-coordinates"
+                            class="rounded-full bg-slate-900/70 px-3 py-1 font-semibold tracking-wide text-amber-200"
+                            >0 · 0</span
+                        >
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
 </html>
