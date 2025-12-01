@@ -1,5 +1,6 @@
 import { Coords } from "../types";
 import { computePan, computeZoom } from "../utils/viewport";
+import { DEFAULT_VALUES } from "../constants";
 
 /**
  * Camera contract used by rendering and coordinate transforms.
@@ -65,8 +66,8 @@ export class Camera implements ICamera {
     readonly maxScale: number;
 
     constructor(initialTopLeft: Coords, scale = 1, minScale = 0.1, maxScale = 10) {
-        this._x = initialTopLeft.x + 0.5; // Center of the pixel
-        this._y = initialTopLeft.y + 0.5; // Center of the pixel
+        this._x = initialTopLeft.x + DEFAULT_VALUES.CELL_CENTER_OFFSET; // Center of the pixel
+        this._y = initialTopLeft.y + DEFAULT_VALUES.CELL_CENTER_OFFSET; // Center of the pixel
         this._scale = scale;
         this.minScale = minScale;
         this.maxScale = maxScale;

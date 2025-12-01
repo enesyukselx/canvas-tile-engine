@@ -2,6 +2,7 @@ import { Coords, DrawObject, CanvasTileEngineConfig } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer } from "./Layer";
+import { VISIBILITY_BUFFER } from "../constants";
 
 /**
  * Canvas-specific helpers for adding draw callbacks to the layer stack.
@@ -25,10 +26,10 @@ export class CanvasDraw {
     ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
-        const minX = topLeft.x - 1;
-        const minY = topLeft.y - 1;
-        const maxX = topLeft.x + viewW + 1;
-        const maxY = topLeft.y + viewH + 1;
+        const minX = topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER;
+        const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
+        const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
+        const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
         return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
     }
 

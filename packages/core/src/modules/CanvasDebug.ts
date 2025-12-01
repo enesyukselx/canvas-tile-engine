@@ -2,6 +2,7 @@ import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { ViewportState } from "./ViewportState";
+import { DEBUG_HUD } from "../constants";
 
 /**
  * Canvas-only debug overlay: draws grid and HUD information.
@@ -97,19 +98,26 @@ export class CanvasDebug {
             );
         }
 
-        const panelWidth = 160;
-        const margin = 8;
         const { width } = this.viewport.getSize();
 
         this.ctx.save();
         this.ctx.fillStyle = "rgba(0,0,0,0.5)";
-        this.ctx.fillRect(width - panelWidth - margin, margin / 2, panelWidth, datas.length * 14 + margin);
+        this.ctx.fillRect(
+            width - DEBUG_HUD.PANEL_WIDTH - DEBUG_HUD.PADDING,
+            DEBUG_HUD.PADDING / 2,
+            DEBUG_HUD.PANEL_WIDTH,
+            datas.length * DEBUG_HUD.LINE_HEIGHT + DEBUG_HUD.PADDING
+        );
 
         this.ctx.fillStyle = "#00ff99";
         this.ctx.font = "12px monospace";
 
         for (let i = 0; i < datas.length; i++) {
-            this.ctx.fillText(datas[i], width - panelWidth - margin + 5, 18 + i * 14);
+            this.ctx.fillText(
+                datas[i],
+                width - DEBUG_HUD.PANEL_WIDTH - DEBUG_HUD.PADDING + 5,
+                18 + i * DEBUG_HUD.LINE_HEIGHT
+            );
         }
 
         this.ctx.restore();

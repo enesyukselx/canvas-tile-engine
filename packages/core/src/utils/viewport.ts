@@ -1,4 +1,5 @@
 import { Coords } from "../types";
+import { DEFAULT_VALUES } from "../constants";
 
 /** Pan the top-left point by screen pixel delta, respecting current scale. */
 export function computePan(topLeft: Coords, scale: number, dx: number, dy: number): Coords {
@@ -14,9 +15,8 @@ export function computeZoom(
     maxScale: number,
     mouse: { x: number; y: number }
 ): { topLeft: Coords; scale: number } {
-    const zoomSensitivity = 0.001;
-    const limitedDelta = Math.min(Math.max(deltaY, -100), 100);
-    const scaleFactor = Math.exp(-limitedDelta * zoomSensitivity);
+    const limitedDelta = Math.min(Math.max(deltaY, DEFAULT_VALUES.MIN_WHEEL_DELTA), DEFAULT_VALUES.MAX_WHEEL_DELTA);
+    const scaleFactor = Math.exp(-limitedDelta * DEFAULT_VALUES.ZOOM_SENSITIVITY);
     const newScale = Math.min(maxScale, Math.max(minScale, oldScale * scaleFactor));
     if (newScale === oldScale) return { topLeft, scale: oldScale };
     return {
@@ -30,7 +30,10 @@ export function computeZoom(
 
 /** Convert world grid coordinates to screen pixels using camera state. */
 export function worldToScreen(world: Coords, cam: { x: number; y: number; scale: number }): Coords {
-    return { x: (world.x + 0.5 - cam.x) * cam.scale, y: (world.y + 0.5 - cam.y) * cam.scale };
+    return {
+        x: (world.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - cam.x) * cam.scale,
+        y: (world.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - cam.y) * cam.scale,
+    };
 }
 
 /** Convert screen pixels back to world grid coordinates using camera state. */

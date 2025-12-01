@@ -1,4 +1,5 @@
 import { CanvasTileEngineConfig } from "../types";
+import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS, DEBUG_DEFAULTS } from "../constants";
 
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
@@ -13,21 +14,21 @@ export class Config {
      */
     constructor(config: CanvasTileEngineConfig) {
         const base: Required<CanvasTileEngineConfig> = {
-            renderer: "canvas",
+            renderer: RENDER_DEFAULTS.RENDERER_TYPE,
             scale: config.scale,
-            minScale: config.minScale ?? config.scale * 0.5,
-            maxScale: config.maxScale ?? config.scale * 2,
+            minScale: config.minScale ?? config.scale * SCALE_LIMITS.MIN_SCALE_MULTIPLIER,
+            maxScale: config.maxScale ?? config.scale * SCALE_LIMITS.MAX_SCALE_MULTIPLIER,
 
             size: {
                 width: config.size.width,
                 height: config.size.height,
-                maxHeight: config.size.maxHeight ?? Infinity,
-                maxWidth: config.size.maxWidth ?? Infinity,
-                minHeight: config.size.minHeight ?? 100,
-                minWidth: config.size.minWidth ?? 100,
+                maxHeight: config.size.maxHeight ?? SIZE_LIMITS.MAX_HEIGHT,
+                maxWidth: config.size.maxWidth ?? SIZE_LIMITS.MAX_WIDTH,
+                minHeight: config.size.minHeight ?? SIZE_LIMITS.MIN_HEIGHT,
+                minWidth: config.size.minWidth ?? SIZE_LIMITS.MIN_WIDTH,
             },
 
-            backgroundColor: config.backgroundColor ?? "#ffffff",
+            backgroundColor: config.backgroundColor ?? RENDER_DEFAULTS.BACKGROUND_COLOR,
 
             eventHandlers: {
                 click: config.eventHandlers?.click ?? false,
@@ -51,8 +52,8 @@ export class Config {
                 enabled: config.debug?.enabled ?? false,
                 grid: {
                     enabled: config.debug?.grid?.enabled ?? false,
-                    color: config.debug?.grid?.color ?? "rgba(255,255,255,0.25)",
-                    lineWidth: config.debug?.grid?.lineWidth ?? 1,
+                    color: config.debug?.grid?.color ?? DEBUG_DEFAULTS.GRID_COLOR,
+                    lineWidth: config.debug?.grid?.lineWidth ?? DEBUG_DEFAULTS.GRID_LINE_WIDTH,
                 },
                 hud: {
                     enabled: config.debug?.hud?.enabled ?? false,

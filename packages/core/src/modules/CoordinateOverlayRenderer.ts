@@ -1,6 +1,7 @@
 import { Config } from "./Config";
 import { ICamera } from "./Camera";
 import { ViewportState } from "./ViewportState";
+import { COORDINATE_OVERLAY } from "../constants";
 
 /**
  * Renders a coordinate overlay (axes and labels) on top of the canvas.
@@ -32,21 +33,29 @@ export class CoordinateOverlayRenderer {
         // Save the current canvas state
         this.ctx.save();
 
-        // Set fill style to black with 0.1 opacity
-        this.ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+        // Set fill style to black with configured opacity
+        this.ctx.fillStyle = `rgba(0, 0, 0, ${COORDINATE_OVERLAY.BORDER_OPACITY})`;
 
         // Draw left border - 20px wide, full height
         const { width, height } = this.viewport.getSize();
-        this.ctx.fillRect(0, 0, 20, height);
+        this.ctx.fillRect(0, 0, COORDINATE_OVERLAY.BORDER_WIDTH, height);
 
         // Draw bottom border - full width, 20px high
-        this.ctx.fillRect(20, height - 20, width, 20);
+        this.ctx.fillRect(
+            COORDINATE_OVERLAY.BORDER_WIDTH,
+            height - COORDINATE_OVERLAY.BORDER_WIDTH,
+            width,
+            COORDINATE_OVERLAY.BORDER_WIDTH
+        );
 
         // Set text properties for coordinates
-        this.ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${COORDINATE_OVERLAY.TEXT_OPACITY})`;
 
         // Adjust font size based on scale (min 8px, max 12px)
-        const fontSize = Math.min(12, Math.max(8, this.camera.scale * 0.25));
+        const fontSize = Math.min(
+            COORDINATE_OVERLAY.MAX_FONT_SIZE,
+            Math.max(COORDINATE_OVERLAY.MIN_FONT_SIZE, this.camera.scale * COORDINATE_OVERLAY.FONT_SIZE_SCALE_FACTOR)
+        );
         this.ctx.font = `${fontSize}px Arial`;
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
@@ -62,11 +71,7 @@ export class CoordinateOverlayRenderer {
 
         // Draw X coordinates (bottom)
         for (let i = 0 - (this.camera.x % 1); i <= visibleAreaWidthInCords + 1; i++) {
-            this.ctx.fillText(
-                Math.round(this.camera.x + i).toString(),
-                cordGap * i + cordGap / 2,
-                height - 10
-            );
+            this.ctx.fillText(Math.round(this.camera.x + i).toString(), cordGap * i + cordGap / 2, height - 10);
         }
 
         // Restore the canvas state

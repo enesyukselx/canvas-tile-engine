@@ -1,3 +1,5 @@
+import { DEFAULT_VALUES } from "../constants";
+
 /**
  * Simple image loader with in-memory caching to avoid duplicate network requests.
  */
@@ -26,7 +28,7 @@ export class ImageLoader {
      * @param retry How many times to retry on error (default: 1).
      * @returns Promise resolving to the loaded image element.
      */
-    async load(src: string, retry: number = 1): Promise<HTMLImageElement> {
+    async load(src: string, retry: number = DEFAULT_VALUES.IMAGE_LOAD_RETRY_COUNT): Promise<HTMLImageElement> {
         // Cached
         if (this.cache.has(src)) {
             return this.cache.get(src)!;
