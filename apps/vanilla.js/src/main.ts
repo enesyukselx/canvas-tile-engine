@@ -1,23 +1,27 @@
-import { generateMapObjects } from "./generateMapObjects";
 import "./style.css";
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
+import { generateMapObjects } from "./generateMapObjects";
 
 const INITIAL_COORDS = { x: 0, y: 0 };
 
+// Popup elements
 const popup = document.getElementById("village-popup");
 const popupPlayerNameElem = document.getElementById("popup-player-name");
 const popupNameElem = document.getElementById("popup-village-name");
 const popupVillageTypeElem = document.getElementById("popup-village-type");
 const popupPointsElem = document.getElementById("popup-village-points");
-const popupCoordinatessElem = document.getElementById("popup-coordinates");
+const popupCoordinatesElem = document.getElementById("popup-coordinates");
 
+// Input elements for coordinates and button to go to coordinates
 const inputX = document.getElementById("x") as HTMLInputElement;
 const inputY = document.getElementById("y") as HTMLInputElement;
 const goToCoordsBtn = document.getElementById("go-to-coords") as HTMLButtonElement;
 
+// Set initial values for input fields
 inputX.value = INITIAL_COORDS.x.toString();
 inputY.value = INITIAL_COORDS.y.toString();
 
+// Main map configuration
 const mainMapOptions: CanvasTileEngineConfig = {
     scale: 50,
     size: { width: 500, height: 500, maxHeight: 700, maxWidth: 700, minHeight: 200, minWidth: 200 },
@@ -34,6 +38,7 @@ const mainMapOptions: CanvasTileEngineConfig = {
     },
 };
 
+// Mini map configuration
 const miniMapOptions: CanvasTileEngineConfig = {
     scale: 10,
     size: { width: 300, height: 300, maxWidth: 700, maxHeight: 700, minWidth: 100, minHeight: 100 },
@@ -44,15 +49,20 @@ const miniMapOptions: CanvasTileEngineConfig = {
     },
 };
 
+// Canvas-wrapper elements for main and mini maps
 const mainMapCanvas = document.getElementById("main-map-wrapper") as HTMLDivElement;
 const miniMapCanvas = document.getElementById("mini-map-wrapper") as HTMLDivElement;
 
+// Initialize maps
 const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, INITIAL_COORDS);
 const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, INITIAL_COORDS);
 
+// Generate map objects
 const items = generateMapObjects(5000, 0, 0, 1.2);
 
+// Function to draw items on both maps
 const drawItems = async () => {
+    // Load all images
     const loaded = await Promise.all(
         items.map(async (item) => ({
             item,
@@ -60,6 +70,7 @@ const drawItems = async () => {
         }))
     );
 
+    // Prepare image items for main map
     const imageItems = loaded.map(({ item, img }) => ({
         img,
         x: item.x,
@@ -67,6 +78,7 @@ const drawItems = async () => {
         size: 1,
     }));
 
+    // Prepare rectangle items for mini map
     const miniMapRects = loaded.map(({ item }) => ({
         x: item.x,
         y: item.y,
@@ -74,7 +86,10 @@ const drawItems = async () => {
         style: { fillStyle: item.color },
     }));
 
+    // Draw images on main map
     mainMap.drawImage(imageItems);
+
+    // Draw circles with object colors on main map
     loaded.forEach(({ item }) => {
         if (item.type === "terrain") {
             return;
@@ -95,10 +110,12 @@ const drawItems = async () => {
             1
         );
     });
+
+    // Draw rectangles on mini map
     miniMap.drawRect(miniMapRects);
 };
 
-// Synchronization logic
+// Synchronization logic between main map and mini map
 let isSyncing = false;
 
 miniMap.onCoordsChange = (coords) => {
@@ -129,6 +146,8 @@ mainMap.onCoordsChange = (coords) => {
 };
 
 // Mini map viewport rectangle
+// Draws a rectangle on the mini map representing the current viewport of the main map
+// "onDraw" is a callback for custom drawing on the map's canvas
 miniMap.onDraw = (ctx) => {
     const mainCfg = mainMap.getConfig();
     const miniCfg = miniMap.getConfig();
@@ -149,39 +168,64 @@ miniMap.onDraw = (ctx) => {
     ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
 };
 
+// Handle hover events on the main map
+// coords: The coordinates of the hover event
+// mouse: The mouse event object
+// client: The client coordinates of the mouse event
 mainMap.onHover = (coords, _mouse, client) => {
-    if (items.some((item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain")) {
+    // Check if any item exists at the hovered coordinates and is not of type "terrain"
+    const item = items.find(
+        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
+    );
+
+    if (item) {
         popup?.classList.remove("hidden");
-        popup!.style.left = `${client.raw.x - 120}px`;
-        popup!.style.top = `${client.raw.y + 15}px`;
-        const item = items.find((item) => item.x === coords.snapped.x && item.y === coords.snapped.y);
-        console.log(item);
-        if (item) {
-            if (popupPlayerNameElem) {
-                popupPlayerNameElem.textContent = `Player: Joe`;
-            }
-            if (popupNameElem) {
-                popupNameElem.textContent = `Village: Joe's Village`;
-            }
-            if (popupVillageTypeElem) {
-                popupVillageTypeElem.textContent = item.type;
-            }
-            if (popupPointsElem) {
-                popupPointsElem.textContent = `Points: ${Math.floor(Math.random() * 1000)}`;
-            }
-            if (popupCoordinatessElem) {
-                popupCoordinatessElem.textContent = `${item.x} · ${item.y}`;
-            }
+        if (popup) {
+            popup.style.left = `${client.raw.x - 120}px`;
+            popup.style.top = `${client.raw.y + 15}px`;
+        }
+
+        // Update popup content
+        if (popupPlayerNameElem) {
+            popupPlayerNameElem.textContent = `${item.playerName}`;
+        }
+        if (popupNameElem) {
+            popupNameElem.textContent = `${item.villageName}`;
+        }
+        if (popupVillageTypeElem) {
+            popupVillageTypeElem.textContent = item.type.toUpperCase();
+        }
+        if (popupPointsElem) {
+            popupPointsElem.textContent = `Points: 500`;
+        }
+        if (popupCoordinatesElem) {
+            popupCoordinatesElem.textContent = `${item.x} | ${item.y}`;
         }
     } else {
         popup?.classList.add("hidden");
     }
 };
 
+// Handle click events on the main map
+mainMap.onClick = (coords, _mouse, _client) => {
+    // Check if any item exists at the clicked coordinates and is not of type "terrain"
+    const item = items.find(
+        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
+    );
+
+    if (item) {
+        alert(
+            `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`
+        );
+    }
+};
+
+// Handle mouse leave event on the main map
 mainMap.onMouseLeave = () => {
     popup?.classList.add("hidden");
 };
 
+// Handle click event on the "Go To Coordinates" button
 goToCoordsBtn.addEventListener("click", () => {
     const x = Number(inputX.value);
     const y = Number(inputY.value);
@@ -192,6 +236,8 @@ goToCoordsBtn.addEventListener("click", () => {
     mainMap.goCoords(x, y, 500);
 });
 
+// Initial drawing of items and rendering of maps
+// Image loading is asynchronous, so we wait for it to complete before rendering
 drawItems().then(() => {
     mainMap.render();
     miniMap.render();

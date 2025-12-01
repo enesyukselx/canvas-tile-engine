@@ -8,6 +8,8 @@ import {
     type VillageSize,
 } from "./constants";
 
+import { faker } from "@faker-js/faker";
+
 type MapObjectType = "terrain" | "normal" | "barbar";
 
 /**
@@ -95,11 +97,16 @@ export const generateMapObjects = (count: number, originX: number = 0, originY: 
             usedCoordinates.add(coordKey);
 
             const objectType = getRandomMapObjectType();
+            const playerName = objectType === "barbar" ? "Barbarian" : faker.internet.username().slice(0, 10);
+            const villageName = objectType === "barbar" ? "Barbarian Camp" : faker.location.street().slice(0, 15);
             const size = getRandomVillageSize();
             const color = getRandomObjectColor(objectType);
             const imageUrl = getObjectImage(objectType, size);
 
             objects.push({
+                id: faker.string.uuid(),
+                playerName,
+                villageName,
                 x,
                 y,
                 color,
