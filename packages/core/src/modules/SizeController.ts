@@ -3,6 +3,7 @@ import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { IRenderer } from "./Renderer/Renderer";
 import { ViewportState } from "./ViewportState";
+import { AnimationController } from "./AnimationController";
 
 export class SizeController {
     private canvasWrapper: HTMLDivElement;
@@ -11,7 +12,6 @@ export class SizeController {
     private viewport: ViewportState;
     private renderer: IRenderer;
     private config: Config;
-    private resizeAnimationId: number | undefined;
     private onSizeApplied: () => void;
 
     constructor(
@@ -34,18 +34,20 @@ export class SizeController {
     }
 
     /**
-     * Manually update canvas size (e.g., user-driven select). Keeps view centered.
+     * Manually update canvas size using AnimationController for smooth transitions.
      * @param width New canvas width in pixels.
      * @param height New canvas height in pixels.
      * @param durationMs Animation duration in ms (default 500). Use 0 for instant resize.
+     * @param animationController AnimationController instance to handle the animation.
      */
-    resize(width: number, height: number, durationMs: number = 500) {
+    resizeWithAnimation(width: number, height: number, durationMs: number, animationController: AnimationController) {
         if (width <= 0 || height <= 0) {
             return;
         }
 
         const configSize = this.config.get().size;
 
+        // Clamp to max values
         if (configSize && configSize.maxHeight && height > configSize.maxHeight) {
             height = configSize.maxHeight;
         }
@@ -53,40 +55,8 @@ export class SizeController {
             width = configSize.maxWidth;
         }
 
-        if (this.resizeAnimationId !== undefined) {
-            cancelAnimationFrame(this.resizeAnimationId);
-        }
-
-        const prev = this.viewport.getSize();
-        const center = this.camera.getCenter(prev.width, prev.height);
-        if (durationMs <= 0) {
-            this.applySize(width, height, center);
-            this.resizeAnimationId = undefined;
-            return;
-        }
-
-        const startW = prev.width;
-        const startH = prev.height;
-        const deltaW = width - prev.width;
-        const deltaH = height - prev.height;
-
-        const start = performance.now();
-
-        const step = (now: number) => {
-            const t = Math.min(1, (now - start) / durationMs);
-            const nextW = startW + deltaW * t;
-            const nextH = startH + deltaH * t;
-
-            this.applySize(nextW, nextH, center);
-
-            if (t < 1) {
-                this.resizeAnimationId = requestAnimationFrame(step);
-            } else {
-                this.resizeAnimationId = undefined;
-            }
-        };
-
-        this.resizeAnimationId = requestAnimationFrame(step);
+        // Delegate to AnimationController
+        animationController.animateResize(width, height, durationMs, (w, h, center) => this.applySize(w, h, center));
     }
 
     private applySize(nextW: number, nextH: number, center: Coords) {

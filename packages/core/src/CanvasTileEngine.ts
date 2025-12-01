@@ -10,6 +10,8 @@ import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
 import { Coords, DrawObject, CanvasTileEngineConfig, onClickCallback, onDrawCallback, onHoverCallback } from "./types";
 import { SizeController } from "./modules/SizeController";
+import { AnimationController } from "./modules/AnimationController";
+import { RendererFactory } from "./modules/RendererFactory";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
@@ -24,8 +26,8 @@ export class CanvasTileEngine {
     private events: EventManager;
     private draw?: CanvasDraw;
     public images: ImageLoader;
-    private moveAnimationId?: number;
     private sizeController: SizeController;
+    private animationController: AnimationController;
 
     public canvasWrapper: HTMLDivElement;
     public canvas: HTMLCanvasElement;
@@ -99,6 +101,10 @@ export class CanvasTileEngine {
         this.viewport = new ViewportState(config.size.width, config.size.height);
         this.camera = new Camera(initialTopLeft, config.scale, config.minScale, config.maxScale);
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
+
+        // Initialize animation controller
+        this.animationController = new AnimationController(this.camera, this.viewport, () => this.handleCameraChange());
+
         this.renderer = this.createRenderer(rendererType);
 
         this.images = new ImageLoader();
@@ -143,7 +149,7 @@ export class CanvasTileEngine {
      * @param durationMs Animation duration in ms (default 500). Use 0 for instant resize.
      */
     resize(width: number, height: number, durationMs: number = 500) {
-        this.sizeController.resize(width, height, durationMs);
+        this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController);
     }
 
     /**
@@ -186,43 +192,7 @@ export class CanvasTileEngine {
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
      */
     goCoords(x: number, y: number, durationMs: number = 500) {
-        if (this.moveAnimationId !== undefined) {
-            cancelAnimationFrame(this.moveAnimationId);
-        }
-
-        if (durationMs <= 0) {
-            const size = this.viewport.getSize();
-            this.camera.setCenter({ x, y }, size.width, size.height);
-            this.handleCameraChange();
-            this.moveAnimationId = undefined;
-            return;
-        }
-
-        const startCenter = this.getCenterCoords();
-        const target = { x, y };
-        const size = this.viewport.getSize();
-        const start = performance.now();
-
-        const step = (now: number) => {
-            const elapsed = now - start;
-            const t = Math.min(1, elapsed / durationMs);
-
-            const nextCenter = {
-                x: startCenter.x + (target.x - startCenter.x) * t,
-                y: startCenter.y + (target.y - startCenter.y) * t,
-            };
-
-            this.camera.setCenter(nextCenter, size.width, size.height);
-            this.handleCameraChange();
-
-            if (t < 1) {
-                this.moveAnimationId = requestAnimationFrame(step);
-            } else {
-                this.moveAnimationId = undefined;
-            }
-        };
-
-        this.moveAnimationId = requestAnimationFrame(step);
+        this.animationController.animateMoveTo(x, y, durationMs);
     }
 
     // ─── Draw helpers (canvas renderer only) ───────────
@@ -318,22 +288,21 @@ export class CanvasTileEngine {
      * @param type Renderer type requested.
      */
     private createRenderer(type: CanvasTileEngineConfig["renderer"]): IRenderer {
-        switch (type) {
-            case "canvas": {
-                this.layers = new Layer();
-                this.draw = new CanvasDraw(this.layers, this.coordinateTransformer, this.camera);
-                return new CanvasRenderer(
-                    this.canvas,
-                    this.camera,
-                    this.coordinateTransformer,
-                    this.config,
-                    this.viewport,
-                    this.layers
-                );
-            }
-            default:
-                throw new Error(`Renderer "${type ?? "unknown"}" is not supported yet.`);
+        // Initialize layers and draw helpers for canvas renderer
+        if (type === "canvas") {
+            this.layers = new Layer();
+            this.draw = new CanvasDraw(this.layers, this.coordinateTransformer, this.camera);
         }
+
+        return RendererFactory.createRenderer(
+            type ?? "canvas",
+            this.canvas,
+            this.camera,
+            this.coordinateTransformer,
+            this.config,
+            this.viewport,
+            this.layers!
+        );
     }
 
     private ensureCanvasDraw(): CanvasDraw {
