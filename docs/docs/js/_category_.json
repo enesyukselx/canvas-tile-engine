@@ -1,7 +1,4 @@
 {
-    "label": "Documentation - Javascript",
-    "position": 2,
-    "link": {
-        "type": "generated-index"
-    }
+    "label": "Javascript",
+    "position": 2
 }

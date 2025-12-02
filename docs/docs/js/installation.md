@@ -52,8 +52,3 @@ engine.drawCircle([
 
 engine.render();
 ```
-
-## Next steps
-
--   See `docs/js` for more examples.
--   For framework integrations, check the React/others tabs.
