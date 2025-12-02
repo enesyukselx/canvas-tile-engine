@@ -225,7 +225,7 @@ mainMap.onHover = (coords, _mouse, client) => {
         if (popup) {
             const position = {
                 x: client.snapped.x - 160 < 0 ? 0 : client.snapped.x - 160,
-                y: client.snapped.y + 20,
+                y: client.snapped.y + mainMap.getConfig().scale / 2,
             };
             popup.style.left = `${position.x}px`;
             popup.style.top = `${position.y}px`;
