@@ -223,8 +223,12 @@ mainMap.onHover = (coords, _mouse, client) => {
     if (item) {
         popup?.classList.remove("hidden");
         if (popup) {
-            popup.style.left = `${client.raw.x - 120}px`;
-            popup.style.top = `${client.raw.y + 15}px`;
+            const position = {
+                x: client.snapped.x - 160 < 0 ? 0 : client.snapped.x - 160,
+                y: client.snapped.y + 20,
+            };
+            popup.style.left = `${position.x}px`;
+            popup.style.top = `${position.y}px`;
         }
 
         // Update popup content
@@ -248,6 +252,11 @@ mainMap.onHover = (coords, _mouse, client) => {
     }
 };
 
+// Handle mouse leave event on the main map
+mainMap.onMouseLeave = () => {
+    popup?.classList.add("hidden");
+};
+
 // Handle click events on the main map
 mainMap.onClick = (coords, _mouse, _client) => {
     // Check if any item exists at the clicked coordinates and is not of type "terrain"
@@ -260,11 +269,6 @@ mainMap.onClick = (coords, _mouse, _client) => {
             `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`
         );
     }
-};
-
-// Handle mouse leave event on the main map
-mainMap.onMouseLeave = () => {
-    popup?.classList.add("hidden");
 };
 
 // Handle click event on the "Go To Coordinates" button

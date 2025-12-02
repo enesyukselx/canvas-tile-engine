@@ -37,25 +37,26 @@ export class GestureController {
         const rect = this.canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        const worldCoords = this.transformer.screenToWorld(mouseX, mouseY);
+        const world = this.transformer.screenToWorld(mouseX, mouseY);
+        const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
 
         this.onClick(
             {
-                raw: worldCoords,
-                snapped: { x: Math.floor(worldCoords.x), y: Math.floor(worldCoords.y) },
+                raw: world,
+                snapped: { x: Math.floor(world.x), y: Math.floor(world.y) },
             },
             {
-                raw: { x: mouseX, y: mouseY },
+                raw: { x: e.clientX - rect.left, y: e.clientY - rect.top },
                 snapped: {
-                    x: Math.round(mouseX / this.camera.scale) * this.camera.scale,
-                    y: Math.round(mouseY / this.camera.scale) * this.camera.scale,
+                    x: screen.x,
+                    y: screen.y,
                 },
             },
             {
                 raw: { x: e.clientX, y: e.clientY },
                 snapped: {
-                    x: Math.round(e.clientX / this.camera.scale) * this.camera.scale,
-                    y: Math.round(e.clientY / this.camera.scale) * this.camera.scale,
+                    x: screen.x + rect.left,
+                    y: screen.y + rect.top,
                 },
             }
         );
@@ -75,20 +76,22 @@ export class GestureController {
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 const world = this.transformer.screenToWorld(mouseX, mouseY);
+                const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
+
                 this.onHover(
                     { raw: world, snapped: { x: Math.floor(world.x), y: Math.floor(world.y) } },
                     {
-                        raw: { x: mouseX, y: mouseY },
+                        raw: { x: e.clientX - rect.left, y: e.clientY - rect.top },
                         snapped: {
-                            x: Math.round(mouseX / this.camera.scale) * this.camera.scale,
-                            y: Math.round(mouseY / this.camera.scale) * this.camera.scale,
+                            x: screen.x,
+                            y: screen.y,
                         },
                     },
                     {
                         raw: { x: e.clientX, y: e.clientY },
                         snapped: {
-                            x: Math.round(e.clientX / this.camera.scale) * this.camera.scale,
-                            y: Math.round(e.clientY / this.camera.scale) * this.camera.scale,
+                            x: screen.x + rect.left,
+                            y: screen.y + rect.top,
                         },
                     }
                 );
