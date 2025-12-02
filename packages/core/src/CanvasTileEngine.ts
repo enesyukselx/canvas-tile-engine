@@ -99,7 +99,12 @@ export class CanvasTileEngine {
         };
 
         this.viewport = new ViewportState(config.size.width, config.size.height);
-        this.camera = new Camera(initialTopLeft, config.scale, config.minScale, config.maxScale);
+        this.camera = new Camera(
+            initialTopLeft,
+            this.config.get().scale,
+            this.config.get().minScale,
+            this.config.get().maxScale
+        );
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
 
         // Initialize animation controller
