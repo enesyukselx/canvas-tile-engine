@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <link rel="stylesheet" href="/style.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>vanilla-js</title>
+    </head>
+    <body class="bg-zinc-800">
+        <div id="map-container">
+            <canvas></canvas>
+        </div>
+        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2">
+            <div
+                class="flex items-center gap-4 rounded-2xl border border-lime-100/30 bg-linear-to-br from-white/20 via-white/8 to-white/5 px-6 py-3 shadow-[0_18px_40px_-16px_rgba(0,0,0,0.9)] ring-1 ring-white/25 backdrop-blur-xl backdrop-saturate-150 opacity-90 hover:opacity-100 transition"
+            >
+                <div class="flex gap-2">
+                    <button
+                        class="group rounded-lg border border-white/30 bg-white/10 p-2 shadow-lg shadow-emerald-950/35 transition hover:-translate-y-1 hover:shadow-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 backdrop-blur"
+                    >
+                        <img
+                            width="72"
+                            height="72"
+                            class="rounded-md transition group-hover:scale-[1.05] group-hover:drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]"
+                            src="/buildings/home.png"
+                            alt="Home"
+                        />
+                    </button>
+                    <button
+                        class="group rounded-lg border border-white/30 bg-white/10 p-2 shadow-lg shadow-emerald-950/35 transition hover:-translate-y-1 hover:shadow-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 backdrop-blur"
+                    >
+                        <img
+                            width="72"
+                            height="72"
+                            class="rounded-md transition group-hover:scale-[1.05] group-hover:drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]"
+                            src="/buildings/farm.png"
+                            alt="Farm"
+                        />
+                    </button>
+                    <button
+                        class="group rounded-lg border border-white/30 bg-white/10 p-2 shadow-lg shadow-emerald-950/35 transition hover:-translate-y-1 hover:shadow-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 backdrop-blur"
+                    >
+                        <img
+                            width="72"
+                            height="72"
+                            class="rounded-md transition group-hover:scale-[1.05] group-hover:drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]"
+                            src="/buildings/barrack.png"
+                            alt="Barrack"
+                        />
+                    </button>
+                    <button
+                        class="group rounded-lg border border-white/30 bg-white/10 p-2 shadow-lg shadow-emerald-950/35 transition hover:-translate-y-1 hover:shadow-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 backdrop-blur"
+                    >
+                        <img
+                            width="72"
+                            height="72"
+                            class="rounded-md transition group-hover:scale-[1.05] group-hover:drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]"
+                            src="/buildings/library.png"
+                            alt="Library"
+                        />
+                    </button>
+                    <button
+                        class="group rounded-lg border border-white/30 bg-white/10 p-2 shadow-lg shadow-emerald-950/35 transition hover:-translate-y-1 hover:shadow-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 backdrop-blur"
+                    >
+                        <img
+                            width="72"
+                            height="72"
+                            class="rounded-md transition group-hover:scale-[1.05] group-hover:drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]"
+                            src="/buildings/tower.png"
+                            alt="Tower"
+                        />
+                    </button>
+                    <button
+                        class="group rounded-lg border border-white/30 bg-white/10 p-2 shadow-lg shadow-emerald-950/35 transition hover:-translate-y-1 hover:shadow-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 backdrop-blur"
+                    >
+                        <img
+                            width="72"
+                            height="72"
+                            class="rounded-md transition group-hover:scale-[1.05] group-hover:drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]"
+                            src="/buildings/forest.png"
+                            alt="Forest"
+                        />
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="absolute left-12 top-5">
+            <div
+                class="flex items-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-3 py-2 shadow-[0_14px_32px_-16px_rgba(0,0,0,0.85)] ring-1 ring-white/20 backdrop-blur-xl backdrop-saturate-150 opacity-90 hover:opacity-100 transition"
+            >
+                <button
+                    id="save-button"
+                    class="rounded-lg border border-emerald-200/60 bg-linear-to-b from-emerald-200/50 via-emerald-400/40 to-emerald-600/45 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-50 shadow-inner shadow-white/10 transition hover:-translate-y-0.5 hover:ring-2 hover:ring-emerald-200/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/80 backdrop-blur"
+                >
+                    Save
+                </button>
+                <button
+                    id="load-button"
+                    class="rounded-lg border border-green-200/60 bg-linear-to-b from-green-200/50 via-green-400/40 to-green-600/45 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-green-50 shadow-inner shadow-white/10 transition hover:-translate-y-0.5 hover:ring-2 hover:ring-green-200/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200/80 backdrop-blur"
+                >
+                    Load
+                </button>
+                <button
+                    id="clear-button"
+                    class="rounded-lg border border-rose-200/60 bg-linear-to-b from-rose-200/55 via-rose-400/45 to-rose-600/50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-rose-50 shadow-inner shadow-white/10 transition hover:-translate-y-0.5 hover:ring-2 hover:ring-rose-200/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200/80 backdrop-blur"
+                >
+                    Clear
+                </button>
+                <button
+                    id="center-button"
+                    class="rounded-lg border border-cyan-200/60 bg-linear-to-b from-cyan-200/55 via-cyan-300/45 to-cyan-600/50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-cyan-50 shadow-inner shadow-white/10 transition hover:-translate-y-0.5 hover:ring-2 hover:ring-cyan-200/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80 backdrop-blur"
+                >
+                    Go Center
+                </button>
+            </div>
+        </div>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>
