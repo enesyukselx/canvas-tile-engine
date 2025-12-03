@@ -5,9 +5,9 @@
     "main": "index.js",
     "scripts": {
         "build": "pnpm --filter @canvas-tile-engine/core build",
-        "dev": "concurrently \"pnpm dev:lib\" \"pnpm dev:app\"",
+        "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "pnpm --filter @canvas-tile-engine/core dev",
-        "dev:app": "pnpm --filter vanilla-js dev",
+        "dev:example": "node run-example.js",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "keywords": [],
