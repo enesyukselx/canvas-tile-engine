@@ -289,6 +289,40 @@ export class CanvasTileEngine {
     }
 
     /**
+     * Clear all draw callbacks from a specific layer (canvas renderer only).
+     * Use this before redrawing dynamic content to prevent accumulation.
+     * @param layer Layer index to clear.
+     * @example
+     * ```ts
+     * engine.clearLayer(1);
+     * engine.drawRect(newRects, 1);
+     * engine.render();
+     * ```
+     */
+    clearLayer(layer: number) {
+        if (!this.layers) {
+            throw new Error("clearLayer is only available when renderer is set to 'canvas'.");
+        }
+        this.layers.clear(layer);
+    }
+
+    /**
+     * Clear all draw callbacks from all layers (canvas renderer only).
+     * Useful for complete scene reset.
+     * @example
+     * ```ts
+     * engine.clearAll();
+     * // Redraw everything from scratch
+     * ```
+     */
+    clearAll() {
+        if (!this.layers) {
+            throw new Error("clearAll is only available when renderer is set to 'canvas'.");
+        }
+        this.layers.clear();
+    }
+
+    /**
      * Build the active renderer based on config.
      * @param type Renderer type requested.
      */

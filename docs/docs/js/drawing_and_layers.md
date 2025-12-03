@@ -190,6 +190,90 @@ The `origin` property controls how shapes and images are positioned relative to 
 
 The engine automatically skips drawing objects that are outside the current viewport (plus a small buffer). You can safely pass thousands of objects to the draw methods; only the visible ones will be rendered.
 
+## Clearing Layers
+
+When your scene content changes dynamically (e.g., objects change color, get added or removed), you need to clear the layer before redrawing. Without clearing, new draw calls accumulate on top of existing ones.
+
+### `clearLayer(layer)`
+
+Clears all draw callbacks from a specific layer.
+
+```typescript
+// Clear layer 1 before redrawing
+engine.clearLayer(1);
+engine.drawRect(updatedRects, 1);
+engine.render();
+```
+
+### `clearAll()`
+
+Clears all draw callbacks from all layers. Useful for complete scene reset.
+
+```typescript
+// Reset everything
+engine.clearAll();
+// Redraw from scratch
+engine.drawRect(background, 0);
+engine.drawImage(units, 1);
+engine.render();
+```
+
+### When to Clear?
+
+| Scenario                | Clear Needed? | Example                  |
+| :---------------------- | :------------ | :----------------------- |
+| Camera pan/zoom         | ❌ No         | User drags the map       |
+| Object color changes    | ✅ Yes        | Seat selection in cinema |
+| Object added/removed    | ✅ Yes        | Placing a tower          |
+| Object position changes | ✅ Yes        | Moving a unit            |
+| Loading new level       | ✅ Yes        | Game level transition    |
+
+:::tip
+If your scene is **static** (objects don't change), you only need to call `drawX()` once at startup. The engine will re-render the same layer content when the camera moves.
+
+If your scene is **dynamic** (objects change state), use `clearLayer()` + `drawX()` + `render()` pattern.
+:::
+
+**Static Scene Example (Map):**
+
+```typescript
+// Draw once at startup
+engine.drawImage(mapTiles, 0);
+engine.drawImage(buildings, 1);
+engine.render();
+
+// Camera changes only need render()
+engine.onCoordsChange = () => {
+    engine.render(); // No clear needed, objects are the same
+};
+```
+
+**Dynamic Scene Example (Cinema Seats):**
+
+```typescript
+function redraw() {
+    engine.clearLayer(1); // Clear old seats
+    engine.drawRect(
+        seats.map((s) => ({
+            x: s.x,
+            y: s.y,
+            size: 0.9,
+            style: { fillStyle: s.selected ? "blue" : "green" },
+        })),
+        1
+    );
+    engine.render();
+}
+
+engine.onClick = (coords) => {
+    const seat = findSeat(coords.snapped.x, coords.snapped.y);
+    if (seat) {
+        seat.selected = !seat.selected;
+        redraw(); // Clear + Draw + Render
+    }
+};
+```
+
 ## Rendering
 
 The engine uses a passive rendering approach. It does not run a continuous loop (like `requestAnimationFrame`) unless you implement one. You must explicitly call `render()` to update the canvas when you modify the scene.
@@ -205,7 +289,8 @@ engine.render(); // Must be called to see the rectangle
 
 **Automatic Renders:**
 The engine automatically calls `render()` when:
-- The camera is panned or zoomed.
-- The viewport is resized.
+
+-   The camera is panned or zoomed.
+-   The viewport is resized.
 
 For all other changes (adding shapes, changing config, loading images), you must call `render()` manually.
