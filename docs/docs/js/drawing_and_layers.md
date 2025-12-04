@@ -214,6 +214,144 @@ The `origin` property controls how shapes and images are positioned relative to 
 
 The engine automatically skips drawing objects that are outside the current viewport (plus a small buffer). You can safely pass thousands of objects to the draw methods; only the visible ones will be rendered.
 
+## Static Caching (Pre-rendered Content)
+
+For large static datasets (e.g., mini-maps with 100k+ items), the engine provides pre-rendering methods that cache content to an offscreen canvas. This dramatically improves performance when all items need to be visible at once.
+
+### When to Use Static Caching
+
+| Scenario                       | Use Static? | Why                                      |
+| :----------------------------- | :---------- | :--------------------------------------- |
+| Mini-map with 100k items       | ✅ Yes      | All items visible, static content        |
+| Main map with 100k items       | ❌ No       | Only viewport visible, culling is enough |
+| Overview map (fixed zoom)      | ✅ Yes      | Static zoom, all items visible           |
+| Dynamic content (units moving) | ❌ No       | Content changes frequently               |
+
+### `drawStaticRect`
+
+Pre-renders rectangles to an offscreen canvas. Ideal for mini-maps.
+
+```typescript
+const miniMapItems = items.map((item) => ({
+    x: item.x,
+    y: item.y,
+    size: 0.9,
+    style: { fillStyle: item.color },
+}));
+
+// "minimap-items" is a unique cache key
+miniMap.drawStaticRect(miniMapItems, "minimap-items", 1);
+```
+
+### `drawStaticCircle`
+
+Pre-renders circles to an offscreen canvas.
+
+```typescript
+const markers = items.map((item) => ({
+    x: item.x,
+    y: item.y,
+    size: 0.5,
+    style: { fillStyle: item.color },
+}));
+
+miniMap.drawStaticCircle(markers, "minimap-markers", 2);
+```
+
+### `drawStaticImage`
+
+Pre-renders images to an offscreen canvas. Useful for static terrain or decorations with fixed zoom.
+
+```typescript
+const terrainTiles = tiles.map((tile) => ({
+    x: tile.x,
+    y: tile.y,
+    size: 1,
+    img: tileImages[tile.type],
+}));
+
+engine.drawStaticImage(terrainTiles, "terrain-cache", 0);
+```
+
+### `clearStaticCache`
+
+Clears pre-rendered caches when content changes.
+
+```typescript
+// Clear a specific cache
+engine.clearStaticCache("minimap-items");
+
+// Clear all static caches
+engine.clearStaticCache();
+```
+
+### Cache Keys
+
+The cache key (second parameter) identifies each pre-rendered cache. Using the same key reuses the existing cache; using a different key creates a new one.
+
+```typescript
+// These use separate caches
+engine.drawStaticRect(villages, "villages", 1);
+engine.drawStaticRect(cities, "cities", 1);
+
+// This reuses the "villages" cache (no re-render)
+engine.drawStaticRect(villages, "villages", 1);
+```
+
+:::warning Memory Usage
+Each static cache creates an offscreen canvas sized to fit all items. For 100k items spread across a large world, this can consume significant memory. Use static caching only when the performance benefit justifies it.
+:::
+
+### How It Works
+
+1. **First render**: All items are drawn to an offscreen canvas (OffscreenCanvas or HTMLCanvasElement)
+2. **Subsequent renders**: Only the visible portion is copied (blitted) to the main canvas
+3. **Zoom changes**: Cache is automatically rebuilt when scale changes
+
+### When to Use
+
+The performance benefit becomes most noticeable during **dragging**. Each drag movement triggers a re-render, and without static caching, this means redrawing all visible items on every frame—causing noticeable lag when you have tens of thousands of items.
+
+With static caching, dragging remains smooth because only a **single `drawImage` call** copies the pre-rendered content during each frame.
+
+**We recommend using static caching when:**
+
+-   You have 50k–100k+ items visible at once (e.g., mini-maps, overview maps)
+-   Dragging/panning is enabled on that canvas
+
+If your canvas doesn't support drag interactions, or only a small portion of items are visible at a time, the regular `drawRect`/`drawCircle`/`drawImage` methods with automatic culling are sufficient.
+
+:::tip
+Static caching is most effective when:
+
+-   Zoom level is fixed (like a mini-map)
+-   Content doesn't change frequently
+-   All or most items are visible at once
+
+For scrollable maps where only a small portion is visible, the regular `drawRect`/`drawCircle`/`drawImage` methods with automatic culling are more efficient.
+:::
+
+### Example: Mini-map with 100k Items
+
+```typescript
+// Mini-map uses static caching (all 100k items visible)
+const miniMapRects = allItems.map((item) => ({
+    x: item.x,
+    y: item.y,
+    size: 0.9,
+    style: { fillStyle: item.color },
+}));
+miniMap.drawStaticRect(miniMapRects, "minimap-items", 1);
+
+// When items change, clear and redraw
+function updateMiniMap() {
+    miniMap.clearStaticCache("minimap-items");
+    miniMap.clearLayer(1);
+    miniMap.drawStaticRect(updatedItems, "minimap-items", 1);
+    miniMap.render();
+}
+```
+
 ## Clearing Layers
 
 When your scene content changes dynamically (e.g., objects change color, get added or removed), you need to clear the layer before redrawing. Without clearing, new draw calls accumulate on top of existing ones.

@@ -81,7 +81,7 @@ const mainMapOptions: CanvasTileEngineConfig = {
 
 // Mini map configuration
 const miniMapOptions: CanvasTileEngineConfig = {
-    scale: 4,
+    scale: 6,
     size: { width: 300, height: 300, maxWidth: 700, maxHeight: 700, minWidth: 100, minHeight: 100 },
     backgroundColor: "#337426ff",
     eventHandlers: {
@@ -121,9 +121,6 @@ const calculateMiniMapBounds = () => {
     const miniViewWidth = miniCfg.size.width / miniCfg.scale;
     const miniViewHeight = miniCfg.size.height / miniCfg.scale;
 
-    // Convert center range back to bounds for mini map
-    // bounds.min = centerMin - viewWidth/2
-    // bounds.max = centerMax + viewWidth/2
     return {
         minX: mainCenterMinX - miniViewWidth / 2,
         maxX: mainCenterMaxX + miniViewWidth / 2,
@@ -133,7 +130,7 @@ const calculateMiniMapBounds = () => {
 };
 
 // Generate map objects
-const items = generateMapObjects(100000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2);
+const items = generateMapObjects(10000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2);
 
 // Create coordinate-based Map for O(1) lookups (hover/click)
 const itemsByCoord = new Map<string, (typeof items)[0]>();
@@ -185,7 +182,9 @@ const drawItems = async () => {
     // Draw on maps
     mainMap.drawImage(imageItems);
     mainMap.drawCircle(circleItems, 1);
-    miniMap.drawRect(miniMapRects);
+
+    // Use pre-rendered static cache for mini map (huge performance boost for 100k items!)
+    miniMap.drawStaticRect(miniMapRects, "minimap-items");
 };
 
 // Synchronization logic between main map and mini map

@@ -298,6 +298,54 @@ export class CanvasTileEngine {
     }
 
     /**
+     * Draw rectangles with pre-rendering cache (canvas renderer only).
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like mini-maps where items don't change.
+     * @param items Array of rectangle definitions.
+     * @param cacheKey Unique key for this cache (e.g., "minimap-items").
+     * @param layer Layer order (lower draws first).
+     */
+    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+        this.ensureCanvasDraw().drawStaticRect(items, cacheKey, layer);
+    }
+
+    /**
+     * Draw circles with pre-rendering cache (canvas renderer only).
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like mini-maps where items don't change.
+     * @param items Array of circle definitions.
+     * @param cacheKey Unique key for this cache (e.g., "minimap-circles").
+     * @param layer Layer order (lower draws first).
+     */
+    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+        this.ensureCanvasDraw().drawStaticCircle(items, cacheKey, layer);
+    }
+
+    /**
+     * Draw images with pre-rendering cache (canvas renderer only).
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like terrain tiles or static decorations.
+     * @param items Array of image definitions with HTMLImageElement.
+     * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
+     * @param layer Layer order (lower draws first).
+     */
+    drawStaticImage(
+        items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
+        cacheKey: string,
+        layer: number = 1
+    ) {
+        this.ensureCanvasDraw().drawStaticImage(items, cacheKey, layer);
+    }
+
+    /**
+     * Clear a static rendering cache.
+     * @param cacheKey The cache key to clear, or undefined to clear all caches.
+     */
+    clearStaticCache(cacheKey?: string) {
+        this.ensureCanvasDraw().clearStaticCache(cacheKey);
+    }
+
+    /**
      * Draw one or many lines between world points (canvas renderer only).
      * @param items Line segments.
      * @param style Line style overrides.
