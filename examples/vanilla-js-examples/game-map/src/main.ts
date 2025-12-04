@@ -81,7 +81,7 @@ const mainMapOptions: CanvasTileEngineConfig = {
 
 // Mini map configuration
 const miniMapOptions: CanvasTileEngineConfig = {
-    scale: 6,
+    scale: 4,
     size: { width: 300, height: 300, maxWidth: 700, maxHeight: 700, minWidth: 100, minHeight: 100 },
     backgroundColor: "#337426ff",
     eventHandlers: {
@@ -133,60 +133,58 @@ const calculateMiniMapBounds = () => {
 };
 
 // Generate map objects
-const items = generateMapObjects(5000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2);
+const items = generateMapObjects(100000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2);
+
+// Create coordinate-based Map for O(1) lookups (hover/click)
+const itemsByCoord = new Map<string, (typeof items)[0]>();
+for (const item of items) {
+    if (item.type !== "terrain") {
+        itemsByCoord.set(`${item.x},${item.y}`, item);
+    }
+}
 
 // Function to draw items on both maps
 const drawItems = async () => {
-    // Load all images
-    const loaded = await Promise.all(
-        items.map(async (item) => ({
-            item,
-            img: await mainMap.images.load(item.imageUrl),
-        }))
+    // Preload unique images only (not 50k times!)
+    const uniqueUrls = [...new Set(items.map((i) => i.imageUrl))];
+    const imageCache = new Map<string, HTMLImageElement>();
+    await Promise.all(
+        uniqueUrls.map(async (url) => {
+            imageCache.set(url, await mainMap.images.load(url));
+        })
     );
 
-    // Prepare image items for main map
-    const imageItems = loaded.map(({ item, img }) => ({
-        img,
-        x: item.x,
-        y: item.y,
-        size: 1,
-    }));
+    // Build arrays in single pass
+    const imageItems: Array<{ img: HTMLImageElement; x: number; y: number; size: number }> = [];
+    const miniMapRects: Array<{ x: number; y: number; size: number; style: { fillStyle: string } }> = [];
+    const circleItems: Array<{
+        x: number;
+        y: number;
+        size: number;
+        origin: { mode: "cell"; x: number; y: number };
+        style: { fillStyle: string };
+    }> = [];
 
-    // Prepare rectangle items for mini map
-    const miniMapRects = loaded.map(({ item }) => ({
-        x: item.x,
-        y: item.y,
-        size: 0.9,
-        style: { fillStyle: item.color },
-    }));
+    for (const item of items) {
+        const img = imageCache.get(item.imageUrl)!;
 
-    // Draw images on main map
-    mainMap.drawImage(imageItems);
+        imageItems.push({ img, x: item.x, y: item.y, size: 1 });
+        miniMapRects.push({ x: item.x, y: item.y, size: 0.9, style: { fillStyle: item.color } });
 
-    // Draw circles with object colors on main map
-    loaded.forEach(({ item }) => {
-        if (item.type === "terrain") {
-            return;
-        }
-
-        mainMap.drawCircle(
-            {
+        if (item.type !== "terrain") {
+            circleItems.push({
                 x: item.x,
                 y: item.y,
                 size: 0.1,
-                origin: {
-                    mode: "cell" as const,
-                    x: 0.1,
-                    y: 0.1,
-                },
+                origin: { mode: "cell", x: 0.1, y: 0.1 },
                 style: { fillStyle: item.color },
-            },
-            1
-        );
-    });
+            });
+        }
+    }
 
-    // Draw rectangles on mini map
+    // Draw on maps
+    mainMap.drawImage(imageItems);
+    mainMap.drawCircle(circleItems, 1);
     miniMap.drawRect(miniMapRects);
 };
 
@@ -260,10 +258,8 @@ mainMap.addDrawFunction((ctx) => {
 // mouse: The mouse event object
 // client: The client coordinates of the mouse event
 mainMap.onHover = (coords, _mouse, client) => {
-    // Check if any item exists at the hovered coordinates and is not of type "terrain"
-    const item = items.find(
-        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
-    );
+    // O(1) lookup using coordinate Map
+    const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
     if (item) {
         popup?.classList.remove("hidden");
@@ -304,10 +300,8 @@ mainMap.onMouseLeave = () => {
 
 // Handle click events on the main map
 mainMap.onClick = (coords, _mouse, _client) => {
-    // Check if any item exists at the clicked coordinates and is not of type "terrain"
-    const item = items.find(
-        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
-    );
+    // O(1) lookup using coordinate Map
+    const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
     if (item) {
         alert(
