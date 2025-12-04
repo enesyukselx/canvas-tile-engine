@@ -38,6 +38,13 @@ export class Config {
                 resize: config.eventHandlers?.resize ?? false,
             },
 
+            bounds: config.bounds ?? {
+                minX: -Infinity,
+                maxX: Infinity,
+                minY: -Infinity,
+                maxY: Infinity,
+            },
+
             coordinates: {
                 enabled: config.coordinates?.enabled ?? false,
                 shownScaleRange: config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity },
@@ -66,10 +73,11 @@ export class Config {
                 },
             },
         };
-        this.config = Object.freeze({
+        this.config = {
             ...base,
             size: Object.freeze(base.size),
             eventHandlers: Object.freeze(base.eventHandlers),
+            bounds: Object.freeze(base.bounds),
             coordinates: Object.freeze({
                 ...base.coordinates,
                 shownScaleRange: Object.freeze(base.coordinates.shownScaleRange),
@@ -80,7 +88,7 @@ export class Config {
                 hud: Object.freeze(base.debug.hud),
                 eventHandlers: Object.freeze(base.debug.eventHandlers),
             }),
-        });
+        };
     }
 
     /**
@@ -102,6 +110,17 @@ export class Config {
                 ...this.config.eventHandlers,
                 ...handlers,
             },
+        };
+    }
+
+    /**
+     * Update map bounds at runtime.
+     * @param bounds New boundary limits. Use Infinity/-Infinity to remove limits on specific axes.
+     */
+    updateBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
+        this.config = {
+            ...this.config,
+            bounds: Object.freeze(bounds),
         };
     }
 }

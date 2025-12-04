@@ -13,7 +13,12 @@ export type CanvasTileEngineConfig = {
         maxHeight?: number;
     };
     eventHandlers?: EventHandlers;
-
+    bounds?: {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+    };
     coordinates?: {
         enabled?: boolean;
         shownScaleRange?: { min: number; max: number };

@@ -410,3 +410,63 @@ document.addEventListener("keyup", (e) => {
 ```
 
 :::
+
+### `setBounds`
+
+Set or update map boundaries to restrict camera movement to a specific area. This prevents users from panning beyond defined limits.
+
+| Parameter | Type     | Description                                           |
+| :-------- | :------- | :---------------------------------------------------- |
+| `bounds`  | `object` | Boundary limits with `minX`, `maxX`, `minY`, `maxY`. |
+
+```typescript
+// Restrict map to -100 to 100 on both axes
+engine.setBounds({ minX: -100, maxX: 100, minY: -100, maxY: 100 });
+
+// Remove all boundaries
+engine.setBounds({ 
+    minX: -Infinity, 
+    maxX: Infinity, 
+    minY: -Infinity, 
+    maxY: Infinity 
+});
+
+// Only limit horizontal scrolling
+engine.setBounds({ 
+    minX: 0, 
+    maxX: 500, 
+    minY: -Infinity, 
+    maxY: Infinity 
+});
+
+// Limit to positive quadrant only
+engine.setBounds({ 
+    minX: 0, 
+    maxX: 1000, 
+    minY: 0, 
+    maxY: 1000 
+});
+```
+
+**Use Cases:**
+- **Game maps**: Keep players within playable area
+- **Data visualization**: Prevent scrolling beyond data boundaries
+- **Floor plans**: Restrict view to building dimensions
+- **Interactive maps**: Define explorable regions
+
+:::info Initial Configuration
+Boundaries can also be set in the initial configuration:
+
+```typescript
+const engine = new CanvasTileEngine(wrapper, {
+    scale: 50,
+    size: { width: 800, height: 600 },
+    bounds: {
+        minX: -100,
+        maxX: 100,
+        minY: -100,
+        maxY: 100
+    }
+});
+```
+:::

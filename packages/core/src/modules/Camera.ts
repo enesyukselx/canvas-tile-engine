@@ -1,6 +1,7 @@
 import { Coords } from "../types";
 import { computePan, computeZoom } from "../utils/viewport";
 import { DEFAULT_VALUES } from "../constants";
+import { ViewportState } from "./ViewportState";
 
 /**
  * Camera contract used by rendering and coordinate transforms.
@@ -64,13 +65,70 @@ export class Camera implements ICamera {
     private _scale: number;
     readonly minScale: number;
     readonly maxScale: number;
+    private bounds?: {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+    };
+    private viewport?: ViewportState;
 
-    constructor(initialTopLeft: Coords, scale = 1, minScale = 0.1, maxScale = 10) {
+    constructor(initialTopLeft: Coords, scale = 1, minScale = 0.1, maxScale = 10, viewport?: ViewportState) {
         this._x = initialTopLeft.x + DEFAULT_VALUES.CELL_CENTER_OFFSET; // Center of the pixel
         this._y = initialTopLeft.y + DEFAULT_VALUES.CELL_CENTER_OFFSET; // Center of the pixel
         this._scale = scale;
         this.minScale = minScale;
         this.maxScale = maxScale;
+        this.viewport = viewport;
+    }
+
+    /**
+     * Set camera bounds to limit panning area.
+     * @param bounds Min and max coordinates for x and y axes. Set to undefined to remove bounds.
+     */
+    setBounds(bounds?: { minX: number; maxX: number; minY: number; maxY: number }) {
+        this.bounds = bounds;
+        // Clamp current position to new bounds
+        if (this.bounds) {
+            this.clampToBounds();
+        }
+    }
+
+    private clampToBounds() {
+        if (!this.bounds || !this.viewport) {
+            return;
+        }
+
+        const { width: viewportWidth, height: viewportHeight } = this.viewport.getSize();
+
+        // Calculate viewport size in world units
+        const viewWidthWorld = viewportWidth / this._scale;
+        const viewHeightWorld = viewportHeight / this._scale;
+
+        this._x = this.clampAxis(this._x, viewWidthWorld, this.bounds.minX, this.bounds.maxX);
+        this._y = this.clampAxis(this._y, viewHeightWorld, this.bounds.minY, this.bounds.maxY);
+    }
+
+    /**
+     * Clamp a single axis value to bounds.
+     * If viewport is larger than bounds, center it. Otherwise, keep viewport within bounds.
+     */
+    private clampAxis(value: number, viewSize: number, min: number, max: number): number {
+        const boundsSize = max - min;
+
+        // If viewport is larger than bounds, center the bounds in viewport
+        if (viewSize >= boundsSize) {
+            return min - (viewSize - boundsSize) / 2;
+        }
+
+        // Normal clamping: ensure viewport stays within bounds
+        if (value < min) {
+            return min;
+        }
+        if (value + viewSize > max) {
+            return max - viewSize;
+        }
+        return value;
     }
 
     get x(): number {
@@ -89,6 +147,7 @@ export class Camera implements ICamera {
         const next = computePan({ x: this._x, y: this._y }, this._scale, deltaScreenX, deltaScreenY);
         this._x = next.x;
         this._y = next.y;
+        this.clampToBounds();
     }
 
     zoom(mouseX: number, mouseY: number, deltaY: number, canvasRect: DOMRect) {
@@ -103,6 +162,7 @@ export class Camera implements ICamera {
         this._x = next.topLeft.x;
         this._y = next.topLeft.y;
         this._scale = next.scale;
+        this.clampToBounds();
     }
 
     getCenter(canvasWidth: number, canvasHeight: number): Coords {
@@ -115,10 +175,12 @@ export class Camera implements ICamera {
     setCenter(center: Coords, canvasWidth: number, canvasHeight: number) {
         this._x = center.x - canvasWidth / (2 * this._scale) + 0.5;
         this._y = center.y - canvasHeight / (2 * this._scale) + 0.5;
+        this.clampToBounds();
     }
 
     adjustForResize(deltaWidthPx: number, deltaHeightPx: number) {
         this._x -= deltaWidthPx / (2 * this._scale);
         this._y -= deltaHeightPx / (2 * this._scale);
+        this.clampToBounds();
     }
 }

@@ -52,6 +52,39 @@ eventHandlers: {
 }
 ```
 
+## Map Boundaries
+
+Restrict camera movement to a specific area of the world. This is useful for preventing users from scrolling beyond your map limits.
+
+| Property | Type     | Default     | Description                                |
+| :------- | :------- | :---------- | :----------------------------------------- |
+| `minX`   | `number` | `-Infinity` | Minimum X coordinate the camera can reach. |
+| `maxX`   | `number` | `Infinity`  | Maximum X coordinate the camera can reach. |
+| `minY`   | `number` | `-Infinity` | Minimum Y coordinate the camera can reach. |
+| `maxY`   | `number` | `Infinity`  | Maximum Y coordinate the camera can reach. |
+
+```typescript
+// Example: Restrict map to a 200x200 grid centered at origin
+bounds: {
+  minX: -100,
+  maxX: 100,
+  minY: -100,
+  maxY: 100
+}
+
+// Example: Only restrict horizontal movement
+bounds: {
+  minX: 0,
+  maxX: 500,
+  minY: -Infinity,
+  maxY: Infinity
+}
+```
+
+:::tip Runtime Updates
+You can change boundaries at runtime using `engine.setBounds()`. See [Camera Controls](/docs/js/events#setbounds) for details.
+:::
+
 ## Visual Customization
 
 ### Coordinate Overlay

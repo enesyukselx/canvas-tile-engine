@@ -2,7 +2,7 @@ import "./style.css";
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { generateMapObjects } from "./generateMapObjects";
 
-const INITIAL_COORDS = { x: 0, y: 0 };
+const INITIAL_COORDS = { x: 200, y: 200 };
 const INITIAL_MAIN_MAP_SIZE = 500;
 const INITIAL_MINI_MAP_SIZE = 300;
 // Popup elements
@@ -30,6 +30,8 @@ miniMapSizeInput.addEventListener("change", () => {
         return;
     }
     miniMap.resize(newSize, newSize, 300);
+    // Recalculate bounds after resize since viewport size changed
+    miniMap.setBounds(calculateMiniMapBounds());
     miniMap.render();
 });
 
@@ -69,6 +71,12 @@ const mainMapOptions: CanvasTileEngineConfig = {
         enabled: true,
         shownScaleRange: { min: 40, max: 60 },
     },
+    bounds: {
+        minX: 0,
+        maxX: 500,
+        minY: 0,
+        maxY: 500,
+    },
 };
 
 // Mini map configuration
@@ -80,6 +88,7 @@ const miniMapOptions: CanvasTileEngineConfig = {
         drag: true,
         resize: true,
     },
+    // Bounds will be dynamically based on viewport size
 };
 
 // Canvas-wrapper elements for main and mini maps
@@ -90,8 +99,41 @@ const miniMapCanvas = document.getElementById("mini-map-wrapper") as HTMLDivElem
 const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, INITIAL_COORDS);
 const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, INITIAL_COORDS);
 
+// Calculate mini map bounds so its CENTER can move within main map's CENTER range
+// Main map center range: (bounds.min + viewWidth/2) to (bounds.max - viewWidth/2)
+// Mini map should have same center range, so we need to adjust bounds for its viewport
+const calculateMiniMapBounds = () => {
+    const mainBounds = mainMapOptions.bounds!;
+    const mainCfg = mainMap.getConfig();
+    const miniCfg = miniMap.getConfig();
+
+    // Main map viewport size in world units
+    const mainViewWidth = mainCfg.size.width / mainCfg.scale;
+    const mainViewHeight = mainCfg.size.height / mainCfg.scale;
+
+    // Main map center movement range
+    const mainCenterMinX = mainBounds.minX + mainViewWidth / 2;
+    const mainCenterMaxX = mainBounds.maxX - mainViewWidth / 2;
+    const mainCenterMinY = mainBounds.minY + mainViewHeight / 2;
+    const mainCenterMaxY = mainBounds.maxY - mainViewHeight / 2;
+
+    // Mini map viewport size in world units
+    const miniViewWidth = miniCfg.size.width / miniCfg.scale;
+    const miniViewHeight = miniCfg.size.height / miniCfg.scale;
+
+    // Convert center range back to bounds for mini map
+    // bounds.min = centerMin - viewWidth/2
+    // bounds.max = centerMax + viewWidth/2
+    return {
+        minX: mainCenterMinX - miniViewWidth / 2,
+        maxX: mainCenterMaxX + miniViewWidth / 2,
+        minY: mainCenterMinY - miniViewHeight / 2,
+        maxY: mainCenterMaxY + miniViewHeight / 2,
+    };
+};
+
 // Generate map objects
-const items = generateMapObjects(5000, 0, 0, 1.2);
+const items = generateMapObjects(5000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2);
 
 // Function to draw items on both maps
 const drawItems = async () => {
@@ -165,6 +207,9 @@ miniMap.onCoordsChange = (coords) => {
 };
 
 mainMap.onCoordsChange = (coords) => {
+    // Set initial bounds for mini map
+    miniMap.setBounds(calculateMiniMapBounds());
+
     if (isSyncing) {
         return;
     }
@@ -290,6 +335,6 @@ drawItems().then(() => {
     mainMap.render();
     miniMap.drawGridLines(1, 0.5, "rgba(0,0,0,1)", 3);
     miniMap.drawGridLines(5, 0.8, "rgba(0,0,0,1)", 3);
-    miniMap.drawGridLines(50, 1.2, "rgba(0,0,0,1)", 3);
+    miniMap.drawGridLines(50, 2, "rgba(0,0,0,1)", 3);
     miniMap.render();
 });

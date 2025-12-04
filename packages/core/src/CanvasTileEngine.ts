@@ -129,8 +129,10 @@ export class CanvasTileEngine {
             initialTopLeft,
             this.config.get().scale,
             this.config.get().minScale,
-            this.config.get().maxScale
+            this.config.get().maxScale,
+            this.viewport
         );
+
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
 
         // Initialize animation controller
@@ -159,6 +161,11 @@ export class CanvasTileEngine {
             () => this.handleCameraChange()
         );
         this.events.setupEvents();
+
+        // Apply initial bounds if provided
+        if (config.bounds) {
+            this.camera.setBounds(config.bounds);
+        }
     }
 
     // ─── PUBLIC API ──────────────────────────────
@@ -244,6 +251,27 @@ export class CanvasTileEngine {
      */
     setEventHandlers(handlers: Partial<EventHandlers>) {
         this.config.updateEventHandlers(handlers);
+    }
+
+    /**
+     * Set or update map boundaries to restrict camera movement.
+     * @param bounds Boundary limits. Use Infinity/-Infinity to remove limits.
+     * @example
+     * ```ts
+     * // Restrict map to -100 to 100 on both axes
+     * engine.setBounds({ minX: -100, maxX: 100, minY: -100, maxY: 100 });
+     *
+     * // Remove boundaries
+     * engine.setBounds({ minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity });
+     *
+     * // Only limit X axis
+     * engine.setBounds({ minX: 0, maxX: 500, minY: -Infinity, maxY: Infinity });
+     * ```
+     */
+    setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
+        this.config.updateBounds(bounds);
+        this.camera.setBounds(bounds);
+        this.render();
     }
 
     // ─── Draw helpers (canvas renderer only) ───────────
