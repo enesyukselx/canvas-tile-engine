@@ -57,6 +57,11 @@ export class CanvasRenderer implements IRenderer {
                 this.config,
                 this.viewport
             );
+            // Start FPS loop if fps hud is enabled
+            if (this.config.get().debug?.hud?.fps) {
+                this.debugOverlay.setFpsUpdateCallback(() => this.render());
+                this.debugOverlay.startFpsLoop();
+            }
         }
     }
 
@@ -126,6 +131,11 @@ export class CanvasRenderer implements IRenderer {
                     this.config,
                     this.viewport
                 );
+                // Start FPS loop if fps hud is enabled
+                if (config.debug?.hud?.fps) {
+                    this.debugOverlay.setFpsUpdateCallback(() => this.render());
+                    this.debugOverlay.startFpsLoop();
+                }
             }
             this.debugOverlay.draw();
         }

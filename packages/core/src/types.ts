@@ -35,6 +35,7 @@ export type CanvasTileEngineConfig = {
             coordinates?: boolean;
             scale?: boolean;
             tilesInView?: boolean;
+            fps?: boolean;
         };
         eventHandlers?: {
             click?: boolean;
