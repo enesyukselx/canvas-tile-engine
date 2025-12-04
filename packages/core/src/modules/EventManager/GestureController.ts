@@ -13,6 +13,11 @@ export class GestureController {
     private shouldPreventClick = false;
     private lastPos = { x: 0, y: 0 };
 
+    // Pinch-to-zoom state
+    private isPinching = false;
+    private lastPinchDistance = 0;
+    private lastPinchCenter = { x: 0, y: 0 };
+
     public onClick?: onClickCallback;
     public onHover?: onHoverCallback;
     public onMouseDown?: () => void;
@@ -138,16 +143,64 @@ export class GestureController {
     };
 
     handleTouchStart = (e: TouchEvent) => {
-        if (!this.config.get().eventHandlers.drag) return;
+        const eventHandlers = this.config.get().eventHandlers;
+
+        // Handle pinch-to-zoom (2 fingers)
+        if (e.touches.length === 2 && eventHandlers.zoom) {
+            e.preventDefault();
+            this.isPinching = true;
+            this.isDragging = false;
+            this.lastPinchDistance = this.getTouchDistance(e.touches);
+            this.lastPinchCenter = this.getTouchCenter(e.touches);
+            return;
+        }
+
+        // Handle single finger drag
+        if (!eventHandlers.drag) return;
         if (e.touches.length !== 1) return;
         const t = e.touches[0];
         this.isDragging = true;
+        this.isPinching = false;
         this.shouldPreventClick = false;
         this.lastPos = { x: t.clientX, y: t.clientY };
     };
 
     handleTouchMove = (e: TouchEvent) => {
-        if (!this.isDragging || e.touches.length !== 1) return;
+        // Handle pinch-to-zoom
+        if (this.isPinching && e.touches.length === 2) {
+            e.preventDefault();
+
+            const currentDistance = this.getTouchDistance(e.touches);
+            const currentCenter = this.getTouchCenter(e.touches);
+            const rect = this.canvas.getBoundingClientRect();
+
+            // Calculate zoom factor from pinch distance change
+            const scaleFactor = currentDistance / this.lastPinchDistance;
+
+            // Get pinch center relative to canvas
+            const centerX = currentCenter.x - rect.left;
+            const centerY = currentCenter.y - rect.top;
+
+            // Apply zoom
+            this.camera.zoomByFactor(scaleFactor, centerX, centerY);
+
+            // Also pan if pinch center moved
+            const dx = currentCenter.x - this.lastPinchCenter.x;
+            const dy = currentCenter.y - this.lastPinchCenter.y;
+            if (dx !== 0 || dy !== 0) {
+                this.camera.pan(dx, dy);
+            }
+
+            this.lastPinchDistance = currentDistance;
+            this.lastPinchCenter = currentCenter;
+            this.onCameraChange();
+            return;
+        }
+
+        // Handle single finger drag
+        if (!this.isDragging || e.touches.length !== 1) {
+            return;
+        }
         e.preventDefault();
         const t = e.touches[0];
         const dx = t.clientX - this.lastPos.x;
@@ -161,10 +214,49 @@ export class GestureController {
         this.onCameraChange();
     };
 
-    handleTouchEnd = () => {
+    handleTouchEnd = (e: TouchEvent) => {
+        // If we still have 2 fingers, stay in pinch mode
+        if (e.touches.length >= 2 && this.isPinching) {
+            this.lastPinchDistance = this.getTouchDistance(e.touches);
+            this.lastPinchCenter = this.getTouchCenter(e.touches);
+            return;
+        }
+
+        // If we have 1 finger left after pinching, switch to drag mode
+        if (e.touches.length === 1 && this.isPinching) {
+            this.isPinching = false;
+            if (this.config.get().eventHandlers.drag) {
+                this.isDragging = true;
+                const t = e.touches[0];
+                this.lastPos = { x: t.clientX, y: t.clientY };
+            }
+            return;
+        }
+
+        // All fingers lifted
         this.isDragging = false;
+        this.isPinching = false;
         this.canvas.style.cursor = this.config.get().cursor.default || "default";
     };
+
+    /**
+     * Calculate the distance between two touch points.
+     */
+    private getTouchDistance(touches: TouchList): number {
+        const dx = touches[1].clientX - touches[0].clientX;
+        const dy = touches[1].clientY - touches[0].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    /**
+     * Calculate the center point between two touches.
+     */
+    private getTouchCenter(touches: TouchList): { x: number; y: number } {
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2,
+        };
+    }
 
     handleWheel = (e: WheelEvent) => {
         if (!this.config.get().eventHandlers.zoom) return;

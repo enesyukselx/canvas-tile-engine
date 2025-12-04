@@ -53,6 +53,14 @@ export interface ICamera {
      * @param deltaHeightPx Change in canvas height (pixels).
      */
     adjustForResize(deltaWidthPx: number, deltaHeightPx: number): void;
+
+    /**
+     * Zoom by a scale factor around a specific point (for pinch-to-zoom).
+     * @param factor Scale multiplier (>1 zooms in, <1 zooms out).
+     * @param centerX Center X in screen coordinates.
+     * @param centerY Center Y in screen coordinates.
+     */
+    zoomByFactor(factor: number, centerX: number, centerY: number): void;
 }
 
 /**
@@ -162,6 +170,25 @@ export class Camera implements ICamera {
         this._x = next.topLeft.x;
         this._y = next.topLeft.y;
         this._scale = next.scale;
+        this.clampToBounds();
+    }
+
+    /**
+     * Zoom by a scale factor around a specific point (for pinch-to-zoom).
+     * @param factor Scale multiplier (>1 zooms in, <1 zooms out).
+     * @param centerX Center X in screen coordinates.
+     * @param centerY Center Y in screen coordinates.
+     */
+    zoomByFactor(factor: number, centerX: number, centerY: number) {
+        const newScale = Math.min(this.maxScale, Math.max(this.minScale, this._scale * factor));
+        if (newScale === this._scale) {
+            return;
+        }
+
+        // Adjust top-left to keep the pinch center stationary
+        this._x = this._x + centerX * (1 / this._scale - 1 / newScale);
+        this._y = this._y + centerY * (1 / this._scale - 1 / newScale);
+        this._scale = newScale;
         this.clampToBounds();
     }
 
