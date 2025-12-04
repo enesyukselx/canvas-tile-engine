@@ -1,4 +1,4 @@
-import { CanvasTileEngineConfig } from "../types";
+import { CanvasTileEngineConfig, EventHandlers } from "../types";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
 
 /**
@@ -6,7 +6,7 @@ import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
  * @internal
  */
 export class Config {
-    private readonly config: Required<CanvasTileEngineConfig>;
+    private config: Required<CanvasTileEngineConfig>;
 
     /**
      * Create a config store with defaults merged from the provided partial config.
@@ -89,5 +89,19 @@ export class Config {
      */
     get(): Readonly<Required<CanvasTileEngineConfig>> {
         return this.config;
+    }
+
+    /**
+     * Update event handlers at runtime.
+     * @param handlers Partial event handlers to update.
+     */
+    updateEventHandlers(handlers: Partial<EventHandlers>) {
+        this.config = {
+            ...this.config,
+            eventHandlers: {
+                ...this.config.eventHandlers,
+                ...handlers,
+            },
+        };
     }
 }

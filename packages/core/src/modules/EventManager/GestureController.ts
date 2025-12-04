@@ -15,6 +15,8 @@ export class GestureController {
 
     public onClick?: onClickCallback;
     public onHover?: onHoverCallback;
+    public onMouseDown?: () => void;
+    public onMouseUp?: () => void;
     public onMouseLeave?: () => void;
 
     constructor(
@@ -63,7 +65,14 @@ export class GestureController {
     };
 
     handleMouseDown = (e: MouseEvent) => {
-        if (!this.config.get().eventHandlers.drag) return;
+        if (this.onMouseDown) {
+            this.onMouseDown();
+        }
+
+        if (!this.config.get().eventHandlers.drag) {
+            return;
+        }
+
         this.isDragging = true;
         this.shouldPreventClick = false;
         this.lastPos = { x: e.clientX, y: e.clientY };
@@ -111,9 +120,19 @@ export class GestureController {
     };
 
     handleMouseUp = () => {
-        if (!this.isDragging && this.onMouseLeave) {
+        if (this.onMouseUp) {
+            this.onMouseUp();
+        }
+
+        this.isDragging = false;
+        this.canvas.style.cursor = this.config.get().cursor.default || "default";
+    };
+
+    handleMouseLeave = () => {
+        if (this.onMouseLeave) {
             this.onMouseLeave();
         }
+
         this.isDragging = false;
         this.canvas.style.cursor = this.config.get().cursor.default || "default";
     };

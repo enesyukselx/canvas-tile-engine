@@ -8,7 +8,15 @@ import { Layer } from "./modules/Layer";
 import { ViewportState } from "./modules/ViewportState";
 import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
-import { Coords, DrawObject, CanvasTileEngineConfig, onClickCallback, onDrawCallback, onHoverCallback } from "./types";
+import {
+    Coords,
+    DrawObject,
+    CanvasTileEngineConfig,
+    onClickCallback,
+    onDrawCallback,
+    onHoverCallback,
+    EventHandlers,
+} from "./types";
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
 import { RendererFactory } from "./modules/RendererFactory";
@@ -52,6 +60,24 @@ export class CanvasTileEngine {
     public set onHover(cb: onHoverCallback | undefined) {
         this._onHover = cb;
         this.events.onHover = cb;
+    }
+
+    private _onMouseDown?: () => void;
+    public get onMouseDown(): (() => void) | undefined {
+        return this._onMouseDown;
+    }
+    public set onMouseDown(cb: (() => void) | undefined) {
+        this._onMouseDown = cb;
+        this.events.onMouseDown = cb;
+    }
+
+    private _onMouseUp?: () => void;
+    public get onMouseUp(): (() => void) | undefined {
+        return this._onMouseUp;
+    }
+    public set onMouseUp(cb: (() => void) | undefined) {
+        this._onMouseUp = cb;
+        this.events.onMouseUp = cb;
     }
 
     private _onMouseLeave?: () => void;
@@ -198,6 +224,26 @@ export class CanvasTileEngine {
      */
     goCoords(x: number, y: number, durationMs: number = 500) {
         this.animationController.animateMoveTo(x, y, durationMs);
+    }
+
+    /**
+     * Update event handlers at runtime.
+     * This allows you to enable or disable specific interactions dynamically.
+     * @param handlers Partial event handlers to update.
+     * @example
+     * ```ts
+     * // Disable drag temporarily
+     * engine.setEventHandlers({ drag: false });
+     *
+     * // Enable painting mode
+     * engine.setEventHandlers({ drag: false, hover: true });
+     *
+     * // Re-enable drag
+     * engine.setEventHandlers({ drag: true });
+     * ```
+     */
+    setEventHandlers(handlers: Partial<EventHandlers>) {
+        this.config.updateEventHandlers(handlers);
     }
 
     // ─── Draw helpers (canvas renderer only) ───────────

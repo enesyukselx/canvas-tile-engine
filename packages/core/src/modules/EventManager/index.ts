@@ -33,6 +33,20 @@ export class EventManager {
         this.gestures.onHover = cb;
     }
 
+    public get onMouseDown(): (() => void) | undefined {
+        return this.gestures.onMouseDown;
+    }
+    public set onMouseDown(cb: (() => void) | undefined) {
+        this.gestures.onMouseDown = cb;
+    }
+
+    public get onMouseUp(): (() => void) | undefined {
+        return this.gestures.onMouseUp;
+    }
+    public set onMouseUp(cb: (() => void) | undefined) {
+        this.gestures.onMouseUp = cb;
+    }
+
     public get onMouseLeave(): (() => void) | undefined {
         return this.gestures.onMouseLeave;
     }
@@ -63,7 +77,7 @@ export class EventManager {
             mousedown: this.gestures.handleMouseDown,
             mousemove: this.gestures.handleMouseMove,
             mouseup: this.gestures.handleMouseUp,
-            mouseleave: this.gestures.handleMouseUp,
+            mouseleave: this.gestures.handleMouseLeave,
             wheel: this.gestures.handleWheel,
             touchstart: this.gestures.handleTouchStart,
             touchmove: this.gestures.handleTouchMove,

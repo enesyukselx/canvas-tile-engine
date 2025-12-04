@@ -12,13 +12,8 @@ export type CanvasTileEngineConfig = {
         maxWidth?: number;
         maxHeight?: number;
     };
-    eventHandlers?: {
-        click?: boolean;
-        hover?: boolean;
-        drag?: boolean;
-        zoom?: boolean;
-        resize?: boolean;
-    };
+    eventHandlers?: EventHandlers;
+
     coordinates?: {
         enabled?: boolean;
         shownScaleRange?: { min: number; max: number };
@@ -44,6 +39,14 @@ export type CanvasTileEngineConfig = {
             resize?: boolean;
         };
     };
+};
+
+export type EventHandlers = {
+    click?: boolean;
+    hover?: boolean;
+    drag?: boolean;
+    zoom?: boolean;
+    resize?: boolean;
 };
 
 export type Coords = {
