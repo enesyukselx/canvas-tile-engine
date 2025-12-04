@@ -12,45 +12,30 @@ Debug features are controlled via the `debug` object in the configuration.
 
 ```typescript
 const config = {
-  // ...
-  debug: {
-    enabled: true,
-    grid: {
-      enabled: true,
-      color: "rgba(255, 0, 0, 0.3)",
-      lineWidth: 1
+    // ...
+    debug: {
+        enabled: true,
+        hud: {
+            enabled: true,
+            coordinates: true,
+            scale: true,
+            tilesInView: true,
+        },
     },
-    hud: {
-      enabled: true,
-      coordinates: true,
-      scale: true,
-      tilesInView: true
-    }
-  }
 };
 ```
-
-## Debug Grid
-
-Draws a visible grid over the map, which is useful for verifying alignment and tile sizes.
-
-| Property | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` | Toggles the debug grid. |
-| `color` | `string` | `"rgba(255,255,255,0.25)"` | Color of the grid lines. |
-| `lineWidth` | `number` | `1` | Width of the grid lines in pixels. |
 
 ## Heads-Up Display (HUD)
 
 Displays real-time information about the engine state in the top-right corner of the canvas.
 
-| Property | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` | Toggles the HUD panel. |
-| `topLeftCoordinates` | `boolean` | `false` | Shows the world coordinates of the top-left corner of the viewport. |
-| `coordinates` | `boolean` | `false` | Shows the world coordinates of the center of the viewport. |
-| `scale` | `boolean` | `false` | Shows the current zoom level (pixels per grid unit). |
-| `tilesInView` | `boolean` | `false` | Shows how many tiles fit horizontally and vertically in the current view. |
+| Property             | Type      | Default | Description                                                               |
+| :------------------- | :-------- | :------ | :------------------------------------------------------------------------ |
+| `enabled`            | `boolean` | `false` | Toggles the HUD panel.                                                    |
+| `topLeftCoordinates` | `boolean` | `false` | Shows the world coordinates of the top-left corner of the viewport.       |
+| `coordinates`        | `boolean` | `false` | Shows the world coordinates of the center of the viewport.                |
+| `scale`              | `boolean` | `false` | Shows the current zoom level (pixels per grid unit).                      |
+| `tilesInView`        | `boolean` | `false` | Shows how many tiles fit horizontally and vertically in the current view. |
 
 ### HUD Example Output
 

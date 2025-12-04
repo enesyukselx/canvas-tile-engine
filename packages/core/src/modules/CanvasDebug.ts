@@ -2,7 +2,7 @@ import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { ViewportState } from "./ViewportState";
-import { DEBUG_HUD } from "../constants";
+import { DEBUG_HUD, DEFAULT_VALUES } from "../constants";
 
 /**
  * Canvas-only debug overlay: draws grid and HUD information.
@@ -30,36 +30,7 @@ export class CanvasDebug {
     }
 
     draw() {
-        this.drawGrid();
         this.drawHud();
-    }
-
-    private drawGrid() {
-        const config = this.config.get();
-
-        if (!config.debug.grid?.enabled) {
-            return;
-        }
-
-        const tile = this.camera.scale;
-        const { width, height } = this.viewport.getSize();
-        const camX = this.camera.x;
-        const camY = this.camera.y;
-
-        const left = Math.floor(camX);
-        const right = Math.ceil(camX + width / tile);
-        const top = Math.floor(camY);
-        const bottom = Math.ceil(camY + height / tile);
-
-        this.ctx.strokeStyle = config.debug.grid?.color ?? "rgba(255,255,255,0.25)";
-        this.ctx.lineWidth = config.debug.grid?.lineWidth ?? 1;
-
-        for (let gx = left; gx <= right; gx++) {
-            for (let gy = top; gy <= bottom; gy++) {
-                const topLeft = this.transformer.worldToScreen(gx - 0.5, gy - 0.5);
-                this.ctx.strokeRect(topLeft.x, topLeft.y, tile, tile);
-            }
-        }
     }
 
     private drawHud() {

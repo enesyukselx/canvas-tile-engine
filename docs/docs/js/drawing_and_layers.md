@@ -110,6 +110,30 @@ engine.drawPath(
 );
 ```
 
+### `drawGridLines`
+
+Draw grid lines at specified intervals. This is useful for creating grid overlays on your map.
+
+| Property      | Type     | Default      | Description                            |
+| :------------ | :------- | :----------- | :------------------------------------- |
+| `cellSize`    | `number` | **Required** | Size of each grid cell in world units. |
+| `lineWidth`   | `number` | `1`          | Width of grid lines in pixels.         |
+| `strokeStyle` | `string` | `"black"`    | Color of the grid lines.               |
+| `layer`       | `number` | `0`          | Rendering layer.                       |
+
+```typescript
+// Draw a basic grid with 1-unit cells
+engine.drawGridLines(1);
+
+// Draw a grid with custom styling
+engine.drawGridLines(5, 2, "rgba(255, 255, 255, 0.3)", 0);
+
+// Draw multiple grids at different scales
+engine.drawGridLines(1, 0.5, "rgba(0, 0, 0, 0.1)", 0); // Fine grid
+engine.drawGridLines(5, 1, "rgba(0, 0, 0, 0.3)", 0); // Medium grid
+engine.drawGridLines(50, 2, "rgba(0, 0, 0, 0.5)", 0); // Coarse grid
+```
+
 ## Text & Images
 
 ### `drawText`

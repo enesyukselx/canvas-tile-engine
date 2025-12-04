@@ -29,11 +29,6 @@ export type CanvasTileEngineConfig = {
     };
     debug?: {
         enabled?: boolean;
-        grid?: {
-            enabled?: boolean;
-            color?: string;
-            lineWidth?: number;
-        };
         hud?: {
             enabled?: boolean;
             topLeftCoordinates?: boolean;

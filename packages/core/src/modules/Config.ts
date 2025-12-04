@@ -1,5 +1,5 @@
 import { CanvasTileEngineConfig } from "../types";
-import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS, DEBUG_DEFAULTS } from "../constants";
+import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
 
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
@@ -50,11 +50,6 @@ export class Config {
 
             debug: {
                 enabled: config.debug?.enabled ?? false,
-                grid: {
-                    enabled: config.debug?.grid?.enabled ?? false,
-                    color: config.debug?.grid?.color ?? DEBUG_DEFAULTS.GRID_COLOR,
-                    lineWidth: config.debug?.grid?.lineWidth ?? DEBUG_DEFAULTS.GRID_LINE_WIDTH,
-                },
                 hud: {
                     enabled: config.debug?.hud?.enabled ?? false,
                     topLeftCoordinates: config.debug?.hud?.topLeftCoordinates ?? false,
@@ -82,7 +77,6 @@ export class Config {
             cursor: Object.freeze(base.cursor),
             debug: Object.freeze({
                 enabled: base.debug.enabled,
-                grid: Object.freeze(base.debug.grid),
                 hud: Object.freeze(base.debug.hud),
                 eventHandlers: Object.freeze(base.debug.eventHandlers),
             }),

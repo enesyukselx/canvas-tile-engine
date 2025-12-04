@@ -73,7 +73,7 @@ const mainMapOptions: CanvasTileEngineConfig = {
 
 // Mini map configuration
 const miniMapOptions: CanvasTileEngineConfig = {
-    scale: 10,
+    scale: 6,
     size: { width: 300, height: 300, maxWidth: 700, maxHeight: 700, minWidth: 100, minHeight: 100 },
     backgroundColor: "#337426ff",
     eventHandlers: {
@@ -115,7 +115,7 @@ const drawItems = async () => {
     const miniMapRects = loaded.map(({ item }) => ({
         x: item.x,
         y: item.y,
-        size: 0.5,
+        size: 0.9,
         style: { fillStyle: item.color },
     }));
 
@@ -196,8 +196,8 @@ miniMap.onDraw = (ctx) => {
     const rectX = miniCfg.size.width / 2 - rectWidth / 2;
     const rectY = miniCfg.size.height / 2 - rectHeight / 2;
 
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
     ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
 };
 
@@ -285,6 +285,11 @@ goToCoordsBtn.addEventListener("click", () => {
 // Initial drawing of items and rendering of maps
 // Image loading is asynchronous, so we wait for it to complete before rendering
 drawItems().then(() => {
+    mainMap.drawGridLines(5);
+    mainMap.drawGridLines(50, 4);
     mainMap.render();
+    miniMap.drawGridLines(1, 0.5, "rgba(0,0,0,1)", 3);
+    miniMap.drawGridLines(5, 0.8, "rgba(0,0,0,1)", 3);
+    miniMap.drawGridLines(50, 1.2, "rgba(0,0,0,1)", 3);
     miniMap.render();
 });

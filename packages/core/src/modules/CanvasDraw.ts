@@ -2,7 +2,7 @@ import { Coords, DrawObject, CanvasTileEngineConfig } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer } from "./Layer";
-import { VISIBILITY_BUFFER } from "../constants";
+import { DEFAULT_VALUES, VISIBILITY_BUFFER } from "../constants";
 
 /**
  * Canvas-specific helpers for adding draw callbacks to the layer stack.
@@ -242,6 +242,42 @@ export class CanvasDraw {
 
                 ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
             }
+        });
+    }
+
+    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0) {
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            const viewW = config.size.width / config.scale;
+            const viewH = config.size.height / config.scale;
+
+            const startX = Math.floor(topLeft.x / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endX = Math.ceil((topLeft.x + viewW) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startY = Math.floor(topLeft.y / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endY = Math.ceil((topLeft.y + viewH) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+
+            ctx.save();
+
+            ctx.strokeStyle = style.strokeStyle;
+            ctx.lineWidth = style.lineWidth;
+
+            ctx.beginPath();
+
+            for (let x = startX; x <= endX; x += cellSize) {
+                const p1 = this.transformer.worldToScreen(x, startY);
+                const p2 = this.transformer.worldToScreen(x, endY);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+            }
+
+            for (let y = startY; y <= endY; y += cellSize) {
+                const p1 = this.transformer.worldToScreen(startX, y);
+                const p2 = this.transformer.worldToScreen(endX, y);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+            }
+
+            ctx.stroke();
+            ctx.restore();
         });
     }
 

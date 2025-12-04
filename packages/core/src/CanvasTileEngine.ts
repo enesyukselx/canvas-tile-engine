@@ -289,6 +289,18 @@ export class CanvasTileEngine {
     }
 
     /**
+     *  Draw grid lines at specified cell size (canvas renderer only).
+     * @param cellSize Size of each grid cell in world units.
+     * @example
+     * ```ts
+     * engine.drawGridLines(50);
+     * ```
+     */
+    drawGridLines(cellSize: number, lineWidth: number = 1, strokeStyle: string = "black", layer: number = 0) {
+        this.ensureCanvasDraw().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+    }
+
+    /**
      * Clear all draw callbacks from a specific layer (canvas renderer only).
      * Use this before redrawing dynamic content to prevent accumulation.
      * @param layer Layer index to clear.
