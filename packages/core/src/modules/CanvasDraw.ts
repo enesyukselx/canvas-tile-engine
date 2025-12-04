@@ -3,12 +3,26 @@ import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer } from "./Layer";
 import { DEFAULT_VALUES, VISIBILITY_BUFFER } from "../constants";
+import { SpatialIndex } from "./SpatialIndex";
+
+// Threshold for using spatial indexing (below this, linear scan is faster)
+const SPATIAL_INDEX_THRESHOLD = 500;
+
+// Cache for static layers (pre-rendered offscreen canvases)
+interface StaticCache {
+    canvas: OffscreenCanvas | HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    worldBounds: { minX: number; minY: number; maxX: number; maxY: number };
+    scale: number;
+}
 
 /**
  * Canvas-specific helpers for adding draw callbacks to the layer stack.
  * @internal
  */
 export class CanvasDraw {
+    private staticCaches = new Map<string, StaticCache>();
+
     constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {}
 
     /**
@@ -33,6 +47,17 @@ export class CanvasDraw {
         return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
     }
 
+    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
+        const viewW = config.size.width / config.scale;
+        const viewH = config.size.height / config.scale;
+        return {
+            minX: topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER,
+            minY: topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER,
+            maxX: topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER,
+            maxY: topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER,
+        };
+    }
+
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
@@ -45,8 +70,22 @@ export class CanvasDraw {
     drawRect(items: Array<DrawObject> | DrawObject, layer: number = 1) {
         const list = Array.isArray(items) ? items : [items];
 
+        // Build spatial index for large datasets (RBush R-Tree)
+        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
+        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+
         this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            for (const item of list) {
+            const bounds = this.getViewportBounds(topLeft, config);
+            const visibleItems = spatialIndex
+                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                : list;
+
+            ctx.save();
+            let lastFillStyle: string | undefined;
+            let lastStrokeStyle: string | undefined;
+            let lastLineWidth: number | undefined;
+
+            for (const item of visibleItems) {
                 const size = item.size ?? 1;
                 const origin = {
                     mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
@@ -55,24 +94,33 @@ export class CanvasDraw {
                 };
                 const style = item.style;
 
-                if (!this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                // Skip visibility check if using spatial index (already filtered)
+                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
-
                 const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
 
-                ctx.save();
-                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
-                if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-                if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+                // Only update style when changed (reduces state changes)
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
+                if (style?.lineWidth && style.lineWidth !== lastLineWidth) {
+                    ctx.lineWidth = style.lineWidth;
+                    lastLineWidth = style.lineWidth;
+                }
 
                 ctx.beginPath();
                 ctx.rect(drawX, drawY, pxSize, pxSize);
                 if (style?.fillStyle) ctx.fill();
                 if (style?.strokeStyle) ctx.stroke();
-                ctx.restore();
             }
+            ctx.restore();
         });
     }
 
@@ -109,8 +157,22 @@ export class CanvasDraw {
     drawCircle(items: Array<DrawObject> | DrawObject, layer: number = 1) {
         const list = Array.isArray(items) ? items : [items];
 
+        // Build spatial index for large datasets (RBush R-Tree)
+        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
+        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+
         this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            for (const item of list) {
+            const bounds = this.getViewportBounds(topLeft, config);
+            const visibleItems = spatialIndex
+                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                : list;
+
+            ctx.save();
+            let lastFillStyle: string | undefined;
+            let lastStrokeStyle: string | undefined;
+            let lastLineWidth: number | undefined;
+
+            for (const item of visibleItems) {
                 const size = item.size ?? 1;
                 const origin = {
                     mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
@@ -119,25 +181,34 @@ export class CanvasDraw {
                 };
                 const style = item.style;
 
-                if (!this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                // Skip visibility check if using spatial index (already filtered)
+                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
                 const radius = pxSize / 2;
-
                 const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
 
-                ctx.save();
-                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
-                if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-                if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+                // Only update style when changed
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
+                if (style?.lineWidth && style.lineWidth !== lastLineWidth) {
+                    ctx.lineWidth = style.lineWidth;
+                    lastLineWidth = style.lineWidth;
+                }
 
                 ctx.beginPath();
                 ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
                 if (style?.fillStyle) ctx.fill();
                 if (style?.strokeStyle) ctx.stroke();
-                ctx.restore();
             }
+            ctx.restore();
         });
     }
 
@@ -211,8 +282,17 @@ export class CanvasDraw {
     ) {
         const list = Array.isArray(items) ? items : [items];
 
+        // Build spatial index for large datasets (RBush R-Tree)
+        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
+        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+
         this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            for (const item of list) {
+            const bounds = this.getViewportBounds(topLeft, config);
+            const visibleItems = spatialIndex
+                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                : list;
+
+            for (const item of visibleItems) {
                 const size = item.size ?? 1;
                 const origin = {
                     mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
@@ -220,7 +300,8 @@ export class CanvasDraw {
                     y: item.origin?.y ?? 0.5,
                 };
 
-                if (!this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                // Skip visibility check if using spatial index (already filtered)
+                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
@@ -299,5 +380,204 @@ export class CanvasDraw {
             x: pos.x - origin.x * pxSize,
             y: pos.y - origin.y * pxSize,
         };
+    }
+
+    /**
+     * Helper to create or get a static cache for pre-rendered content.
+     * Handles bounds calculation, canvas creation, and rebuild logic.
+     */
+    private getOrCreateStaticCache<T extends { x: number; y: number; size?: number }>(
+        items: T[],
+        cacheKey: string,
+        renderFn: (
+            ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+            item: T,
+            x: number,
+            y: number,
+            pxSize: number
+        ) => void
+    ): StaticCache {
+        // Calculate world bounds from items
+        let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+
+        for (const item of items) {
+            const size = item.size ?? 1;
+            if (item.x - size / 2 < minX) minX = item.x - size / 2;
+            if (item.x + size / 2 > maxX) maxX = item.x + size / 2;
+            if (item.y - size / 2 < minY) minY = item.y - size / 2;
+            if (item.y + size / 2 > maxY) maxY = item.y + size / 2;
+        }
+
+        // Add padding
+        minX -= 1;
+        minY -= 1;
+        maxX += 1;
+        maxY += 1;
+
+        const worldWidth = maxX - minX;
+        const worldHeight = maxY - minY;
+
+        // Use current scale for rendering
+        const renderScale = this.camera.scale;
+        const canvasWidth = Math.ceil(worldWidth * renderScale);
+        const canvasHeight = Math.ceil(worldHeight * renderScale);
+
+        // Check if we need to create or update cache
+        let cache = this.staticCaches.get(cacheKey);
+        const needsRebuild =
+            !cache || cache.scale !== renderScale || cache.worldBounds.minX !== minX || cache.worldBounds.maxX !== maxX;
+
+        if (needsRebuild) {
+            // Create offscreen canvas
+            const offscreen =
+                typeof OffscreenCanvas !== "undefined"
+                    ? new OffscreenCanvas(canvasWidth, canvasHeight)
+                    : document.createElement("canvas");
+
+            if (!(offscreen instanceof OffscreenCanvas)) {
+                offscreen.width = canvasWidth;
+                offscreen.height = canvasHeight;
+            }
+
+            const offCtx = offscreen.getContext("2d")!;
+
+            // Render all items using the provided render function
+            for (const item of items) {
+                const size = item.size ?? 1;
+                const x = (item.x - minX) * renderScale;
+                const y = (item.y - minY) * renderScale;
+                const pxSize = size * renderScale;
+
+                renderFn(offCtx, item, x, y, pxSize);
+            }
+
+            cache = {
+                canvas: offscreen,
+                ctx: offCtx,
+                worldBounds: { minX, minY, maxX, maxY },
+                scale: renderScale,
+            };
+
+            this.staticCaches.set(cacheKey, cache);
+        }
+
+        return cache!;
+    }
+
+    /**
+     * Helper to add a layer callback that blits from a static cache.
+     */
+    private addStaticCacheLayer(cache: StaticCache, layer: number) {
+        const cachedCanvas = cache.canvas;
+        const cachedBounds = cache.worldBounds;
+        const cachedScale = cache.scale;
+
+        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            const viewW = config.size.width / config.scale;
+            const viewH = config.size.height / config.scale;
+
+            // Source rect in cached canvas (what part of cache to draw)
+            const srcX = (topLeft.x - cachedBounds.minX) * cachedScale;
+            const srcY = (topLeft.y - cachedBounds.minY) * cachedScale;
+            const srcW = viewW * cachedScale;
+            const srcH = viewH * cachedScale;
+
+            // Destination on screen
+            ctx.drawImage(cachedCanvas, srcX, srcY, srcW, srcH, 0, 0, config.size.width, config.size.height);
+        });
+    }
+
+    /**
+     * Draw rectangles with pre-rendering cache.
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like mini-maps.
+     * @param items Array of draw objects
+     * @param cacheKey Unique key for this cache (e.g., "minimap-items")
+     * @param layer Layer order
+     */
+    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+        let lastFillStyle: string | undefined;
+
+        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
+            const style = (item as DrawObject).style;
+            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                ctx.fillStyle = style.fillStyle;
+                lastFillStyle = style.fillStyle;
+            }
+            ctx.fillRect(x, y, pxSize, pxSize);
+        });
+
+        this.addStaticCacheLayer(cache, layer);
+    }
+
+    /**
+     * Draw images with pre-rendering cache.
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like terrain tiles or static decorations.
+     * @param items Array of image objects with position and HTMLImageElement
+     * @param cacheKey Unique key for this cache (e.g., "terrain-cache")
+     * @param layer Layer order
+     */
+    drawStaticImage(
+        items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
+        cacheKey: string,
+        layer: number = 1
+    ) {
+        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
+            const img = (item as { img: HTMLImageElement }).img;
+            const aspect = img.width / img.height;
+            let drawW = pxSize;
+            let drawH = pxSize;
+
+            if (aspect > 1) drawH = pxSize / aspect;
+            else drawW = pxSize * aspect;
+
+            ctx.drawImage(img, x, y, drawW, drawH);
+        });
+
+        this.addStaticCacheLayer(cache, layer);
+    }
+
+    /**
+     * Draw circles with pre-rendering cache.
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like mini-maps.
+     * @param items Array of draw objects
+     * @param cacheKey Unique key for this cache (e.g., "minimap-circles")
+     * @param layer Layer order
+     */
+    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+        let lastFillStyle: string | undefined;
+
+        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
+            const style = (item as DrawObject).style;
+            const radius = pxSize / 2;
+
+            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                ctx.fillStyle = style.fillStyle;
+                lastFillStyle = style.fillStyle;
+            }
+
+            ctx.beginPath();
+            ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        this.addStaticCacheLayer(cache, layer);
+    }
+
+    /**
+     * Clear a static cache
+     * @param cacheKey The cache key to clear, or undefined to clear all
+     */
+    clearStaticCache(cacheKey?: string) {
+        if (cacheKey) {
+            this.staticCaches.delete(cacheKey);
+        } else {
+            this.staticCaches.clear();
+        }
     }
 }

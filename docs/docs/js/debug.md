@@ -20,6 +20,7 @@ const config = {
             coordinates: true,
             scale: true,
             tilesInView: true,
+            fps: true,
         },
     },
 };
@@ -36,6 +37,7 @@ Displays real-time information about the engine state in the top-right corner of
 | `coordinates`        | `boolean` | `false` | Shows the world coordinates of the center of the viewport.                |
 | `scale`              | `boolean` | `false` | Shows the current zoom level (pixels per grid unit).                      |
 | `tilesInView`        | `boolean` | `false` | Shows how many tiles fit horizontally and vertically in the current view. |
+| `fps`                | `boolean` | `false` | Shows the current frames per second (continuously updated).               |
 
 ### HUD Example Output
 
@@ -46,6 +48,7 @@ TopLeft: 10.50, 5.20
 Coords: 15.00, 10.00
 Scale: 32.00
 Tiles in view: 25 x 19
+FPS: 60
 ```
 
 :::tip

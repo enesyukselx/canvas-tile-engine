@@ -120,6 +120,7 @@ Built-in tools to help you develop. Enable via the `debug` object.
 | `hud.coordinates`        | `false`                    | Display center coords.                                 |
 | `hud.scale`              | `false`                    | Display current scale.                                 |
 | `hud.tilesInView`        | `false`                    | Display visible tile counts.                           |
+| `hud.fps`                | `false`                    | Display current FPS (continuously updated).            |
 | `eventHandlers.*`        | `true`                     | Debug-time overrides for click/hover/drag/zoom/resize. |
 
 ## Full TypeScript Type

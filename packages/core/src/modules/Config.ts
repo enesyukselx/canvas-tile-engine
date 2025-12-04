@@ -63,6 +63,7 @@ export class Config {
                     coordinates: config.debug?.hud?.coordinates ?? false,
                     scale: config.debug?.hud?.scale ?? false,
                     tilesInView: config.debug?.hud?.tilesInView ?? false,
+                    fps: config.debug?.hud?.fps ?? false,
                 },
                 eventHandlers: {
                     click: config.debug?.eventHandlers?.click ?? true,

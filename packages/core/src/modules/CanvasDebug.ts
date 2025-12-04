@@ -4,6 +4,8 @@ import { CoordinateTransformer } from "./CoordinateTransformer";
 import { ViewportState } from "./ViewportState";
 import { DEBUG_HUD, DEFAULT_VALUES } from "../constants";
 
+const FPS_SAMPLE_SIZE = 10;
+
 /**
  * Canvas-only debug overlay: draws grid and HUD information.
  * @internal
@@ -14,6 +16,13 @@ export class CanvasDebug {
     private transformer: CoordinateTransformer;
     private config: Config;
     private viewport: ViewportState;
+
+    // FPS tracking (runs continuously via rAF)
+    private frameTimes: number[] = [];
+    private lastFrameTime = 0;
+    private currentFps = 0;
+    private fpsLoopRunning = false;
+    private onFpsUpdate: (() => void) | null = null;
 
     constructor(
         ctx: CanvasRenderingContext2D,
@@ -27,6 +36,54 @@ export class CanvasDebug {
         this.transformer = transformer;
         this.config = config;
         this.viewport = viewport;
+    }
+
+    /**
+     * Set callback for FPS updates (triggers re-render)
+     */
+    setFpsUpdateCallback(callback: () => void) {
+        this.onFpsUpdate = callback;
+    }
+
+    /**
+     * Start FPS monitoring loop
+     */
+    startFpsLoop() {
+        if (this.fpsLoopRunning) return;
+        this.fpsLoopRunning = true;
+        this.lastFrameTime = performance.now();
+        this.fpsLoop();
+    }
+
+    /**
+     * Stop FPS monitoring loop
+     */
+    stopFpsLoop() {
+        this.fpsLoopRunning = false;
+    }
+
+    private fpsLoop() {
+        if (!this.fpsLoopRunning) return;
+
+        const now = performance.now();
+        const delta = now - this.lastFrameTime;
+        this.lastFrameTime = now;
+
+        this.frameTimes.push(delta);
+        if (this.frameTimes.length > FPS_SAMPLE_SIZE) {
+            this.frameTimes.shift();
+        }
+
+        const avgDelta = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+        const newFps = Math.round(1000 / avgDelta);
+
+        // Only trigger update if FPS changed
+        if (newFps !== this.currentFps) {
+            this.currentFps = newFps;
+            this.onFpsUpdate?.();
+        }
+
+        requestAnimationFrame(() => this.fpsLoop());
     }
 
     draw() {
@@ -67,6 +124,10 @@ export class CanvasDebug {
             datas.push(
                 `Tiles in view: ${Math.ceil(width / this.camera.scale)} x ${Math.ceil(height / this.camera.scale)}`
             );
+        }
+
+        if (config.debug.hud.fps) {
+            datas.push(`FPS: ${this.currentFps}`);
         }
 
         const { width } = this.viewport.getSize();
