@@ -62,13 +62,20 @@ export class SizeController {
     private applySize(nextW: number, nextH: number, center: Coords) {
         const roundedW = Math.round(nextW);
         const roundedH = Math.round(nextH);
+        const dpr = this.viewport.dpr;
 
         this.viewport.setSize(roundedW, roundedH);
 
+        // CSS size (logical pixels)
         this.canvasWrapper.style.width = `${roundedW}px`;
         this.canvasWrapper.style.height = `${roundedH}px`;
-        this.canvas.width = roundedW;
-        this.canvas.height = roundedH;
+
+        // Canvas resolution (physical pixels for HiDPI)
+        this.canvas.width = roundedW * dpr;
+        this.canvas.height = roundedH * dpr;
+        this.canvas.style.width = `${roundedW}px`;
+        this.canvas.style.height = `${roundedH}px`;
+
         this.camera.setCenter(center, roundedW, roundedH);
         this.renderer.resize(roundedW, roundedH);
         this.onSizeApplied();

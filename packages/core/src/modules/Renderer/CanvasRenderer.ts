@@ -10,6 +10,7 @@ import { IRenderer } from "./Renderer";
 
 /**
  * Canvas-based renderer that draws engine layers, user callbacks, and coordinate overlays.
+ * Supports HiDPI/Retina displays via devicePixelRatio scaling.
  * @internal
  */
 export class CanvasRenderer implements IRenderer {
@@ -42,7 +43,12 @@ export class CanvasRenderer implements IRenderer {
 
         this.ctx = context;
         this.applyCanvasSize();
-        this.coordinateOverlayRenderer = new CoordinateOverlayRenderer(this.ctx, this.camera, this.config, this.viewport);
+        this.coordinateOverlayRenderer = new CoordinateOverlayRenderer(
+            this.ctx,
+            this.camera,
+            this.config,
+            this.viewport
+        );
         if (this.config.get().debug?.enabled) {
             this.debugOverlay = new CanvasDebug(
                 this.ctx,
@@ -60,14 +66,28 @@ export class CanvasRenderer implements IRenderer {
 
     private applyCanvasSize() {
         const size = this.viewport.getSize();
-        this.canvas.width = size.width;
-        this.canvas.height = size.height;
+        const dpr = this.viewport.dpr;
+
+        // Set actual canvas resolution (physical pixels)
+        this.canvas.width = size.width * dpr;
+        this.canvas.height = size.height * dpr;
+
+        // Set display size via CSS (logical pixels)
+        this.canvas.style.width = `${size.width}px`;
+        this.canvas.style.height = `${size.height}px`;
+
+        // Scale context to match DPR
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     render(): void {
         const size = this.viewport.getSize();
+        const dpr = this.viewport.dpr;
         const config = { ...this.config.get(), size: { ...size }, scale: this.camera.scale };
         const topLeft: Coords = { x: this.camera.x, y: this.camera.y };
+
+        // Reset transform for HiDPI support (canvas.width/height changes reset transform)
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
         // Clear background
         this.ctx.clearRect(0, 0, config.size.width, config.size.height);
@@ -112,9 +132,20 @@ export class CanvasRenderer implements IRenderer {
     }
 
     resize(width: number, height: number): void {
+        const dpr = this.viewport.dpr;
+
         this.viewport.setSize(width, height);
-        this.canvas.width = width;
-        this.canvas.height = height;
+
+        // Set actual canvas resolution (physical pixels)
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+
+        // Set display size via CSS (logical pixels)
+        this.canvas.style.width = `${width}px`;
+        this.canvas.style.height = `${height}px`;
+
+        // Scale context to match DPR
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     destroy(): void {
