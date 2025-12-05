@@ -7,6 +7,8 @@ import { SpatialIndex } from "./SpatialIndex";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
 const SPATIAL_INDEX_THRESHOLD = 500;
+// Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
+const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
 // Cache for static layers (pre-rendered offscreen canvases)
 interface StaticCache {
@@ -436,6 +438,14 @@ export class CanvasDraw {
         const renderScale = this.camera.scale;
         const canvasWidth = Math.ceil(worldWidth * renderScale);
         const canvasHeight = Math.ceil(worldHeight * renderScale);
+
+        if (canvasWidth > MAX_STATIC_CANVAS_DIMENSION || canvasHeight > MAX_STATIC_CANVAS_DIMENSION) {
+            if (!this.warnedStaticCacheDisabled) {
+                console.warn(`Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight}).`);
+                this.warnedStaticCacheDisabled = true;
+            }
+            return null;
+        }
 
         // Check if we need to create or update cache
         let cache = this.staticCaches.get(cacheKey);
