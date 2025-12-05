@@ -471,9 +471,9 @@ export class CanvasDraw {
             // Render all items using the provided render function
             for (const item of items) {
                 const size = item.size ?? 1;
-                const x = (item.x - minX) * renderScale;
-                const y = (item.y - minY) * renderScale;
                 const pxSize = size * renderScale;
+                const x = (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale - pxSize / 2;
+                const y = (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale - pxSize / 2;
 
                 renderFn(offCtx, item, x, y, pxSize);
             }
