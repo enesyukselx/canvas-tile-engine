@@ -17,6 +17,7 @@ const popupCoordinatesElem = document.getElementById("popup-coordinates");
 const inputX = document.getElementById("x") as HTMLInputElement;
 
 const inputY = document.getElementById("y") as HTMLInputElement;
+
 const goToCoordsBtn = document.getElementById("go-to-coords") as HTMLButtonElement;
 
 // Event listeners for resizing maps
