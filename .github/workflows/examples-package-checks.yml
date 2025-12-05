@@ -12,9 +12,6 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-                  sparse-checkout-cone-mode: false
             - name: Install pnpm
               uses: pnpm/action-setup@v4
               with:
