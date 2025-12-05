@@ -1,4 +1,4 @@
-name: "Examples - Typecheck"
+name: "Examples - Typecheck + Lint Checks"
 
 on:
     push:
@@ -6,20 +6,30 @@ on:
             - "examples/**"
 
 jobs:
-    typecheck:
-        name: Typecheck Examples
+    checks:
+        name: Typecheck - Lint
         runs-on: ubuntu-22.04
+
         steps:
             - uses: actions/checkout@v4
-            - uses: pnpm/action-setup@v4
-              name: Install pnpm
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
               with:
                   version: 10.23.0
                   run_install: false
-            - uses: actions/setup-node@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
               with:
-                  node-version: "22"
+                  node-version: 22
                   cache: "pnpm"
                   cache-dependency-path: "pnpm-lock.yaml"
-            - run: pnpm install --no-frozen-lockfile
-            - run: pnpm -r --filter '{./examples/**}' typecheck
+
+            - name: Install dependencies
+              run: pnpm install --no-frozen-lockfile
+
+            - name: Typecheck examples
+              run: pnpm -r --filter '{./examples/**}' typecheck
+
+            - name: Lint examples
+              run: pnpm eslint 'examples/**/src' --ext .ts,.tsx

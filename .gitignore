@@ -33,7 +33,6 @@ lerna-debug.log*
 
 # pnpm
 .pnpm-store/
-pnpm-lock.yaml
 
 # Editor
 .vscode/*
