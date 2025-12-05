@@ -19,6 +19,7 @@ import {
 } from "./types";
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
+
 import { RendererFactory } from "./modules/RendererFactory";
 
 /**

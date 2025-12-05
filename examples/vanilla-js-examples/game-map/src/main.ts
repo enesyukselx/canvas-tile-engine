@@ -15,6 +15,7 @@ const popupCoordinatesElem = document.getElementById("popup-coordinates");
 
 // Input elements for coordinates and button to go to coordinates
 const inputX = document.getElementById("x") as HTMLInputElement;
+
 const inputY = document.getElementById("y") as HTMLInputElement;
 const goToCoordsBtn = document.getElementById("go-to-coords") as HTMLButtonElement;
 
