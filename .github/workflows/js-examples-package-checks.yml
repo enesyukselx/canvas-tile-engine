@@ -1,13 +1,14 @@
-name: "Examples - Typecheck + Lint Checks"
+name: "Js Examples - Typecheck + Lint Checks"
 
 on:
     push:
         paths:
             - "examples/**"
+            - "packages/core/**"
 
 jobs:
     checks:
-        name: Typecheck - Lint (Examples)
+        name: Typecheck - Lint (Vanilla Js Examples)
         runs-on: ubuntu-22.04
 
         steps:
