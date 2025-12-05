@@ -3,7 +3,7 @@ name: "Js Examples - Typecheck + Lint Checks"
 on:
     push:
         paths:
-            - "examples/**"
+            - "examples/vanilla-js-examples/**"
             - "packages/core/**"
 
 jobs:
