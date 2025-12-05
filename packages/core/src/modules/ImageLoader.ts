@@ -94,4 +94,13 @@ export class ImageLoader {
     has(src: string): boolean {
         return this.cache.has(src);
     }
+
+    /**
+     * Clear all cached and inflight images/listeners to free memory.
+     */
+    clear() {
+        this.cache.clear();
+        this.inflight.clear();
+        this.listeners.clear();
+    }
 }

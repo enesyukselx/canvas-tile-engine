@@ -90,6 +90,14 @@ export class CanvasDebug {
         this.drawHud();
     }
 
+    /**
+     * Stop FPS tracking and release callbacks.
+     */
+    destroy() {
+        this.stopFpsLoop();
+        this.onFpsUpdate = null;
+    }
+
     private drawHud() {
         const config = this.config.get();
 

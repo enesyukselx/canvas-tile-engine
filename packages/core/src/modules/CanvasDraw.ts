@@ -22,8 +22,12 @@ interface StaticCache {
  */
 export class CanvasDraw {
     private staticCaches = new Map<string, StaticCache>();
+    private staticCacheSupported: boolean;
+    private warnedStaticCacheDisabled = false;
 
-    constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {}
+    constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {
+        this.staticCacheSupported = typeof OffscreenCanvas !== "undefined" || typeof document !== "undefined";
+    }
 
     /**
      * Register a generic draw callback; receives raw context, current coords, and config.
@@ -396,7 +400,15 @@ export class CanvasDraw {
             y: number,
             pxSize: number
         ) => void
-    ): StaticCache {
+    ): StaticCache | null {
+        if (!this.staticCacheSupported) {
+            if (!this.warnedStaticCacheDisabled) {
+                console.warn("[CanvasDraw] Static cache disabled: OffscreenCanvas not available.");
+                this.warnedStaticCacheDisabled = true;
+            }
+            return null;
+        }
+
         // Calculate world bounds from items
         let minX = Infinity,
             maxX = -Infinity,
@@ -428,7 +440,12 @@ export class CanvasDraw {
         // Check if we need to create or update cache
         let cache = this.staticCaches.get(cacheKey);
         const needsRebuild =
-            !cache || cache.scale !== renderScale || cache.worldBounds.minX !== minX || cache.worldBounds.maxX !== maxX;
+            !cache ||
+            cache.scale !== renderScale ||
+            cache.worldBounds.minX !== minX ||
+            cache.worldBounds.maxX !== maxX ||
+            cache.worldBounds.minY !== minY ||
+            cache.worldBounds.maxY !== maxY;
 
         if (needsRebuild) {
             // Create offscreen canvas
@@ -442,7 +459,14 @@ export class CanvasDraw {
                 offscreen.height = canvasHeight;
             }
 
-            const offCtx = offscreen.getContext("2d")!;
+            const offCtx = offscreen.getContext("2d");
+            if (!offCtx) {
+                if (!this.warnedStaticCacheDisabled) {
+                    console.warn("[CanvasDraw] Static cache disabled: 2D context unavailable.");
+                    this.warnedStaticCacheDisabled = true;
+                }
+                return null;
+            }
 
             // Render all items using the provided render function
             for (const item of items) {
@@ -464,13 +488,16 @@ export class CanvasDraw {
             this.staticCaches.set(cacheKey, cache);
         }
 
-        return cache!;
+        return cache || null;
     }
 
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
-    private addStaticCacheLayer(cache: StaticCache, layer: number) {
+    private addStaticCacheLayer(cache: StaticCache | null, layer: number) {
+        if (!cache) {
+            return;
+        }
         const cachedCanvas = cache.canvas;
         const cachedBounds = cache.worldBounds;
         const cachedScale = cache.scale;
@@ -510,6 +537,11 @@ export class CanvasDraw {
             ctx.fillRect(x, y, pxSize, pxSize);
         });
 
+        if (!cache) {
+            this.drawRect(items, layer);
+            return;
+        }
+
         this.addStaticCacheLayer(cache, layer);
     }
 
@@ -537,6 +569,11 @@ export class CanvasDraw {
 
             ctx.drawImage(img, x, y, drawW, drawH);
         });
+
+        if (!cache) {
+            this.drawImage(items, layer);
+            return;
+        }
 
         this.addStaticCacheLayer(cache, layer);
     }
@@ -566,6 +603,11 @@ export class CanvasDraw {
             ctx.fill();
         });
 
+        if (!cache) {
+            this.drawCircle(items, layer);
+            return;
+        }
+
         this.addStaticCacheLayer(cache, layer);
     }
 
@@ -579,5 +621,13 @@ export class CanvasDraw {
         } else {
             this.staticCaches.clear();
         }
+    }
+
+    /**
+     * Release cached canvases and layer callbacks.
+     */
+    destroy() {
+        this.staticCaches.clear();
+        this.layers.clear();
     }
 }

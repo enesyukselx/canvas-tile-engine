@@ -159,7 +159,11 @@ export class CanvasRenderer implements IRenderer {
     }
 
     destroy(): void {
-        //
+        if (this.debugOverlay) {
+            this.debugOverlay.destroy();
+            this.debugOverlay = undefined;
+        }
+        this.layers.clear();
     }
 
     /** Access the underlying 2D rendering context for advanced usage. */

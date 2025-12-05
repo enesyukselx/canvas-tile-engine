@@ -115,7 +115,8 @@ export class CanvasTileEngine {
     constructor(canvasWrapper: HTMLDivElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
-
+        this.canvasWrapper.style.position = "relative";
+        this.canvas.style.position = "absolute";
         this.config = new Config(config);
 
         const rendererType = config.renderer ?? "canvas";
@@ -173,6 +174,11 @@ export class CanvasTileEngine {
     /** Tear down listeners and observers. */
     destroy() {
         this.events.destroy();
+        this.animationController.cancelAll();
+        this.draw?.destroy();
+        this.layers?.clear();
+        this.images.clear();
+        this.renderer.destroy();
     }
 
     /** Render a frame using the active renderer. */
