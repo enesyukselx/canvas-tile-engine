@@ -23,6 +23,7 @@ const goToCoordsBtn = document.getElementById("go-to-coords") as HTMLButtonEleme
 // Event listeners for resizing maps
 // Mini map size input event listener
 const miniMapSizeInput = document.getElementById("minimap-size-select") as HTMLInputElement;
+
 miniMapSizeInput.value = INITIAL_MINI_MAP_SIZE.toString();
 miniMapSizeInput.addEventListener("change", () => {
     const newSize = Number(miniMapSizeInput.value);
