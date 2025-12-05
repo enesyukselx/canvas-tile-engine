@@ -61,14 +61,16 @@ export class ImageLoader {
                 resolve(img);
             };
 
-            img.onerror = async (err) => {
+            img.onerror = (err) => {
                 this.inflight.delete(src);
                 if (retry > 0) {
                     console.warn(`Retrying image: ${src}`);
                     resolve(this.load(src, retry - 1));
                 } else {
                     console.error(`Image failed to load: ${src}`, err);
-                    reject(err);
+                    const reason =
+                        err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err);
+                    reject(new Error(`Image failed to load: ${src}. Reason: ${reason}`));
                 }
             };
 
@@ -93,5 +95,14 @@ export class ImageLoader {
      */
     has(src: string): boolean {
         return this.cache.has(src);
+    }
+
+    /**
+     * Clear all cached and inflight images/listeners to free memory.
+     */
+    clear() {
+        this.cache.clear();
+        this.inflight.clear();
+        this.listeners.clear();
     }
 }

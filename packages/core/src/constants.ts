@@ -53,14 +53,6 @@ export const RENDER_DEFAULTS = {
     RENDERER_TYPE: "canvas" as const,
 } as const;
 
-export const DEBUG_DEFAULTS = {
-    /** Debug grid color */
-    GRID_COLOR: "rgba(255,255,255,0.25)",
-
-    /** Debug grid line width */
-    GRID_LINE_WIDTH: 1,
-} as const;
-
 export const COORDINATE_OVERLAY = {
     /** Coordinate overlay border width in pixels */
     BORDER_WIDTH: 20,

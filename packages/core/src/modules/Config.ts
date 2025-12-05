@@ -1,12 +1,12 @@
-import { CanvasTileEngineConfig } from "../types";
-import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS, DEBUG_DEFAULTS } from "../constants";
+import { CanvasTileEngineConfig, EventHandlers } from "../types";
+import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
 
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
  * @internal
  */
 export class Config {
-    private readonly config: Required<CanvasTileEngineConfig>;
+    private config: Required<CanvasTileEngineConfig>;
 
     /**
      * Create a config store with defaults merged from the provided partial config.
@@ -38,6 +38,13 @@ export class Config {
                 resize: config.eventHandlers?.resize ?? false,
             },
 
+            bounds: config.bounds ?? {
+                minX: -Infinity,
+                maxX: Infinity,
+                minY: -Infinity,
+                maxY: Infinity,
+            },
+
             coordinates: {
                 enabled: config.coordinates?.enabled ?? false,
                 shownScaleRange: config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity },
@@ -50,17 +57,13 @@ export class Config {
 
             debug: {
                 enabled: config.debug?.enabled ?? false,
-                grid: {
-                    enabled: config.debug?.grid?.enabled ?? false,
-                    color: config.debug?.grid?.color ?? DEBUG_DEFAULTS.GRID_COLOR,
-                    lineWidth: config.debug?.grid?.lineWidth ?? DEBUG_DEFAULTS.GRID_LINE_WIDTH,
-                },
                 hud: {
                     enabled: config.debug?.hud?.enabled ?? false,
                     topLeftCoordinates: config.debug?.hud?.topLeftCoordinates ?? false,
                     coordinates: config.debug?.hud?.coordinates ?? false,
                     scale: config.debug?.hud?.scale ?? false,
                     tilesInView: config.debug?.hud?.tilesInView ?? false,
+                    fps: config.debug?.hud?.fps ?? false,
                 },
                 eventHandlers: {
                     click: config.debug?.eventHandlers?.click ?? true,
@@ -71,10 +74,11 @@ export class Config {
                 },
             },
         };
-        this.config = Object.freeze({
+        this.config = {
             ...base,
             size: Object.freeze(base.size),
             eventHandlers: Object.freeze(base.eventHandlers),
+            bounds: Object.freeze(base.bounds),
             coordinates: Object.freeze({
                 ...base.coordinates,
                 shownScaleRange: Object.freeze(base.coordinates.shownScaleRange),
@@ -82,11 +86,10 @@ export class Config {
             cursor: Object.freeze(base.cursor),
             debug: Object.freeze({
                 enabled: base.debug.enabled,
-                grid: Object.freeze(base.debug.grid),
                 hud: Object.freeze(base.debug.hud),
                 eventHandlers: Object.freeze(base.debug.eventHandlers),
             }),
-        });
+        };
     }
 
     /**
@@ -95,5 +98,30 @@ export class Config {
      */
     get(): Readonly<Required<CanvasTileEngineConfig>> {
         return this.config;
+    }
+
+    /**
+     * Update event handlers at runtime.
+     * @param handlers Partial event handlers to update.
+     */
+    updateEventHandlers(handlers: Partial<EventHandlers>) {
+        this.config = {
+            ...this.config,
+            eventHandlers: {
+                ...this.config.eventHandlers,
+                ...handlers,
+            },
+        };
+    }
+
+    /**
+     * Update map bounds at runtime.
+     * @param bounds New boundary limits. Use Infinity/-Infinity to remove limits on specific axes.
+     */
+    updateBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
+        this.config = {
+            ...this.config,
+            bounds: Object.freeze(bounds),
+        };
     }
 }

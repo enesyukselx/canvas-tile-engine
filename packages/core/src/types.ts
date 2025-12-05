@@ -12,12 +12,12 @@ export type CanvasTileEngineConfig = {
         maxWidth?: number;
         maxHeight?: number;
     };
-    eventHandlers?: {
-        click?: boolean;
-        hover?: boolean;
-        drag?: boolean;
-        zoom?: boolean;
-        resize?: boolean;
+    eventHandlers?: EventHandlers;
+    bounds?: {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
     };
     coordinates?: {
         enabled?: boolean;
@@ -29,17 +29,13 @@ export type CanvasTileEngineConfig = {
     };
     debug?: {
         enabled?: boolean;
-        grid?: {
-            enabled?: boolean;
-            color?: string;
-            lineWidth?: number;
-        };
         hud?: {
             enabled?: boolean;
             topLeftCoordinates?: boolean;
             coordinates?: boolean;
             scale?: boolean;
             tilesInView?: boolean;
+            fps?: boolean;
         };
         eventHandlers?: {
             click?: boolean;
@@ -49,6 +45,14 @@ export type CanvasTileEngineConfig = {
             resize?: boolean;
         };
     };
+};
+
+export type EventHandlers = {
+    click?: boolean;
+    hover?: boolean;
+    drag?: boolean;
+    zoom?: boolean;
+    resize?: boolean;
 };
 
 export type Coords = {

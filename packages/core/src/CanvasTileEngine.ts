@@ -8,7 +8,15 @@ import { Layer } from "./modules/Layer";
 import { ViewportState } from "./modules/ViewportState";
 import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
-import { Coords, DrawObject, CanvasTileEngineConfig, onClickCallback, onDrawCallback, onHoverCallback } from "./types";
+import {
+    Coords,
+    DrawObject,
+    CanvasTileEngineConfig,
+    onClickCallback,
+    onDrawCallback,
+    onHoverCallback,
+    EventHandlers,
+} from "./types";
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
 import { RendererFactory } from "./modules/RendererFactory";
@@ -54,6 +62,24 @@ export class CanvasTileEngine {
         this.events.onHover = cb;
     }
 
+    private _onMouseDown?: () => void;
+    public get onMouseDown(): (() => void) | undefined {
+        return this._onMouseDown;
+    }
+    public set onMouseDown(cb: (() => void) | undefined) {
+        this._onMouseDown = cb;
+        this.events.onMouseDown = cb;
+    }
+
+    private _onMouseUp?: () => void;
+    public get onMouseUp(): (() => void) | undefined {
+        return this._onMouseUp;
+    }
+    public set onMouseUp(cb: (() => void) | undefined) {
+        this._onMouseUp = cb;
+        this.events.onMouseUp = cb;
+    }
+
     private _onMouseLeave?: () => void;
     public get onMouseLeave(): (() => void) | undefined {
         return this._onMouseLeave;
@@ -89,7 +115,8 @@ export class CanvasTileEngine {
     constructor(canvasWrapper: HTMLDivElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
-
+        this.canvasWrapper.style.position = "relative";
+        this.canvas.style.position = "absolute";
         this.config = new Config(config);
 
         const rendererType = config.renderer ?? "canvas";
@@ -103,8 +130,10 @@ export class CanvasTileEngine {
             initialTopLeft,
             this.config.get().scale,
             this.config.get().minScale,
-            this.config.get().maxScale
+            this.config.get().maxScale,
+            this.viewport
         );
+
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
 
         // Initialize animation controller
@@ -133,6 +162,11 @@ export class CanvasTileEngine {
             () => this.handleCameraChange()
         );
         this.events.setupEvents();
+
+        // Apply initial bounds if provided
+        if (config.bounds) {
+            this.camera.setBounds(config.bounds);
+        }
     }
 
     // ─── PUBLIC API ──────────────────────────────
@@ -140,6 +174,11 @@ export class CanvasTileEngine {
     /** Tear down listeners and observers. */
     destroy() {
         this.events.destroy();
+        this.animationController.cancelAll();
+        this.draw?.destroy();
+        this.layers?.clear();
+        this.images.clear();
+        this.renderer.destroy();
     }
 
     /** Render a frame using the active renderer. */
@@ -178,7 +217,6 @@ export class CanvasTileEngine {
 
     /** Center coordinates of the map. */
     getCenterCoords(): Coords {
-        const cfg = this.config.get();
         const size = this.viewport.getSize();
         return this.camera.getCenter(size.width, size.height);
     }
@@ -198,6 +236,47 @@ export class CanvasTileEngine {
      */
     goCoords(x: number, y: number, durationMs: number = 500) {
         this.animationController.animateMoveTo(x, y, durationMs);
+    }
+
+    /**
+     * Update event handlers at runtime.
+     * This allows you to enable or disable specific interactions dynamically.
+     * @param handlers Partial event handlers to update.
+     * @example
+     * ```ts
+     * // Disable drag temporarily
+     * engine.setEventHandlers({ drag: false });
+     *
+     * // Enable painting mode
+     * engine.setEventHandlers({ drag: false, hover: true });
+     *
+     * // Re-enable drag
+     * engine.setEventHandlers({ drag: true });
+     * ```
+     */
+    setEventHandlers(handlers: Partial<EventHandlers>) {
+        this.config.updateEventHandlers(handlers);
+    }
+
+    /**
+     * Set or update map boundaries to restrict camera movement.
+     * @param bounds Boundary limits. Use Infinity/-Infinity to remove limits.
+     * @example
+     * ```ts
+     * // Restrict map to -100 to 100 on both axes
+     * engine.setBounds({ minX: -100, maxX: 100, minY: -100, maxY: 100 });
+     *
+     * // Remove boundaries
+     * engine.setBounds({ minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity });
+     *
+     * // Only limit X axis
+     * engine.setBounds({ minX: 0, maxX: 500, minY: -Infinity, maxY: Infinity });
+     * ```
+     */
+    setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
+        this.config.updateBounds(bounds);
+        this.camera.setBounds(bounds);
+        this.render();
     }
 
     // ─── Draw helpers (canvas renderer only) ───────────
@@ -221,6 +300,54 @@ export class CanvasTileEngine {
      */
     drawRect(items: DrawObject | Array<DrawObject>, layer: number = 1) {
         this.ensureCanvasDraw().drawRect(items, layer);
+    }
+
+    /**
+     * Draw rectangles with pre-rendering cache (canvas renderer only).
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like mini-maps where items don't change.
+     * @param items Array of rectangle definitions.
+     * @param cacheKey Unique key for this cache (e.g., "minimap-items").
+     * @param layer Layer order (lower draws first).
+     */
+    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+        this.ensureCanvasDraw().drawStaticRect(items, cacheKey, layer);
+    }
+
+    /**
+     * Draw circles with pre-rendering cache (canvas renderer only).
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like mini-maps where items don't change.
+     * @param items Array of circle definitions.
+     * @param cacheKey Unique key for this cache (e.g., "minimap-circles").
+     * @param layer Layer order (lower draws first).
+     */
+    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+        this.ensureCanvasDraw().drawStaticCircle(items, cacheKey, layer);
+    }
+
+    /**
+     * Draw images with pre-rendering cache (canvas renderer only).
+     * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
+     * Ideal for large static datasets like terrain tiles or static decorations.
+     * @param items Array of image definitions with HTMLImageElement.
+     * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
+     * @param layer Layer order (lower draws first).
+     */
+    drawStaticImage(
+        items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
+        cacheKey: string,
+        layer: number = 1
+    ) {
+        this.ensureCanvasDraw().drawStaticImage(items, cacheKey, layer);
+    }
+
+    /**
+     * Clear a static rendering cache.
+     * @param cacheKey The cache key to clear, or undefined to clear all caches.
+     */
+    clearStaticCache(cacheKey?: string) {
+        this.ensureCanvasDraw().clearStaticCache(cacheKey);
     }
 
     /**
@@ -286,6 +413,18 @@ export class CanvasTileEngine {
         layer: number = 1
     ) {
         this.ensureCanvasDraw().drawImage(items, layer);
+    }
+
+    /**
+     *  Draw grid lines at specified cell size (canvas renderer only).
+     * @param cellSize Size of each grid cell in world units.
+     * @example
+     * ```ts
+     * engine.drawGridLines(50);
+     * ```
+     */
+    drawGridLines(cellSize: number, lineWidth: number = 1, strokeStyle: string = "black", layer: number = 0) {
+        this.ensureCanvasDraw().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
     }
 
     /**

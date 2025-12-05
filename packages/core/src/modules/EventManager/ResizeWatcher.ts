@@ -61,11 +61,19 @@ export class ResizeWatcher {
 
                 const diffW = width - prev.width;
                 const diffH = height - prev.height;
+                const dpr = this.viewport.dpr;
 
                 this.camera.adjustForResize(diffW, diffH);
                 this.viewport.setSize(width, height);
-                this.canvas.width = width;
-                this.canvas.height = height;
+
+                // Set canvas resolution (physical pixels for HiDPI)
+                this.canvas.width = width * dpr;
+                this.canvas.height = height * dpr;
+
+                // Set CSS size (logical pixels)
+                this.canvas.style.width = `${width}px`;
+                this.canvas.style.height = `${height}px`;
+
                 this.wrapper.style.width = `${width}px`;
                 this.wrapper.style.height = `${height}px`;
 

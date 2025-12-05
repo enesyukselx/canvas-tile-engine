@@ -4,6 +4,8 @@ import { CoordinateTransformer } from "./CoordinateTransformer";
 import { ViewportState } from "./ViewportState";
 import { DEBUG_HUD } from "../constants";
 
+const FPS_SAMPLE_SIZE = 10;
+
 /**
  * Canvas-only debug overlay: draws grid and HUD information.
  * @internal
@@ -14,6 +16,13 @@ export class CanvasDebug {
     private transformer: CoordinateTransformer;
     private config: Config;
     private viewport: ViewportState;
+
+    // FPS tracking (runs continuously via rAF)
+    private frameTimes: number[] = [];
+    private lastFrameTime = 0;
+    private currentFps = 0;
+    private fpsLoopRunning = false;
+    private onFpsUpdate: (() => void) | null = null;
 
     constructor(
         ctx: CanvasRenderingContext2D,
@@ -29,37 +38,64 @@ export class CanvasDebug {
         this.viewport = viewport;
     }
 
+    /**
+     * Set callback for FPS updates (triggers re-render)
+     */
+    setFpsUpdateCallback(callback: () => void) {
+        this.onFpsUpdate = callback;
+    }
+
+    /**
+     * Start FPS monitoring loop
+     */
+    startFpsLoop() {
+        if (this.fpsLoopRunning) return;
+        this.fpsLoopRunning = true;
+        this.lastFrameTime = performance.now();
+        this.fpsLoop();
+    }
+
+    /**
+     * Stop FPS monitoring loop
+     */
+    stopFpsLoop() {
+        this.fpsLoopRunning = false;
+    }
+
+    private fpsLoop() {
+        if (!this.fpsLoopRunning) return;
+
+        const now = performance.now();
+        const delta = now - this.lastFrameTime;
+        this.lastFrameTime = now;
+
+        this.frameTimes.push(delta);
+        if (this.frameTimes.length > FPS_SAMPLE_SIZE) {
+            this.frameTimes.shift();
+        }
+
+        const avgDelta = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+        const newFps = Math.round(1000 / avgDelta);
+
+        // Only trigger update if FPS changed
+        if (newFps !== this.currentFps) {
+            this.currentFps = newFps;
+            this.onFpsUpdate?.();
+        }
+
+        requestAnimationFrame(() => this.fpsLoop());
+    }
+
     draw() {
-        this.drawGrid();
         this.drawHud();
     }
 
-    private drawGrid() {
-        const config = this.config.get();
-
-        if (!config.debug.grid?.enabled) {
-            return;
-        }
-
-        const tile = this.camera.scale;
-        const { width, height } = this.viewport.getSize();
-        const camX = this.camera.x;
-        const camY = this.camera.y;
-
-        const left = Math.floor(camX);
-        const right = Math.ceil(camX + width / tile);
-        const top = Math.floor(camY);
-        const bottom = Math.ceil(camY + height / tile);
-
-        this.ctx.strokeStyle = config.debug.grid?.color ?? "rgba(255,255,255,0.25)";
-        this.ctx.lineWidth = config.debug.grid?.lineWidth ?? 1;
-
-        for (let gx = left; gx <= right; gx++) {
-            for (let gy = top; gy <= bottom; gy++) {
-                const topLeft = this.transformer.worldToScreen(gx - 0.5, gy - 0.5);
-                this.ctx.strokeRect(topLeft.x, topLeft.y, tile, tile);
-            }
-        }
+    /**
+     * Stop FPS tracking and release callbacks.
+     */
+    destroy() {
+        this.stopFpsLoop();
+        this.onFpsUpdate = null;
     }
 
     private drawHud() {
@@ -96,6 +132,10 @@ export class CanvasDebug {
             datas.push(
                 `Tiles in view: ${Math.ceil(width / this.camera.scale)} x ${Math.ceil(height / this.camera.scale)}`
             );
+        }
+
+        if (config.debug.hud.fps) {
+            datas.push(`FPS: ${this.currentFps}`);
         }
 
         const { width } = this.viewport.getSize();

@@ -2,7 +2,7 @@ import "./style.css";
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { generateMapObjects } from "./generateMapObjects";
 
-const INITIAL_COORDS = { x: 0, y: 0 };
+const INITIAL_COORDS = { x: 200, y: 200 };
 const INITIAL_MAIN_MAP_SIZE = 500;
 const INITIAL_MINI_MAP_SIZE = 300;
 // Popup elements
@@ -30,6 +30,8 @@ miniMapSizeInput.addEventListener("change", () => {
         return;
     }
     miniMap.resize(newSize, newSize, 300);
+    // Recalculate bounds after resize since viewport size changed
+    miniMap.setBounds(calculateMiniMapBounds());
     miniMap.render();
 });
 
@@ -69,17 +71,24 @@ const mainMapOptions: CanvasTileEngineConfig = {
         enabled: true,
         shownScaleRange: { min: 40, max: 60 },
     },
+    bounds: {
+        minX: 0,
+        maxX: 500,
+        minY: 0,
+        maxY: 500,
+    },
 };
 
 // Mini map configuration
 const miniMapOptions: CanvasTileEngineConfig = {
-    scale: 10,
+    scale: 6,
     size: { width: 300, height: 300, maxWidth: 700, maxHeight: 700, minWidth: 100, minHeight: 100 },
     backgroundColor: "#337426ff",
     eventHandlers: {
         drag: true,
         resize: true,
     },
+    // Bounds will be dynamically based on viewport size
 };
 
 // Canvas-wrapper elements for main and mini maps
@@ -90,62 +99,92 @@ const miniMapCanvas = document.getElementById("mini-map-wrapper") as HTMLDivElem
 const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, INITIAL_COORDS);
 const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, INITIAL_COORDS);
 
+// Calculate mini map bounds so its CENTER can move within main map's CENTER range
+// Main map center range: (bounds.min + viewWidth/2) to (bounds.max - viewWidth/2)
+// Mini map should have same center range, so we need to adjust bounds for its viewport
+const calculateMiniMapBounds = () => {
+    const mainBounds = mainMapOptions.bounds!;
+    const mainCfg = mainMap.getConfig();
+    const miniCfg = miniMap.getConfig();
+
+    // Main map viewport size in world units
+    const mainViewWidth = mainCfg.size.width / mainCfg.scale;
+    const mainViewHeight = mainCfg.size.height / mainCfg.scale;
+
+    // Main map center movement range
+    const mainCenterMinX = mainBounds.minX + mainViewWidth / 2;
+    const mainCenterMaxX = mainBounds.maxX - mainViewWidth / 2;
+    const mainCenterMinY = mainBounds.minY + mainViewHeight / 2;
+    const mainCenterMaxY = mainBounds.maxY - mainViewHeight / 2;
+
+    // Mini map viewport size in world units
+    const miniViewWidth = miniCfg.size.width / miniCfg.scale;
+    const miniViewHeight = miniCfg.size.height / miniCfg.scale;
+
+    return {
+        minX: mainCenterMinX - miniViewWidth / 2,
+        maxX: mainCenterMaxX + miniViewWidth / 2,
+        minY: mainCenterMinY - miniViewHeight / 2,
+        maxY: mainCenterMaxY + miniViewHeight / 2,
+    };
+};
+
 // Generate map objects
-const items = generateMapObjects(5000, 0, 0, 1.2);
+const items = generateMapObjects(10000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2);
+
+// Create coordinate-based Map for O(1) lookups (hover/click)
+const itemsByCoord = new Map<string, (typeof items)[0]>();
+for (const item of items) {
+    if (item.type !== "terrain") {
+        itemsByCoord.set(`${item.x},${item.y}`, item);
+    }
+}
 
 // Function to draw items on both maps
 const drawItems = async () => {
-    // Load all images
-    const loaded = await Promise.all(
-        items.map(async (item) => ({
-            item,
-            img: await mainMap.images.load(item.imageUrl),
-        }))
+    // Preload unique images only (not 50k times!)
+    const uniqueUrls = [...new Set(items.map((i) => i.imageUrl))];
+    const imageCache = new Map<string, HTMLImageElement>();
+    await Promise.all(
+        uniqueUrls.map(async (url) => {
+            imageCache.set(url, await mainMap.images.load(url));
+        })
     );
 
-    // Prepare image items for main map
-    const imageItems = loaded.map(({ item, img }) => ({
-        img,
-        x: item.x,
-        y: item.y,
-        size: 1,
-    }));
+    // Build arrays in single pass
+    const imageItems: Array<{ img: HTMLImageElement; x: number; y: number; size: number }> = [];
+    const miniMapRects: Array<{ x: number; y: number; size: number; style: { fillStyle: string } }> = [];
+    const circleItems: Array<{
+        x: number;
+        y: number;
+        size: number;
+        origin: { mode: "cell"; x: number; y: number };
+        style: { fillStyle: string };
+    }> = [];
 
-    // Prepare rectangle items for mini map
-    const miniMapRects = loaded.map(({ item }) => ({
-        x: item.x,
-        y: item.y,
-        size: 0.5,
-        style: { fillStyle: item.color },
-    }));
+    for (const item of items) {
+        const img = imageCache.get(item.imageUrl)!;
 
-    // Draw images on main map
-    mainMap.drawImage(imageItems);
+        imageItems.push({ img, x: item.x, y: item.y, size: 1 });
+        miniMapRects.push({ x: item.x, y: item.y, size: 0.9, style: { fillStyle: item.color } });
 
-    // Draw circles with object colors on main map
-    loaded.forEach(({ item }) => {
-        if (item.type === "terrain") {
-            return;
-        }
-
-        mainMap.drawCircle(
-            {
+        if (item.type !== "terrain") {
+            circleItems.push({
                 x: item.x,
                 y: item.y,
                 size: 0.1,
-                origin: {
-                    mode: "cell" as const,
-                    x: 0.1,
-                    y: 0.1,
-                },
+                origin: { mode: "cell", x: 0.1, y: 0.1 },
                 style: { fillStyle: item.color },
-            },
-            1
-        );
-    });
+            });
+        }
+    }
 
-    // Draw rectangles on mini map
-    miniMap.drawRect(miniMapRects);
+    // Draw on maps
+    mainMap.drawImage(imageItems);
+    mainMap.drawCircle(circleItems, 1);
+
+    // Use pre-rendered static cache for mini map (huge performance boost for 100k items!)
+    miniMap.drawStaticRect(miniMapRects, "minimap-items");
 };
 
 // Synchronization logic between main map and mini map
@@ -165,6 +204,9 @@ miniMap.onCoordsChange = (coords) => {
 };
 
 mainMap.onCoordsChange = (coords) => {
+    // Set initial bounds for mini map
+    miniMap.setBounds(calculateMiniMapBounds());
+
     if (isSyncing) {
         return;
     }
@@ -196,8 +238,8 @@ miniMap.onDraw = (ctx) => {
     const rectX = miniCfg.size.width / 2 - rectWidth / 2;
     const rectY = miniCfg.size.height / 2 - rectHeight / 2;
 
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
     ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
 };
 
@@ -215,10 +257,8 @@ mainMap.addDrawFunction((ctx) => {
 // mouse: The mouse event object
 // client: The client coordinates of the mouse event
 mainMap.onHover = (coords, _mouse, client) => {
-    // Check if any item exists at the hovered coordinates and is not of type "terrain"
-    const item = items.find(
-        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
-    );
+    // O(1) lookup using coordinate Map
+    const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
     if (item) {
         popup?.classList.remove("hidden");
@@ -258,11 +298,10 @@ mainMap.onMouseLeave = () => {
 };
 
 // Handle click events on the main map
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 mainMap.onClick = (coords, _mouse, _client) => {
-    // Check if any item exists at the clicked coordinates and is not of type "terrain"
-    const item = items.find(
-        (item) => item.x === coords.snapped.x && item.y === coords.snapped.y && item.type !== "terrain"
-    );
+    // O(1) lookup using coordinate Map
+    const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
     if (item) {
         alert(
@@ -284,7 +323,12 @@ goToCoordsBtn.addEventListener("click", () => {
 
 // Initial drawing of items and rendering of maps
 // Image loading is asynchronous, so we wait for it to complete before rendering
-drawItems().then(() => {
+void drawItems().then(() => {
+    mainMap.drawGridLines(5);
+    mainMap.drawGridLines(50, 4);
     mainMap.render();
+    miniMap.drawGridLines(1, 0.5, "rgba(0,0,0,1)", 3);
+    miniMap.drawGridLines(5, 0.8, "rgba(0,0,0,1)", 3);
+    miniMap.drawGridLines(50, 2, "rgba(0,0,0,1)", 3);
     miniMap.render();
 });
