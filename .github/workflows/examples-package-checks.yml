@@ -28,8 +28,11 @@ jobs:
             - name: Install dependencies
               run: pnpm install --no-frozen-lockfile
 
+            - name: Build core package
+              run: pnpm -w -F @canvas-tile-engine/core build
+
             - name: Typecheck examples
               run: pnpm -r --filter '{./examples/**}' typecheck
 
             - name: Lint examples
-              run: pnpm eslint 'examples/**/src' --ext .ts,.tsx
+              run: pnpm -w exec eslint "examples/**/*.{ts,tsx}" --ext .ts,.tsx
