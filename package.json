@@ -1,5 +1,5 @@
 {
-    "name": "grid-engine",
+    "name": "tile-engine",
     "version": "1.0.0",
     "description": "",
     "main": "index.js",
@@ -9,6 +9,7 @@
         "dev:lib": "pnpm --filter @canvas-tile-engine/core dev",
         "dev:example": "node run-example.js",
         "lint": "pnpm exec eslint .",
+        "typecheck": "pnpm -r --filter=!tile-engine typecheck",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "keywords": [],

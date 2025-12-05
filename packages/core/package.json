@@ -9,7 +9,8 @@
     ],
     "scripts": {
         "build": "tsup",
-        "dev": "tsup --watch"
+        "dev": "tsup --watch",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "rbush": "^4.0.1"
