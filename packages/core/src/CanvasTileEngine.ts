@@ -116,7 +116,6 @@ export class CanvasTileEngine {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
         this.canvasWrapper.style.position = "relative";
-        this.canvas.style.position = "absolute";
         this.config = new Config(config);
 
         const rendererType = config.renderer ?? "canvas";
