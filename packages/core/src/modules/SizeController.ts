@@ -46,14 +46,20 @@ export class SizeController {
         }
 
         const configSize = this.config.get().size;
+        const clamp = (value: number, min?: number, max?: number) => {
+            let result = value;
+            if (min !== undefined) {
+                result = Math.max(min, result);
+            }
+            if (max !== undefined) {
+                result = Math.min(max, result);
+            }
+            return result;
+        };
 
-        // Clamp to max values
-        if (configSize && configSize.maxHeight && height > configSize.maxHeight) {
-            height = configSize.maxHeight;
-        }
-        if (configSize && configSize.maxWidth && width > configSize.maxWidth) {
-            width = configSize.maxWidth;
-        }
+        // Clamp to min/max values
+        width = clamp(width, configSize?.minWidth, configSize?.maxWidth);
+        height = clamp(height, configSize?.minHeight, configSize?.maxHeight);
 
         // Delegate to AnimationController
         animationController.animateResize(width, height, durationMs, (w, h, center) => this.applySize(w, h, center));
