@@ -20,7 +20,7 @@ interface PlacedBuilding {
 const INITIAL_COORDS = { x: 0, y: 0 };
 
 const HOVER_LAYER_INDEX = 0;
-const SELECT_LAYER_INDEX = 1;
+// const SELECT_LAYER_INDEX = 1;
 const OBJECTS_LAYER_INDEX = 2;
 
 const BUILDING_IMAGES: Record<BuildingType, string> = {
@@ -234,13 +234,13 @@ function placeBuilding(x: number, y: number) {
     drawBuildings();
 }
 
-function removeBuilding(x: number, y: number) {
-    const index = placedBuildings.findIndex((b) => b.x === x && b.y === y);
-    if (index !== -1) {
-        placedBuildings.splice(index, 1);
-        drawBuildings();
-    }
-}
+// function removeBuilding(x: number, y: number) {
+//     const index = placedBuildings.findIndex((b) => b.x === x && b.y === y);
+//     if (index !== -1) {
+//         placedBuildings.splice(index, 1);
+//         drawBuildings();
+//     }
+// }
 
 // ========================================
 // EVENT HANDLERS
@@ -347,4 +347,4 @@ async function init() {
     map.render();
 }
 
-init();
+void init();
