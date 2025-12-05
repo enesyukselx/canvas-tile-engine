@@ -28,6 +28,9 @@ jobs:
             - name: Install dependencies
               run: pnpm install --no-frozen-lockfile
 
+            - name: Build core package
+              run: pnpm -w -F @canvas-tile-engine/core build
+
             - name: Typecheck examples
               run: pnpm -r --filter '{./examples/**}' typecheck
 
