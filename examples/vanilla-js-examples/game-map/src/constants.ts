@@ -13,7 +13,6 @@ import Village6BarbarWebp from "/villages/village6_barbar.webp";
 import ForestTerrainWebp from "/terrains/forest.webp";
 import LakeTerrainWebp from "/terrains/lake.webp";
 import MineTerrainWebp from "/terrains/mine.webp";
-
 export const COLORS = ["red", "blue", "purple"] as const;
 export type Color = (typeof COLORS)[number];
 
