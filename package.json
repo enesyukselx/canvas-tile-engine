@@ -8,6 +8,7 @@
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "pnpm --filter @canvas-tile-engine/core dev",
         "dev:example": "node run-example.js",
+        "lint": "pnpm exec eslint .",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "keywords": [],
@@ -18,5 +19,10 @@
         "concurrently": "^9.2.1",
         "tsup": "^8.5.1",
         "typescript": "^5.9.3"
+    },
+    "devDependencies": {
+        "eslint": "^9.39.1",
+        "typescript-eslint": "^8.48.1",
+        "globals": "^16.5.0"
     }
 }

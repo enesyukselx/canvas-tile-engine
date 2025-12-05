@@ -529,7 +529,7 @@ export class CanvasDraw {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
-            const style = (item as DrawObject).style;
+            const style = item.style;
             if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                 ctx.fillStyle = style.fillStyle;
                 lastFillStyle = style.fillStyle;
@@ -590,7 +590,7 @@ export class CanvasDraw {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
-            const style = (item as DrawObject).style;
+            const style = item.style;
             const radius = pxSize / 2;
 
             if (style?.fillStyle && style.fillStyle !== lastFillStyle) {

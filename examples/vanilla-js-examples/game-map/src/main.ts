@@ -298,6 +298,7 @@ mainMap.onMouseLeave = () => {
 };
 
 // Handle click events on the main map
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 mainMap.onClick = (coords, _mouse, _client) => {
     // O(1) lookup using coordinate Map
     const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
@@ -322,7 +323,7 @@ goToCoordsBtn.addEventListener("click", () => {
 
 // Initial drawing of items and rendering of maps
 // Image loading is asynchronous, so we wait for it to complete before rendering
-drawItems().then(() => {
+void drawItems().then(() => {
     mainMap.drawGridLines(5);
     mainMap.drawGridLines(50, 4);
     mainMap.render();

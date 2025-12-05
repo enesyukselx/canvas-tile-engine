@@ -2,7 +2,7 @@ import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { ViewportState } from "./ViewportState";
-import { DEBUG_HUD, DEFAULT_VALUES } from "../constants";
+import { DEBUG_HUD } from "../constants";
 
 const FPS_SAMPLE_SIZE = 10;
 

@@ -217,7 +217,6 @@ export class CanvasTileEngine {
 
     /** Center coordinates of the map. */
     getCenterCoords(): Coords {
-        const cfg = this.config.get();
         const size = this.viewport.getSize();
         return this.camera.getCenter(size.width, size.height);
     }
