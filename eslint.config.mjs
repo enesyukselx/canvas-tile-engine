@@ -5,7 +5,7 @@ import globals from "globals";
 const rules = [
     globalIgnores(["**/dist/**", "**/build/**", "**/node_modules/**", "docs/.docusaurus/**", "docs/build/**"]),
     {
-        files: ["./packages/core/**/*.ts"],
+        files: ["./packages/core/src/**/*.ts", "./packages/core/tsup.config.ts"],
         languageOptions: {
             parserOptions: {
                 ecmaVersion: "latest",
@@ -15,6 +15,22 @@ const rules = [
             },
             globals: {
                 ...globals.browser,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
+        files: ["./packages/core/tests/**/*.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/core/tsconfig.vitest.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.node,
+                ...globals.vitest,
             },
         },
         extends: [tseslint.configs.recommendedTypeChecked],
