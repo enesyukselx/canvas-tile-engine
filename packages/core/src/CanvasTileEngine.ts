@@ -296,6 +296,7 @@ export class CanvasTileEngine {
 
     /**
      * Draw one or many rectangles in world space (canvas renderer only).
+     * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      */
@@ -307,6 +308,7 @@ export class CanvasTileEngine {
      * Draw rectangles with pre-rendering cache (canvas renderer only).
      * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
      * Ideal for large static datasets like mini-maps where items don't change.
+     * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Array of rectangle definitions.
      * @param cacheKey Unique key for this cache (e.g., "minimap-items").
      * @param layer Layer order (lower draws first).
@@ -331,6 +333,7 @@ export class CanvasTileEngine {
      * Draw images with pre-rendering cache (canvas renderer only).
      * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
      * Ideal for large static datasets like terrain tiles or static decorations.
+     * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Array of image definitions with HTMLImageElement.
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
      * @param layer Layer order (lower draws first).
@@ -404,6 +407,7 @@ export class CanvasTileEngine {
 
     /**
      * Draw one or many images scaled in world units (canvas renderer only).
+     * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Image definitions.
      * @param layer Layer order.
      */

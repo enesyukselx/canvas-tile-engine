@@ -92,4 +92,6 @@ export type DrawObject = {
         y?: number; // 0 to 1
     };
     style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+    /** Rotation angle in degrees (0 = no rotation, positive = clockwise) */
+    rotate?: number;
 };
