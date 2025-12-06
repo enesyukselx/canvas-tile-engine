@@ -27,13 +27,14 @@ You can use any number for a layer. They are sorted automatically at render time
 
 Draw basic geometric shapes. You can pass a single object or an array of objects for batch rendering.
 
-| Property | Type     | Default                            | Description                             |
-| :------- | :------- | :--------------------------------- | :-------------------------------------- |
-| `x`, `y` | `number` | **Required**                       | World coordinates of the center/origin. |
-| `size`   | `number` | `1`                                | Size in grid units (width/diameter).    |
-| `layer`  | `number` | `1`                                | Rendering layer.                        |
-| `style`  | `object` | `{}`                               | Styling options (see below).            |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                           |
+| Property | Type     | Default                            | Description                                      |
+| :------- | :------- | :--------------------------------- | :----------------------------------------------- |
+| `x`, `y` | `number` | **Required**                       | World coordinates of the center/origin.          |
+| `size`   | `number` | `1`                                | Size in grid units (width/diameter).             |
+| `layer`  | `number` | `1`                                | Rendering layer.                                 |
+| `style`  | `object` | `{}`                               | Styling options (see below).                     |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                    |
+| `rotate` | `number` | `0`                                | Rotation angle in degrees (only for `drawRect`). |
 
 **Style Options:**
 
@@ -49,6 +50,18 @@ engine.drawRect(
         y: 5,
         size: 1,
         style: { fillStyle: "#0077be" },
+    },
+    1
+);
+
+// Draw a rotated rectangle (45 degrees)
+engine.drawRect(
+    {
+        x: 8,
+        y: 5,
+        size: 1,
+        rotate: 45, // 45 degrees
+        style: { fillStyle: "#ff6b6b" },
     },
     1
 );
@@ -161,15 +174,20 @@ engine.drawText({ coords: { x: 5, y: 5 }, text: "Base Camp" }, { font: "14px san
 
 Draw an image scaled to world units. Supports single object or array of objects.
 
-| Property | Type               | Description                                  |
-| :------- | :----------------- | :------------------------------------------- |
-| `img`    | `HTMLImageElement` | The loaded image object.                     |
-| `x`, `y` | `number`           | World coordinates.                           |
-| `size`   | `number`           | Size in grid units (maintains aspect ratio). |
+| Property | Type               | Description                                                        |
+| :------- | :----------------- | :----------------------------------------------------------------- |
+| `img`    | `HTMLImageElement` | The loaded image object.                                           |
+| `x`, `y` | `number`           | World coordinates.                                                 |
+| `size`   | `number`           | Size in grid units (maintains aspect ratio).                       |
+| `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 
 ```typescript
 const img = await engine.images.load("/assets/tree.png");
 engine.drawImage({ x: 2, y: 3, size: 1.5, img }, 2);
+
+// Draw a rotated image (90 degrees clockwise)
+const arrow = await engine.images.load("/assets/arrow.png");
+engine.drawImage({ x: 5, y: 3, size: 1, img: arrow, rotate: 90 }, 2);
 ```
 
 ## Advanced
@@ -229,7 +247,7 @@ For large static datasets (e.g., mini-maps with 100k+ items), the engine provide
 
 ### `drawStaticRect`
 
-Pre-renders rectangles to an offscreen canvas. Ideal for mini-maps.
+Pre-renders rectangles to an offscreen canvas. Ideal for mini-maps. Supports `rotate` property for rotated rectangles.
 
 ```typescript
 const miniMapItems = items.map((item) => ({
@@ -237,6 +255,7 @@ const miniMapItems = items.map((item) => ({
     y: item.y,
     size: 0.9,
     style: { fillStyle: item.color },
+    rotate: item.rotation, // Optional rotation in degrees
 }));
 
 // "minimap-items" is a unique cache key
@@ -260,7 +279,7 @@ miniMap.drawStaticCircle(markers, "minimap-markers", 2);
 
 ### `drawStaticImage`
 
-Pre-renders images to an offscreen canvas. Useful for static terrain or decorations with fixed zoom.
+Pre-renders images to an offscreen canvas. Useful for static terrain or decorations with fixed zoom. Supports `rotate` property for rotated images.
 
 ```typescript
 const terrainTiles = tiles.map((tile) => ({
@@ -268,6 +287,7 @@ const terrainTiles = tiles.map((tile) => ({
     y: tile.y,
     size: 1,
     img: tileImages[tile.type],
+    rotate: tile.rotation, // Optional rotation in degrees
 }));
 
 engine.drawStaticImage(terrainTiles, "terrain-cache", 0);

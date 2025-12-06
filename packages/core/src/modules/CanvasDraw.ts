@@ -121,10 +121,26 @@ export class CanvasDraw {
                     lastLineWidth = style.lineWidth;
                 }
 
-                ctx.beginPath();
-                ctx.rect(drawX, drawY, pxSize, pxSize);
-                if (style?.fillStyle) ctx.fill();
-                if (style?.strokeStyle) ctx.stroke();
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+
+                if (rotationDeg !== 0) {
+                    const centerX = drawX + pxSize / 2;
+                    const centerY = drawY + pxSize / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.beginPath();
+                    ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                    if (style?.fillStyle) ctx.fill();
+                    if (style?.strokeStyle) ctx.stroke();
+                    ctx.restore();
+                } else {
+                    ctx.beginPath();
+                    ctx.rect(drawX, drawY, pxSize, pxSize);
+                    if (style?.fillStyle) ctx.fill();
+                    if (style?.strokeStyle) ctx.stroke();
+                }
             }
             ctx.restore();
         });
@@ -327,7 +343,20 @@ export class CanvasDraw {
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
 
-                ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+
+                if (rotationDeg !== 0) {
+                    const centerX = offsetX + drawW / 2;
+                    const centerY = offsetY + drawH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.drawImage(item.img, -drawW / 2, -drawH / 2, drawW, drawH);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+                }
             }
         });
     }
@@ -470,6 +499,7 @@ export class CanvasDraw {
             }
 
             const offCtx = offscreen.getContext("2d");
+
             if (!offCtx) {
                 if (!this.warnedStaticCacheDisabled) {
                     console.warn("[CanvasDraw] Static cache disabled: 2D context unavailable.");
@@ -540,11 +570,25 @@ export class CanvasDraw {
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const style = item.style;
+            const rotationDeg = item.rotate ?? 0;
+            const rotation = rotationDeg * (Math.PI / 180);
+
             if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                 ctx.fillStyle = style.fillStyle;
                 lastFillStyle = style.fillStyle;
             }
-            ctx.fillRect(x, y, pxSize, pxSize);
+
+            if (rotationDeg !== 0) {
+                const centerX = x + pxSize / 2;
+                const centerY = y + pxSize / 2;
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(rotation);
+                ctx.fillRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                ctx.restore();
+            } else {
+                ctx.fillRect(x, y, pxSize, pxSize);
+            }
         });
 
         if (!cache) {
@@ -570,6 +614,8 @@ export class CanvasDraw {
     ) {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
+            const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
+            const rotation = rotationDeg * (Math.PI / 180);
             const aspect = img.width / img.height;
             let drawW = pxSize;
             let drawH = pxSize;
@@ -577,7 +623,21 @@ export class CanvasDraw {
             if (aspect > 1) drawH = pxSize / aspect;
             else drawW = pxSize * aspect;
 
-            ctx.drawImage(img, x, y, drawW, drawH);
+            // x, y are top-left of pxSize box, need to center image within it
+            const imgX = x + (pxSize - drawW) / 2;
+            const imgY = y + (pxSize - drawH) / 2;
+
+            if (rotationDeg !== 0) {
+                const centerX = imgX + drawW / 2;
+                const centerY = imgY + drawH / 2;
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(rotation);
+                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                ctx.restore();
+            } else {
+                ctx.drawImage(img, imgX, imgY, drawW, drawH);
+            }
         });
 
         if (!cache) {
