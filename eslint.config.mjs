@@ -3,7 +3,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 
 const rules = [
-    globalIgnores(["**/dist/**", "**/build/**", "**/node_modules/**", "docs/.docusaurus/**", "docs/build/**"]),
+    globalIgnores(["**/dist/**", "**/build/**", "**/node_modules/**", "docs/.docusaurus/**", "docs/build/**", "packages/*/coverage/**"]),
     {
         files: ["./packages/core/src/**/*.ts", "./packages/core/tsup.config.ts"],
         languageOptions: {
