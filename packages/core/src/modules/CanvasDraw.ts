@@ -493,9 +493,13 @@ export class CanvasDraw {
                     ? new OffscreenCanvas(canvasWidth, canvasHeight)
                     : document.createElement("canvas");
 
-            if (!(offscreen instanceof OffscreenCanvas)) {
-                offscreen.width = canvasWidth;
-                offscreen.height = canvasHeight;
+            // Guard instanceof with typeof to avoid ReferenceError when OffscreenCanvas is undefined (e.g., jsdom)
+            const isOffscreenCanvas =
+                typeof OffscreenCanvas !== "undefined" && offscreen instanceof OffscreenCanvas;
+
+            if (!isOffscreenCanvas) {
+                (offscreen as HTMLCanvasElement).width = canvasWidth;
+                (offscreen as HTMLCanvasElement).height = canvasHeight;
             }
 
             const offCtx = offscreen.getContext("2d");
