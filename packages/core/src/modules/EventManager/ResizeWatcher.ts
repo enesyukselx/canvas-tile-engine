@@ -8,6 +8,8 @@ import { ViewportState } from "../ViewportState";
  */
 export class ResizeWatcher {
     private resizeObserver?: ResizeObserver;
+    private handleWindowResize?: () => void;
+    private currentDpr: number;
 
     public onResize?: () => void;
 
@@ -18,9 +20,15 @@ export class ResizeWatcher {
         private camera: Camera,
         private config: Config,
         private onCameraChange: () => void
-    ) {}
+    ) {
+        this.currentDpr = this.viewport.dpr;
+    }
 
     start() {
+        // Ensure DPR is up to date before sizing
+        this.viewport.updateDpr();
+        this.currentDpr = this.viewport.dpr;
+
         const size = this.viewport.getSize();
 
         const configSize = this.config.get().size;
@@ -85,6 +93,8 @@ export class ResizeWatcher {
         });
 
         this.resizeObserver.observe(this.wrapper);
+
+        this.attachDprWatcher();
     }
 
     stop() {
@@ -94,6 +104,11 @@ export class ResizeWatcher {
         }
 
         this.resizeObserver = undefined;
+
+        if (this.handleWindowResize) {
+            window.removeEventListener("resize", this.handleWindowResize);
+            this.handleWindowResize = undefined;
+        }
     }
 
     private clamp(value: number, min?: number, max?: number) {
@@ -101,5 +116,41 @@ export class ResizeWatcher {
         if (min !== undefined) result = Math.max(min, result);
         if (max !== undefined) result = Math.min(max, result);
         return result;
+    }
+
+    /**
+     * Listen for devicePixelRatio changes (e.g., monitor switch) and rescale canvas.
+     */
+    private attachDprWatcher() {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        this.handleWindowResize = () => {
+            const prevDpr = this.currentDpr;
+            this.viewport.updateDpr();
+            const nextDpr = this.viewport.dpr;
+
+            if (nextDpr === prevDpr) {
+                return;
+            }
+
+            this.currentDpr = nextDpr;
+            const { width, height } = this.viewport.getSize();
+
+            // Update canvas resolution for new DPR while keeping logical size
+            this.canvas.width = width * nextDpr;
+            this.canvas.height = height * nextDpr;
+            this.canvas.style.width = `${width}px`;
+            this.canvas.style.height = `${height}px`;
+
+            if (this.onResize) {
+                this.onResize();
+            }
+
+            this.onCameraChange();
+        };
+
+        window.addEventListener("resize", this.handleWindowResize, { passive: true });
     }
 }
