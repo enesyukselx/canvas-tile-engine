@@ -45,7 +45,7 @@ const config: Config = {
                     // Remove this to remove the "edit this page" links.
                     editUrl: "https://github.com/enesyukselx/canvas-tile-engine/tree/master/docs/",
                 },
-                blog: {
+                /*blog: {
                     showReadingTime: true,
                     feedOptions: {
                         type: ["rss", "atom"],
@@ -59,7 +59,7 @@ const config: Config = {
                     onInlineTags: "warn",
                     onInlineAuthors: "warn",
                     onUntruncatedBlogPosts: "warn",
-                },
+                },*/
                 theme: {
                     customCss: "./src/css/custom.css",
                 },
@@ -86,7 +86,7 @@ const config: Config = {
                     position: "left",
                     label: "Documentation",
                 },
-                { to: "/blog", label: "Blog", position: "left" },
+                /*{ to: "/blog", label: "Blog", position: "left" },*/
                 {
                     href: "https://github.com/enesyukselx/canvas-tile-engine",
                     label: "GitHub",
@@ -107,7 +107,7 @@ const config: Config = {
                         },
                     ],
                 },
-                {
+                /*{
                     title: "More",
                     items: [
                         {
@@ -119,7 +119,7 @@ const config: Config = {
                             href: "https://github.com/enesyukselx/canvas-tile-engine",
                         },
                     ],
-                },
+                },*/
             ],
             copyright: `Copyright © ${new Date().getFullYear()} Canvas Tile Engine, Inc. Built with Docusaurus.`,
         },

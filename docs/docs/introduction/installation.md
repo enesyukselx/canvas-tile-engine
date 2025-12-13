@@ -19,7 +19,7 @@ npm install @canvas-tile-engine/core
 ```typescript
 import { CanvasTileEngine } from "@canvas-tile-engine/core";
 
-const wrapper = document.getElementById("map") as HTMLDivElement;
+const wrapper = document.getElementById("wrapper") as HTMLDivElement;
 const engine = new CanvasTileEngine(wrapper, config, { x: 0, y: 0 });
 ```
 

@@ -1,35 +1,32 @@
----
-sidebar_position: 1
----
+# Canvas Tile Engine
 
-# Getting Started
-
-`Canvas Tile Engine` is a lightweight library for building interactive 2D grid-based maps and visualizations. It handles camera controls, coordinate transformations, rendering, and user interactions - so you can focus on your content.
-
-**Features:**
+Canvas Tile Engine is a lightweight library for building interactive 2D grid-based maps and visualizations. It handles camera controls, coordinate transformations, rendering, and user interactions—so you can focus on your content.
 
 -   Pan, zoom, and smooth camera animations
 -   Grid-based coordinate system with automatic transformations
 -   Event handling (click, hover, drag, zoom)
--   Layer-based rendering with drawing helpers
+-   Layer-based rendering with drawing helpers (`drawRect`, `drawImage`, `drawGridLines`, `drawStatic*`)
+-   Optional coordinate/debug HUD for quick visibility
+-   Optimized for large datasets: spatial indexing (R-Tree) + viewport culling to skip off-screen work, static draw caches.
 
-## Installation
+## Install
 
 ```bash
+# npm
 npm install @canvas-tile-engine/core
+# yarn
+yarn add @canvas-tile-engine/core
+# pnpm
+pnpm add @canvas-tile-engine/core
 ```
 
-## Quick Start
-
-HTML wrapper (must contain a `<canvas>`):
+## Quickstart
 
 ```html
 <div id="wrapper">
     <canvas></canvas>
 </div>
 ```
-
-Initialize, draw, and render:
 
 ```ts
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
@@ -45,27 +42,18 @@ const config: CanvasTileEngineConfig = {
 };
 
 const engine = new CanvasTileEngine(wrapper, config, { x: 0, y: 0 });
-
-// Draw a yellow tile
 engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#f9c74f" } });
-
-// Render the frame
 engine.render();
 
-// Handle click events
 engine.onClick = (coords) => {
     console.log("Clicked tile:", coords.snapped);
 };
-
-// Render
-engine.render();
 ```
 
-That's it! You now have a draggable, zoomable grid map with click detection.
+## Documentation
 
-## What's happening?
+Full guide, API docs, and examples: [canvastileengine.dev](https://canvastileengine.dev)
 
--   **Config** sets up canvas size, zoom level (`scale`), and enables interactions
--   **Engine** manages the camera, rendering, and events automatically
--   **Drawing** uses world coordinates - the engine handles screen transformations
--   **Events** provide both raw and grid-snapped coordinates
+## Framework Bindings
+
+React, Vue, and Svelte bindings are planned as separate packages (e.g., `@canvas-tile-engine/react`). Once released, this README will link their installs and starter snippets.
