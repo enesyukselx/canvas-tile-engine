@@ -24,7 +24,7 @@ npm install @canvas-tile-engine/core
 HTML wrapper (must contain a `<canvas>`):
 
 ```html
-<div id="map" style="width: 500px; height: 500px">
+<div id="wrapper">
     <canvas></canvas>
 </div>
 ```
@@ -34,7 +34,7 @@ Initialize, draw, and render:
 ```ts
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 
-const wrapper = document.getElementById("map") as HTMLDivElement;
+const wrapper = document.getElementById("wrapper") as HTMLDivElement;
 
 const config: CanvasTileEngineConfig = {
     scale: 50,
