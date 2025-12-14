@@ -15,7 +15,7 @@
     },
     "keywords": [],
     "author": "",
-    "license": "ISC",
+    "license": "MIT",
     "packageManager": "pnpm@10.23.0",
     "dependencies": {
         "concurrently": "^9.2.1",
