@@ -6,6 +6,15 @@ sidebar_position: 2
 
 The React package provides declarative draw components that automatically manage layer registration and rendering. All components use **world coordinates**, and the engine handles scaling and positioning.
 
+:::tip Type Safety
+All drawing types are exported from the package. See [Types Reference](/docs/introduction/types) for complete type definitions.
+
+```typescript
+import { Rect, Circle, Text, Path, ImageItem, Coords } from "@canvas-tile-engine/react";
+```
+
+:::
+
 ## Layer System
 
 Layers control the Z-order of your content. Lower numbers draw first (background), higher numbers draw last (foreground).
@@ -23,47 +32,38 @@ Layers control the Z-order of your content. Lower numbers draw first (background
 
 Draw basic geometric shapes. Pass a single object or an array for batch rendering.
 
-| Prop     | Type                 | Default | Description                                                                                                                      |
-| :------- | :------------------- | :------ | :------------------------------------------------------------------------------------------------------------------------------- |
-| `items`  | `DrawObject \| DrawObject[]` | **Required** | Shape definitions.                                                                                                        |
-| `layer`  | `number`             | `1`     | Rendering layer.                                                                                                                 |
+| Prop    | Type                         | Default      | Description        |
+| :------ | :--------------------------- | :----------- | :----------------- |
+| `items` | `DrawObject \| DrawObject[]` | **Required** | Shape definitions. |
+| `layer` | `number`                     | `1`          | Rendering layer.   |
 
 **DrawObject Properties:**
 
-| Property | Type                 | Default                            | Description                                                                                                                      |
-| :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
-| `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                               |
-| `size`   | `number`             | `1`                                | Size in grid units.                                                                                                              |
-| `style`  | `object`             | `{}`                               | Styling options.                                                                                                                 |
-| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                    |
-| `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `Rect`).                                                                                     |
-| `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`).     |
+| Property | Type                 | Default                            | Description                                                                                                                 |
+| :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
+| `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                          |
+| `size`   | `number`             | `1`                                | Size in grid units.                                                                                                         |
+| `style`  | `object`             | `{}`                               | Styling options.                                                                                                            |
+| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                               |
+| `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `Rect`).                                                                                |
+| `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`). |
 
 **Style Options:**
 
-- `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
-- `strokeStyle`: Border color
-- `lineWidth`: Border width in pixels
+-   `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
+-   `strokeStyle`: Border color
+-   `lineWidth`: Border width in pixels
 
 ```tsx
 <CanvasTileEngine engine={engine} config={config}>
     {/* Blue square */}
-    <CanvasTileEngine.Rect
-        items={{ x: 5, y: 5, size: 1, style: { fillStyle: "#0077be" } }}
-        layer={1}
-    />
+    <CanvasTileEngine.Rect items={{ x: 5, y: 5, size: 1, style: { fillStyle: "#0077be" } }} layer={1} />
 
     {/* Rotated rectangle */}
-    <CanvasTileEngine.Rect
-        items={{ x: 8, y: 5, size: 1, rotate: 45, style: { fillStyle: "#ff6b6b" } }}
-        layer={1}
-    />
+    <CanvasTileEngine.Rect items={{ x: 8, y: 5, size: 1, rotate: 45, style: { fillStyle: "#ff6b6b" } }} layer={1} />
 
     {/* Rounded rectangle */}
-    <CanvasTileEngine.Rect
-        items={{ x: 10, y: 5, size: 1, radius: 8, style: { fillStyle: "#2ecc71" } }}
-        layer={1}
-    />
+    <CanvasTileEngine.Rect items={{ x: 10, y: 5, size: 1, radius: 8, style: { fillStyle: "#2ecc71" } }} layer={1} />
 
     {/* Different corner radii */}
     <CanvasTileEngine.Rect
@@ -72,10 +72,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
     />
 
     {/* Red circle */}
-    <CanvasTileEngine.Circle
-        items={{ x: 6, y: 5, size: 0.8, style: { fillStyle: "#e63946" } }}
-        layer={2}
-    />
+    <CanvasTileEngine.Circle items={{ x: 6, y: 5, size: 0.8, style: { fillStyle: "#e63946" } }} layer={2} />
 
     {/* Batch rendering */}
     <CanvasTileEngine.Rect
@@ -95,11 +92,11 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 
 Draw straight lines between two points.
 
-| Prop    | Type                                         | Default | Description       |
-| :------ | :------------------------------------------- | :------ | :---------------- |
-| `items` | `{ from: Coords, to: Coords } \| Array`      | **Required** | Line definitions. |
-| `style` | `{ strokeStyle?: string, lineWidth?: number }` | -     | Line style.       |
-| `layer` | `number`                                     | `1`     | Rendering layer.  |
+| Prop    | Type                                           | Default      | Description       |
+| :------ | :--------------------------------------------- | :----------- | :---------------- |
+| `items` | `{ from: Coords, to: Coords } \| Array`        | **Required** | Line definitions. |
+| `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Line style.       |
+| `layer` | `number`                                       | `1`          | Rendering layer.  |
 
 ```tsx
 <CanvasTileEngine.Line
@@ -113,11 +110,11 @@ Draw straight lines between two points.
 
 Draw continuous lines through multiple points.
 
-| Prop    | Type                                         | Default | Description       |
-| :------ | :------------------------------------------- | :------ | :---------------- |
-| `items` | `Coords[] \| Coords[][]`                     | **Required** | Points array.    |
-| `style` | `{ strokeStyle?: string, lineWidth?: number }` | -     | Path style.       |
-| `layer` | `number`                                     | `1`     | Rendering layer.  |
+| Prop    | Type                                           | Default      | Description      |
+| :------ | :--------------------------------------------- | :----------- | :--------------- |
+| `items` | `Coords[] \| Coords[][]`                       | **Required** | Points array.    |
+| `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Path style.      |
+| `layer` | `number`                                       | `1`          | Rendering layer. |
 
 ```tsx
 <CanvasTileEngine.Path
@@ -135,12 +132,12 @@ Draw continuous lines through multiple points.
 
 Draw grid lines at specified intervals.
 
-| Prop          | Type     | Default   | Description                            |
-| :------------ | :------- | :-------- | :------------------------------------- |
+| Prop          | Type     | Default      | Description                            |
+| :------------ | :------- | :----------- | :------------------------------------- |
 | `cellSize`    | `number` | **Required** | Size of each grid cell in world units. |
-| `lineWidth`   | `number` | `1`       | Width of grid lines in pixels.         |
-| `strokeStyle` | `string` | `"black"` | Color of the grid lines.               |
-| `layer`       | `number` | `0`       | Rendering layer.                       |
+| `lineWidth`   | `number` | `1`          | Width of grid lines in pixels.         |
+| `strokeStyle` | `string` | `"black"`    | Color of the grid lines.               |
+| `layer`       | `number` | `0`          | Rendering layer.                       |
 
 ```tsx
 {/* Basic grid */}
@@ -166,18 +163,18 @@ Draw grid lines at specified intervals.
 
 Render text at world coordinates.
 
-| Prop    | Type                                     | Default | Description       |
-| :------ | :--------------------------------------- | :------ | :---------------- |
+| Prop    | Type                                        | Default      | Description       |
+| :------ | :------------------------------------------ | :----------- | :---------------- |
 | `items` | `{ coords: Coords, text: string } \| Array` | **Required** | Text definitions. |
-| `style` | `object`                                 | -       | Font styling.     |
-| `layer` | `number`                                 | `2`     | Rendering layer.  |
+| `style` | `object`                                    | -            | Font styling.     |
+| `layer` | `number`                                    | `2`          | Rendering layer.  |
 
 **Style Options:**
 
-- `font`: CSS font string (e.g., `"12px Arial"`)
-- `fillStyle`: Text color
-- `textAlign`: `"left"`, `"center"`, `"right"`
-- `textBaseline`: `"top"`, `"middle"`, `"bottom"`
+-   `font`: CSS font string (e.g., `"12px Arial"`)
+-   `fillStyle`: Text color
+-   `textAlign`: `"left"`, `"center"`, `"right"`
+-   `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 
 ```tsx
 <CanvasTileEngine.Text
@@ -191,10 +188,10 @@ Render text at world coordinates.
 
 Draw images scaled to world units.
 
-| Prop    | Type               | Default | Description        |
-| :------ | :----------------- | :------ | :----------------- |
+| Prop    | Type                       | Default      | Description        |
+| :------ | :------------------------- | :----------- | :----------------- |
 | `items` | `ImageItem \| ImageItem[]` | **Required** | Image definitions. |
-| `layer` | `number`           | `1`     | Rendering layer.   |
+| `layer` | `number`                   | `1`          | Rendering layer.   |
 
 **ImageItem Properties:**
 
@@ -218,12 +215,7 @@ function MapWithImages() {
 
     return (
         <CanvasTileEngine engine={engine} config={config}>
-            {treeImg && (
-                <CanvasTileEngine.Image
-                    items={{ x: 2, y: 3, size: 1.5, img: treeImg }}
-                    layer={2}
-                />
-            )}
+            {treeImg && <CanvasTileEngine.Image items={{ x: 2, y: 3, size: 1.5, img: treeImg }} layer={2} />}
         </CanvasTileEngine>
     );
 }
@@ -235,10 +227,10 @@ function MapWithImages() {
 
 For maximum flexibility, use a custom draw function with direct canvas context access.
 
-| Prop       | Type                                              | Default | Description         |
-| :--------- | :------------------------------------------------ | :------ | :------------------ |
-| `children` | `(ctx, coords, config) => void`                   | **Required** | Draw function.  |
-| `layer`    | `number`                                          | `1`     | Rendering layer.    |
+| Prop       | Type                            | Default      | Description      |
+| :--------- | :------------------------------ | :----------- | :--------------- |
+| `children` | `(ctx, coords, config) => void` | **Required** | Draw function.   |
+| `layer`    | `number`                        | `1`          | Rendering layer. |
 
 ```tsx
 <CanvasTileEngine.DrawFunction layer={4}>
@@ -295,23 +287,20 @@ Pre-renders rectangles to an offscreen canvas. Supports `rotate` and `radius` pr
 | `layer`    | `number`       | `1`          | Rendering layer.       |
 
 ```tsx
-const miniMapItems = useMemo(() =>
-    items.map((item) => ({
-        x: item.x,
-        y: item.y,
-        size: 0.9,
-        style: { fillStyle: item.color },
-        rotate: item.rotation,
-        radius: 4,
-    })),
+const miniMapItems = useMemo(
+    () =>
+        items.map((item) => ({
+            x: item.x,
+            y: item.y,
+            size: 0.9,
+            style: { fillStyle: item.color },
+            rotate: item.rotation,
+            radius: 4,
+        })),
     [items]
 );
 
-<CanvasTileEngine.StaticRect
-    items={miniMapItems}
-    cacheKey="minimap-items"
-    layer={1}
-/>
+<CanvasTileEngine.StaticRect items={miniMapItems} cacheKey="minimap-items" layer={1} />;
 ```
 
 ### `<StaticCircle>`
@@ -319,11 +308,7 @@ const miniMapItems = useMemo(() =>
 Pre-renders circles to an offscreen canvas.
 
 ```tsx
-<CanvasTileEngine.StaticCircle
-    items={markers}
-    cacheKey="minimap-markers"
-    layer={2}
-/>
+<CanvasTileEngine.StaticCircle items={markers} cacheKey="minimap-markers" layer={2} />
 ```
 
 ### `<StaticImage>`
@@ -331,19 +316,16 @@ Pre-renders circles to an offscreen canvas.
 Pre-renders images to an offscreen canvas. Supports `rotate` property.
 
 ```tsx
-<CanvasTileEngine.StaticImage
-    items={terrainTiles}
-    cacheKey="terrain-cache"
-    layer={0}
-/>
+<CanvasTileEngine.StaticImage items={terrainTiles} cacheKey="terrain-cache" layer={0} />
 ```
 
 :::tip Automatic Cache Management
 Static components automatically:
-- Clear the cache when `cacheKey` changes
-- Clean up the cache on unmount
-- Rebuild when `items` change
-:::
+
+-   Clear the cache when `cacheKey` changes
+-   Clean up the cache on unmount
+-   Rebuild when `items` change
+    :::
 
 :::warning Memory Usage
 Each static cache creates an offscreen canvas sized to fit all items. Use static caching only when the performance benefit justifies the memory cost.
@@ -357,13 +339,14 @@ React's declarative nature handles dynamic content automatically. When your data
 function DynamicScene({ seats }) {
     const engine = useCanvasTileEngine();
 
-    const seatRects = useMemo(() =>
-        seats.map((s) => ({
-            x: s.x,
-            y: s.y,
-            size: 0.9,
-            style: { fillStyle: s.selected ? "blue" : "green" },
-        })),
+    const seatRects = useMemo(
+        () =>
+            seats.map((s) => ({
+                x: s.x,
+                y: s.y,
+                size: 0.9,
+                style: { fillStyle: s.selected ? "blue" : "green" },
+            })),
         [seats]
     );
 
@@ -377,8 +360,8 @@ function DynamicScene({ seats }) {
 ```
 
 :::tip Performance
-- Use `useMemo` for computed items arrays to avoid unnecessary re-renders
-- For truly static content, use `<StaticRect>`, `<StaticCircle>`, or `<StaticImage>`
-- The engine automatically batches renders when multiple components update in the same frame
-:::
 
+-   Use `useMemo` for computed items arrays to avoid unnecessary re-renders
+-   For truly static content, use `<StaticRect>`, `<StaticCircle>`, or `<StaticImage>`
+-   The engine automatically batches renders when multiple components update in the same frame
+    :::

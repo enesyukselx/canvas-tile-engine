@@ -6,6 +6,15 @@ sidebar_position: 2
 
 The engine provides a layered rendering system where you can draw shapes, text, images, and custom content. All drawing operations use **world coordinates**, and the engine handles the scaling and positioning automatically.
 
+:::tip Type Safety
+All drawing types are exported from the package. See [Types Reference](/docs/introduction/types) for complete type definitions.
+
+```typescript
+import { Rect, Circle, Text, Path, ImageItem, Coords } from "@canvas-tile-engine/core";
+```
+
+:::
+
 ## Layer System
 
 Layers control the Z-order of your content. Lower numbers draw first (background), higher numbers draw last (foreground).
