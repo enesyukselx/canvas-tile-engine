@@ -1,8 +1,9 @@
 import { Coords, CanvasTileEngineConfig } from "../types";
-import { ICamera } from "./Camera";
-import { CoordinateTransformer } from "./CoordinateTransformer";
+import type { ICamera } from "./Camera";
+import type { CoordinateTransformer } from "./CoordinateTransformer";
 
-type DrawContext = {
+/** @internal */
+export type DrawContext = {
     ctx: CanvasRenderingContext2D;
     camera: ICamera;
     transformer: CoordinateTransformer;
@@ -10,6 +11,7 @@ type DrawContext = {
     topLeft: Coords;
 };
 
+/** @internal */
 export type DrawCallback = (dc: DrawContext) => void;
 
 export interface LayerHandle {

@@ -3,6 +3,6 @@
     "include": ["src", "tsup.config.ts"],
     "compilerOptions": {
         "outDir": "dist",
-        "stripInternal": false
+        "stripInternal": true
     }
 }
