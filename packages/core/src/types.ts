@@ -97,3 +97,18 @@ export type DrawObject = {
     /** Border radius in pixels. Single value for all corners, or array for [topLeft, topRight, bottomRight, bottomLeft] */
     radius?: number | number[];
 };
+
+export type Rect = DrawObject;
+export type Line = {
+    from: Coords;
+    to: Coords;
+    style: { strokeStyle?: string; lineWidth?: number };
+};
+
+export type Circle = Omit<DrawObject, "rotate" | "radius">;
+export type Text = {
+    coords: Coords;
+    text: string;
+};
+export type Path = Coords[];
+export type ImageItem = Omit<DrawObject, "style"> & { img: HTMLImageElement };

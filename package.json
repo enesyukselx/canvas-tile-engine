@@ -4,9 +4,9 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "build": "pnpm --filter @canvas-tile-engine/core build",
+        "build": "pnpm --filter @canvas-tile-engine/core build && pnpm --filter @canvas-tile-engine/react build",
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
-        "dev:lib": "pnpm --filter @canvas-tile-engine/core dev",
+        "dev:lib": "pnpm --filter @canvas-tile-engine/core dev && pnpm --filter @canvas-tile-engine/react dev",
         "dev:example": "node run-example.js",
         "lint": "pnpm exec eslint .",
         "typecheck": "pnpm -r --filter=!tile-engine typecheck",
@@ -26,6 +26,8 @@
         "@types/node": "^24.10.1",
         "@vitest/coverage-v8": "^4.0.15",
         "eslint": "^9.39.1",
+        "eslint-plugin-react": "^7.37.5",
+        "eslint-plugin-react-hooks": "^7.0.1",
         "globals": "^16.5.0",
         "typescript-eslint": "^8.48.1",
         "vitest": "^4.0.15"

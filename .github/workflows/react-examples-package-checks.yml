@@ -1,14 +1,14 @@
-name: "Js Examples - Typecheck + Lint Checks"
+name: "React Examples - Typecheck + Lint Checks"
 
 on:
     push:
         paths:
-            - "examples/vanilla-js-examples/**"
-            - "packages/core/**"
+            - "examples/react/**"
+            - "packages/react/**"
 
 jobs:
     checks:
-        name: Typecheck - Lint (Vanilla Js Examples)
+        name: Typecheck - Lint (React Examples)
         runs-on: ubuntu-22.04
 
         steps:
@@ -32,8 +32,11 @@ jobs:
             - name: Build core package
               run: pnpm -w -F @canvas-tile-engine/core build
 
+            - name: Build react package
+              run: pnpm -w -F @canvas-tile-engine/react build
+
             - name: Typecheck examples
-              run: pnpm -r --filter '{./examples/vanilla-js-examples/**}' typecheck
+              run: pnpm -r --filter '{./examples/react/**}' typecheck
 
             - name: Lint examples
-              run: pnpm -w exec eslint "examples/vanilla-js-examples/**/*.{ts,tsx}" --ext .ts,.tsx
+              run: pnpm -w exec eslint "examples/react/**/*.{ts,tsx}" --ext .ts,.tsx
