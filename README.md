@@ -50,10 +50,46 @@ engine.onClick = (coords) => {
 };
 ```
 
+For detailed core API reference, see [packages/core/README.md](./packages/core/README.md).
+
+## React
+
+For React applications, use the `@canvas-tile-engine/react` package:
+
+```bash
+npm install @canvas-tile-engine/react
+```
+
+```tsx
+import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+
+function App() {
+    const engine = useCanvasTileEngine();
+
+    return (
+        <CanvasTileEngine
+            engine={engine}
+            config={config}
+            center={{ x: 0, y: 0 }}
+            onClick={(coords) => console.log("Clicked:", coords.snapped)}
+        >
+            <CanvasTileEngine.Rect items={tiles} layer={0} />
+            <CanvasTileEngine.GridLines cellSize={10} layer={1} />
+        </CanvasTileEngine>
+    );
+}
+```
+
+See the full React documentation: [packages/react/README.md](./packages/react/README.md)
+
+## Other Frameworks
+
+Vue and Svelte bindings are planned for future releases.
+
 ## Documentation
 
 Full guide, API docs, and examples: [canvastileengine.dev](https://canvastileengine.dev)
 
-## Framework Bindings
+## License
 
-React, Vue, and Svelte bindings are planned as separate packages (e.g., `@canvas-tile-engine/react`). Once released, this README will link their installs and starter snippets.
+MIT
