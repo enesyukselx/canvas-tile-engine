@@ -33,10 +33,16 @@ export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: 
     });
 
     useEffect(() => {
-        engine.addDrawFunction((ctx, coords, config) => {
+        const handle = engine.addDrawFunction((ctx, coords, config) => {
             fnRef.current(ctx, coords, config);
         }, layer);
         requestRender();
+
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, layer, requestRender]);
 
     return null;

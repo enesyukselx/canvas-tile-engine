@@ -16,8 +16,13 @@ export const GridLines = memo(function GridLines({ cellSize, lineWidth = 1, stro
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        engine.drawGridLines(cellSize, lineWidth, strokeStyle, layer);
+        const handle = engine.drawGridLines(cellSize, lineWidth, strokeStyle, layer);
         requestRender();
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, cellSize, lineWidth, strokeStyle, layer, requestRender]);
 
     return null;

@@ -1,7 +1,7 @@
 import { Coords, DrawObject, CanvasTileEngineConfig } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
-import { Layer } from "./Layer";
+import { Layer, type LayerHandle } from "./Layer";
 import { DEFAULT_VALUES, VISIBILITY_BUFFER } from "../constants";
 import { SpatialIndex } from "./SpatialIndex";
 
@@ -67,20 +67,20 @@ export class CanvasDraw {
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
-    ) {
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+    ): LayerHandle {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config);
         });
     }
 
-    drawRect(items: Array<DrawObject> | DrawObject, layer: number = 1) {
+    drawRect(items: Array<DrawObject> | DrawObject, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -160,10 +160,10 @@ export class CanvasDraw {
         items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ) {
+    ): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
@@ -186,14 +186,14 @@ export class CanvasDraw {
         });
     }
 
-    drawCircle(items: Array<DrawObject> | DrawObject, layer: number = 1) {
+    drawCircle(items: Array<DrawObject> | DrawObject, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -248,10 +248,10 @@ export class CanvasDraw {
         items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
         style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
         layer: number = 2
-    ) {
+    ): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.font) ctx.font = style.font;
             if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
@@ -271,10 +271,10 @@ export class CanvasDraw {
         items: Array<Coords[]> | Coords[],
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ) {
+    ): LayerHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
@@ -311,14 +311,14 @@ export class CanvasDraw {
             | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
             | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
         layer: number = 1
-    ) {
+    ): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -371,8 +371,8 @@ export class CanvasDraw {
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0) {
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): LayerHandle {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -547,15 +547,15 @@ export class CanvasDraw {
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
-    private addStaticCacheLayer(cache: StaticCache | null, layer: number) {
+    private addStaticCacheLayer(cache: StaticCache | null, layer: number): LayerHandle | null {
         if (!cache) {
-            return;
+            return null;
         }
         const cachedCanvas = cache.canvas;
         const cachedBounds = cache.worldBounds;
         const cachedScale = cache.scale;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -578,7 +578,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items")
      * @param layer Layer order
      */
-    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
@@ -618,11 +618,10 @@ export class CanvasDraw {
         });
 
         if (!cache) {
-            this.drawRect(items, layer);
-            return;
+            return this.drawRect(items, layer);
         }
 
-        this.addStaticCacheLayer(cache, layer);
+        return this.addStaticCacheLayer(cache, layer)!;
     }
 
     /**
@@ -637,7 +636,7 @@ export class CanvasDraw {
         items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
         cacheKey: string,
         layer: number = 1
-    ) {
+    ): LayerHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
             const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
@@ -667,11 +666,10 @@ export class CanvasDraw {
         });
 
         if (!cache) {
-            this.drawImage(items, layer);
-            return;
+            return this.drawImage(items, layer);
         }
 
-        this.addStaticCacheLayer(cache, layer);
+        return this.addStaticCacheLayer(cache, layer)!;
     }
 
     /**
@@ -682,7 +680,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles")
      * @param layer Layer order
      */
-    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
@@ -700,11 +698,10 @@ export class CanvasDraw {
         });
 
         if (!cache) {
-            this.drawCircle(items, layer);
-            return;
+            return this.drawCircle(items, layer);
         }
 
-        this.addStaticCacheLayer(cache, layer);
+        return this.addStaticCacheLayer(cache, layer)!;
     }
 
     /**

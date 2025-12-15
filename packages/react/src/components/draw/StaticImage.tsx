@@ -26,8 +26,14 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
             prevCacheKeyRef.current = cacheKey;
         }
 
-        engine.drawStaticImage(items, cacheKey, layer);
+        const handle = engine.drawStaticImage(items, cacheKey, layer);
         requestRender();
+
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, cacheKey, layer, requestRender]);
 
     useEffect(() => {

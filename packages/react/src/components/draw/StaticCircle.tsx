@@ -25,8 +25,14 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
             prevCacheKeyRef.current = cacheKey;
         }
 
-        engine.drawStaticCircle(items, cacheKey, layer);
+        const handle = engine.drawStaticCircle(items, cacheKey, layer);
         requestRender();
+
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, cacheKey, layer, requestRender]);
 
     useEffect(() => {

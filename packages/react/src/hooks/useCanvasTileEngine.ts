@@ -5,6 +5,7 @@ import type {
     Coords,
     DrawObject,
     EventHandlers,
+    LayerHandle,
 } from "@canvas-tile-engine/core";
 
 /**
@@ -51,33 +52,37 @@ export interface EngineHandle {
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     /** Draw rectangles */
-    drawRect(items: DrawObject | DrawObject[], layer?: number): void;
+    drawRect(items: DrawObject | DrawObject[], layer?: number): LayerHandle | null;
 
     /** Draw static rectangles (cached) */
-    drawStaticRect(items: DrawObject[], cacheKey: string, layer?: number): void;
+    drawStaticRect(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle | null;
 
     /** Draw circles */
-    drawCircle(items: DrawObject | DrawObject[], layer?: number): void;
+    drawCircle(items: DrawObject | DrawObject[], layer?: number): LayerHandle | null;
 
     /** Draw static circles (cached) */
-    drawStaticCircle(items: DrawObject[], cacheKey: string, layer?: number): void;
+    drawStaticCircle(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle | null;
 
     /** Draw lines */
     drawLine(
         items: { from: Coords; to: Coords } | { from: Coords; to: Coords }[],
         style?: { strokeStyle?: string; lineWidth?: number },
         layer?: number
-    ): void;
+    ): LayerHandle | null;
 
     /** Draw text */
     drawText(
         items: { coords: Coords; text: string } | { coords: Coords; text: string }[],
         style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
         layer?: number
-    ): void;
+    ): LayerHandle | null;
 
     /** Draw paths/polylines */
-    drawPath(items: Coords[] | Coords[][], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): void;
+    drawPath(
+        items: Coords[] | Coords[][],
+        style?: { strokeStyle?: string; lineWidth?: number },
+        layer?: number
+    ): LayerHandle | null;
 
     /** Draw images */
     drawImage(
@@ -85,23 +90,23 @@ export interface EngineHandle {
             | (Omit<DrawObject, "style"> & { img: HTMLImageElement })
             | (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
         layer?: number
-    ): void;
+    ): LayerHandle | null;
 
     /** Draw static images (cached) */
     drawStaticImage(
         items: (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
         cacheKey: string,
         layer?: number
-    ): void;
+    ): LayerHandle | null;
 
     /** Draw grid lines */
-    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): void;
+    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle | null;
 
     /** Add custom draw function */
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer?: number
-    ): void;
+    ): LayerHandle | null;
 
     /** Clear a specific layer */
     clearLayer(layer: number): void;
@@ -111,6 +116,9 @@ export interface EngineHandle {
 
     /** Clear static cache */
     clearStaticCache(cacheKey?: string): void;
+
+    /** Remove a previously registered draw callback */
+    removeLayerHandle(handle: LayerHandle): void;
 
     /** Image loader instance */
     readonly images: CanvasTileEngineCore["images"] | null;
@@ -209,47 +217,47 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             drawRect(items, layer) {
-                instanceRef.current?.drawRect(items, layer);
+                return instanceRef.current?.drawRect(items, layer) ?? null;
             },
 
             drawStaticRect(items, cacheKey, layer) {
-                instanceRef.current?.drawStaticRect(items, cacheKey, layer);
+                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? null;
             },
 
             drawCircle(items, layer) {
-                instanceRef.current?.drawCircle(items, layer);
+                return instanceRef.current?.drawCircle(items, layer) ?? null;
             },
 
             drawStaticCircle(items, cacheKey, layer) {
-                instanceRef.current?.drawStaticCircle(items, cacheKey, layer);
+                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? null;
             },
 
             drawLine(items, style, layer) {
-                instanceRef.current?.drawLine(items, style, layer);
+                return instanceRef.current?.drawLine(items, style, layer) ?? null;
             },
 
             drawText(items, style, layer) {
-                instanceRef.current?.drawText(items, style, layer);
+                return instanceRef.current?.drawText(items, style, layer) ?? null;
             },
 
             drawPath(items, style, layer) {
-                instanceRef.current?.drawPath(items, style, layer);
+                return instanceRef.current?.drawPath(items, style, layer) ?? null;
             },
 
             drawImage(items, layer) {
-                instanceRef.current?.drawImage(items, layer);
+                return instanceRef.current?.drawImage(items, layer) ?? null;
             },
 
             drawStaticImage(items, cacheKey, layer) {
-                instanceRef.current?.drawStaticImage(items, cacheKey, layer);
+                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? null;
             },
 
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
-                instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer);
+                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? null;
             },
 
             addDrawFunction(fn, layer) {
-                instanceRef.current?.addDrawFunction(fn, layer);
+                return instanceRef.current?.addDrawFunction(fn, layer) ?? null;
             },
 
             clearLayer(layer) {
@@ -262,6 +270,10 @@ export function useCanvasTileEngine(): EngineHandle {
 
             clearStaticCache(cacheKey) {
                 instanceRef.current?.clearStaticCache(cacheKey);
+            },
+
+            removeLayerHandle(handle) {
+                instanceRef.current?.removeLayerHandle(handle);
             },
         }),
         [setInstance, isReady]

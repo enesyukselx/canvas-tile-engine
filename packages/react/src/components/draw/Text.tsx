@@ -20,8 +20,13 @@ export const Text = memo(function Text({ items, style, layer = 2 }: TextProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        engine.drawText(items, style, layer);
+        const handle = engine.drawText(items, style, layer);
         requestRender();
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, style, layer, requestRender]);
 
     return null;

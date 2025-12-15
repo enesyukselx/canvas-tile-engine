@@ -8,4 +8,5 @@ export type {
     onHoverCallback,
     onDrawCallback,
 } from "./types";
+export type { LayerHandle } from "./modules/Layer";
 export * from "./constants";

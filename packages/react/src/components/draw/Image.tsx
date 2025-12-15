@@ -16,8 +16,13 @@ export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        engine.drawImage(items, layer);
+        const handle = engine.drawImage(items, layer);
         requestRender();
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, layer, requestRender]);
 
     return null;

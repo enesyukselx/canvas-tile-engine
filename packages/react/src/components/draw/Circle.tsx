@@ -14,8 +14,13 @@ export const Circle = memo(function Circle({ items, layer = 1 }: CircleProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        engine.drawCircle(items, layer);
+        const handle = engine.drawCircle(items, layer);
         requestRender();
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, layer, requestRender]);
 
     return null;

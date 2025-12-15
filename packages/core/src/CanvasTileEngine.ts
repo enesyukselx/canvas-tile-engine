@@ -4,7 +4,7 @@ import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { CanvasDraw } from "./modules/CanvasDraw";
 import { EventManager } from "./modules/EventManager";
 import { ImageLoader } from "./modules/ImageLoader";
-import { Layer } from "./modules/Layer";
+import { Layer, type LayerHandle } from "./modules/Layer";
 import { ViewportState } from "./modules/ViewportState";
 import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
@@ -290,8 +290,8 @@ export class CanvasTileEngine {
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
-    ) {
-        this.ensureCanvasDraw().addDrawFunction(fn, layer);
+    ): LayerHandle {
+        return this.ensureCanvasDraw().addDrawFunction(fn, layer);
     }
 
     /**
@@ -300,8 +300,8 @@ export class CanvasTileEngine {
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      */
-    drawRect(items: DrawObject | Array<DrawObject>, layer: number = 1) {
-        this.ensureCanvasDraw().drawRect(items, layer);
+    drawRect(items: DrawObject | Array<DrawObject>, layer: number = 1): LayerHandle {
+        return this.ensureCanvasDraw().drawRect(items, layer);
     }
 
     /**
@@ -313,8 +313,8 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
-        this.ensureCanvasDraw().drawStaticRect(items, cacheKey, layer);
+    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+        return this.ensureCanvasDraw().drawStaticRect(items, cacheKey, layer);
     }
 
     /**
@@ -325,8 +325,8 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
-        this.ensureCanvasDraw().drawStaticCircle(items, cacheKey, layer);
+    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+        return this.ensureCanvasDraw().drawStaticCircle(items, cacheKey, layer);
     }
 
     /**
@@ -342,8 +342,8 @@ export class CanvasTileEngine {
         items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
         cacheKey: string,
         layer: number = 1
-    ) {
-        this.ensureCanvasDraw().drawStaticImage(items, cacheKey, layer);
+    ): LayerHandle {
+        return this.ensureCanvasDraw().drawStaticImage(items, cacheKey, layer);
     }
 
     /**
@@ -364,8 +364,8 @@ export class CanvasTileEngine {
         items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ) {
-        this.ensureCanvasDraw().drawLine(items, style, layer);
+    ): LayerHandle {
+        return this.ensureCanvasDraw().drawLine(items, style, layer);
     }
 
     /**
@@ -373,8 +373,8 @@ export class CanvasTileEngine {
      * @param items Circle definitions.
      * @param layer Layer order.
      */
-    drawCircle(items: DrawObject | Array<DrawObject>, layer: number = 1) {
-        this.ensureCanvasDraw().drawCircle(items, layer);
+    drawCircle(items: DrawObject | Array<DrawObject>, layer: number = 1): LayerHandle {
+        return this.ensureCanvasDraw().drawCircle(items, layer);
     }
 
     /**
@@ -387,8 +387,8 @@ export class CanvasTileEngine {
         items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
         style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
         layer: number = 2
-    ) {
-        this.ensureCanvasDraw().drawText(items, style, layer);
+    ): LayerHandle {
+        return this.ensureCanvasDraw().drawText(items, style, layer);
     }
 
     /**
@@ -401,8 +401,8 @@ export class CanvasTileEngine {
         items: Array<Coords[]> | Coords[],
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ) {
-        this.ensureCanvasDraw().drawPath(items, style, layer);
+    ): LayerHandle {
+        return this.ensureCanvasDraw().drawPath(items, style, layer);
     }
 
     /**
@@ -416,8 +416,8 @@ export class CanvasTileEngine {
             | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
             | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
         layer: number = 1
-    ) {
-        this.ensureCanvasDraw().drawImage(items, layer);
+    ): LayerHandle {
+        return this.ensureCanvasDraw().drawImage(items, layer);
     }
 
     /**
@@ -428,8 +428,19 @@ export class CanvasTileEngine {
      * engine.drawGridLines(50);
      * ```
      */
-    drawGridLines(cellSize: number, lineWidth: number = 1, strokeStyle: string = "black", layer: number = 0) {
-        this.ensureCanvasDraw().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+    drawGridLines(cellSize: number, lineWidth: number = 1, strokeStyle: string = "black", layer: number = 0): LayerHandle {
+        return this.ensureCanvasDraw().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+    }
+
+    /**
+     * Remove a specific draw callback by handle (canvas renderer only).
+     * Does not clear other callbacks on the same layer.
+     */
+    removeLayerHandle(handle: LayerHandle) {
+        if (!this.layers) {
+            throw new Error("removeLayerHandle is only available when renderer is set to 'canvas'.");
+        }
+        this.layers.remove(handle);
     }
 
     /**

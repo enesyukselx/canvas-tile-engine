@@ -15,8 +15,13 @@ export const Line = memo(function Line({ items, style, layer = 1 }: LineProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        engine.drawLine(items, style, layer);
+        const handle = engine.drawLine(items, style, layer);
         requestRender();
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, style, layer, requestRender]);
 
     return null;

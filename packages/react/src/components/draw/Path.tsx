@@ -15,8 +15,13 @@ export const Path = memo(function Path({ items, style, layer = 1 }: PathProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        engine.drawPath(items, style, layer);
+        const handle = engine.drawPath(items, style, layer);
         requestRender();
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, style, layer, requestRender]);
 
     return null;

@@ -27,8 +27,14 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 
             prevCacheKeyRef.current = cacheKey;
         }
 
-        engine.drawStaticRect(items, cacheKey, layer);
+        const handle = engine.drawStaticRect(items, cacheKey, layer);
         requestRender();
+
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, cacheKey, layer, requestRender]);
 
     // Cleanup cache on unmount

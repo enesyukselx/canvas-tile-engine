@@ -14,8 +14,13 @@ export const Rect = memo(function Rect({ items, layer = 1 }: RectProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        engine.drawRect(items, layer);
+        const handle = engine.drawRect(items, layer);
         requestRender();
+        return () => {
+            if (handle) {
+                engine.removeLayerHandle(handle);
+            }
+        };
     }, [engine, items, layer, requestRender]);
 
     return null;
