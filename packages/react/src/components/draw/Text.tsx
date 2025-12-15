@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { Coords } from "@canvas-tile-engine/core";
 
@@ -16,7 +16,7 @@ export interface TextProps {
 /**
  * Draws text on the canvas.
  */
-export function Text({ items, style, layer = 2 }: TextProps) {
+export const Text = memo(function Text({ items, style, layer = 2 }: TextProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
@@ -25,4 +25,4 @@ export function Text({ items, style, layer = 2 }: TextProps) {
     }, [engine, items, style, layer, requestRender]);
 
     return null;
-}
+});

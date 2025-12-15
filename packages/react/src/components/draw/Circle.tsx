@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { DrawObject } from "@canvas-tile-engine/core";
 
@@ -10,7 +10,7 @@ export interface CircleProps {
 /**
  * Draws circles on the canvas.
  */
-export function Circle({ items, layer = 1 }: CircleProps) {
+export const Circle = memo(function Circle({ items, layer = 1 }: CircleProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
@@ -19,4 +19,4 @@ export function Circle({ items, layer = 1 }: CircleProps) {
     }, [engine, items, layer, requestRender]);
 
     return null;
-}
+});

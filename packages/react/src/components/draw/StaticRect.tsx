@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { DrawObject } from "@canvas-tile-engine/core";
 
@@ -12,7 +12,7 @@ export interface StaticRectProps {
  * Draws static rectangles with caching for performance.
  * Ideal for large datasets that don't change frequently.
  */
-export function StaticRect({ items, cacheKey, layer = 1 }: StaticRectProps) {
+export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 }: StaticRectProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
 
@@ -39,4 +39,4 @@ export function StaticRect({ items, cacheKey, layer = 1 }: StaticRectProps) {
     }, [engine, cacheKey]);
 
     return null;
-}
+});

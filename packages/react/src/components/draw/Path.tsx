@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { Coords } from "@canvas-tile-engine/core";
 
@@ -11,7 +11,7 @@ export interface PathProps {
 /**
  * Draws paths/polylines on the canvas.
  */
-export function Path({ items, style, layer = 1 }: PathProps) {
+export const Path = memo(function Path({ items, style, layer = 1 }: PathProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
@@ -20,4 +20,4 @@ export function Path({ items, style, layer = 1 }: PathProps) {
     }, [engine, items, style, layer, requestRender]);
 
     return null;
-}
+});

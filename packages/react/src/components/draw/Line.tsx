@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { Coords } from "@canvas-tile-engine/core";
 
@@ -11,7 +11,7 @@ export interface LineProps {
 /**
  * Draws lines on the canvas.
  */
-export function Line({ items, style, layer = 1 }: LineProps) {
+export const Line = memo(function Line({ items, style, layer = 1 }: LineProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
@@ -20,4 +20,4 @@ export function Line({ items, style, layer = 1 }: LineProps) {
     }, [engine, items, style, layer, requestRender]);
 
     return null;
-}
+});

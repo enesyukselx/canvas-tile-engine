@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { DrawObject } from "@canvas-tile-engine/core";
 
@@ -10,7 +10,7 @@ export interface RectProps {
 /**
  * Draws rectangles on the canvas.
  */
-export function Rect({ items, layer = 1 }: RectProps) {
+export const Rect = memo(function Rect({ items, layer = 1 }: RectProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
@@ -19,4 +19,4 @@ export function Rect({ items, layer = 1 }: RectProps) {
     }, [engine, items, layer, requestRender]);
 
     return null;
-}
+});

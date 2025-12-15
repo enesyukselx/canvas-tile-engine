@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { ImageItem } from "./Image";
 
@@ -12,7 +12,7 @@ export interface StaticImageProps {
  * Draws static images with caching for performance.
  * Ideal for terrain tiles or static decorations.
  */
-export function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
+export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
 
@@ -37,4 +37,4 @@ export function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
     }, [engine, cacheKey]);
 
     return null;
-}
+});

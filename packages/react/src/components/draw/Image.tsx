@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { DrawObject } from "@canvas-tile-engine/core";
 
@@ -12,7 +12,7 @@ export interface ImageProps {
 /**
  * Draws images on the canvas.
  */
-export function Image({ items, layer = 1 }: ImageProps) {
+export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
@@ -21,4 +21,4 @@ export function Image({ items, layer = 1 }: ImageProps) {
     }, [engine, items, layer, requestRender]);
 
     return null;
-}
+});

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { CanvasTileEngineConfig, Coords } from "@canvas-tile-engine/core";
 
@@ -11,6 +11,7 @@ export interface DrawFunctionProps {
 /**
  * Custom draw function component.
  * Allows arbitrary canvas drawing within the engine's render cycle.
+ * Multiple DrawFunction components can share the same layer (additive drawing).
  *
  * @example
  * ```tsx
@@ -22,7 +23,7 @@ export interface DrawFunctionProps {
  * </DrawFunction>
  * ```
  */
-export function DrawFunction({ children, layer = 1 }: DrawFunctionProps) {
+export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: DrawFunctionProps) {
     const { engine, requestRender } = useEngineContext();
     const fnRef = useRef(children);
 
@@ -39,4 +40,4 @@ export function DrawFunction({ children, layer = 1 }: DrawFunctionProps) {
     }, [engine, layer, requestRender]);
 
     return null;
-}
+});

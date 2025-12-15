@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 
 export interface GridLinesProps {
@@ -12,7 +12,7 @@ export interface GridLinesProps {
  * Draws grid lines on the canvas.
  * Multiple GridLines can share the same layer (additive drawing).
  */
-export function GridLines({ cellSize, lineWidth = 1, strokeStyle = "black", layer = 0 }: GridLinesProps) {
+export const GridLines = memo(function GridLines({ cellSize, lineWidth = 1, strokeStyle = "black", layer = 0 }: GridLinesProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
@@ -21,4 +21,4 @@ export function GridLines({ cellSize, lineWidth = 1, strokeStyle = "black", laye
     }, [engine, cellSize, lineWidth, strokeStyle, layer, requestRender]);
 
     return null;
-}
+});
