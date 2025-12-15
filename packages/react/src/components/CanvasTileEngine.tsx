@@ -123,6 +123,8 @@ function CanvasTileEngineBase({
     );
 
     // Initialize engine when component mounts
+    // Note: config and center are intentionally not in deps - we only want to create the engine once
+    // Callbacks are accessed via callbacksRef which is always up-to-date
     useEffect(() => {
         const container = engine._containerRef.current;
 
@@ -156,24 +158,6 @@ function CanvasTileEngineBase({
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [engine]);
-
-    // Update callbacks on engine when they change
-    useEffect(() => {
-        const instance = engine.instance;
-
-        if (!instance) {
-            return;
-        }
-
-        if (onClick !== undefined) instance.onClick = onClick;
-        if (onHover !== undefined) instance.onHover = onHover;
-        if (onMouseDown !== undefined) instance.onMouseDown = onMouseDown;
-        if (onMouseUp !== undefined) instance.onMouseUp = onMouseUp;
-        if (onMouseLeave !== undefined) instance.onMouseLeave = onMouseLeave;
-        if (onDraw !== undefined) instance.onDraw = onDraw;
-        if (onResize !== undefined) instance.onResize = onResize;
-        if (onCoordsChange !== undefined) instance.onCoordsChange = onCoordsChange;
-    }, [engine, onClick, onHover, onMouseDown, onMouseUp, onMouseLeave, onDraw, onResize, onCoordsChange]);
 
     return (
         <EngineContext.Provider value={contextValue}>

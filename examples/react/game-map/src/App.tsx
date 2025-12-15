@@ -183,7 +183,7 @@ export default function App() {
             setCircleItems(newCircleItems);
         };
 
-        loadImages();
+        void loadImages();
     }, [mainMap.isReady, miniMap.isReady, mainMap.instance, items]);
 
     // Handle main map coords change
