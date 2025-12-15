@@ -231,6 +231,10 @@ engine.addDrawFunction((ctx, coords, config) => {
 }, 4);
 ```
 
+:::tip
+`addDrawFunction()` also returns a layer handle. You can remove the registered callback later via `engine.removeLayerHandle(handle)` (see “Clearing Layers”).
+:::
+
 ### Renderer Hook (`onDraw`)
 
 The `onDraw` callback runs **after** all layers have been drawn but **before** the debug overlays. It is useful for post-processing effects or drawing UI elements that should always be on top of the map content.
@@ -401,6 +405,35 @@ function updateMiniMap() {
 ## Clearing Layers
 
 When your scene content changes dynamically (e.g., objects change color, get added or removed), you need to clear the layer before redrawing. Without clearing, new draw calls accumulate on top of existing ones.
+
+### Remove a Single Draw Call (`LayerHandle`)
+
+Most `draw*()` methods (and `addDrawFunction`) return a **layer handle** that uniquely identifies the registered draw callback.
+You can keep this handle and later remove **only that specific draw call** without clearing the whole layer.
+
+This is especially useful for temporary overlays (hover highlights, selections, debug helpers) where you want to “add, then remove” a single draw callback.
+
+```typescript
+// Add a temporary overlay
+const handle = engine.drawRect({ x: 5, y: 5, size: 1, style: { fillStyle: "rgba(255, 255, 0, 0.25)" } }, 3);
+engine.render();
+
+// Later: remove only this draw callback (no need to clear the entire layer)
+engine.removeLayerHandle(handle);
+engine.render();
+```
+
+You can also use this with custom drawing functions:
+
+```typescript
+const hudHandle = engine.addDrawFunction((ctx) => {
+    ctx.fillStyle = "white";
+    ctx.fillText("HUD", 10, 20);
+}, 99);
+
+// Remove HUD when no longer needed
+engine.removeLayerHandle(hudHandle);
+```
 
 ### `clearLayer(layer)`
 
