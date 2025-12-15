@@ -55,11 +55,6 @@ canvas-tile-engine/
 
 ## 🚀 Development Setup
 
-### Prerequisites
-
-- **Node.js**: v18 or higher
-- **pnpm**: v10.23.0 or higher
-
 ### Installation
 
 1. **Fork and clone the repository**
