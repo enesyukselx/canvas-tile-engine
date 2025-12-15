@@ -1,13 +1,35 @@
 import type {
     CanvasTileEngineConfig,
     Coords,
+    DrawObject,
+    EventHandlers,
     onClickCallback,
     onHoverCallback,
     onDrawCallback,
+    Rect,
+    Line,
+    Circle,
+    Path,
+    Text,
+    ImageItem,
 } from "@canvas-tile-engine/core";
 import type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
-export type { CanvasTileEngineConfig, Coords };
+export type {
+    CanvasTileEngineConfig,
+    Coords,
+    DrawObject,
+    EventHandlers,
+    onClickCallback,
+    onHoverCallback,
+    onDrawCallback,
+    Rect,
+    Line,
+    Circle,
+    Text,
+    Path,
+    ImageItem,
+};
 
 /**
  * Props for CanvasTileEngine component

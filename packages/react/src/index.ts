@@ -3,21 +3,9 @@ export { CanvasTileEngine } from "./components";
 
 // Draw components
 export {
-    Rect,
-    Circle,
-    Image,
-    GridLines,
-    Line,
-    Text,
-    Path,
-    StaticRect,
-    StaticCircle,
-    StaticImage,
-    DrawFunction,
     type RectProps,
     type CircleProps,
     type ImageProps,
-    type ImageItem,
     type GridLinesProps,
     type LineProps,
     type TextProps,
@@ -35,7 +23,22 @@ export { useCanvasTileEngine } from "./hooks";
 export { useEngineContext, type EngineContextValue } from "./context";
 
 // Types
-export type { CanvasTileEngineProps, Coords, CanvasTileEngineConfig } from "./types";
+export type {
+    CanvasTileEngineProps,
+    CanvasTileEngineConfig,
+    Coords,
+    DrawObject,
+    EventHandlers,
+    onClickCallback,
+    onHoverCallback,
+    onDrawCallback,
+    Rect,
+    Line,
+    Circle,
+    Text,
+    Path,
+    ImageItem,
+} from "./types";
 export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
 // Re-export core class with different name

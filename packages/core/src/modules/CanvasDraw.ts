@@ -1,4 +1,4 @@
-import { Coords, DrawObject, CanvasTileEngineConfig } from "../types";
+import { Coords, CanvasTileEngineConfig, Rect, Circle, Text, Path, ImageItem } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer, type LayerHandle } from "./Layer";
@@ -73,7 +73,7 @@ export class CanvasDraw {
         });
     }
 
-    drawRect(items: Array<DrawObject> | DrawObject, layer: number = 1): LayerHandle {
+    drawRect(items: Array<Rect> | Rect, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -186,7 +186,7 @@ export class CanvasDraw {
         });
     }
 
-    drawCircle(items: Array<DrawObject> | DrawObject, layer: number = 1): LayerHandle {
+    drawCircle(items: Array<Circle> | Circle, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -245,7 +245,7 @@ export class CanvasDraw {
     }
 
     drawText(
-        items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
+        items: Array<Text> | Text,
         style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
         layer: number = 2
     ): LayerHandle {
@@ -268,7 +268,7 @@ export class CanvasDraw {
     }
 
     drawPath(
-        items: Array<Coords[]> | Coords[],
+        items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ): LayerHandle {
@@ -306,12 +306,7 @@ export class CanvasDraw {
         });
     }
 
-    drawImage(
-        items:
-            | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
-        layer: number = 1
-    ): LayerHandle {
+    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -578,7 +573,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items")
      * @param layer Layer order
      */
-    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): LayerHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
@@ -632,11 +627,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache")
      * @param layer Layer order
      */
-    drawStaticImage(
-        items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
-        cacheKey: string,
-        layer: number = 1
-    ): LayerHandle {
+    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): LayerHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
             const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
@@ -680,7 +671,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles")
      * @param layer Layer order
      */
-    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): LayerHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {

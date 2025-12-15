@@ -1,8 +1,6 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { DrawObject } from "@canvas-tile-engine/core";
-
-export type ImageItem = Omit<DrawObject, "style"> & { img: HTMLImageElement };
+import { ImageItem } from "@canvas-tile-engine/core";
 
 export interface ImageProps {
     items: ImageItem | ImageItem[];

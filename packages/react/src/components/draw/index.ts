@@ -1,6 +1,6 @@
 export { Rect, type RectProps } from "./Rect";
 export { Circle, type CircleProps } from "./Circle";
-export { Image, type ImageProps, type ImageItem } from "./Image";
+export { Image, type ImageProps } from "./Image";
 export { GridLines, type GridLinesProps } from "./GridLines";
 export { Line, type LineProps } from "./Line";
 export { Text, type TextProps } from "./Text";
@@ -9,4 +9,3 @@ export { StaticRect, type StaticRectProps } from "./StaticRect";
 export { StaticCircle, type StaticCircleProps } from "./StaticCircle";
 export { StaticImage, type StaticImageProps } from "./StaticImage";
 export { DrawFunction, type DrawFunctionProps } from "./DrawFunction";
-

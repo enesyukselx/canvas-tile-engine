@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     CanvasTileEngine,
+    Circle,
+    Rect,
+    ImageItem,
     useCanvasTileEngine,
     type CanvasTileEngineConfig,
-    type ImageItem,
 } from "@canvas-tile-engine/react";
 import { VillagePopup } from "./components/VillagePopup";
 import { generateMapObjects, type MapObject } from "./generateMapObjects";
@@ -73,18 +75,8 @@ export default function App() {
 
     // Image loading state
     const [imageItems, setImageItems] = useState<ImageItem[]>([]);
-    const [circleItems, setCircleItems] = useState<
-        Array<{
-            x: number;
-            y: number;
-            size: number;
-            origin: { mode: "cell"; x: number; y: number };
-            style: { fillStyle: string };
-        }>
-    >([]);
-    const [miniMapRects, setMiniMapRects] = useState<
-        Array<{ x: number; y: number; size: number; style: { fillStyle: string } }>
-    >([]);
+    const [circleItems, setCircleItems] = useState<Array<Circle>>([]);
+    const [miniMapRects, setMiniMapRects] = useState<Array<Rect>>([]);
 
     // Popup state
     const [popupItem, setPopupItem] = useState<MapObject | null>(null);
@@ -152,14 +144,8 @@ export default function App() {
 
             // Build arrays
             const newImageItems: ImageItem[] = [];
-            const newMiniMapRects: Array<{ x: number; y: number; size: number; style: { fillStyle: string } }> = [];
-            const newCircleItems: Array<{
-                x: number;
-                y: number;
-                size: number;
-                origin: { mode: "cell"; x: number; y: number };
-                style: { fillStyle: string };
-            }> = [];
+            const newMiniMapRects: Array<Rect> = [];
+            const newCircleItems: Array<Circle> = [];
 
             for (const item of items) {
                 const img = imageCache.get(item.imageUrl)!;

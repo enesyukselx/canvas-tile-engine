@@ -7,6 +7,12 @@ export type {
     onClickCallback,
     onHoverCallback,
     onDrawCallback,
+    Rect,
+    Line,
+    Circle,
+    Text,
+    Path,
+    ImageItem,
 } from "./types";
 export type { LayerHandle } from "./modules/Layer";
 export * from "./constants";

@@ -16,7 +16,6 @@ export {
     type RectProps,
     type CircleProps,
     type ImageProps,
-    type ImageItem,
     type GridLinesProps,
     type LineProps,
     type TextProps,
