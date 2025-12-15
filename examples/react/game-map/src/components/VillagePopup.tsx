@@ -17,7 +17,7 @@ export function VillagePopup({ item, position, visible }: VillagePopupProps) {
                 top: position.y,
             }}
         >
-            <div className="w-80 rounded-3xl border border-amber-500/50 bg-slate-950/80 p-4 text-slate-100 shadow-[0_20px_45px_rgba(0,0,0,0.45)] backdrop-blur supports-[backdrop-filter]:bg-slate-950/70">
+            <div className="w-80 rounded-3xl border border-amber-500/50 bg-slate-950/80 p-4 text-slate-100 shadow-[0_20px_45px_rgba(0,0,0,0.45)] backdrop-blur">
                 <div className="grid gap-3 rounded-2xl border border-white/5 bg-white/5 p-4 text-sm">
                     <div className="flex items-center justify-between">
                         <span className="text-slate-300">Player</span>
