@@ -1,21 +1,25 @@
 {
-    "name": "tile-engine",
+    "name": "canvas-tile-engine",
     "version": "1.0.0",
-    "description": "",
-    "main": "index.js",
+    "private": true,
+    "description": "Canvas Tile Engine monorepo",
+    "author": "Enes Yüksel",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/enesyukselx/canvas-tile-engine.git"
+    },
     "scripts": {
         "build": "pnpm --filter @canvas-tile-engine/core build && pnpm --filter @canvas-tile-engine/react build",
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "pnpm --filter @canvas-tile-engine/core dev && pnpm --filter @canvas-tile-engine/react dev",
         "dev:example": "node run-example.js",
         "lint": "pnpm exec eslint .",
-        "typecheck": "pnpm -r --filter=!tile-engine typecheck",
+        "typecheck": "pnpm -r --filter=!canvas-tile-engine typecheck",
         "test": "pnpm --filter @canvas-tile-engine/core test",
         "test:coverage": "pnpm --filter @canvas-tile-engine/core test:coverage"
     },
     "keywords": [],
-    "author": "",
-    "license": "MIT",
     "packageManager": "pnpm@10.23.0",
     "dependencies": {
         "concurrently": "^9.2.1",
