@@ -82,10 +82,6 @@ function App() {
 
 See the full React documentation: [packages/react/README.md](./packages/react/README.md)
 
-## Other Frameworks
-
-Vue and Svelte bindings are planned for future releases.
-
 ## Documentation
 
 Full guide, API docs, and examples: [canvastileengine.dev](https://canvastileengine.dev)
