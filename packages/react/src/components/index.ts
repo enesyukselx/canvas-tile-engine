@@ -1,6 +1,6 @@
 export { CanvasTileEngine } from "./CanvasTileEngine";
 
-// Draw components
+// Draw components export
 export {
     Rect,
     Circle,
