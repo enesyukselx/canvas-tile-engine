@@ -94,4 +94,6 @@ export type DrawObject = {
     style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
     /** Rotation angle in degrees (0 = no rotation, positive = clockwise) */
     rotate?: number;
+    /** Border radius in pixels. Single value for all corners, or array for [topLeft, topRight, bottomRight, bottomLeft] */
+    radius?: number | number[];
 };
