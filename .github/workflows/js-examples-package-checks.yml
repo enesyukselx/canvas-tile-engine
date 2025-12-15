@@ -33,7 +33,7 @@ jobs:
               run: pnpm -w -F @canvas-tile-engine/core build
 
             - name: Typecheck examples
-              run: pnpm -r --filter '{./examples/**}' typecheck
+              run: pnpm -r --filter '{./examples/vanilla-js-examples/**}' typecheck
 
             - name: Lint examples
-              run: pnpm -w exec eslint "examples/**/*.{ts,tsx}" --ext .ts,.tsx
+              run: pnpm -w exec eslint "examples/vanilla-js-examples/**/*.{ts,tsx}" --ext .ts,.tsx

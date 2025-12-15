@@ -1,0 +1,39 @@
+name: "React Package - Typecheck + Lint Checks"
+
+on:
+    push:
+        paths:
+            - "packages/core/**"
+            - "packages/react/**"
+
+jobs:
+    checks:
+        name: Typecheck - Lint (React Package)
+        runs-on: ubuntu-22.04
+
+        steps:
+            - uses: actions/checkout@v4
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10.23.0
+                  run_install: false
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: "pnpm"
+                  cache-dependency-path: "pnpm-lock.yaml"
+
+            - name: Install dependencies
+              run: pnpm install --no-frozen-lockfile
+
+            - name: Build core package
+              run: pnpm -w -F @canvas-tile-engine/core build
+
+            - name: Typecheck React
+              run: pnpm --filter @canvas-tile-engine/react typecheck
+
+            - name: Lint React
+              run: pnpm eslint packages/react --ext .ts,.tsx
