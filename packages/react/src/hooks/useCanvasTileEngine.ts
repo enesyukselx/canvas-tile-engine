@@ -4,6 +4,7 @@ import type {
     CanvasTileEngineConfig,
     Coords,
     DrawObject,
+    EventHandlers,
 } from "@canvas-tile-engine/core";
 
 /**
@@ -45,6 +46,9 @@ export interface EngineHandle {
 
     /** Set map boundaries */
     setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void;
+
+    /** Dynamically update event handlers at runtime */
+    setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     /** Draw rectangles */
     drawRect(items: DrawObject | DrawObject[], layer?: number): void;
@@ -198,6 +202,10 @@ export function useCanvasTileEngine(): EngineHandle {
 
             setBounds(bounds) {
                 instanceRef.current?.setBounds(bounds);
+            },
+
+            setEventHandlers(handlers) {
+                instanceRef.current?.setEventHandlers(handlers);
             },
 
             drawRect(items, layer) {
