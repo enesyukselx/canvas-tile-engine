@@ -124,6 +124,8 @@ export class CanvasDraw {
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
 
+                const radius = item.radius;
+
                 if (rotationDeg !== 0) {
                     const centerX = drawX + pxSize / 2;
                     const centerY = drawY + pxSize / 2;
@@ -131,13 +133,21 @@ export class CanvasDraw {
                     ctx.translate(centerX, centerY);
                     ctx.rotate(rotation);
                     ctx.beginPath();
-                    ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize, radius);
+                    } else {
+                        ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                    }
                     if (style?.fillStyle) ctx.fill();
                     if (style?.strokeStyle) ctx.stroke();
                     ctx.restore();
                 } else {
                     ctx.beginPath();
-                    ctx.rect(drawX, drawY, pxSize, pxSize);
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(drawX, drawY, pxSize, pxSize, radius);
+                    } else {
+                        ctx.rect(drawX, drawY, pxSize, pxSize);
+                    }
                     if (style?.fillStyle) ctx.fill();
                     if (style?.strokeStyle) ctx.stroke();
                 }
@@ -421,7 +431,7 @@ export class CanvasDraw {
      * Helper to create or get a static cache for pre-rendered content.
      * Handles bounds calculation, canvas creation, and rebuild logic.
      */
-    private getOrCreateStaticCache<T extends { x: number; y: number; size?: number }>(
+    private getOrCreateStaticCache<T extends { x: number; y: number; size?: number; radius?: number | number[] }>(
         items: T[],
         cacheKey: string,
         renderFn: (
@@ -494,8 +504,7 @@ export class CanvasDraw {
                     : document.createElement("canvas");
 
             // Guard instanceof with typeof to avoid ReferenceError when OffscreenCanvas is undefined (e.g., jsdom)
-            const isOffscreenCanvas =
-                typeof OffscreenCanvas !== "undefined" && offscreen instanceof OffscreenCanvas;
+            const isOffscreenCanvas = typeof OffscreenCanvas !== "undefined" && offscreen instanceof OffscreenCanvas;
 
             if (!isOffscreenCanvas) {
                 (offscreen as HTMLCanvasElement).width = canvasWidth;
@@ -576,6 +585,7 @@ export class CanvasDraw {
             const style = item.style;
             const rotationDeg = item.rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
+            const radius = item.radius;
 
             if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                 ctx.fillStyle = style.fillStyle;
@@ -588,10 +598,22 @@ export class CanvasDraw {
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(rotation);
-                ctx.fillRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                if (radius && ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize, radius);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                }
                 ctx.restore();
             } else {
-                ctx.fillRect(x, y, pxSize, pxSize);
+                if (radius && ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, pxSize, pxSize, radius);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(x, y, pxSize, pxSize);
+                }
             }
         });
 

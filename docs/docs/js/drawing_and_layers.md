@@ -27,14 +27,15 @@ You can use any number for a layer. They are sorted automatically at render time
 
 Draw basic geometric shapes. You can pass a single object or an array of objects for batch rendering.
 
-| Property | Type     | Default                            | Description                                      |
-| :------- | :------- | :--------------------------------- | :----------------------------------------------- |
-| `x`, `y` | `number` | **Required**                       | World coordinates of the center/origin.          |
-| `size`   | `number` | `1`                                | Size in grid units (width/diameter).             |
-| `layer`  | `number` | `1`                                | Rendering layer.                                 |
-| `style`  | `object` | `{}`                               | Styling options (see below).                     |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                    |
-| `rotate` | `number` | `0`                                | Rotation angle in degrees (only for `drawRect`). |
+| Property | Type                 | Default                            | Description                                                                                                                     |
+| :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| `x`, `y` | `number`             | **Required**                       | World coordinates of the center/origin.                                                                                         |
+| `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                            |
+| `layer`  | `number`             | `1`                                | Rendering layer.                                                                                                                |
+| `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                    |
+| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                   |
+| `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                |
+| `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
 
 **Style Options:**
 
@@ -62,6 +63,30 @@ engine.drawRect(
         size: 1,
         rotate: 45, // 45 degrees
         style: { fillStyle: "#ff6b6b" },
+    },
+    1
+);
+
+// Draw a rounded rectangle
+engine.drawRect(
+    {
+        x: 10,
+        y: 5,
+        size: 1,
+        radius: 8, // 8px radius for all corners
+        style: { fillStyle: "#2ecc71" },
+    },
+    1
+);
+
+// Draw with different corner radii [topLeft, topRight, bottomRight, bottomLeft]
+engine.drawRect(
+    {
+        x: 12,
+        y: 5,
+        size: 1,
+        radius: [10, 0, 10, 0], // Diagonal rounded corners
+        style: { fillStyle: "#9b59b6" },
     },
     1
 );
@@ -247,7 +272,7 @@ For large static datasets (e.g., mini-maps with 100k+ items), the engine provide
 
 ### `drawStaticRect`
 
-Pre-renders rectangles to an offscreen canvas. Ideal for mini-maps. Supports `rotate` property for rotated rectangles.
+Pre-renders rectangles to an offscreen canvas. Ideal for mini-maps. Supports `rotate` property for rotated rectangles and `radius` property for rounded corners.
 
 ```typescript
 const miniMapItems = items.map((item) => ({
@@ -256,6 +281,7 @@ const miniMapItems = items.map((item) => ({
     size: 0.9,
     style: { fillStyle: item.color },
     rotate: item.rotation, // Optional rotation in degrees
+    radius: 4, // Optional rounded corners
 }));
 
 // "minimap-items" is a unique cache key
