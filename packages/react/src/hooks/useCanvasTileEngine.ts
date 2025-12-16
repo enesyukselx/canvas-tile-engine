@@ -45,6 +45,12 @@ export interface EngineHandle {
     /** Get current canvas scale */
     getScale(): number | null;
 
+    /** Zoom in by a factor (default: 1.5) */
+    zoomIn(factor?: number): void;
+
+    /** Zoom out by a factor (default: 1.5) */
+    zoomOut(factor?: number): void;
+
     /** Get current config */
     getConfig(): Required<CanvasTileEngineConfig> | null;
 
@@ -209,6 +215,14 @@ export function useCanvasTileEngine(): EngineHandle {
 
             getScale() {
                 return instanceRef.current?.getScale() ?? NaN;
+            },
+
+            zoomIn(factor?: number) {
+                instanceRef.current?.zoomIn(factor);
+            },
+
+            zoomOut(factor?: number) {
+                instanceRef.current?.zoomOut(factor);
             },
 
             getConfig() {

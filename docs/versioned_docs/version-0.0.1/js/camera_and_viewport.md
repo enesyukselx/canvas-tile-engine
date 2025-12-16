@@ -52,7 +52,7 @@ console.log(center); // { x: 5.5, y: 10.2 }
 
 ### Zooming
 
-Zooming is primarily handled by user interaction (mouse wheel), but you can configure the limits.
+Zooming is primarily handled by user interaction (mouse wheel), but you can also control it programmatically.
 
 **Configuration:**
 
@@ -65,6 +65,41 @@ const config = {
     zoom: true     // Enable mouse wheel zoom
   }
 };
+```
+
+#### `zoomIn(factor?)`
+
+Zooms in by a given factor, centered on the viewport.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `factor` | `number` | `1.5` | Zoom multiplier. Higher values zoom in more. |
+
+```typescript
+engine.zoomIn();    // Zoom in by 1.5x
+engine.zoomIn(2);   // Zoom in by 2x
+```
+
+#### `zoomOut(factor?)`
+
+Zooms out by a given factor, centered on the viewport.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `factor` | `number` | `1.5` | Zoom multiplier. Higher values zoom out more. |
+
+```typescript
+engine.zoomOut();   // Zoom out by 1.5x
+engine.zoomOut(2);  // Zoom out by 2x
+```
+
+#### `getScale()`
+
+Returns the current zoom scale.
+
+```typescript
+const scale = engine.getScale();
+console.log(scale); // 50
 ```
 
 ## Viewport & Resizing

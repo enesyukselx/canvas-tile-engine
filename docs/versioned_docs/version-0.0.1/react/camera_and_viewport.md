@@ -128,6 +128,62 @@ const config = {
 };
 ```
 
+### Programmatic Zoom Control
+
+#### `zoomIn(factor?)`
+
+Zooms in by a given factor (default: 1.5), centered on the viewport.
+
+```tsx
+const handleZoomIn = () => {
+    engine.zoomIn();    // Zoom in by 1.5x
+    engine.zoomIn(2);   // Zoom in by 2x
+};
+```
+
+#### `zoomOut(factor?)`
+
+Zooms out by a given factor (default: 1.5), centered on the viewport.
+
+```tsx
+const handleZoomOut = () => {
+    engine.zoomOut();   // Zoom out by 1.5x
+    engine.zoomOut(2);  // Zoom out by 2x
+};
+```
+
+#### `getScale()`
+
+Returns the current zoom scale.
+
+```tsx
+const logScale = () => {
+    const scale = engine.getScale();
+    console.log("Current scale:", scale); // 50
+};
+```
+
+### Example: Zoom Controls
+
+```tsx
+function MapWithZoomControls() {
+    const engine = useCanvasTileEngine();
+
+    return (
+        <div>
+            <div>
+                <button onClick={() => engine.zoomIn()}>+</button>
+                <button onClick={() => engine.zoomOut()}>-</button>
+            </div>
+
+            <CanvasTileEngine engine={engine} config={config}>
+                {/* children */}
+            </CanvasTileEngine>
+        </div>
+    );
+}
+```
+
 ## Viewport & Resizing
 
 ### Auto-Resizing
