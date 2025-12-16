@@ -213,6 +213,26 @@ export class CanvasTileEngine {
         return this.camera.scale;
     }
 
+    /**
+     * Zoom in by a given factor, centered on the viewport.
+     * @param factor Zoom multiplier (default: 1.5). Higher values zoom in more.
+     */
+    zoomIn(factor: number = 1.5) {
+        const size = this.viewport.getSize();
+        this.camera.zoomByFactor(factor, size.width / 2, size.height / 2);
+        this.handleCameraChange();
+    }
+
+    /**
+     * Zoom out by a given factor, centered on the viewport.
+     * @param factor Zoom multiplier (default: 1.5). Higher values zoom out more.
+     */
+    zoomOut(factor: number = 1.5) {
+        const size = this.viewport.getSize();
+        this.camera.zoomByFactor(1 / factor, size.width / 2, size.height / 2);
+        this.handleCameraChange();
+    }
+
     /** Snapshot of current normalized config. */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
