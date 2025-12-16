@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
     CanvasTileEngine,
     Circle,
@@ -101,7 +101,7 @@ export default function App() {
     }, [items]);
 
     // Calculate mini map bounds
-    const calculateMiniMapBounds = useCallback(() => {
+    const calculateMiniMapBounds = () => {
         const mainCfg = mainMap.getConfig();
         const miniCfg = miniMap.getConfig();
         if (!mainCfg || !miniCfg) return null;
@@ -125,7 +125,7 @@ export default function App() {
             minY: mainCenterMinY - miniViewHeight / 2,
             maxY: mainCenterMaxY + miniViewHeight / 2,
         };
-    }, [mainMap, miniMap]);
+    };
 
     // Load images and prepare draw data
     useEffect(() => {
@@ -173,102 +173,87 @@ export default function App() {
     }, [mainMap.isReady, miniMap.isReady, mainMap.instance, items]);
 
     // Handle main map coords change
-    const handleMainMapCoordsChange = useCallback(
-        (coords: { x: number; y: number }) => {
-            const bounds = calculateMiniMapBounds();
-            if (bounds) {
-                miniMap.setBounds(bounds);
-            }
+    const handleMainMapCoordsChange = (coords: { x: number; y: number }) => {
+        const bounds = calculateMiniMapBounds();
+        if (bounds) {
+            miniMap.setBounds(bounds);
+        }
 
-            if (isSyncingRef.current) return;
+        if (isSyncingRef.current) return;
 
-            setPopupVisible(false);
-            setInputX(Math.round(coords.x).toString());
-            setInputY(Math.round(coords.y).toString());
+        setPopupVisible(false);
+        setInputX(Math.round(coords.x).toString());
+        setInputY(Math.round(coords.y).toString());
 
-            isSyncingRef.current = true;
-            miniMap.updateCoords(coords);
-            isSyncingRef.current = false;
-        },
-        [miniMap, calculateMiniMapBounds]
-    );
+        isSyncingRef.current = true;
+        miniMap.updateCoords(coords);
+        isSyncingRef.current = false;
+    };
 
     // Handle mini map coords change
-    const handleMiniMapCoordsChange = useCallback(
-        (coords: { x: number; y: number }) => {
-            if (isSyncingRef.current) return;
+    const handleMiniMapCoordsChange = (coords: { x: number; y: number }) => {
+        if (isSyncingRef.current) return;
 
-            isSyncingRef.current = true;
-            setInputX(Math.round(coords.x).toString());
-            setInputY(Math.round(coords.y).toString());
-            mainMap.updateCoords(coords);
-            isSyncingRef.current = false;
-        },
-        [mainMap]
-    );
+        isSyncingRef.current = true;
+        setInputX(Math.round(coords.x).toString());
+        setInputY(Math.round(coords.y).toString());
+        mainMap.updateCoords(coords);
+        isSyncingRef.current = false;
+    };
 
     // Handle mini map draw (viewport rectangle)
-    const handleMiniMapDraw = useCallback(
-        (ctx: CanvasRenderingContext2D) => {
-            const mainCfg = mainMap.getConfig();
-            const miniCfg = miniMap.getConfig();
-            if (!mainCfg || !miniCfg) return;
+    const handleMiniMapDraw = (ctx: CanvasRenderingContext2D) => {
+        const mainCfg = mainMap.getConfig();
+        const miniCfg = miniMap.getConfig();
+        if (!mainCfg || !miniCfg) return;
 
-            const ratio = miniCfg.scale / mainCfg.scale;
-            const rectWidth = mainCfg.size.width * ratio;
-            const rectHeight = mainCfg.size.height * ratio;
-            const rectX = miniCfg.size.width / 2 - rectWidth / 2;
-            const rectY = miniCfg.size.height / 2 - rectHeight / 2;
+        const ratio = miniCfg.scale / mainCfg.scale;
+        const rectWidth = mainCfg.size.width * ratio;
+        const rectHeight = mainCfg.size.height * ratio;
+        const rectX = miniCfg.size.width / 2 - rectWidth / 2;
+        const rectY = miniCfg.size.height / 2 - rectHeight / 2;
 
-            ctx.strokeStyle = "white";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
-        },
-        [mainMap, miniMap]
-    );
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+    };
 
     // Handle hover
-    const handleHover = useCallback(
-        (
-            coords: { raw: { x: number; y: number }; snapped: { x: number; y: number } },
-            _mouse: unknown,
-            client: { raw: { x: number; y: number }; snapped: { x: number; y: number } }
-        ) => {
-            const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
+    const handleHover = (
+        coords: { raw: { x: number; y: number }; snapped: { x: number; y: number } },
+        _mouse: unknown,
+        client: { raw: { x: number; y: number }; snapped: { x: number; y: number } }
+    ) => {
+        const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
-            if (item) {
-                const cfg = mainMap.getConfig();
-                setPopupItem(item);
-                setPopupPosition({
-                    x: client.snapped.x,
-                    y: client.snapped.y + (cfg?.scale ?? 50) / 2,
-                });
-                setPopupVisible(true);
-            } else {
-                setPopupVisible(false);
-            }
-        },
-        [itemsByCoord, mainMap]
-    );
+        if (item) {
+            const cfg = mainMap.getConfig();
+            setPopupItem(item);
+            setPopupPosition({
+                x: client.snapped.x,
+                y: client.snapped.y + (cfg?.scale ?? 50) / 2,
+            });
+            setPopupVisible(true);
+        } else {
+            setPopupVisible(false);
+        }
+    };
 
     // Handle click
-    const handleClick = useCallback(
-        (coords: { raw: { x: number; y: number }; snapped: { x: number; y: number } }) => {
-            const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
+    const handleClick = (coords: { raw: { x: number; y: number }; snapped: { x: number; y: number } }) => {
+        const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
-            if (item) {
-                alert(
-                    `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`
-                );
-            }
-        },
-        [itemsByCoord]
-    );
+        if (item) {
+            alert(
+                `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`
+            );
+        }
+    };
 
     // Handle mouse leave
-    const handleMouseLeave = useCallback(() => {
+    const handleMouseLeave = () => {
         setPopupVisible(false);
-    }, []);
+    };
 
     // Handle go to coordinates
     const handleGoToCoords = () => {
