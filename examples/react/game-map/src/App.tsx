@@ -188,7 +188,6 @@ export default function App() {
 
             isSyncingRef.current = true;
             miniMap.updateCoords(coords);
-            miniMap.render();
             isSyncingRef.current = false;
         },
         [miniMap, calculateMiniMapBounds]
@@ -203,7 +202,6 @@ export default function App() {
             setInputX(Math.round(coords.x).toString());
             setInputY(Math.round(coords.y).toString());
             mainMap.updateCoords(coords);
-            mainMap.render();
             isSyncingRef.current = false;
         },
         [mainMap]
@@ -289,13 +287,10 @@ export default function App() {
         setMiniMapSize(e.target.value);
         miniMap.resize(newSize, newSize, 300);
 
-        setTimeout(() => {
-            const bounds = calculateMiniMapBounds();
-            if (bounds) {
-                miniMap.setBounds(bounds);
-            }
-            miniMap.render();
-        }, 350);
+        const bounds = calculateMiniMapBounds();
+        if (bounds) {
+            miniMap.setBounds(bounds);
+        }
     };
 
     // Handle main map resize
