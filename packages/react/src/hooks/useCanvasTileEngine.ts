@@ -42,6 +42,9 @@ export interface EngineHandle {
     /** Get current canvas size */
     getSize(): { width: number; height: number } | null;
 
+    /** Get current canvas scale */
+    getScale(): number | null;
+
     /** Get current config */
     getConfig(): Required<CanvasTileEngineConfig> | null;
 
@@ -202,6 +205,10 @@ export function useCanvasTileEngine(): EngineHandle {
 
             getSize() {
                 return instanceRef.current?.getSize() ?? null;
+            },
+
+            getScale() {
+                return instanceRef.current?.getScale() ?? NaN;
             },
 
             getConfig() {
