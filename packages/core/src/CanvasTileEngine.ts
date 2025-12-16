@@ -205,6 +205,14 @@ export class CanvasTileEngine {
         return this.viewport.getSize();
     }
 
+    /**
+     * Current canvas scale.
+     * @returns Current canvas scale.
+     */
+    getScale() {
+        return this.camera.scale;
+    }
+
     /** Snapshot of current normalized config. */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
@@ -428,7 +436,12 @@ export class CanvasTileEngine {
      * engine.drawGridLines(50);
      * ```
      */
-    drawGridLines(cellSize: number, lineWidth: number = 1, strokeStyle: string = "black", layer: number = 0): LayerHandle {
+    drawGridLines(
+        cellSize: number,
+        lineWidth: number = 1,
+        strokeStyle: string = "black",
+        layer: number = 0
+    ): LayerHandle {
         return this.ensureCanvasDraw().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
     }
 
