@@ -1,0 +1,42 @@
+name: "React Examples - Typecheck + Lint Checks"
+
+on:
+    push:
+        paths:
+            - "examples/react/**"
+            - "packages/react/**"
+
+jobs:
+    checks:
+        name: Typecheck - Lint (React Examples)
+        runs-on: ubuntu-22.04
+
+        steps:
+            - uses: actions/checkout@v4
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10.23.0
+                  run_install: false
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: "pnpm"
+                  cache-dependency-path: "pnpm-lock.yaml"
+
+            - name: Install dependencies
+              run: pnpm install --no-frozen-lockfile
+
+            - name: Build core package
+              run: pnpm -w -F @canvas-tile-engine/core build
+
+            - name: Build react package
+              run: pnpm -w -F @canvas-tile-engine/react build
+
+            - name: Typecheck examples
+              run: pnpm -r --filter '{./examples/react/**}' typecheck
+
+            - name: Lint examples
+              run: pnpm -w exec eslint "examples/react/**/*.{ts,tsx}" --ext .ts,.tsx

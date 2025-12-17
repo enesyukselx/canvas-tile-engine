@@ -7,7 +7,7 @@ on:
 
 jobs:
     checks:
-        name: Typecheck - Lint
+        name: Typecheck - Lint (Core Package)
         runs-on: ubuntu-22.04
 
         steps:

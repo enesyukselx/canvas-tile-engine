@@ -1,12 +1,14 @@
-import { Coords, DrawObject, CanvasTileEngineConfig } from "../types";
+import { Coords, CanvasTileEngineConfig, Rect, Circle, Text, Path, ImageItem } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
-import { Layer } from "./Layer";
+import { Layer, type LayerHandle } from "./Layer";
 import { DEFAULT_VALUES, VISIBILITY_BUFFER } from "../constants";
 import { SpatialIndex } from "./SpatialIndex";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
 const SPATIAL_INDEX_THRESHOLD = 500;
+// Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
+const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
 // Cache for static layers (pre-rendered offscreen canvases)
 interface StaticCache {
@@ -65,20 +67,20 @@ export class CanvasDraw {
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
-    ) {
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+    ): LayerHandle {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config);
         });
     }
 
-    drawRect(items: Array<DrawObject> | DrawObject, layer: number = 1) {
+    drawRect(items: Array<Rect> | Rect, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -119,10 +121,36 @@ export class CanvasDraw {
                     lastLineWidth = style.lineWidth;
                 }
 
-                ctx.beginPath();
-                ctx.rect(drawX, drawY, pxSize, pxSize);
-                if (style?.fillStyle) ctx.fill();
-                if (style?.strokeStyle) ctx.stroke();
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+
+                const radius = item.radius;
+
+                if (rotationDeg !== 0) {
+                    const centerX = drawX + pxSize / 2;
+                    const centerY = drawY + pxSize / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize, radius);
+                    } else {
+                        ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                    }
+                    if (style?.fillStyle) ctx.fill();
+                    if (style?.strokeStyle) ctx.stroke();
+                    ctx.restore();
+                } else {
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(drawX, drawY, pxSize, pxSize, radius);
+                    } else {
+                        ctx.rect(drawX, drawY, pxSize, pxSize);
+                    }
+                    if (style?.fillStyle) ctx.fill();
+                    if (style?.strokeStyle) ctx.stroke();
+                }
             }
             ctx.restore();
         });
@@ -132,10 +160,10 @@ export class CanvasDraw {
         items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ) {
+    ): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
@@ -158,14 +186,14 @@ export class CanvasDraw {
         });
     }
 
-    drawCircle(items: Array<DrawObject> | DrawObject, layer: number = 1) {
+    drawCircle(items: Array<Circle> | Circle, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -217,13 +245,13 @@ export class CanvasDraw {
     }
 
     drawText(
-        items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
+        items: Array<Text> | Text,
         style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
         layer: number = 2
-    ) {
+    ): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.font) ctx.font = style.font;
             if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
@@ -240,13 +268,13 @@ export class CanvasDraw {
     }
 
     drawPath(
-        items: Array<Coords[]> | Coords[],
+        items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ) {
+    ): LayerHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
             if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
@@ -278,19 +306,14 @@ export class CanvasDraw {
         });
     }
 
-    drawImage(
-        items:
-            | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
-        layer: number = 1
-    ) {
+    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -325,13 +348,26 @@ export class CanvasDraw {
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
 
-                ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+
+                if (rotationDeg !== 0) {
+                    const centerX = offsetX + drawW / 2;
+                    const centerY = offsetY + drawH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.drawImage(item.img, -drawW / 2, -drawH / 2, drawW, drawH);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+                }
             }
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0) {
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): LayerHandle {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -390,7 +426,7 @@ export class CanvasDraw {
      * Helper to create or get a static cache for pre-rendered content.
      * Handles bounds calculation, canvas creation, and rebuild logic.
      */
-    private getOrCreateStaticCache<T extends { x: number; y: number; size?: number }>(
+    private getOrCreateStaticCache<T extends { x: number; y: number; size?: number; radius?: number | number[] }>(
         items: T[],
         cacheKey: string,
         renderFn: (
@@ -437,6 +473,14 @@ export class CanvasDraw {
         const canvasWidth = Math.ceil(worldWidth * renderScale);
         const canvasHeight = Math.ceil(worldHeight * renderScale);
 
+        if (canvasWidth > MAX_STATIC_CANVAS_DIMENSION || canvasHeight > MAX_STATIC_CANVAS_DIMENSION) {
+            if (!this.warnedStaticCacheDisabled) {
+                console.warn(`Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight}).`);
+                this.warnedStaticCacheDisabled = true;
+            }
+            return null;
+        }
+
         // Check if we need to create or update cache
         let cache = this.staticCaches.get(cacheKey);
         const needsRebuild =
@@ -454,12 +498,16 @@ export class CanvasDraw {
                     ? new OffscreenCanvas(canvasWidth, canvasHeight)
                     : document.createElement("canvas");
 
-            if (!(offscreen instanceof OffscreenCanvas)) {
-                offscreen.width = canvasWidth;
-                offscreen.height = canvasHeight;
+            // Guard instanceof with typeof to avoid ReferenceError when OffscreenCanvas is undefined (e.g., jsdom)
+            const isOffscreenCanvas = typeof OffscreenCanvas !== "undefined" && offscreen instanceof OffscreenCanvas;
+
+            if (!isOffscreenCanvas) {
+                (offscreen as HTMLCanvasElement).width = canvasWidth;
+                (offscreen as HTMLCanvasElement).height = canvasHeight;
             }
 
             const offCtx = offscreen.getContext("2d");
+
             if (!offCtx) {
                 if (!this.warnedStaticCacheDisabled) {
                     console.warn("[CanvasDraw] Static cache disabled: 2D context unavailable.");
@@ -471,9 +519,9 @@ export class CanvasDraw {
             // Render all items using the provided render function
             for (const item of items) {
                 const size = item.size ?? 1;
-                const x = (item.x - minX) * renderScale;
-                const y = (item.y - minY) * renderScale;
                 const pxSize = size * renderScale;
+                const x = (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale - pxSize / 2;
+                const y = (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale - pxSize / 2;
 
                 renderFn(offCtx, item, x, y, pxSize);
             }
@@ -494,15 +542,15 @@ export class CanvasDraw {
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
-    private addStaticCacheLayer(cache: StaticCache | null, layer: number) {
+    private addStaticCacheLayer(cache: StaticCache | null, layer: number): LayerHandle | null {
         if (!cache) {
-            return;
+            return null;
         }
         const cachedCanvas = cache.canvas;
         const cachedBounds = cache.worldBounds;
         const cachedScale = cache.scale;
 
-        this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -525,24 +573,50 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items")
      * @param layer Layer order
      */
-    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): LayerHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const style = item.style;
+            const rotationDeg = item.rotate ?? 0;
+            const rotation = rotationDeg * (Math.PI / 180);
+            const radius = item.radius;
+
             if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                 ctx.fillStyle = style.fillStyle;
                 lastFillStyle = style.fillStyle;
             }
-            ctx.fillRect(x, y, pxSize, pxSize);
+
+            if (rotationDeg !== 0) {
+                const centerX = x + pxSize / 2;
+                const centerY = y + pxSize / 2;
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(rotation);
+                if (radius && ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize, radius);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                }
+                ctx.restore();
+            } else {
+                if (radius && ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, pxSize, pxSize, radius);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(x, y, pxSize, pxSize);
+                }
+            }
         });
 
         if (!cache) {
-            this.drawRect(items, layer);
-            return;
+            return this.drawRect(items, layer);
         }
 
-        this.addStaticCacheLayer(cache, layer);
+        return this.addStaticCacheLayer(cache, layer)!;
     }
 
     /**
@@ -553,13 +627,11 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache")
      * @param layer Layer order
      */
-    drawStaticImage(
-        items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
-        cacheKey: string,
-        layer: number = 1
-    ) {
+    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): LayerHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
+            const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
+            const rotation = rotationDeg * (Math.PI / 180);
             const aspect = img.width / img.height;
             let drawW = pxSize;
             let drawH = pxSize;
@@ -567,15 +639,28 @@ export class CanvasDraw {
             if (aspect > 1) drawH = pxSize / aspect;
             else drawW = pxSize * aspect;
 
-            ctx.drawImage(img, x, y, drawW, drawH);
+            // x, y are top-left of pxSize box, need to center image within it
+            const imgX = x + (pxSize - drawW) / 2;
+            const imgY = y + (pxSize - drawH) / 2;
+
+            if (rotationDeg !== 0) {
+                const centerX = imgX + drawW / 2;
+                const centerY = imgY + drawH / 2;
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(rotation);
+                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                ctx.restore();
+            } else {
+                ctx.drawImage(img, imgX, imgY, drawW, drawH);
+            }
         });
 
         if (!cache) {
-            this.drawImage(items, layer);
-            return;
+            return this.drawImage(items, layer);
         }
 
-        this.addStaticCacheLayer(cache, layer);
+        return this.addStaticCacheLayer(cache, layer)!;
     }
 
     /**
@@ -586,7 +671,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles")
      * @param layer Layer order
      */
-    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1) {
+    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): LayerHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
@@ -604,11 +689,10 @@ export class CanvasDraw {
         });
 
         if (!cache) {
-            this.drawCircle(items, layer);
-            return;
+            return this.drawCircle(items, layer);
         }
 
-        this.addStaticCacheLayer(cache, layer);
+        return this.addStaticCacheLayer(cache, layer)!;
     }
 
     /**

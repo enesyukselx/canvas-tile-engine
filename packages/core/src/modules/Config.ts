@@ -97,7 +97,26 @@ export class Config {
      * @returns Normalized configuration snapshot e.g. `{ scale: 1, size: { width: 800, height: 600 }, ... }`.
      */
     get(): Readonly<Required<CanvasTileEngineConfig>> {
-        return this.config;
+        const cfg = this.config;
+        return {
+            ...cfg,
+            size: { ...cfg.size },
+            eventHandlers: { ...cfg.eventHandlers },
+            bounds: { ...cfg.bounds },
+            coordinates: {
+                ...cfg.coordinates,
+                shownScaleRange: {
+                    min: cfg.coordinates.shownScaleRange?.min ?? 0,
+                    max: cfg.coordinates.shownScaleRange?.max ?? Infinity,
+                },
+            },
+            cursor: { ...cfg.cursor },
+            debug: {
+                ...cfg.debug,
+                hud: { ...cfg.debug.hud },
+                eventHandlers: { ...cfg.debug.eventHandlers },
+            },
+        };
     }
 
     /**
@@ -107,10 +126,10 @@ export class Config {
     updateEventHandlers(handlers: Partial<EventHandlers>) {
         this.config = {
             ...this.config,
-            eventHandlers: {
+            eventHandlers: Object.freeze({
                 ...this.config.eventHandlers,
                 ...handlers,
-            },
+            }),
         };
     }
 

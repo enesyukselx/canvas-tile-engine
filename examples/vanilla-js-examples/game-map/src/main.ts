@@ -1,4 +1,3 @@
-import "./style.css";
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { generateMapObjects } from "./generateMapObjects";
 
@@ -32,7 +31,6 @@ miniMapSizeInput.addEventListener("change", () => {
     miniMap.resize(newSize, newSize, 300);
     // Recalculate bounds after resize since viewport size changed
     miniMap.setBounds(calculateMiniMapBounds());
-    miniMap.render();
 });
 
 // Main map size input event listener
@@ -46,7 +44,6 @@ mainMapSizeInput.addEventListener("change", () => {
         return;
     }
     mainMap.resize(newSize, newSize, 300);
-    mainMap.render();
 });
 
 // Set initial values for input fields
@@ -198,7 +195,6 @@ miniMap.onCoordsChange = (coords) => {
     inputX.value = Math.round(coords.x).toString();
     inputY.value = Math.round(coords.y).toString();
     mainMap.updateCoords(coords);
-    mainMap.render();
 
     isSyncing = false;
 };
@@ -215,7 +211,6 @@ mainMap.onCoordsChange = (coords) => {
     inputY.value = Math.round(coords.y).toString();
     isSyncing = true;
     miniMap.updateCoords(coords);
-    miniMap.render();
 
     isSyncing = false;
 };
@@ -264,7 +259,7 @@ mainMap.onHover = (coords, _mouse, client) => {
         popup?.classList.remove("hidden");
         if (popup) {
             const position = {
-                x: client.snapped.x - 160 < 0 ? 0 : client.snapped.x - 160,
+                x: client.snapped.x - 180 < 0 ? 0 : client.snapped.x - 180,
                 y: client.snapped.y + mainMap.getConfig().scale / 2,
             };
             popup.style.left = `${position.x}px`;

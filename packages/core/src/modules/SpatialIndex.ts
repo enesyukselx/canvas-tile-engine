@@ -8,6 +8,10 @@ import RBush from "rbush";
 export interface SpatialItem {
     x: number;
     y: number;
+    /**
+     * Optional world-space size (width/height). Defaults to 0 for point-like items.
+     */
+    size?: number;
 }
 
 interface RBushItem<T> {
@@ -29,13 +33,18 @@ export class SpatialIndex<T extends SpatialItem> {
      * Bulk load items into the R-Tree (much faster than individual inserts)
      */
     load(items: T[]): void {
-        const rbushItems: RBushItem<T>[] = items.map((item) => ({
-            minX: item.x,
-            minY: item.y,
-            maxX: item.x,
-            maxY: item.y,
-            item,
-        }));
+        const rbushItems: RBushItem<T>[] = items.map((item) => {
+            const size = typeof item.size === "number" ? item.size : 0;
+            const half = size / 2;
+
+            return {
+                minX: item.x - half,
+                minY: item.y - half,
+                maxX: item.x + half,
+                maxY: item.y + half,
+                item,
+            };
+        });
         this.tree.load(rbushItems);
     }
 

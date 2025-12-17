@@ -30,7 +30,10 @@ function HomepageHeader() {
 export default function Home(): ReactNode {
     const { siteConfig } = useDocusaurusContext();
     return (
-        <Layout title={`Hello from ${siteConfig.title}`} description="Description will go into a meta tag in <head />">
+        <Layout
+            title={`${siteConfig.title} Documentation`}
+            description="A powerful and flexible tile engine for creating 2D games and applications using HTML5 Canvas."
+        >
             <HomepageHeader />
             <main>
                 <HomepageFeatures />
