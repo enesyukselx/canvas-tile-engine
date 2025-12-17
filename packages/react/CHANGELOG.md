@@ -2,6 +2,12 @@
 
 All notable changes to `@canvas-tile-engine/react` will be documented in this file.
 
+## [0.0.2] - 2024-12-18
+
+### Fixed
+
+- **Dependency Issue** - Resolved an issue where the package was published with `workspace:*` version protocol, which is not supported by npm. It now correctly points to `@canvas-tile-engine/core@^0.0.1`.
+
 ## [0.0.1] - 2024-12-18
 
 ### Added
