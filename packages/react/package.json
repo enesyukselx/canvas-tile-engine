@@ -46,7 +46,8 @@
     },
     "peerDependencies": {
         "react": ">=18.0.0",
-        "react-dom": ">=18.0.0"
+        "react-dom": ">=18.0.0",
+        "@canvas-tile-engine/core": ">=0.0.1"
     },
     "dependencies": {
         "@canvas-tile-engine/core": "workspace:*"
