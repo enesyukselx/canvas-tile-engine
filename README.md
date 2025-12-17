@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@canvas-tile-engine/core?label=core)](https://www.npmjs.com/package/@canvas-tile-engine/core)
 [![npm version](https://img.shields.io/npm/v/@canvas-tile-engine/react?label=react)](https://www.npmjs.com/package/@canvas-tile-engine/react)
 [![npm downloads](https://img.shields.io/npm/dm/@canvas-tile-engine/core)](https://www.npmjs.com/package/@canvas-tile-engine/core)
+[![npm downloads](https://img.shields.io/npm/dm/@canvas-tile-engine/react)](https://www.npmjs.com/package/@canvas-tile-engine/react)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@canvas-tile-engine/core)](https://bundlephobia.com/package/@canvas-tile-engine/core)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@canvas-tile-engine/react)](https://bundlephobia.com/package/@canvas-tile-engine/react)  
 [![license](https://img.shields.io/npm/l/@canvas-tile-engine/core)](./LICENSE)
