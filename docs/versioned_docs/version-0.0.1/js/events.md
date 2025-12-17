@@ -279,15 +279,21 @@ engine.updateCoords({ x: 10, y: 10 });
 
 Smoothly animates the camera center to target coordinates over a specified duration.
 
-| Parameter    | Type     | Default      | Description                                                      |
-| :----------- | :------- | :----------- | :--------------------------------------------------------------- |
-| `x`          | `number` | **Required** | Target world X coordinate.                                       |
-| `y`          | `number` | **Required** | Target world Y coordinate.                                       |
-| `durationMs` | `number` | `500`        | Animation duration in milliseconds. Set to `0` for instant move. |
+| Parameter    | Type         | Default      | Description                                                      |
+| :----------- | :----------- | :----------- | :--------------------------------------------------------------- |
+| `x`          | `number`     | **Required** | Target world X coordinate.                                       |
+| `y`          | `number`     | **Required** | Target world Y coordinate.                                       |
+| `durationMs` | `number`     | `500`        | Animation duration in milliseconds. Set to `0` for instant move. |
+| `onComplete` | `() => void` | `undefined`  | Callback fired when animation completes.                         |
 
 ```typescript
 // Pan to (10, 10) over 1 second
 engine.goCoords(10, 10, 1000);
+
+// With completion callback
+engine.goCoords(50, 50, 500, () => {
+    console.log('Navigation complete!');
+});
 
 // Instant move (same as updateCoords)
 engine.goCoords(5, 5, 0);
@@ -297,15 +303,21 @@ engine.goCoords(5, 5, 0);
 
 Manually updates the canvas size (e.g., when the container resizes or user selects a resolution). The engine attempts to keep the current center point in focus during the resize.
 
-| Parameter    | Type     | Default      | Description                                                     |
-| :----------- | :------- | :----------- | :-------------------------------------------------------------- |
-| `width`      | `number` | **Required** | New canvas width in pixels.                                     |
-| `height`     | `number` | **Required** | New canvas height in pixels.                                    |
-| `durationMs` | `number` | `500`        | Animation duration in milliseconds. Use `0` for instant resize. |
+| Parameter    | Type         | Default      | Description                                                     |
+| :----------- | :----------- | :----------- | :-------------------------------------------------------------- |
+| `width`      | `number`     | **Required** | New canvas width in pixels.                                     |
+| `height`     | `number`     | **Required** | New canvas height in pixels.                                    |
+| `durationMs` | `number`     | `500`        | Animation duration in milliseconds. Use `0` for instant resize. |
+| `onComplete` | `() => void` | `undefined`  | Callback fired when resize animation completes.                 |
 
 ```typescript
 // Resize to 800x600 with a smooth transition
 engine.resize(800, 600, 500);
+
+// With completion callback
+engine.resize(1024, 768, 300, () => {
+    console.log('Resize complete!');
+});
 ```
 
 ### `setEventHandlers`
