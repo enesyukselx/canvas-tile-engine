@@ -51,6 +51,26 @@ export const TERRAIN_IMAGES: Record<Terrain, string> = {
 };
 
 export const INITIAL_COORDS = { x: 200, y: 200 };
-export const INITIAL_MAIN_MAP_SIZE = 500;
-export const INITIAL_MINI_MAP_SIZE = 300;
+export const MAP_BACKGROUND_COLOR = "#337426ff";
 
+export interface SizeOption {
+    value: string;
+    label: string;
+}
+
+export const MINI_MAP_SIZE_OPTIONS: SizeOption[] = [
+    { value: "100", label: "100x100" },
+    { value: "200", label: "200x200" },
+    { value: "300", label: "300x300" },
+    { value: "400", label: "400x400" },
+    { value: "500", label: "500x500" },
+];
+
+export const MAIN_MAP_SIZE_OPTIONS: SizeOption[] = [
+    { value: "300", label: "300x300" },
+    { value: "400", label: "400x400" },
+    { value: "500", label: "500x500" },
+    { value: "600", label: "600x600" },
+    { value: "700", label: "700x700" },
+    { value: "800", label: "800x800" },
+];

@@ -1,4 +1,3 @@
-import "./style.css";
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { generateMapObjects } from "./generateMapObjects";
 
@@ -260,7 +259,7 @@ mainMap.onHover = (coords, _mouse, client) => {
         popup?.classList.remove("hidden");
         if (popup) {
             const position = {
-                x: client.snapped.x - 160 < 0 ? 0 : client.snapped.x - 160,
+                x: client.snapped.x - 180 < 0 ? 0 : client.snapped.x - 180,
                 y: client.snapped.y + mainMap.getConfig().scale / 2,
             };
             popup.style.left = `${position.x}px`;

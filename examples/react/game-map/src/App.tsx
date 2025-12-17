@@ -1,30 +1,28 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import {
-    CanvasTileEngine,
-    Circle,
-    Rect,
-    ImageItem,
-    useCanvasTileEngine,
-    type CanvasTileEngineConfig,
-} from "@canvas-tile-engine/react";
+import { CanvasTileEngine, Circle, Rect, ImageItem, useCanvasTileEngine, CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 import { VillagePopup } from "./components/VillagePopup";
+import { VillageModal } from "./components/VillageModal";
+import { CoordinateInput } from "./components/CoordinateInput";
+import { MapSizeSelect } from "./components/MapSizeSelect";
+import { MapPlaceholder } from "./components/MapPlaceholder";
 import { generateMapObjects, type MapObject } from "./generateMapObjects";
-import { INITIAL_COORDS, INITIAL_MAIN_MAP_SIZE, INITIAL_MINI_MAP_SIZE } from "./constants";
+import { INITIAL_COORDS, MINI_MAP_SIZE_OPTIONS, MAIN_MAP_SIZE_OPTIONS, MAP_BACKGROUND_COLOR } from "./constants";
+import calculateMiniMapBounds from "./utils/calculateMiniMapBounds";
+import miniMapViewportRectangleDraw from "./utils/miniMapViewportRectangleDraw";
 
-// Main map configuration
 const mainMapConfig: CanvasTileEngineConfig = {
     scale: 50,
     minScale: 40,
     maxScale: 60,
     size: {
-        width: INITIAL_MAIN_MAP_SIZE,
-        height: INITIAL_MAIN_MAP_SIZE,
+        width: 500,
+        height: 500,
         maxHeight: 800,
         maxWidth: 800,
         minHeight: 200,
         minWidth: 200,
     },
-    backgroundColor: "#337426ff",
+    backgroundColor: MAP_BACKGROUND_COLOR,
     eventHandlers: {
         zoom: true,
         drag: true,
@@ -44,23 +42,23 @@ const mainMapConfig: CanvasTileEngineConfig = {
     },
 };
 
-// Mini map configuration
 const miniMapConfig: CanvasTileEngineConfig = {
     scale: 6,
     size: {
-        width: INITIAL_MINI_MAP_SIZE,
-        height: INITIAL_MINI_MAP_SIZE,
+        width: 300,
+        height: 300,
         maxWidth: 700,
         maxHeight: 700,
         minWidth: 100,
         minHeight: 100,
     },
-    backgroundColor: "#337426ff",
+    backgroundColor: MAP_BACKGROUND_COLOR,
     eventHandlers: {
         drag: true,
         resize: true,
     },
 };
+
 
 export default function App() {
     // Engine handles
@@ -70,8 +68,8 @@ export default function App() {
     // State
     const [inputX, setInputX] = useState(INITIAL_COORDS.x.toString());
     const [inputY, setInputY] = useState(INITIAL_COORDS.y.toString());
-    const [mainMapSize, setMainMapSize] = useState(INITIAL_MAIN_MAP_SIZE.toString());
-    const [miniMapSize, setMiniMapSize] = useState(INITIAL_MINI_MAP_SIZE.toString());
+    const [mainMapSize, setMainMapSize] = useState(mainMapConfig.size.width.toString());
+    const [miniMapSize, setMiniMapSize] = useState(miniMapConfig.size.width.toString());
 
     // Image loading state
     const [imageItems, setImageItems] = useState<ImageItem[]>([]);
@@ -82,6 +80,10 @@ export default function App() {
     const [popupItem, setPopupItem] = useState<MapObject | null>(null);
     const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
     const [popupVisible, setPopupVisible] = useState(false);
+
+    // Modal state
+    const [modalItem, setModalItem] = useState<MapObject | null>(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     // Sync flag ref
     const isSyncingRef = useRef(false);
@@ -100,38 +102,11 @@ export default function App() {
         return map;
     }, [items]);
 
-    // Calculate mini map bounds
-    const calculateMiniMapBounds = () => {
-        const mainCfg = mainMap.getConfig();
-        const miniCfg = miniMap.getConfig();
-        if (!mainCfg || !miniCfg) return null;
-
-        const mainBounds = mainMapConfig.bounds!;
-
-        const mainViewWidth = mainCfg.size.width / mainCfg.scale;
-        const mainViewHeight = mainCfg.size.height / mainCfg.scale;
-
-        const mainCenterMinX = mainBounds.minX + mainViewWidth / 2;
-        const mainCenterMaxX = mainBounds.maxX - mainViewWidth / 2;
-        const mainCenterMinY = mainBounds.minY + mainViewHeight / 2;
-        const mainCenterMaxY = mainBounds.maxY - mainViewHeight / 2;
-
-        const miniViewWidth = miniCfg.size.width / miniCfg.scale;
-        const miniViewHeight = miniCfg.size.height / miniCfg.scale;
-
-        return {
-            minX: mainCenterMinX - miniViewWidth / 2,
-            maxX: mainCenterMaxX + miniViewWidth / 2,
-            minY: mainCenterMinY - miniViewHeight / 2,
-            maxY: mainCenterMaxY + miniViewHeight / 2,
-        };
-    };
-
     // Load images and prepare draw data
     useEffect(() => {
         if (!mainMap.isReady || !miniMap.isReady) return;
 
-        const loadImages = async () => {
+        const loadItems = async () => {
             // Preload unique images
             const uniqueUrls = [...new Set(items.map((i) => i.imageUrl))];
             const imageCache = new Map<string, HTMLImageElement>();
@@ -169,12 +144,12 @@ export default function App() {
             setCircleItems(newCircleItems);
         };
 
-        void loadImages();
+        void loadItems();
     }, [mainMap.isReady, miniMap.isReady, mainMap.instance, items]);
 
     // Handle main map coords change
     const handleMainMapCoordsChange = (coords: { x: number; y: number }) => {
-        const bounds = calculateMiniMapBounds();
+        const bounds = calculateMiniMapBounds(mainMapConfig, miniMapConfig);
         if (bounds) {
             miniMap.setBounds(bounds);
         }
@@ -199,23 +174,6 @@ export default function App() {
         setInputY(Math.round(coords.y).toString());
         mainMap.updateCoords(coords);
         isSyncingRef.current = false;
-    };
-
-    // Handle mini map draw (viewport rectangle)
-    const handleMiniMapDraw = (ctx: CanvasRenderingContext2D) => {
-        const mainCfg = mainMap.getConfig();
-        const miniCfg = miniMap.getConfig();
-        if (!mainCfg || !miniCfg) return;
-
-        const ratio = miniCfg.scale / mainCfg.scale;
-        const rectWidth = mainCfg.size.width * ratio;
-        const rectHeight = mainCfg.size.height * ratio;
-        const rectX = miniCfg.size.width / 2 - rectWidth / 2;
-        const rectY = miniCfg.size.height / 2 - rectHeight / 2;
-
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
     };
 
     // Handle hover
@@ -244,15 +202,10 @@ export default function App() {
         const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
         if (item) {
-            alert(
-                `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`
-            );
+            setModalItem(item);
+            setModalVisible(true);
+            setPopupVisible(false);
         }
-    };
-
-    // Handle mouse leave
-    const handleMouseLeave = () => {
-        setPopupVisible(false);
     };
 
     // Handle go to coordinates
@@ -272,7 +225,7 @@ export default function App() {
         setMiniMapSize(e.target.value);
         miniMap.resize(newSize, newSize, 300);
 
-        const bounds = calculateMiniMapBounds();
+        const bounds = calculateMiniMapBounds(mainMap.getConfig()!, miniMap.getConfig()!);
         if (bounds) {
             miniMap.setBounds(bounds);
         }
@@ -288,16 +241,15 @@ export default function App() {
     return (
         <div className="flex flex-wrap justify-center gap-4 p-4">
             {/* Main Map */}
-            <div>
+            <div className="relative">
                 <CanvasTileEngine
                     engine={mainMap}
                     config={mainMapConfig}
                     center={INITIAL_COORDS}
-                    className="rounded-lg"
                     onCoordsChange={handleMainMapCoordsChange}
                     onHover={handleHover}
                     onClick={handleClick}
-                    onMouseLeave={handleMouseLeave}
+                    onMouseLeave={() => setPopupVisible(false)}
                 >
                     <CanvasTileEngine.Image items={imageItems} layer={0} />
                     <CanvasTileEngine.Circle items={circleItems} layer={1} />
@@ -315,51 +267,34 @@ export default function App() {
                     </CanvasTileEngine.DrawFunction>
                 </CanvasTileEngine>
 
-                <div className="flex flex-wrap gap-2 mt-2 items-center">
-                    <div>
-                        <label className="text-white font-semibold" htmlFor="x">
-                            X
-                        </label>
-                        <input
-                            className="bg-white w-16 rounded-lg px-2 font-semibold ml-1"
-                            id="x"
-                            type="number"
-                            value={inputX}
-                            onChange={(e) => setInputX(e.target.value)}
+                {/* Loading overlay */}
+                {!mainMap.isReady && (
+                    <div className="absolute inset-0">
+                        <MapPlaceholder
+                            width={mainMapConfig.size.width}
+                            height={mainMapConfig.size.height}
+                            label="Loading Main Map..."
                         />
                     </div>
-                    <div>
-                        <label className="text-white font-semibold" htmlFor="y">
-                            Y
-                        </label>
-                        <input
-                            className="bg-white w-16 rounded-lg px-2 font-semibold ml-1"
-                            id="y"
-                            type="number"
-                            value={inputY}
-                            onChange={(e) => setInputY(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <button
-                            onClick={handleGoToCoords}
-                            className="cursor-pointer bg-zinc-600 hover:bg-zinc-700 text-white font-semibold px-2 py-1 rounded-lg"
-                        >
-                            Go
-                        </button>
-                    </div>
-                </div>
+                )}
+
+                <CoordinateInput
+                    inputX={inputX}
+                    inputY={inputY}
+                    onInputXChange={setInputX}
+                    onInputYChange={setInputY}
+                    onGoClick={handleGoToCoords}
+                />
             </div>
 
             {/* Mini Map */}
-            <div>
+            <div className="relative">
                 <CanvasTileEngine
                     engine={miniMap}
                     config={miniMapConfig}
                     center={INITIAL_COORDS}
-                    className="rounded-lg"
                     onCoordsChange={handleMiniMapCoordsChange}
-                    onDraw={handleMiniMapDraw}
+                    onDraw={(ctx) => miniMapViewportRectangleDraw(mainMap.getConfig()!, miniMap.getConfig()!, ctx)}
                 >
                     <CanvasTileEngine.StaticRect items={miniMapRects} cacheKey="minimap-items" layer={0} />
                     <CanvasTileEngine.GridLines cellSize={1} lineWidth={0.5} strokeStyle="rgba(0,0,0,1)" layer={3} />
@@ -367,53 +302,43 @@ export default function App() {
                     <CanvasTileEngine.GridLines cellSize={50} lineWidth={2} strokeStyle="rgba(0,0,0,1)" layer={3} />
                 </CanvasTileEngine>
 
-                <div className="mt-4">
-                    <label htmlFor="minimap-size-select" className="text-white font-semibold">
-                        Mini Size
-                    </label>
-                    <select
-                        id="minimap-size-select"
-                        className="ml-3 bg-white rounded p-1"
-                        value={miniMapSize}
-                        onChange={handleMiniMapSizeChange}
-                    >
-                        <option value="100">100x100</option>
-                        <option value="200">200x200</option>
-                        <option value="300">300x300</option>
-                        <option value="400">400x400</option>
-                        <option value="500">500x500</option>
-                    </select>
-                </div>
+                {/* Loading overlay */}
+                {!miniMap.isReady && (
+                    <div className="absolute inset-0">
+                        <MapPlaceholder
+                            width={miniMapConfig.size.width}
+                            height={miniMapConfig.size.height}
+                            label="Loading Mini Map..."
+                        />
+                    </div>
+                )}
 
-                <div className="mt-4">
-                    <label htmlFor="mainmap-size-select" className="text-white font-semibold">
-                        Main Size
-                    </label>
-                    <select
-                        id="mainmap-size-select"
-                        className="ml-2 bg-white rounded p-1"
-                        value={mainMapSize}
-                        onChange={handleMainMapSizeChange}
-                    >
-                        <option value="300">300x300</option>
-                        <option value="400">400x400</option>
-                        <option value="500">500x500</option>
-                        <option value="600">600x600</option>
-                        <option value="700">700x700</option>
-                        <option value="800">800x800</option>
-                    </select>
-                </div>
+                <MapSizeSelect
+                    id="minimap-size-select"
+                    label="Mini Size"
+                    value={miniMapSize}
+                    options={MINI_MAP_SIZE_OPTIONS}
+                    onChange={handleMiniMapSizeChange}
+                />
+
+                <MapSizeSelect
+                    id="mainmap-size-select"
+                    label="Main Size"
+                    value={mainMapSize}
+                    options={MAIN_MAP_SIZE_OPTIONS}
+                    onChange={handleMainMapSizeChange}
+                />
             </div>
 
             {/* Village Popup */}
             <VillagePopup item={popupItem} position={popupPosition} visible={popupVisible} />
 
-            {/* Loading Indicator */}
-            {imageItems.length === 0 && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-                    <div className="text-white text-2xl font-semibold">Loading map...</div>
-                </div>
-            )}
+            {/* Village Modal */}
+            <VillageModal
+                item={modalItem}
+                visible={modalVisible}
+                onClose={() => setModalVisible(false)}
+            />
         </div>
     );
 }
