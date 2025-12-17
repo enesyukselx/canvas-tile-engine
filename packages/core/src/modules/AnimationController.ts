@@ -19,8 +19,14 @@ export class AnimationController {
      * @param targetX Target world x coordinate.
      * @param targetY Target world y coordinate.
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
+     * @param onComplete Optional callback fired when animation completes.
      */
-    animateMoveTo(targetX: number, targetY: number, durationMs: number = DEFAULT_VALUES.ANIMATION_DURATION_MS) {
+    animateMoveTo(
+        targetX: number,
+        targetY: number,
+        durationMs: number = DEFAULT_VALUES.ANIMATION_DURATION_MS,
+        onComplete?: () => void
+    ) {
         // Cancel any existing move animation
         this.cancelMove();
 
@@ -29,6 +35,7 @@ export class AnimationController {
             const size = this.viewport.getSize();
             this.camera.setCenter({ x: targetX, y: targetY }, size.width, size.height);
             this.onAnimationFrame();
+            onComplete?.();
             return;
         }
 
@@ -54,6 +61,7 @@ export class AnimationController {
                 this.moveAnimationId = requestAnimationFrame(step);
             } else {
                 this.moveAnimationId = undefined;
+                onComplete?.();
             }
         };
 
@@ -66,12 +74,14 @@ export class AnimationController {
      * @param targetHeight New canvas height in pixels.
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant resize.
      * @param onApplySize Callback to apply the new size (updates wrapper, canvas, renderer).
+     * @param onComplete Optional callback fired when animation completes.
      */
     animateResize(
         targetWidth: number,
         targetHeight: number,
         durationMs: number = DEFAULT_VALUES.ANIMATION_DURATION_MS,
-        onApplySize: (width: number, height: number, center: Coords) => void
+        onApplySize: (width: number, height: number, center: Coords) => void,
+        onComplete?: () => void
     ) {
         if (targetWidth <= 0 || targetHeight <= 0) {
             return;
@@ -86,6 +96,7 @@ export class AnimationController {
         // Instant resize if duration is 0 or negative
         if (durationMs <= 0) {
             onApplySize(targetWidth, targetHeight, center);
+            onComplete?.();
             return;
         }
 
@@ -108,6 +119,7 @@ export class AnimationController {
                 this.resizeAnimationId = requestAnimationFrame(step);
             } else {
                 this.resizeAnimationId = undefined;
+                onComplete?.();
             }
         };
 

@@ -85,6 +85,10 @@ export default function App() {
     const [modalItem, setModalItem] = useState<MapObject | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
 
+    // Navigation state
+    // If true, the main map will be animated to the clicked position
+    const [isNavigating, setIsNavigating] = useState(false);
+
     // Sync flag ref
     const isSyncingRef = useRef(false);
 
@@ -113,7 +117,7 @@ export default function App() {
 
             await Promise.all(
                 uniqueUrls.map(async (url) => {
-                    imageCache.set(url, await mainMap.instance!.images.load(url));
+                    imageCache.set(url, await mainMap.images!.load(url));
                 })
             );
 
@@ -147,13 +151,16 @@ export default function App() {
         void loadItems();
     }, [mainMap.isReady, miniMap.isReady, mainMap.instance, items]);
 
-    // Handle main map coords change
-    const handleMainMapCoordsChange = (coords: { x: number; y: number }) => {
-        const bounds = calculateMiniMapBounds(mainMapConfig, miniMapConfig);
+    // Handle resize for both maps - recalculate mini map bounds
+    const handleResize = () => {
+        const bounds = calculateMiniMapBounds(mainMap.getConfig(), miniMap.getConfig());
         if (bounds) {
             miniMap.setBounds(bounds);
         }
+    };
 
+    // Handle main map coords change
+    const handleMainMapCoordsChange = (coords: { x: number; y: number }) => {
         if (isSyncingRef.current) return;
 
         setPopupVisible(false);
@@ -189,7 +196,7 @@ export default function App() {
             setPopupItem(item);
             setPopupPosition({
                 x: client.snapped.x,
-                y: client.snapped.y + (cfg?.scale ?? 50) / 2,
+                y: client.snapped.y + cfg.scale / 2,
             });
             setPopupVisible(true);
         } else {
@@ -216,7 +223,10 @@ export default function App() {
             alert("Please enter valid numbers for X and Y.");
             return;
         }
-        mainMap.goCoords(x, y, 500);
+        setIsNavigating(true);
+        mainMap.goCoords(x, y, 500, () => {
+            setIsNavigating(false);
+        });
     };
 
     // Handle mini map resize
@@ -224,11 +234,6 @@ export default function App() {
         const newSize = Number(e.target.value);
         setMiniMapSize(e.target.value);
         miniMap.resize(newSize, newSize, 300);
-
-        const bounds = calculateMiniMapBounds(mainMap.getConfig()!, miniMap.getConfig()!);
-        if (bounds) {
-            miniMap.setBounds(bounds);
-        }
     };
 
     // Handle main map resize
@@ -247,6 +252,7 @@ export default function App() {
                     config={mainMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMainMapCoordsChange}
+                    onResize={handleResize}
                     onHover={handleHover}
                     onClick={handleClick}
                     onMouseLeave={() => setPopupVisible(false)}
@@ -258,7 +264,6 @@ export default function App() {
                     <CanvasTileEngine.DrawFunction layer={3}>
                         {(ctx) => {
                             const cfg = mainMap.getConfig();
-                            if (!cfg) return;
                             const centerX = cfg.size.width / 2;
                             const centerY = cfg.size.height / 2;
                             ctx.fillStyle = "red";
@@ -284,6 +289,7 @@ export default function App() {
                     onInputXChange={setInputX}
                     onInputYChange={setInputY}
                     onGoClick={handleGoToCoords}
+                    disabled={isNavigating}
                 />
             </div>
 
@@ -294,7 +300,8 @@ export default function App() {
                     config={miniMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMiniMapCoordsChange}
-                    onDraw={(ctx) => miniMapViewportRectangleDraw(mainMap.getConfig()!, miniMap.getConfig()!, ctx)}
+                    onResize={handleResize}
+                    onDraw={(ctx) => miniMapViewportRectangleDraw(mainMap.getConfig(), miniMap.getConfig(), ctx)}
                 >
                     <CanvasTileEngine.StaticRect items={miniMapRects} cacheKey="minimap-items" layer={0} />
                     <CanvasTileEngine.GridLines cellSize={1} lineWidth={0.5} strokeStyle="rgba(0,0,0,1)" layer={3} />

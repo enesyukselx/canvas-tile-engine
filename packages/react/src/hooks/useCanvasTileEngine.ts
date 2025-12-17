@@ -8,9 +8,64 @@ import type {
     LayerHandle,
 } from "@canvas-tile-engine/core";
 
+/** Dummy handle returned when engine is not ready */
+const DUMMY_LAYER_HANDLE: LayerHandle = { layer: -1, id: Symbol("dummy") };
+
+/** Default config when engine is not ready */
+const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
+    size: { width: 0, height: 0, minWidth: 100, minHeight: 100, maxWidth: Infinity, maxHeight: Infinity },
+    scale: 1,
+    minScale: 0.5,
+    maxScale: 2,
+    backgroundColor: "#ffffff",
+    renderer: "canvas",
+    eventHandlers: {
+        drag: true,
+        zoom: true,
+        hover: false,
+        click: false,
+        resize: false,
+    },
+    bounds: {
+        minX: -Infinity,
+        maxX: Infinity,
+        minY: -Infinity,
+        maxY: Infinity,
+    },
+    coordinates: {
+        enabled: false,
+        shownScaleRange: { min: 0, max: Infinity },
+    },
+    cursor: {
+        default: "default",
+        move: "move",
+    },
+    debug: {
+        enabled: false,
+        hud: {
+            enabled: false,
+            topLeftCoordinates: false,
+            coordinates: false,
+            scale: false,
+            tilesInView: false,
+            fps: false,
+        },
+        eventHandlers: {
+            click: false,
+            hover: false,
+            drag: false,
+            zoom: false,
+            resize: false,
+        },
+    },
+};
+
 /**
  * Engine handle returned by useCanvasTileEngine hook.
  * Provides access to engine methods with proper typing.
+ * 
+ * All methods return default/dummy values when engine is not ready,
+ * allowing safe usage without null checks.
  */
 export interface EngineHandle {
     /** @internal - Used by CanvasTileEngine component */
@@ -28,22 +83,22 @@ export interface EngineHandle {
     render(): void;
 
     /** Get current center coordinates */
-    getCenterCoords(): Coords | null;
+    getCenterCoords(): Coords;
 
     /** Update center coordinates */
     updateCoords(center: Coords): void;
 
     /** Animate to target coordinates */
-    goCoords(x: number, y: number, durationMs?: number): void;
+    goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
 
     /** Resize the canvas */
-    resize(width: number, height: number, durationMs?: number): void;
+    resize(width: number, height: number, durationMs?: number, onComplete?: () => void): void;
 
     /** Get current canvas size */
-    getSize(): { width: number; height: number } | null;
+    getSize(): { width: number; height: number };
 
     /** Get current canvas scale */
-    getScale(): number | null;
+    getScale(): number;
 
     /** Zoom in by a factor (default: 1.5) */
     zoomIn(factor?: number): void;
@@ -52,7 +107,7 @@ export interface EngineHandle {
     zoomOut(factor?: number): void;
 
     /** Get current config */
-    getConfig(): Required<CanvasTileEngineConfig> | null;
+    getConfig(): Required<CanvasTileEngineConfig>;
 
     /** Set map boundaries */
     setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void;
@@ -61,37 +116,37 @@ export interface EngineHandle {
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     /** Draw rectangles */
-    drawRect(items: DrawObject | DrawObject[], layer?: number): LayerHandle | null;
+    drawRect(items: DrawObject | DrawObject[], layer?: number): LayerHandle;
 
     /** Draw static rectangles (cached) */
-    drawStaticRect(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle | null;
+    drawStaticRect(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw circles */
-    drawCircle(items: DrawObject | DrawObject[], layer?: number): LayerHandle | null;
+    drawCircle(items: DrawObject | DrawObject[], layer?: number): LayerHandle;
 
     /** Draw static circles (cached) */
-    drawStaticCircle(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle | null;
+    drawStaticCircle(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw lines */
     drawLine(
         items: { from: Coords; to: Coords } | { from: Coords; to: Coords }[],
         style?: { strokeStyle?: string; lineWidth?: number },
         layer?: number
-    ): LayerHandle | null;
+    ): LayerHandle;
 
     /** Draw text */
     drawText(
         items: { coords: Coords; text: string } | { coords: Coords; text: string }[],
         style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
         layer?: number
-    ): LayerHandle | null;
+    ): LayerHandle;
 
     /** Draw paths/polylines */
     drawPath(
         items: Coords[] | Coords[][],
         style?: { strokeStyle?: string; lineWidth?: number },
         layer?: number
-    ): LayerHandle | null;
+    ): LayerHandle;
 
     /** Draw images */
     drawImage(
@@ -99,23 +154,23 @@ export interface EngineHandle {
             | (Omit<DrawObject, "style"> & { img: HTMLImageElement })
             | (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
         layer?: number
-    ): LayerHandle | null;
+    ): LayerHandle;
 
     /** Draw static images (cached) */
     drawStaticImage(
         items: (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
         cacheKey: string,
         layer?: number
-    ): LayerHandle | null;
+    ): LayerHandle;
 
     /** Draw grid lines */
-    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle | null;
+    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle;
 
     /** Add custom draw function */
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer?: number
-    ): LayerHandle | null;
+    ): LayerHandle;
 
     /** Clear a specific layer */
     clearLayer(layer: number): void;
@@ -129,8 +184,8 @@ export interface EngineHandle {
     /** Remove a previously registered draw callback */
     removeLayerHandle(handle: LayerHandle): void;
 
-    /** Image loader instance */
-    readonly images: CanvasTileEngineCore["images"] | null;
+    /** Image loader instance (undefined until engine mounts) */
+    readonly images: CanvasTileEngineCore["images"] | undefined;
 }
 
 /**
@@ -186,7 +241,7 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             get images() {
-                return instanceRef.current?.images ?? null;
+                return instanceRef.current?.images;
             },
 
             render() {
@@ -194,27 +249,27 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             getCenterCoords() {
-                return instanceRef.current?.getCenterCoords() ?? null;
+                return instanceRef.current?.getCenterCoords() ?? { x: 0, y: 0 };
             },
 
             updateCoords(center: Coords) {
                 instanceRef.current?.updateCoords(center);
             },
 
-            goCoords(x: number, y: number, durationMs?: number) {
-                instanceRef.current?.goCoords(x, y, durationMs);
+            goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void) {
+                instanceRef.current?.goCoords(x, y, durationMs, onComplete);
             },
 
-            resize(width: number, height: number, durationMs?: number) {
-                instanceRef.current?.resize(width, height, durationMs);
+            resize(width: number, height: number, durationMs?: number, onComplete?: () => void) {
+                instanceRef.current?.resize(width, height, durationMs, onComplete);
             },
 
             getSize() {
-                return instanceRef.current?.getSize() ?? null;
+                return instanceRef.current?.getSize() ?? { width: 0, height: 0 };
             },
 
             getScale() {
-                return instanceRef.current?.getScale() ?? NaN;
+                return instanceRef.current?.getScale() ?? 1;
             },
 
             zoomIn(factor?: number) {
@@ -226,7 +281,7 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             getConfig() {
-                return instanceRef.current?.getConfig() ?? null;
+                return instanceRef.current?.getConfig() ?? DEFAULT_CONFIG;
             },
 
             setBounds(bounds) {
@@ -238,47 +293,47 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             drawRect(items, layer) {
-                return instanceRef.current?.drawRect(items, layer) ?? null;
+                return instanceRef.current?.drawRect(items, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawStaticRect(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? null;
+                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawCircle(items, layer) {
-                return instanceRef.current?.drawCircle(items, layer) ?? null;
+                return instanceRef.current?.drawCircle(items, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawStaticCircle(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? null;
+                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawLine(items, style, layer) {
-                return instanceRef.current?.drawLine(items, style, layer) ?? null;
+                return instanceRef.current?.drawLine(items, style, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawText(items, style, layer) {
-                return instanceRef.current?.drawText(items, style, layer) ?? null;
+                return instanceRef.current?.drawText(items, style, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawPath(items, style, layer) {
-                return instanceRef.current?.drawPath(items, style, layer) ?? null;
+                return instanceRef.current?.drawPath(items, style, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawImage(items, layer) {
-                return instanceRef.current?.drawImage(items, layer) ?? null;
+                return instanceRef.current?.drawImage(items, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawStaticImage(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? null;
+                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
-                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? null;
+                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             addDrawFunction(fn, layer) {
-                return instanceRef.current?.addDrawFunction(fn, layer) ?? null;
+                return instanceRef.current?.addDrawFunction(fn, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             clearLayer(layer) {

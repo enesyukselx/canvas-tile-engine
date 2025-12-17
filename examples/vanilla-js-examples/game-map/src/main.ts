@@ -29,8 +29,6 @@ miniMapSizeInput.addEventListener("change", () => {
         return;
     }
     miniMap.resize(newSize, newSize, 300);
-    // Recalculate bounds after resize since viewport size changed
-    miniMap.setBounds(calculateMiniMapBounds());
 });
 
 // Main map size input event listener
@@ -200,9 +198,6 @@ miniMap.onCoordsChange = (coords) => {
 };
 
 mainMap.onCoordsChange = (coords) => {
-    // Set initial bounds for mini map
-    miniMap.setBounds(calculateMiniMapBounds());
-
     if (isSyncing) {
         return;
     }
@@ -213,6 +208,15 @@ mainMap.onCoordsChange = (coords) => {
     miniMap.updateCoords(coords);
 
     isSyncing = false;
+};
+
+// Handle resize for both maps - recalculate mini map bounds
+mainMap.onResize = () => {
+    miniMap.setBounds(calculateMiniMapBounds());
+};
+
+miniMap.onResize = () => {
+    miniMap.setBounds(calculateMiniMapBounds());
 };
 
 // Mini map viewport rectangle

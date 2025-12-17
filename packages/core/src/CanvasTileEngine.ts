@@ -192,9 +192,14 @@ export class CanvasTileEngine {
      * @param width New canvas width in pixels.
      * @param height New canvas height in pixels.
      * @param durationMs Animation duration in ms (default 500). Use 0 for instant resize.
+     * @param onComplete Optional callback fired when resize animation completes.
      */
-    resize(width: number, height: number, durationMs: number = 500) {
-        this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController);
+    resize(width: number, height: number, durationMs: number = 500, onComplete?: () => void) {
+        this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController, () => {
+            // Trigger onResize callback after programmatic resize completes
+            this._onResize?.();
+            onComplete?.();
+        });
     }
 
     /**
@@ -262,9 +267,10 @@ export class CanvasTileEngine {
      * @param x Target world x.
      * @param y Target world y.
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
+     * @param onComplete Optional callback fired when animation completes.
      */
-    goCoords(x: number, y: number, durationMs: number = 500) {
-        this.animationController.animateMoveTo(x, y, durationMs);
+    goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
+        this.animationController.animateMoveTo(x, y, durationMs, onComplete);
     }
 
     /**
