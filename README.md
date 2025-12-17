@@ -4,6 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/@canvas-tile-engine/react?label=react)](https://www.npmjs.com/package/@canvas-tile-engine/react)
 [![npm downloads](https://img.shields.io/npm/dm/@canvas-tile-engine/core)](https://www.npmjs.com/package/@canvas-tile-engine/core)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@canvas-tile-engine/core)](https://bundlephobia.com/package/@canvas-tile-engine/core)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@canvas-tile-engine/react)](https://bundlephobia.com/package/@canvas-tile-engine/react)  
 [![license](https://img.shields.io/npm/l/@canvas-tile-engine/core)](./LICENSE)
 
 Canvas Tile Engine is a lightweight library for building interactive 2D grid-based maps and visualizations. It handles camera controls, coordinate transformations, rendering, and user interactions—so you can focus on your content.
