@@ -5,6 +5,7 @@ import type {
     EventHandlers,
     onClickCallback,
     onHoverCallback,
+    onZoomCallback,
     onDrawCallback,
     Rect,
     Line,
@@ -22,6 +23,7 @@ export type {
     EventHandlers,
     onClickCallback,
     onHoverCallback,
+    onZoomCallback,
     onDrawCallback,
     Rect,
     Line,
@@ -76,4 +78,7 @@ export interface CanvasTileEngineProps {
 
     /** Callback on canvas resize */
     onResize?: () => void;
+
+    /** Callback when zoom level changes */
+    onZoom?: onZoomCallback;
 }

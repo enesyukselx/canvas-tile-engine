@@ -107,6 +107,16 @@ export class CanvasTileEngine {
         this.events.onResize = cb;
     }
 
+    private _onZoom?: (scale: number) => void;
+    /** Callback: zoom level changes (wheel or pinch) */
+    public get onZoom(): ((scale: number) => void) | undefined {
+        return this._onZoom;
+    }
+    public set onZoom(cb: ((scale: number) => void) | undefined) {
+        this._onZoom = cb;
+        this.events.onZoom = cb;
+    }
+
     /**
      * @param canvas Target canvas element.
      * @param config Initial engine configuration.

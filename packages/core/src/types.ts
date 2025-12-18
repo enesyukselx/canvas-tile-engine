@@ -82,6 +82,8 @@ export type onClickCallback = (
 
 export type onHoverCallback = onClickCallback;
 
+export type onZoomCallback = (scale: number) => void;
+
 export type DrawObject = {
     x: number;
     y: number;

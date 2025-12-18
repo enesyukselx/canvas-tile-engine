@@ -6,6 +6,7 @@ export type {
     EventHandlers,
     onClickCallback,
     onHoverCallback,
+    onZoomCallback,
     onDrawCallback,
     Rect,
     Line,

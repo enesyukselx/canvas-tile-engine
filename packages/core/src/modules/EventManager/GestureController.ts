@@ -1,4 +1,4 @@
-import { onClickCallback, onHoverCallback } from "../../types";
+import { onClickCallback, onHoverCallback, onZoomCallback } from "../../types";
 import { ICamera } from "../Camera";
 import { Config } from "../Config";
 import { CoordinateTransformer } from "../CoordinateTransformer";
@@ -23,6 +23,7 @@ export class GestureController {
     public onMouseDown?: () => void;
     public onMouseUp?: () => void;
     public onMouseLeave?: () => void;
+    public onZoom?: onZoomCallback;
 
     constructor(
         private canvas: HTMLCanvasElement,
@@ -193,6 +194,9 @@ export class GestureController {
 
             this.lastPinchDistance = currentDistance;
             this.lastPinchCenter = currentCenter;
+            if (this.onZoom) {
+                this.onZoom(this.camera.scale);
+            }
             this.onCameraChange();
             return;
         }
@@ -263,6 +267,9 @@ export class GestureController {
         e.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
         this.camera.zoom(e.clientX, e.clientY, e.deltaY, rect);
+        if (this.onZoom) {
+            this.onZoom(this.camera.scale);
+        }
         this.onCameraChange();
     };
 }
