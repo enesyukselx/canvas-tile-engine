@@ -164,6 +164,29 @@ Triggered when the canvas is resized.
 </CanvasTileEngine>
 ```
 
+### `onZoom`
+
+Triggered when the zoom level changes (via mouse wheel or pinch gesture). Receives the new scale value.
+
+```tsx
+<CanvasTileEngine
+    engine={engine}
+    config={config}
+    onZoom={(scale) => {
+        console.log("Zoom level changed:", scale);
+        setCurrentZoom(scale);
+    }}
+>
+    {/* children */}
+</CanvasTileEngine>
+```
+
+:::tip Use Cases
+- **Zoom indicator**: Display current zoom percentage in the UI
+- **Level of detail**: Conditionally render components based on zoom level
+- **Minimap sync**: Update viewport representation in a minimap
+:::
+
 ## Coordinate Data Structure
 
 The `onClick` and `onHover` callbacks receive three coordinate objects:

@@ -238,6 +238,24 @@ engine.onResize = () => {
 };
 ```
 
+### `onZoom`
+
+Triggered when the zoom level changes (via mouse wheel or pinch gesture). Receives the new scale value.
+
+```typescript
+engine.onZoom = (scale) => {
+    console.log("Zoom level changed:", scale);
+    // Update UI elements based on zoom level
+    updateZoomIndicator(scale);
+};
+```
+
+:::tip Use Cases
+- **Zoom indicator**: Display current zoom percentage in the UI
+- **Level of detail**: Show/hide elements based on zoom level
+- **Minimap sync**: Update viewport representation in a minimap
+:::
+
 ## Coordinate Data Structure
 
 The `onClick` and `onHover` callbacks receive three coordinate objects to provide position data in different contexts:
