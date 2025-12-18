@@ -2,6 +2,16 @@
 
 All notable changes to `@canvas-tile-engine/react` will be documented in this file.
 
+## [0.0.3] - 2025-12-18
+
+### Added
+
+- **onZoom** callback for zoom level changes
+
+### Fixed
+
+- **Fixed draw components cleanup issue**: Stabilized engine handle reference to prevent unexpected `useEffect` cleanup when [isReady] state changes.
+
 ## [0.0.2] - 2024-12-18
 
 ### Fixed

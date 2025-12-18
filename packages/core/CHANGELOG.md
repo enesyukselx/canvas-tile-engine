@@ -2,6 +2,12 @@
 
 All notable changes to `@canvas-tile-engine/core` will be documented in this file.
 
+## [0.0.2] - 2025-12-18
+
+### Added
+
+- **onZoom** callback for zoom level changes
+
 ## [0.0.1] - 2024-12-18
 
 ### Added
