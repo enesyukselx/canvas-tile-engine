@@ -219,21 +219,26 @@ export interface EngineHandle {
 export function useCanvasTileEngine(): EngineHandle {
     const instanceRef = useRef<CanvasTileEngineCore | null>(null);
     const containerRef = useRef<HTMLDivElement>(null!);
-    const [isReady, setIsReady] = useState(false);
+    // _isReady state is only used to trigger re-renders, actual value is read from isReadyRef
+    const [, setIsReady] = useState(false);
+    // Keep isReady in a ref so the handle getter can read it without recreating handle
+    const isReadyRef = useRef(false);
 
     const setInstance = useCallback((engine: CanvasTileEngineCore | null) => {
         instanceRef.current = engine;
+        isReadyRef.current = engine !== null;
         setIsReady(engine !== null);
     }, []);
 
     // Create stable handle object using useMemo
+    // Note: isReady is NOT in deps - we read from isReadyRef to keep handle stable
     const handle = useMemo<EngineHandle>(
         () => ({
             _containerRef: containerRef,
             _setInstance: setInstance,
 
             get isReady() {
-                return isReady;
+                return isReadyRef.current;
             },
 
             get instance() {
@@ -352,7 +357,7 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.removeLayerHandle(handle);
             },
         }),
-        [setInstance, isReady]
+        [setInstance]
     );
 
     return handle;
