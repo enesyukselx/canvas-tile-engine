@@ -1,5 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { CanvasTileEngine, Circle, Rect, ImageItem, useCanvasTileEngine, CanvasTileEngineConfig } from "@canvas-tile-engine/react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import {
+    CanvasTileEngine,
+    Circle,
+    Rect,
+    ImageItem,
+    useCanvasTileEngine,
+    CanvasTileEngineConfig,
+} from "@canvas-tile-engine/react";
 import { VillagePopup } from "./components/VillagePopup";
 import { VillageModal } from "./components/VillageModal";
 import { CoordinateInput } from "./components/CoordinateInput";
@@ -58,7 +65,6 @@ const miniMapConfig: CanvasTileEngineConfig = {
         resize: true,
     },
 };
-
 
 export default function App() {
     // Engine handles
@@ -149,17 +155,24 @@ export default function App() {
         };
 
         void loadItems();
-    }, [mainMap.isReady, miniMap.isReady, mainMap.instance, items]);
+    }, [mainMap.isReady, miniMap.isReady, mainMap.instance, items, mainMap.images]);
+
+    // Recalculate mini map bounds - used for initial setup, resize, and zoom
+    const recalculateMiniMapBounds = useCallback(() => {
+        miniMap.setBounds(
+            calculateMiniMapBounds(mainMap.getConfig(), miniMap.getConfig()) ?? {
+                minX: -Infinity,
+                maxX: Infinity,
+                minY: -Infinity,
+                maxY: Infinity,
+            }
+        );
+    }, [mainMap, miniMap]);
 
     // Initial bounds calculation
     useEffect(() => {
-        miniMap.setBounds(calculateMiniMapBounds(mainMap.getConfig(), miniMap.getConfig()) ?? { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity });
-    }, [mainMap.isReady, miniMap.isReady])  
-    
-    // Handle resize for both maps - recalculate mini map bounds
-    const handleResize = () => {
-        miniMap.setBounds(calculateMiniMapBounds(mainMap.getConfig(), miniMap.getConfig()) ?? { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity });
-    };
+        recalculateMiniMapBounds();
+    }, [recalculateMiniMapBounds, mainMap.isReady, miniMap.isReady]);
 
     // Handle main map coords change
     const handleMainMapCoordsChange = (coords: { x: number; y: number }) => {
@@ -254,7 +267,8 @@ export default function App() {
                     config={mainMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMainMapCoordsChange}
-                    onResize={handleResize}
+                    onResize={recalculateMiniMapBounds}
+                    onZoom={recalculateMiniMapBounds}
                     onHover={handleHover}
                     onClick={handleClick}
                     onMouseLeave={() => setPopupVisible(false)}
@@ -302,7 +316,7 @@ export default function App() {
                     config={miniMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMiniMapCoordsChange}
-                    onResize={handleResize}
+                    onResize={recalculateMiniMapBounds}
                     onDraw={(ctx) => miniMapViewportRectangleDraw(mainMap.getConfig(), miniMap.getConfig(), ctx)}
                 >
                     <CanvasTileEngine.StaticRect items={miniMapRects} cacheKey="minimap-items" layer={0} />
@@ -343,11 +357,7 @@ export default function App() {
             <VillagePopup item={popupItem} position={popupPosition} visible={popupVisible} />
 
             {/* Village Modal */}
-            <VillageModal
-                item={modalItem}
-                visible={modalVisible}
-                onClose={() => setModalVisible(false)}
-            />
+            <VillageModal item={modalItem} visible={modalVisible} onClose={() => setModalVisible(false)} />
         </div>
     );
 }
