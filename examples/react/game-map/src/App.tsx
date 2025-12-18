@@ -151,12 +151,14 @@ export default function App() {
         void loadItems();
     }, [mainMap.isReady, miniMap.isReady, mainMap.instance, items]);
 
+    // Initial bounds calculation
+    useEffect(() => {
+        miniMap.setBounds(calculateMiniMapBounds(mainMap.getConfig(), miniMap.getConfig()) ?? { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity });
+    }, [mainMap.isReady, miniMap.isReady])  
+    
     // Handle resize for both maps - recalculate mini map bounds
     const handleResize = () => {
-        const bounds = calculateMiniMapBounds(mainMap.getConfig(), miniMap.getConfig());
-        if (bounds) {
-            miniMap.setBounds(bounds);
-        }
+        miniMap.setBounds(calculateMiniMapBounds(mainMap.getConfig(), miniMap.getConfig()) ?? { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity });
     };
 
     // Handle main map coords change

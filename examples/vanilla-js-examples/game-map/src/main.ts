@@ -124,6 +124,10 @@ const calculateMiniMapBounds = () => {
     };
 };
 
+// Set initial mini map bounds
+calculateMiniMapBounds();
+miniMap.setBounds(calculateMiniMapBounds());
+
 // Generate map objects
 const items = generateMapObjects(10000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2);
 
