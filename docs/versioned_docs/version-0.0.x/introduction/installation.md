@@ -39,51 +39,18 @@ npm install @canvas-tile-engine/react
 **Basic usage:**
 
 ```tsx
-import { CanvasTileMap } from "@canvas-tile-engine/react";
+import { CanvasTileMap, useCanvasTileEngine } from "@canvas-tile-engine/react";
 
 function App() {
-    return <CanvasTileMap config={config} center={{ x: 0, y: 0 }} onClick={(coords) => console.log(coords)} />;
+    const engine = useCanvasTileEngine();
+
+    return (
+        <CanvasTileMap
+            engine={engine}
+            config={config}
+            center={{ x: 0, y: 0 }}
+            onClick={(coords) => console.log(coords)}
+        />
+    );
 }
-```
-
-## Vue
-
-Vue 3 component:
-
-```bash
-npm install @canvas-tile-engine/vue
-```
-
-**Basic usage:**
-
-```ts
-<template>
-    <CanvasTileMap :config="config" :center="{ x: 0, y: 0 }" @click="handleClick" />
-</template>
-
-<script setup>
-import { CanvasTileMap } from "@canvas-tile-engine/vue";
-</script>
-```
-
-## Svelte
-
-Svelte component:
-
-```bash
-npm install @canvas-tile-engine/svelte
-```
-
-**Basic usage:**
-
-```ts
-<script>
-    import { CanvasTileMap } from "@canvas-tile-engine/svelte";
-</script>
-
-<CanvasTileMap
-    {config}
-    center={{ x: 0, y: 0 }}
-    on:click={handleClick}
-/>
 ```
