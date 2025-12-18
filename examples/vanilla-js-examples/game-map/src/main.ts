@@ -223,6 +223,14 @@ miniMap.onResize = () => {
     miniMap.setBounds(calculateMiniMapBounds());
 };
 
+mainMap.onZoom = () => {
+    miniMap.setBounds(calculateMiniMapBounds());
+};
+
+miniMap.onZoom = () => {
+    mainMap.setBounds(calculateMiniMapBounds());
+};
+
 // Mini map viewport rectangle
 // Draws a rectangle on the mini map representing the current viewport of the main map
 // "onDraw" is a callback for custom drawing on the map's canvas
