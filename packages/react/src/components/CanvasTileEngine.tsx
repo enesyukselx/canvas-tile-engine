@@ -142,9 +142,9 @@ function CanvasTileEngineBase({
         instance.onCoordsChange = (coords) => callbacksRef.current.onCoordsChange?.(coords);
         instance.onClick = (...args) => callbacksRef.current.onClick?.(...args);
         instance.onHover = (...args) => callbacksRef.current.onHover?.(...args);
-        instance.onMouseDown = () => callbacksRef.current.onMouseDown?.();
-        instance.onMouseUp = () => callbacksRef.current.onMouseUp?.();
-        instance.onMouseLeave = () => callbacksRef.current.onMouseLeave?.();
+        instance.onMouseDown = (...args) => callbacksRef.current.onMouseDown?.(...args);
+        instance.onMouseUp = (...args) => callbacksRef.current.onMouseUp?.(...args);
+        instance.onMouseLeave = (...args) => callbacksRef.current.onMouseLeave?.(...args);
         instance.onDraw = (...args) => callbacksRef.current.onDraw?.(...args);
         instance.onResize = () => callbacksRef.current.onResize?.();
         instance.onZoom = (scale) => callbacksRef.current.onZoom?.(scale);
