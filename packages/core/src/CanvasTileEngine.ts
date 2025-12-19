@@ -16,6 +16,9 @@ import {
     onDrawCallback,
     onHoverCallback,
     EventHandlers,
+    onMouseDownCallback,
+    onMouseUpCallback,
+    onMouseLeaveCallback,
 } from "./types";
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
@@ -62,29 +65,29 @@ export class CanvasTileEngine {
         this.events.onHover = cb;
     }
 
-    private _onMouseDown?: () => void;
-    public get onMouseDown(): (() => void) | undefined {
+    private _onMouseDown?: onMouseDownCallback;
+    public get onMouseDown(): onMouseDownCallback | undefined {
         return this._onMouseDown;
     }
-    public set onMouseDown(cb: (() => void) | undefined) {
+    public set onMouseDown(cb: onMouseDownCallback | undefined) {
         this._onMouseDown = cb;
         this.events.onMouseDown = cb;
     }
 
-    private _onMouseUp?: () => void;
-    public get onMouseUp(): (() => void) | undefined {
+    private _onMouseUp?: onMouseUpCallback;
+    public get onMouseUp(): onMouseUpCallback | undefined {
         return this._onMouseUp;
     }
-    public set onMouseUp(cb: (() => void) | undefined) {
+    public set onMouseUp(cb: onMouseUpCallback | undefined) {
         this._onMouseUp = cb;
         this.events.onMouseUp = cb;
     }
 
-    private _onMouseLeave?: () => void;
-    public get onMouseLeave(): (() => void) | undefined {
+    private _onMouseLeave?: onMouseLeaveCallback;
+    public get onMouseLeave(): onMouseLeaveCallback | undefined {
         return this._onMouseLeave;
     }
-    public set onMouseLeave(cb: (() => void) | undefined) {
+    public set onMouseLeave(cb: onMouseLeaveCallback | undefined) {
         this._onMouseLeave = cb;
         this.events.onMouseLeave = cb;
     }
