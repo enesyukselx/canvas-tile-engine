@@ -118,7 +118,7 @@ Triggered when the mouse leaves the canvas area.
 <CanvasTileEngine
     engine={engine}
     config={config}
-    onMouseLeave={() => {
+    onMouseLeave={(world, canvas, client) => {
         setHoverCell(null);
         setIsDrawing(false);
     }}
@@ -182,10 +182,11 @@ Triggered when the zoom level changes (via mouse wheel or pinch gesture). Receiv
 ```
 
 :::tip Use Cases
-- **Zoom indicator**: Display current zoom percentage in the UI
-- **Level of detail**: Conditionally render components based on zoom level
-- **Minimap sync**: Update viewport representation in a minimap
-:::
+
+-   **Zoom indicator**: Display current zoom percentage in the UI
+-   **Level of detail**: Conditionally render components based on zoom level
+-   **Minimap sync**: Update viewport representation in a minimap
+    :::
 
 ## Coordinate Data Structure
 

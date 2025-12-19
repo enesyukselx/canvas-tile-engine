@@ -61,7 +61,7 @@ Triggered when the user presses the mouse button on the canvas. This is useful f
 ```typescript
 let isDrawing = false;
 
-engine.onMouseDown = () => {
+engine.onMouseDown = (world, canvas, client) => {
     isDrawing = true;
     console.log("Mouse button pressed");
 };
@@ -72,7 +72,7 @@ engine.onMouseDown = () => {
 Triggered when the user releases the mouse button. Useful for completing drawing operations or drag actions.
 
 ```typescript
-engine.onMouseUp = () => {
+engine.onMouseUp = (world, canvas, client) => {
     isDrawing = false;
     console.log("Mouse button released");
 };
@@ -85,12 +85,12 @@ Combine `onMouseDown`, `onMouseUp`, and `onHover` to create a painting tool:
 let isDrawing = false;
 const paintedCells = new Set();
 
-engine.onMouseDown = () => {
+engine.onMouseDown = (world, canvas, client) => {
     isDrawing = true;
     paintedCells.clear();
 };
 
-engine.onHover = (world) => {
+engine.onHover = (world, canvas, client) => {
     if (isDrawing) {
         const key = `${world.snapped.x},${world.snapped.y}`;
         if (!paintedCells.has(key)) {
@@ -109,7 +109,7 @@ engine.onHover = (world) => {
     }
 };
 
-engine.onMouseUp = () => {
+engine.onMouseUp = (world, canvas, client) => {
     isDrawing = false;
     console.log("Painted cells:", Array.from(paintedCells));
 };
@@ -211,7 +211,7 @@ panModeBtn.addEventListener("click", () => {
 Triggered when the mouse leaves the canvas area. Useful for cleaning up hover states, hiding tooltips, or stopping drawing operations.
 
 ```typescript
-engine.onMouseLeave = () => {
+engine.onMouseLeave = (world, canvas, client) => {
     console.log("Mouse left the map");
     // Clear highlights or tooltips
     isDrawing = false; // Stop drawing if in progress
@@ -251,10 +251,11 @@ engine.onZoom = (scale) => {
 ```
 
 :::tip Use Cases
-- **Zoom indicator**: Display current zoom percentage in the UI
-- **Level of detail**: Show/hide elements based on zoom level
-- **Minimap sync**: Update viewport representation in a minimap
-:::
+
+-   **Zoom indicator**: Display current zoom percentage in the UI
+-   **Level of detail**: Show/hide elements based on zoom level
+-   **Minimap sync**: Update viewport representation in a minimap
+    :::
 
 ## Coordinate Data Structure
 
@@ -297,21 +298,15 @@ engine.updateCoords({ x: 10, y: 10 });
 
 Smoothly animates the camera center to target coordinates over a specified duration.
 
-| Parameter    | Type         | Default      | Description                                                      |
-| :----------- | :----------- | :----------- | :--------------------------------------------------------------- |
-| `x`          | `number`     | **Required** | Target world X coordinate.                                       |
-| `y`          | `number`     | **Required** | Target world Y coordinate.                                       |
-| `durationMs` | `number`     | `500`        | Animation duration in milliseconds. Set to `0` for instant move. |
-| `onComplete` | `() => void` | `undefined`  | Callback fired when animation completes.                         |
+| Parameter    | Type     | Default      | Description                                                      |
+| :----------- | :------- | :----------- | :--------------------------------------------------------------- |
+| `x`          | `number` | **Required** | Target world X coordinate.                                       |
+| `y`          | `number` | **Required** | Target world Y coordinate.                                       |
+| `durationMs` | `number` | `500`        | Animation duration in milliseconds. Set to `0` for instant move. |
 
 ```typescript
 // Pan to (10, 10) over 1 second
 engine.goCoords(10, 10, 1000);
-
-// With completion callback
-engine.goCoords(50, 50, 500, () => {
-    console.log('Navigation complete!');
-});
 
 // Instant move (same as updateCoords)
 engine.goCoords(5, 5, 0);
@@ -321,21 +316,15 @@ engine.goCoords(5, 5, 0);
 
 Manually updates the canvas size (e.g., when the container resizes or user selects a resolution). The engine attempts to keep the current center point in focus during the resize.
 
-| Parameter    | Type         | Default      | Description                                                     |
-| :----------- | :----------- | :----------- | :-------------------------------------------------------------- |
-| `width`      | `number`     | **Required** | New canvas width in pixels.                                     |
-| `height`     | `number`     | **Required** | New canvas height in pixels.                                    |
-| `durationMs` | `number`     | `500`        | Animation duration in milliseconds. Use `0` for instant resize. |
-| `onComplete` | `() => void` | `undefined`  | Callback fired when resize animation completes.                 |
+| Parameter    | Type     | Default      | Description                                                     |
+| :----------- | :------- | :----------- | :-------------------------------------------------------------- |
+| `width`      | `number` | **Required** | New canvas width in pixels.                                     |
+| `height`     | `number` | **Required** | New canvas height in pixels.                                    |
+| `durationMs` | `number` | `500`        | Animation duration in milliseconds. Use `0` for instant resize. |
 
 ```typescript
 // Resize to 800x600 with a smooth transition
 engine.resize(800, 600, 500);
-
-// With completion callback
-engine.resize(1024, 768, 300, () => {
-    console.log('Resize complete!');
-});
 ```
 
 ### `setEventHandlers`
@@ -445,8 +434,8 @@ document.addEventListener("keyup", (e) => {
 
 Set or update map boundaries to restrict camera movement to a specific area. This prevents users from panning beyond defined limits.
 
-| Parameter | Type     | Description                                           |
-| :-------- | :------- | :---------------------------------------------------- |
+| Parameter | Type     | Description                                          |
+| :-------- | :------- | :--------------------------------------------------- |
 | `bounds`  | `object` | Boundary limits with `minX`, `maxX`, `minY`, `maxY`. |
 
 ```typescript
@@ -454,35 +443,36 @@ Set or update map boundaries to restrict camera movement to a specific area. Thi
 engine.setBounds({ minX: -100, maxX: 100, minY: -100, maxY: 100 });
 
 // Remove all boundaries
-engine.setBounds({ 
-    minX: -Infinity, 
-    maxX: Infinity, 
-    minY: -Infinity, 
-    maxY: Infinity 
+engine.setBounds({
+    minX: -Infinity,
+    maxX: Infinity,
+    minY: -Infinity,
+    maxY: Infinity,
 });
 
 // Only limit horizontal scrolling
-engine.setBounds({ 
-    minX: 0, 
-    maxX: 500, 
-    minY: -Infinity, 
-    maxY: Infinity 
+engine.setBounds({
+    minX: 0,
+    maxX: 500,
+    minY: -Infinity,
+    maxY: Infinity,
 });
 
 // Limit to positive quadrant only
-engine.setBounds({ 
-    minX: 0, 
-    maxX: 1000, 
-    minY: 0, 
-    maxY: 1000 
+engine.setBounds({
+    minX: 0,
+    maxX: 1000,
+    minY: 0,
+    maxY: 1000,
 });
 ```
 
 **Use Cases:**
-- **Game maps**: Keep players within playable area
-- **Data visualization**: Prevent scrolling beyond data boundaries
-- **Floor plans**: Restrict view to building dimensions
-- **Interactive maps**: Define explorable regions
+
+-   **Game maps**: Keep players within playable area
+-   **Data visualization**: Prevent scrolling beyond data boundaries
+-   **Floor plans**: Restrict view to building dimensions
+-   **Interactive maps**: Define explorable regions
 
 :::info Initial Configuration
 Boundaries can also be set in the initial configuration:
@@ -495,8 +485,7 @@ const engine = new CanvasTileEngine(wrapper, {
         minX: -100,
         maxX: 100,
         minY: -100,
-        maxY: 100
-    }
+        maxY: 100,
+    },
 });
 ```
-:::
