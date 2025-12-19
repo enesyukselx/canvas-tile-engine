@@ -6,7 +6,7 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
     title: "Canvas Tile Engine",
-    tagline: "High-performance HTML5 Canvas tile engine for JS, React, Vue & Svelte",
+    tagline: "High-performance HTML5 Canvas tile engine for JS & React",
     favicon: "img/favicon.ico",
 
     // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -15,7 +15,7 @@ const config: Config = {
     },
 
     // Set the production url of your site here
-    url: "https://your-docusaurus-site.example.com",
+    url: "https://www.canvastileengine.dev/",
     // Set the /<baseUrl>/ pathname under which your site is served
     // For GitHub pages deployment, it is often '/<projectName>/'
     baseUrl: "/",

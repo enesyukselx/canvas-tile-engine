@@ -13,6 +13,12 @@ sidebar_position: 1
 -   Event handling (click, hover, drag, zoom)
 -   Layer-based rendering with drawing helpers
 
+:::info Compatibility
+These docs (**0.0.x**) are compatible with:
+- `@canvas-tile-engine/core`: `0.0.1+`
+- `@canvas-tile-engine/react`: `0.0.2+`
+:::
+
 ## Installation
 
 ```bash

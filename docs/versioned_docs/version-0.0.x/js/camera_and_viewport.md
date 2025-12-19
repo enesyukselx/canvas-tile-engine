@@ -18,7 +18,7 @@ You can move the camera using the engine instance.
 
 ### Moving the Camera
 
-#### `goCoords(x, y, duration?)`
+#### `goCoords(x, y, duration?, onComplete?)`
 
 Smoothly animates the camera to a new position.
 
@@ -27,10 +27,16 @@ Smoothly animates the camera to a new position.
 | `x` | `number` | **Required** | Target world X. |
 | `y` | `number` | **Required** | Target world Y. |
 | `duration` | `number` | `500` | Animation duration in ms. |
+| `onComplete` | `() => void` | `undefined` | Callback fired when animation completes. |
 
 ```typescript
 // Pan to coordinates (15, 20) over 1 second
 engine.goCoords(15, 20, 1000);
+
+// With completion callback
+engine.goCoords(50, 50, 500, () => {
+    console.log('Navigation complete!');
+});
 ```
 
 #### `updateCoords(center)`
@@ -121,13 +127,25 @@ const config = {
 
 ### Manual Resizing
 
-#### `resize(width, height, duration?)`
+#### `resize(width, height, duration?, onComplete?)`
 
 You can manually trigger a resize, optionally with an animation. This is useful for UI-driven layout changes.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `width` | `number` | **Required** | New canvas width in pixels. |
+| `height` | `number` | **Required** | New canvas height in pixels. |
+| `duration` | `number` | `500` | Animation duration in ms. |
+| `onComplete` | `() => void` | `undefined` | Callback fired when resize animation completes. |
 
 ```typescript
 // Resize canvas to 800x600 over 500ms
 engine.resize(800, 600, 500);
+
+// With completion callback
+engine.resize(1024, 768, 300, () => {
+    console.log('Resize complete!');
+});
 ```
 
 #### `getSize()`

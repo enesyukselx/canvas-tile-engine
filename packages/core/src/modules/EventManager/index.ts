@@ -1,4 +1,4 @@
-import { onClickCallback, onHoverCallback } from "../../types";
+import { onClickCallback, onHoverCallback, onZoomCallback } from "../../types";
 import { Camera, ICamera } from "../Camera";
 import { Config } from "../Config";
 import { CoordinateTransformer } from "../CoordinateTransformer";
@@ -52,6 +52,13 @@ export class EventManager {
     }
     public set onMouseLeave(cb: (() => void) | undefined) {
         this.gestures.onMouseLeave = cb;
+    }
+
+    public get onZoom(): onZoomCallback | undefined {
+        return this.gestures.onZoom;
+    }
+    public set onZoom(cb: onZoomCallback | undefined) {
+        this.gestures.onZoom = cb;
     }
 
     constructor(

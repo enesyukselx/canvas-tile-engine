@@ -109,19 +109,16 @@ Customize the mouse cursor for different states.
 
 Built-in tools to help you develop. Enable via the `debug` object.
 
-| Feature                  | Default                    | Description                                            |
-| :----------------------- | :------------------------- | :----------------------------------------------------- |
-| `enabled`                | `false`                    | Master switch for all debug features.                  |
-| `grid.enabled`           | `false`                    | Draw a grid overlay.                                   |
-| `grid.color`             | `"rgba(255,255,255,0.25)"` | Grid line color.                                       |
-| `grid.lineWidth`         | `1`                        | Grid line width.                                       |
-| `hud.enabled`            | `false`                    | Show HUD panel.                                        |
-| `hud.topLeftCoordinates` | `false`                    | Display top-left world coords.                         |
-| `hud.coordinates`        | `false`                    | Display center coords.                                 |
-| `hud.scale`              | `false`                    | Display current scale.                                 |
-| `hud.tilesInView`        | `false`                    | Display visible tile counts.                           |
-| `hud.fps`                | `false`                    | Display current FPS (continuously updated).            |
-| `eventHandlers.*`        | `true`                     | Debug-time overrides for click/hover/drag/zoom/resize. |
+| Feature                  | Default | Description                                            |
+| :----------------------- | :------ | :----------------------------------------------------- |
+| `enabled`                | `false` | Master switch for all debug features.                  |
+| `hud.enabled`            | `false` | Show HUD panel.                                        |
+| `hud.topLeftCoordinates` | `false` | Display top-left world coords.                         |
+| `hud.coordinates`        | `false` | Display center coords.                                 |
+| `hud.scale`              | `false` | Display current scale.                                 |
+| `hud.tilesInView`        | `false` | Display visible tile counts.                           |
+| `hud.fps`                | `false` | Display current FPS (continuously updated).            |
+| `eventHandlers.*`        | `true`  | Debug-time overrides for click/hover/drag/zoom/resize. |
 
 ## Full TypeScript Type
 

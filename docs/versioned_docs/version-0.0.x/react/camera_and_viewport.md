@@ -32,29 +32,43 @@ Access camera methods through the engine handle when `engine.isReady` is `true`.
 
 ### Moving the Camera
 
-#### `goCoords(x, y, duration?)`
+#### `goCoords(x, y, duration?, onComplete?)`
 
 Smoothly animates the camera to a new position.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `x` | `number` | **Required** | Target world X. |
+| `y` | `number` | **Required** | Target world Y. |
+| `duration` | `number` | `500` | Animation duration in ms. |
+| `onComplete` | `() => void` | `undefined` | Callback fired when animation completes. |
 
 ```tsx
 function MapWithNavigation() {
     const engine = useCanvasTileEngine();
+    const [isNavigating, setIsNavigating] = useState(false);
 
     const goToBase = () => {
         if (engine.isReady) {
-            engine.goCoords(0, 0, 1000); // Pan to origin over 1 second
+            setIsNavigating(true);
+            engine.goCoords(0, 0, 1000, () => {
+                setIsNavigating(false);
+                console.log('Arrived at base!');
+            });
         }
     };
 
     const goToMarker = () => {
         if (engine.isReady) {
-            engine.goCoords(50, 50, 500); // Pan to (50, 50) over 500ms
+            engine.goCoords(50, 50, 500); // Without callback
         }
     };
 
     return (
         <div>
-            <button onClick={goToBase}>Go to Base</button>
+            <button onClick={goToBase} disabled={isNavigating}>
+                {isNavigating ? 'Going...' : 'Go to Base'}
+            </button>
             <button onClick={goToMarker}>Go to Marker</button>
 
             <CanvasTileEngine engine={engine} config={config}>
@@ -201,16 +215,45 @@ const config = {
 
 ### Manual Resizing
 
-#### `resize(width, height, duration?)`
+#### `resize(width, height, duration?, onComplete?)`
 
 Manually trigger a resize with optional animation:
 
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `width` | `number` | **Required** | New canvas width in pixels. |
+| `height` | `number` | **Required** | New canvas height in pixels. |
+| `duration` | `number` | `500` | Animation duration in ms. |
+| `onComplete` | `() => void` | `undefined` | Callback fired when resize animation completes. |
+
 ```tsx
-const changeResolution = (width: number, height: number) => {
-    if (engine.isReady) {
-        engine.resize(width, height, 500); // Animate over 500ms
-    }
-};
+function MapWithResizing() {
+    const engine = useCanvasTileEngine();
+    const [isResizing, setIsResizing] = useState(false);
+
+    const changeResolution = (width: number, height: number) => {
+        if (engine.isReady) {
+            setIsResizing(true);
+            engine.resize(width, height, 500, () => {
+                setIsResizing(false);
+            });
+        }
+    };
+
+    return (
+        <div>
+            <button 
+                onClick={() => changeResolution(800, 600)}
+                disabled={isResizing}
+            >
+                Resize to 800x600
+            </button>
+            <CanvasTileEngine engine={engine} config={config}>
+                {/* children */}
+            </CanvasTileEngine>
+        </div>
+    );
+}
 ```
 
 #### `getSize()`

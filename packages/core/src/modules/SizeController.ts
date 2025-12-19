@@ -39,8 +39,15 @@ export class SizeController {
      * @param height New canvas height in pixels.
      * @param durationMs Animation duration in ms (default 500). Use 0 for instant resize.
      * @param animationController AnimationController instance to handle the animation.
+     * @param onComplete Optional callback fired when resize animation completes.
      */
-    resizeWithAnimation(width: number, height: number, durationMs: number, animationController: AnimationController) {
+    resizeWithAnimation(
+        width: number,
+        height: number,
+        durationMs: number,
+        animationController: AnimationController,
+        onComplete?: () => void
+    ) {
         if (width <= 0 || height <= 0) {
             return;
         }
@@ -62,7 +69,7 @@ export class SizeController {
         height = clamp(height, configSize?.minHeight, configSize?.maxHeight);
 
         // Delegate to AnimationController
-        animationController.animateResize(width, height, durationMs, (w, h, center) => this.applySize(w, h, center));
+        animationController.animateResize(width, height, durationMs, (w, h, center) => this.applySize(w, h, center), onComplete);
     }
 
     private applySize(nextW: number, nextH: number, center: Coords) {

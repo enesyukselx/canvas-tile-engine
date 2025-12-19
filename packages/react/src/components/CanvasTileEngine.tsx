@@ -66,6 +66,7 @@ function CanvasTileEngineBase({
     onMouseLeave,
     onDraw,
     onResize,
+    onZoom,
 }: CanvasTileEngineProps) {
     // Stable callback refs
     const callbacksRef = useRef({
@@ -77,6 +78,7 @@ function CanvasTileEngineBase({
         onMouseLeave,
         onDraw,
         onResize,
+        onZoom,
     });
 
     // Update callback refs
@@ -90,6 +92,7 @@ function CanvasTileEngineBase({
             onMouseLeave,
             onDraw,
             onResize,
+            onZoom,
         };
     });
 
@@ -144,6 +147,7 @@ function CanvasTileEngineBase({
         instance.onMouseLeave = () => callbacksRef.current.onMouseLeave?.();
         instance.onDraw = (...args) => callbacksRef.current.onDraw?.(...args);
         instance.onResize = () => callbacksRef.current.onResize?.();
+        instance.onZoom = (scale) => callbacksRef.current.onZoom?.(scale);
 
         // Attach to handle
         engine._setInstance(instance);

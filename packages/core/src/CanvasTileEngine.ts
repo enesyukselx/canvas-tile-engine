@@ -107,6 +107,16 @@ export class CanvasTileEngine {
         this.events.onResize = cb;
     }
 
+    private _onZoom?: (scale: number) => void;
+    /** Callback: zoom level changes (wheel or pinch) */
+    public get onZoom(): ((scale: number) => void) | undefined {
+        return this._onZoom;
+    }
+    public set onZoom(cb: ((scale: number) => void) | undefined) {
+        this._onZoom = cb;
+        this.events.onZoom = cb;
+    }
+
     /**
      * @param canvas Target canvas element.
      * @param config Initial engine configuration.
@@ -116,6 +126,8 @@ export class CanvasTileEngine {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
         this.canvasWrapper.style.position = "relative";
+        this.canvasWrapper.style.width = config.size.width + "px";
+        this.canvasWrapper.style.height = config.size.height + "px";
         this.canvas.style.position = "absolute";
 
         this.config = new Config(config);
@@ -192,9 +204,14 @@ export class CanvasTileEngine {
      * @param width New canvas width in pixels.
      * @param height New canvas height in pixels.
      * @param durationMs Animation duration in ms (default 500). Use 0 for instant resize.
+     * @param onComplete Optional callback fired when resize animation completes.
      */
-    resize(width: number, height: number, durationMs: number = 500) {
-        this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController);
+    resize(width: number, height: number, durationMs: number = 500, onComplete?: () => void) {
+        this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController, () => {
+            // Trigger onResize callback after programmatic resize completes
+            this._onResize?.();
+            onComplete?.();
+        });
     }
 
     /**
@@ -262,9 +279,10 @@ export class CanvasTileEngine {
      * @param x Target world x.
      * @param y Target world y.
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
+     * @param onComplete Optional callback fired when animation completes.
      */
-    goCoords(x: number, y: number, durationMs: number = 500) {
-        this.animationController.animateMoveTo(x, y, durationMs);
+    goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
+        this.animationController.animateMoveTo(x, y, durationMs, onComplete);
     }
 
     /**
