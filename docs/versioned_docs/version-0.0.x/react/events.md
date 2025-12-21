@@ -42,6 +42,23 @@ Triggered when the user clicks on the canvas.
 </CanvasTileEngine>
 ```
 
+### `onRightClick`
+
+Triggered when the user right clicks on the canvas.
+
+```tsx
+<CanvasTileEngine
+    engine={engine}
+    config={config}
+    onRightClick={(world, canvas, client) => {
+        console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
+        console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+    }}
+>
+    {/* children */}
+</CanvasTileEngine>
+```
+
 ### `onHover`
 
 Triggered when the mouse moves over the canvas.
