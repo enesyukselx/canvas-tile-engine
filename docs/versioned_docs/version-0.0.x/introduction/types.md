@@ -201,16 +201,22 @@ type DrawObject = {
 
 ## Callback Types
 
-### `onClickCallback`
+### `MouseEventCallback`
 
-Callback for click events.
+Callback for mouse events.
 
 ```typescript
-type onClickCallback = (
+type MouseEventCallback = (
     coords: { raw: Coords; snapped: Coords },
     mouse: { raw: Coords; snapped: Coords },
     client: { raw: Coords; snapped: Coords }
 ) => void;
+
+type onClickCallback = MouseEventCallback;
+type onHoverCallback = MouseEventCallback;
+type onMouseDownCallback = MouseEventCallback;
+type onMouseUpCallback = MouseEventCallback;
+type onMouseLeaveCallback = MouseEventCallback;
 ```
 
 | Parameter | Description                                             |
@@ -218,18 +224,6 @@ type onClickCallback = (
 | `coords`  | World coordinates (raw = exact, snapped = grid-aligned) |
 | `mouse`   | Mouse position relative to canvas                       |
 | `client`  | Mouse position relative to viewport                     |
-
----
-
-### `onHoverCallback`
-
-Callback for hover events. Same signature as `onClickCallback`.
-
-```typescript
-type onHoverCallback = onClickCallback;
-```
-
----
 
 ### `onDrawCallback`
 

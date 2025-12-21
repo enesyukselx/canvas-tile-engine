@@ -1,4 +1,11 @@
-import { onClickCallback, onHoverCallback, onZoomCallback } from "../../types";
+import {
+    onClickCallback,
+    onHoverCallback,
+    onMouseDownCallback,
+    onMouseLeaveCallback,
+    onMouseUpCallback,
+    onZoomCallback,
+} from "../../types";
 import { ICamera } from "../Camera";
 import { Config } from "../Config";
 import { CoordinateTransformer } from "../CoordinateTransformer";
@@ -20,9 +27,9 @@ export class GestureController {
 
     public onClick?: onClickCallback;
     public onHover?: onHoverCallback;
-    public onMouseDown?: () => void;
-    public onMouseUp?: () => void;
-    public onMouseLeave?: () => void;
+    public onMouseDown?: onMouseDownCallback;
+    public onMouseUp?: onMouseUpCallback;
+    public onMouseLeave?: onMouseLeaveCallback;
     public onZoom?: onZoomCallback;
 
     constructor(
@@ -34,6 +41,35 @@ export class GestureController {
         private onCameraChange: () => void
     ) {}
 
+    private getEventCoords = (e: MouseEvent | { clientX: number; clientY: number }) => {
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const world = this.transformer.screenToWorld(mouseX, mouseY);
+        const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
+
+        return {
+            coords: {
+                raw: world,
+                snapped: { x: Math.floor(world.x), y: Math.floor(world.y) },
+            },
+            mouse: {
+                raw: { x: mouseX, y: mouseY },
+                snapped: {
+                    x: screen.x,
+                    y: screen.y,
+                },
+            },
+            client: {
+                raw: { x: e.clientX, y: e.clientY },
+                snapped: {
+                    x: screen.x + rect.left,
+                    y: screen.y + rect.top,
+                },
+            },
+        };
+    };
+
     handleClick = (e: MouseEvent) => {
         if (this.shouldPreventClick) {
             this.shouldPreventClick = false;
@@ -42,37 +78,14 @@ export class GestureController {
         if (!this.config.get().eventHandlers.click || !this.onClick) {
             return;
         }
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const world = this.transformer.screenToWorld(mouseX, mouseY);
-        const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
-
-        this.onClick(
-            {
-                raw: world,
-                snapped: { x: Math.floor(world.x), y: Math.floor(world.y) },
-            },
-            {
-                raw: { x: e.clientX - rect.left, y: e.clientY - rect.top },
-                snapped: {
-                    x: screen.x,
-                    y: screen.y,
-                },
-            },
-            {
-                raw: { x: e.clientX, y: e.clientY },
-                snapped: {
-                    x: screen.x + rect.left,
-                    y: screen.y + rect.top,
-                },
-            }
-        );
+        const { coords, mouse, client } = this.getEventCoords(e);
+        this.onClick(coords, mouse, client);
     };
 
     handleMouseDown = (e: MouseEvent) => {
         if (this.onMouseDown) {
-            this.onMouseDown();
+            const { coords, mouse, client } = this.getEventCoords(e);
+            this.onMouseDown(coords, mouse, client);
         }
 
         if (!this.config.get().eventHandlers.drag) {
@@ -87,29 +100,9 @@ export class GestureController {
     handleMouseMove = (e: MouseEvent) => {
         if (!this.isDragging) {
             if (this.onHover && this.config.get().eventHandlers.hover) {
-                const rect = this.canvas.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                const world = this.transformer.screenToWorld(mouseX, mouseY);
-                const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
+                const { coords, mouse, client } = this.getEventCoords(e);
 
-                this.onHover(
-                    { raw: world, snapped: { x: Math.floor(world.x), y: Math.floor(world.y) } },
-                    {
-                        raw: { x: e.clientX - rect.left, y: e.clientY - rect.top },
-                        snapped: {
-                            x: screen.x,
-                            y: screen.y,
-                        },
-                    },
-                    {
-                        raw: { x: e.clientX, y: e.clientY },
-                        snapped: {
-                            x: screen.x + rect.left,
-                            y: screen.y + rect.top,
-                        },
-                    }
-                );
+                this.onHover(coords, mouse, client);
             }
             return;
         }
@@ -125,18 +118,20 @@ export class GestureController {
         this.onCameraChange();
     };
 
-    handleMouseUp = () => {
+    handleMouseUp = (e: MouseEvent) => {
         if (this.onMouseUp) {
-            this.onMouseUp();
+            const { coords, mouse, client } = this.getEventCoords(e);
+            this.onMouseUp(coords, mouse, client);
         }
 
         this.isDragging = false;
         this.canvas.style.cursor = this.config.get().cursor.default || "default";
     };
 
-    handleMouseLeave = () => {
+    handleMouseLeave = (e: MouseEvent) => {
         if (this.onMouseLeave) {
-            this.onMouseLeave();
+            const { coords, mouse, client } = this.getEventCoords(e);
+            this.onMouseLeave(coords, mouse, client);
         }
 
         this.isDragging = false;
