@@ -139,10 +139,17 @@ export class CanvasTileEngine {
     constructor(canvasWrapper: HTMLDivElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
-        this.canvasWrapper.style.position = "relative";
-        this.canvasWrapper.style.width = config.size.width + "px";
-        this.canvasWrapper.style.height = config.size.height + "px";
-        this.canvas.style.position = "absolute";
+        // Ensure canvas wrapper has relative positioning for absolute canvas inside
+        Object.assign(this.canvasWrapper.style, {
+            position: "relative",
+            width: config.size.width + "px",
+            height: config.size.height + "px",
+        });
+        Object.assign(this.canvas.style, {
+            position: "absolute",
+            top: "0",
+            left: "0",
+        });
 
         this.config = new Config(config);
 
