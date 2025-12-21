@@ -133,9 +133,12 @@ export class CanvasTileEngine {
         this.config = new Config(config);
 
         const rendererType = config.renderer ?? "canvas";
+        const alignedCenter = config.gridAligned
+            ? { x: Math.floor(center.x) + 0.5, y: Math.floor(center.y) + 0.5 }
+            : center;
         const initialTopLeft: Coords = {
-            x: center.x - config.size.width / (2 * config.scale),
-            y: center.y - config.size.height / (2 * config.scale),
+            x: alignedCenter.x - config.size.width / (2 * config.scale),
+            y: alignedCenter.y - config.size.height / (2 * config.scale),
         };
 
         this.viewport = new ViewportState(config.size.width, config.size.height);
