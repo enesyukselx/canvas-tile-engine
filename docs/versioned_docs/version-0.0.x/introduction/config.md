@@ -10,13 +10,14 @@ The `CanvasTileEngineConfig` object controls the initial state and behavior of t
 
 These are the fundamental settings required to initialize the engine.
 
-| Property          | Type     | Default       | Description                                                      |
-| :---------------- | :------- | :------------ | :--------------------------------------------------------------- |
-| `scale`           | `number` | **Required**  | The initial zoom level (pixels per grid unit).                   |
-| `size`            | `object` | **Required**  | The dimensions of the canvas. See [Size Options](#size-options). |
-| `backgroundColor` | `string` | `"#ffffff"`   | The background color of the canvas.                              |
-| `minScale`        | `number` | `scale * 0.5` | Minimum allowed zoom level.                                      |
-| `maxScale`        | `number` | `scale * 2`   | Maximum allowed zoom level.                                      |
+| Property          | Type      | Default       | Description                                                                      |
+| :---------------- | :-------- | :------------ | :------------------------------------------------------------------------------- |
+| `scale`           | `number`  | **Required**  | The initial zoom level (pixels per grid unit).                                   |
+| `size`            | `object`  | **Required**  | The dimensions of the canvas. See [Size Options](#size-options).                 |
+| `backgroundColor` | `string`  | `"#ffffff"`   | The background color of the canvas.                                              |
+| `minScale`        | `number`  | `scale * 0.5` | Minimum allowed zoom level.                                                      |
+| `maxScale`        | `number`  | `scale * 2`   | Maximum allowed zoom level.                                                      |
+| `gridAligned`     | `boolean` | `false`       | Snap initial center to cell centers (x.5, y.5) for pixel-perfect grid alignment. |
 
 ### Size Options
 
@@ -131,6 +132,7 @@ export type CanvasTileEngineConfig = {
     maxScale?: number;
     minScale?: number;
     backgroundColor?: string;
+    gridAligned?: boolean;
     size: {
         width: number;
         height: number;
