@@ -11,6 +11,7 @@ function App() {
     const engine = useCanvasTileEngine();
     const config: CanvasTileEngineConfig = {
         scale: 40,
+        gridAligned: true,
         size: {
             width: 400,
             height: 400,
@@ -49,13 +50,6 @@ function App() {
                 <CanvasTileEngine
                     engine={engine}
                     config={config}
-                    // Because of the 0.5 addition, the top right cell is fully visible
-                    // Also, for example, if the scale is 40 and the width is 400, 10 cells will be visible for full pixel views, so pay attention to that
-                    // If not calculated properly, some cells may appear half-visible
-                    center={{
-                        x: 0.5,
-                        y: 0.5,
-                    }}
                     onHover={(coords) => {
                         if (!isDrawing) {
                             engine.clearLayer(HOVER_LAYER);
