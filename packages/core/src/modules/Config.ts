@@ -32,6 +32,7 @@ export class Config {
 
             eventHandlers: {
                 click: config.eventHandlers?.click ?? false,
+                rightClick: config.eventHandlers?.rightClick ?? false,
                 hover: config.eventHandlers?.hover ?? false,
                 drag: config.eventHandlers?.drag ?? false,
                 zoom: config.eventHandlers?.zoom ?? false,

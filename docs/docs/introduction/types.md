@@ -213,6 +213,7 @@ type MouseEventCallback = (
 ) => void;
 
 type onClickCallback = MouseEventCallback;
+type onRightClickCallback = MouseEventCallback;
 type onHoverCallback = MouseEventCallback;
 type onMouseDownCallback = MouseEventCallback;
 type onMouseUpCallback = MouseEventCallback;

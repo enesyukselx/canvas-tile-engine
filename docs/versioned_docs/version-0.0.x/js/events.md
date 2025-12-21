@@ -36,6 +36,16 @@ engine.onClick = (world, canvas, client) => {
 };
 ```
 
+### `onRightClick`
+
+Triggered when the user right clicks on the canvas.
+
+````typescript
+engine.onRightClick = (world, canvas, client) => {
+    console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
+    console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+};
+
 ### `onHover`
 
 Triggered when the mouse moves over the canvas. Useful for tooltips or highlighting cells.
@@ -52,7 +62,7 @@ engine.onHover = (world, canvas, client) => {
         3
     );
 };
-```
+````
 
 ### `onMouseDown`
 

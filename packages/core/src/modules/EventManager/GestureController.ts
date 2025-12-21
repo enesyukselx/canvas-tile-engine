@@ -1,5 +1,6 @@
 import {
     onClickCallback,
+    onRightClickCallback,
     onHoverCallback,
     onMouseDownCallback,
     onMouseLeaveCallback,
@@ -26,6 +27,7 @@ export class GestureController {
     private lastPinchCenter = { x: 0, y: 0 };
 
     public onClick?: onClickCallback;
+    public onRightClick?: onRightClickCallback;
     public onHover?: onHoverCallback;
     public onMouseDown?: onMouseDownCallback;
     public onMouseUp?: onMouseUpCallback;
@@ -80,6 +82,16 @@ export class GestureController {
         }
         const { coords, mouse, client } = this.getEventCoords(e);
         this.onClick(coords, mouse, client);
+    };
+
+    handleContextMenu = (e: MouseEvent) => {
+        if (!this.config.get().eventHandlers.rightClick || !this.onRightClick) {
+            return;
+        }
+        e.preventDefault();
+        const { coords, mouse, client } = this.getEventCoords(e);
+
+        this.onRightClick(coords, mouse, client);
     };
 
     handleMouseDown = (e: MouseEvent) => {

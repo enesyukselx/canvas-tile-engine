@@ -141,6 +141,7 @@ export type CanvasTileEngineConfig = {
     };
     eventHandlers?: {
         click?: boolean;
+        rightClick?: boolean;
         hover?: boolean;
         drag?: boolean;
         zoom?: boolean;

@@ -1,5 +1,6 @@
 import {
     onClickCallback,
+    onRightClickCallback,
     onHoverCallback,
     onMouseDownCallback,
     onMouseLeaveCallback,
@@ -31,6 +32,13 @@ export class EventManager {
     }
     public set onClick(cb: onClickCallback | undefined) {
         this.gestures.onClick = cb;
+    }
+
+    public get onRightClick(): onRightClickCallback | undefined {
+        return this.gestures.onRightClick;
+    }
+    public set onRightClick(cb: onRightClickCallback | undefined) {
+        this.gestures.onRightClick = cb;
     }
 
     public get onHover(): onHoverCallback | undefined {
@@ -88,6 +96,7 @@ export class EventManager {
 
         this.binder = new EventBinder(this.canvas, {
             click: this.gestures.handleClick,
+            contextmenu: this.gestures.handleContextMenu,
             mousedown: this.gestures.handleMouseDown,
             mousemove: this.gestures.handleMouseMove,
             mouseup: this.gestures.handleMouseUp,

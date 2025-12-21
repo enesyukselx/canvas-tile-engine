@@ -60,6 +60,7 @@ function CanvasTileEngineBase({
     children,
     onCoordsChange,
     onClick,
+    onRightClick,
     onHover,
     onMouseDown,
     onMouseUp,
@@ -72,6 +73,7 @@ function CanvasTileEngineBase({
     const callbacksRef = useRef({
         onCoordsChange,
         onClick,
+        onRightClick,
         onHover,
         onMouseDown,
         onMouseUp,
@@ -86,6 +88,7 @@ function CanvasTileEngineBase({
         callbacksRef.current = {
             onCoordsChange,
             onClick,
+            onRightClick,
             onHover,
             onMouseDown,
             onMouseUp,
@@ -141,6 +144,7 @@ function CanvasTileEngineBase({
         // Set up callbacks using stable refs
         instance.onCoordsChange = (coords) => callbacksRef.current.onCoordsChange?.(coords);
         instance.onClick = (...args) => callbacksRef.current.onClick?.(...args);
+        instance.onRightClick = (...args) => callbacksRef.current.onRightClick?.(...args);
         instance.onHover = (...args) => callbacksRef.current.onHover?.(...args);
         instance.onMouseDown = (...args) => callbacksRef.current.onMouseDown?.(...args);
         instance.onMouseUp = (...args) => callbacksRef.current.onMouseUp?.(...args);
