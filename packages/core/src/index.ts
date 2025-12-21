@@ -5,6 +5,7 @@ export type {
     DrawObject,
     EventHandlers,
     onClickCallback,
+    onRightClickCallback,
     onHoverCallback,
     onZoomCallback,
     onDrawCallback,

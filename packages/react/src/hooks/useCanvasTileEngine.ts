@@ -24,6 +24,7 @@ const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
         zoom: true,
         hover: false,
         click: false,
+        rightClick: false,
         resize: false,
     },
     bounds: {

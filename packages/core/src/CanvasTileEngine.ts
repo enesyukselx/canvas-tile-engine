@@ -13,6 +13,7 @@ import {
     DrawObject,
     CanvasTileEngineConfig,
     onClickCallback,
+    onRightClickCallback,
     onDrawCallback,
     onHoverCallback,
     EventHandlers,
@@ -51,6 +52,16 @@ export class CanvasTileEngine {
     public set onClick(cb: onClickCallback | undefined) {
         this._onClick = cb;
         this.events.onClick = cb;
+    }
+
+    private _onRightClick?: onRightClickCallback;
+
+    public get onRightClick(): onRightClickCallback | undefined {
+        return this._onRightClick;
+    }
+    public set onRightClick(cb: onRightClickCallback | undefined) {
+        this._onRightClick = cb;
+        this.events.onRightClick = cb;
     }
 
     private _onHover?: onHoverCallback;

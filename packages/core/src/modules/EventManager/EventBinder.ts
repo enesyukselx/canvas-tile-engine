@@ -1,5 +1,6 @@
 type HandlerMap = {
     click?: (e: MouseEvent) => void;
+    contextmenu?: (e: MouseEvent) => void;
     mousedown?: (e: MouseEvent) => void;
     mousemove?: (e: MouseEvent) => void;
     mouseup?: (e: MouseEvent) => void;
@@ -20,6 +21,10 @@ export class EventBinder {
     attach() {
         if (this.handlers.click) {
             this.canvas.addEventListener("click", this.handlers.click);
+        }
+
+        if (this.handlers.contextmenu) {
+            this.canvas.addEventListener("contextmenu", this.handlers.contextmenu);
         }
 
         if (this.handlers.mousedown) {
@@ -58,6 +63,10 @@ export class EventBinder {
     detach() {
         if (this.handlers.click) {
             this.canvas.removeEventListener("click", this.handlers.click);
+        }
+
+        if (this.handlers.contextmenu) {
+            this.canvas.removeEventListener("contextmenu", this.handlers.contextmenu);
         }
 
         if (this.handlers.mousedown) {

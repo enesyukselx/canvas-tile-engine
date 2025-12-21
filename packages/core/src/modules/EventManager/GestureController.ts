@@ -1,4 +1,4 @@
-import { onClickCallback, onHoverCallback, onZoomCallback } from "../../types";
+import { onClickCallback, onHoverCallback, onRightClickCallback, onZoomCallback } from "../../types";
 import { ICamera } from "../Camera";
 import { Config } from "../Config";
 import { CoordinateTransformer } from "../CoordinateTransformer";
@@ -19,6 +19,7 @@ export class GestureController {
     private lastPinchCenter = { x: 0, y: 0 };
 
     public onClick?: onClickCallback;
+    public onRightClick?: onRightClickCallback;
     public onHover?: onHoverCallback;
     public onMouseDown?: () => void;
     public onMouseUp?: () => void;
@@ -49,6 +50,39 @@ export class GestureController {
         const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
 
         this.onClick(
+            {
+                raw: world,
+                snapped: { x: Math.floor(world.x), y: Math.floor(world.y) },
+            },
+            {
+                raw: { x: e.clientX - rect.left, y: e.clientY - rect.top },
+                snapped: {
+                    x: screen.x,
+                    y: screen.y,
+                },
+            },
+            {
+                raw: { x: e.clientX, y: e.clientY },
+                snapped: {
+                    x: screen.x + rect.left,
+                    y: screen.y + rect.top,
+                },
+            }
+        );
+    };
+
+    handleContextMenu = (e: MouseEvent) => {
+        if (!this.config.get().eventHandlers.rightClick || !this.onRightClick) {
+            return;
+        }
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const world = this.transformer.screenToWorld(mouseX, mouseY);
+        const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
+
+        this.onRightClick(
             {
                 raw: world,
                 snapped: { x: Math.floor(world.x), y: Math.floor(world.y) },

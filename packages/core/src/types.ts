@@ -49,6 +49,7 @@ export type CanvasTileEngineConfig = {
 
 export type EventHandlers = {
     click?: boolean;
+    rightClick?: boolean;
     hover?: boolean;
     drag?: boolean;
     zoom?: boolean;
@@ -81,6 +82,8 @@ export type onClickCallback = (
 ) => void;
 
 export type onHoverCallback = onClickCallback;
+
+export type onRightClickCallback = onClickCallback;
 
 export type onZoomCallback = (scale: number) => void;
 
