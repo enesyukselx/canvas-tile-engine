@@ -36,13 +36,14 @@ Define the canvas dimensions and constraints.
 
 Control how the user interacts with the map via `eventHandlers`.
 
-| Handler  | Default | Description                                         |
-| :------- | :------ | :-------------------------------------------------- |
-| `drag`   | `false` | Enable panning by dragging the map.                 |
-| `zoom`   | `false` | Enable zooming with the mouse wheel.                |
-| `click`  | `false` | Enable click events on grid cells.                  |
-| `hover`  | `false` | Enable hover events and tracking.                   |
-| `resize` | `false` | Automatically resize canvas when container changes. |
+| Handler      | Default | Description                                         |
+| :----------- | :------ | :-------------------------------------------------- |
+| `click`      | `false` | Enable click events on grid cells.                  |
+| `rightClick` | `false` | Enable right click events on grid cells.            |
+| `hover`      | `false` | Enable hover events and tracking.                   |
+| `drag`       | `false` | Enable panning by dragging the map.                 |
+| `zoom`       | `false` | Enable zooming with the mouse wheel.                |
+| `resize`     | `false` | Automatically resize canvas when container changes. |
 
 ```typescript
 // Example usage

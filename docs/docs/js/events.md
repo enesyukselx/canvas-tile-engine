@@ -15,6 +15,7 @@ const config = {
     // ...
     eventHandlers: {
         click: true, // Enable click events
+        rightClick: true, // Enable right click events
         hover: true, // Enable hover events
         drag: true, // Enable panning
         zoom: true, // Enable zooming
@@ -36,7 +37,7 @@ engine.onClick = (world, canvas, client) => {
 };
 ```
 
-### `onRightClick`
+### `onRightClick`
 
 Triggered when the user right clicks on the canvas.
 

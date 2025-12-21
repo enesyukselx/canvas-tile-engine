@@ -15,6 +15,7 @@ const config = {
     // ...
     eventHandlers: {
         click: true, // Enable click events
+        rightClick: true, // Enable right click events
         hover: true, // Enable hover events
         drag: true, // Enable panning
         zoom: true, // Enable zooming
@@ -36,15 +37,16 @@ engine.onClick = (world, canvas, client) => {
 };
 ```
 
-### `onRightClick`
+### `onRightClick`
 
 Triggered when the user right clicks on the canvas.
 
-````typescript
+```typescript
 engine.onRightClick = (world, canvas, client) => {
     console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
     console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
 };
+```
 
 ### `onHover`
 
@@ -62,7 +64,7 @@ engine.onHover = (world, canvas, client) => {
         3
     );
 };
-````
+```
 
 ### `onMouseDown`
 

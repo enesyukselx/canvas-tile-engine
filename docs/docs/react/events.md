@@ -15,6 +15,7 @@ const config = {
     // ...
     eventHandlers: {
         click: true, // Enable click events
+        rightClick: true // Enable right click evenets
         hover: true, // Enable hover events
         drag: true, // Enable panning
         zoom: true, // Enable zooming
