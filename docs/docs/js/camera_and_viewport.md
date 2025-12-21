@@ -50,6 +50,26 @@ const center = engine.getCenterCoords();
 console.log(center); // { x: 5.5, y: 10.2 }
 ```
 
+#### `getVisibleBounds()`
+
+Returns the world coordinate bounds of the visible viewport. Values are floored/ceiled to cell boundaries.
+
+```typescript
+const bounds = engine.getVisibleBounds();
+console.log(bounds); // { minX: 0, maxX: 10, minY: 0, maxY: 10 }
+
+// Use for random placement within visible area
+const x = bounds.minX + Math.floor(Math.random() * (bounds.maxX - bounds.minX));
+const y = bounds.minY + Math.floor(Math.random() * (bounds.maxY - bounds.minY));
+```
+
+| Property | Description |
+| :--- | :--- |
+| `minX` | Left edge of viewport (floored) |
+| `maxX` | Right edge of viewport (ceiled) |
+| `minY` | Top edge of viewport (floored) |
+| `maxY` | Bottom edge of viewport (ceiled) |
+
 ### Zooming
 
 Zooming is primarily handled by user interaction (mouse wheel), but you can configure the limits.

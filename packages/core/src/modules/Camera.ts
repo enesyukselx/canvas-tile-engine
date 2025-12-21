@@ -61,6 +61,19 @@ export interface ICamera {
      * @param centerY Center Y in screen coordinates.
      */
     zoomByFactor(factor: number, centerX: number, centerY: number): void;
+
+    /**
+     * Get the visible world coordinate bounds of the viewport.
+     * @param canvasWidth Canvas width in pixels.
+     * @param canvasHeight Canvas height in pixels.
+     * @returns Visible bounds with min/max coordinates (floored/ceiled to cell boundaries).
+     */
+    getVisibleBounds(canvasWidth: number, canvasHeight: number): {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+    };
 }
 
 /**
@@ -209,5 +222,24 @@ export class Camera implements ICamera {
         this._x -= deltaWidthPx / (2 * this._scale);
         this._y -= deltaHeightPx / (2 * this._scale);
         this.clampToBounds();
+    }
+
+    getVisibleBounds(canvasWidth: number, canvasHeight: number): {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+    } {
+        const rawMinX = this._x - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+        const rawMinY = this._y - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+        const rawMaxX = rawMinX + canvasWidth / this._scale;
+        const rawMaxY = rawMinY + canvasHeight / this._scale;
+
+        return {
+            minX: Math.floor(rawMinX),
+            maxX: Math.ceil(rawMaxX),
+            minY: Math.floor(rawMinY),
+            maxY: Math.ceil(rawMaxY),
+        };
     }
 }
