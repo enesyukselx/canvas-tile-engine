@@ -66,7 +66,7 @@ export type onDrawCallback = (
     info: { scale: number; width: number; height: number; coords: Coords }
 ) => void;
 
-export type onClickCallback = (
+type MouseEventCallback = (
     coords: {
         raw: Coords;
         snapped: Coords;
@@ -81,7 +81,15 @@ export type onClickCallback = (
     }
 ) => void;
 
-export type onHoverCallback = onClickCallback;
+export type onClickCallback = MouseEventCallback;
+
+export type onHoverCallback = MouseEventCallback;
+
+export type onMouseDownCallback = MouseEventCallback;
+
+export type onMouseUpCallback = MouseEventCallback;
+
+export type onMouseLeaveCallback = MouseEventCallback;
 
 export type onRightClickCallback = onClickCallback;
 

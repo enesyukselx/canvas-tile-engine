@@ -6,6 +6,9 @@ import type {
     onClickCallback,
     onRightClickCallback,
     onHoverCallback,
+    onMouseDownCallback,
+    onMouseUpCallback,
+    onMouseLeaveCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -25,6 +28,9 @@ export type {
     onClickCallback,
     onRightClickCallback,
     onHoverCallback,
+    onMouseDownCallback,
+    onMouseUpCallback,
+    onMouseLeaveCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -70,13 +76,13 @@ export interface CanvasTileEngineProps {
     onHover?: onHoverCallback;
 
     /** Callback on mouse down */
-    onMouseDown?: () => void;
+    onMouseDown?: onMouseDownCallback;
 
     /** Callback on mouse up */
-    onMouseUp?: () => void;
+    onMouseUp?: onMouseUpCallback;
 
     /** Callback on mouse leave */
-    onMouseLeave?: () => void;
+    onMouseLeave?: onMouseLeaveCallback;
 
     /** Callback after each draw frame */
     onDraw?: onDrawCallback;
