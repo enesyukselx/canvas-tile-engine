@@ -13,9 +13,13 @@ import {
     DrawObject,
     CanvasTileEngineConfig,
     onClickCallback,
+    onRightClickCallback,
     onDrawCallback,
     onHoverCallback,
     EventHandlers,
+    onMouseDownCallback,
+    onMouseUpCallback,
+    onMouseLeaveCallback,
 } from "./types";
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
@@ -53,6 +57,16 @@ export class CanvasTileEngine {
         this.events.onClick = cb;
     }
 
+    private _onRightClick?: onRightClickCallback;
+
+    public get onRightClick(): onRightClickCallback | undefined {
+        return this._onRightClick;
+    }
+    public set onRightClick(cb: onRightClickCallback | undefined) {
+        this._onRightClick = cb;
+        this.events.onRightClick = cb;
+    }
+
     private _onHover?: onHoverCallback;
     public get onHover(): onHoverCallback | undefined {
         return this._onHover;
@@ -62,29 +76,29 @@ export class CanvasTileEngine {
         this.events.onHover = cb;
     }
 
-    private _onMouseDown?: () => void;
-    public get onMouseDown(): (() => void) | undefined {
+    private _onMouseDown?: onMouseDownCallback;
+    public get onMouseDown(): onMouseDownCallback | undefined {
         return this._onMouseDown;
     }
-    public set onMouseDown(cb: (() => void) | undefined) {
+    public set onMouseDown(cb: onMouseDownCallback | undefined) {
         this._onMouseDown = cb;
         this.events.onMouseDown = cb;
     }
 
-    private _onMouseUp?: () => void;
-    public get onMouseUp(): (() => void) | undefined {
+    private _onMouseUp?: onMouseUpCallback;
+    public get onMouseUp(): onMouseUpCallback | undefined {
         return this._onMouseUp;
     }
-    public set onMouseUp(cb: (() => void) | undefined) {
+    public set onMouseUp(cb: onMouseUpCallback | undefined) {
         this._onMouseUp = cb;
         this.events.onMouseUp = cb;
     }
 
-    private _onMouseLeave?: () => void;
-    public get onMouseLeave(): (() => void) | undefined {
+    private _onMouseLeave?: onMouseLeaveCallback;
+    public get onMouseLeave(): onMouseLeaveCallback | undefined {
         return this._onMouseLeave;
     }
-    public set onMouseLeave(cb: (() => void) | undefined) {
+    public set onMouseLeave(cb: onMouseLeaveCallback | undefined) {
         this._onMouseLeave = cb;
         this.events.onMouseLeave = cb;
     }
@@ -125,17 +139,27 @@ export class CanvasTileEngine {
     constructor(canvasWrapper: HTMLDivElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
-        this.canvasWrapper.style.position = "relative";
-        this.canvasWrapper.style.width = config.size.width + "px";
-        this.canvasWrapper.style.height = config.size.height + "px";
-        this.canvas.style.position = "absolute";
+        // Ensure canvas wrapper has relative positioning for absolute canvas inside
+        Object.assign(this.canvasWrapper.style, {
+            position: "relative",
+            width: config.size.width + "px",
+            height: config.size.height + "px",
+        });
+        Object.assign(this.canvas.style, {
+            position: "absolute",
+            top: "0",
+            left: "0",
+        });
 
         this.config = new Config(config);
 
         const rendererType = config.renderer ?? "canvas";
+        const alignedCenter = config.gridAligned
+            ? { x: Math.floor(center.x) + 0.5, y: Math.floor(center.y) + 0.5 }
+            : center;
         const initialTopLeft: Coords = {
-            x: center.x - config.size.width / (2 * config.scale),
-            y: center.y - config.size.height / (2 * config.scale),
+            x: alignedCenter.x - config.size.width / (2 * config.scale),
+            y: alignedCenter.y - config.size.height / (2 * config.scale),
         };
 
         this.viewport = new ViewportState(config.size.width, config.size.height);
@@ -265,6 +289,24 @@ export class CanvasTileEngine {
     getCenterCoords(): Coords {
         const size = this.viewport.getSize();
         return this.camera.getCenter(size.width, size.height);
+    }
+
+    /**
+     * Get the visible world coordinate bounds of the viewport.
+     * Returns floored/ceiled values representing which cells are visible.
+     * @returns Visible bounds with min/max coordinates.
+     * @example
+     * ```ts
+     * const bounds = engine.getVisibleBounds();
+     * // { minX: 0, maxX: 10, minY: 0, maxY: 10 }
+     *
+     * // Use for random placement within visible area
+     * const x = bounds.minX + Math.floor(Math.random() * (bounds.maxX - bounds.minX));
+     * ```
+     */
+    getVisibleBounds(): { minX: number; maxX: number; minY: number; maxY: number } {
+        const size = this.viewport.getSize();
+        return this.camera.getVisibleBounds(size.width, size.height);
     }
 
     /** Set center coordinates from outside (adjusts the camera accordingly). */

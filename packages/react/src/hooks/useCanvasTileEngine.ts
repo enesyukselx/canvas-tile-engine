@@ -18,12 +18,14 @@ const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
     minScale: 0.5,
     maxScale: 2,
     backgroundColor: "#ffffff",
+    gridAligned: false,
     renderer: "canvas",
     eventHandlers: {
         drag: true,
         zoom: true,
         hover: false,
         click: false,
+        rightClick: false,
         resize: false,
     },
     bounds: {
@@ -84,6 +86,9 @@ export interface EngineHandle {
 
     /** Get current center coordinates */
     getCenterCoords(): Coords;
+
+    /** Get visible world coordinate bounds of the viewport */
+    getVisibleBounds(): { minX: number; maxX: number; minY: number; maxY: number };
 
     /** Update center coordinates */
     updateCoords(center: Coords): void;
@@ -255,6 +260,10 @@ export function useCanvasTileEngine(): EngineHandle {
 
             getCenterCoords() {
                 return instanceRef.current?.getCenterCoords() ?? { x: 0, y: 0 };
+            },
+
+            getVisibleBounds() {
+                return instanceRef.current?.getVisibleBounds() ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 };
             },
 
             updateCoords(center: Coords) {

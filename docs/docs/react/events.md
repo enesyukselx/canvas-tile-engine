@@ -42,6 +42,23 @@ Triggered when the user clicks on the canvas.
 </CanvasTileEngine>
 ```
 
+### `onRightClick`
+
+Triggered when the user right clicks on the canvas.
+
+```tsx
+<CanvasTileEngine
+    engine={engine}
+    config={config}
+    onRightClick={(world, canvas, client) => {
+        console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
+        console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+    }}
+>
+    {/* children */}
+</CanvasTileEngine>
+```
+
 ### `onHover`
 
 Triggered when the mouse moves over the canvas.
@@ -118,7 +135,7 @@ Triggered when the mouse leaves the canvas area.
 <CanvasTileEngine
     engine={engine}
     config={config}
-    onMouseLeave={() => {
+    onMouseLeave={(world, canvas, client) => {
         setHoverCell(null);
         setIsDrawing(false);
     }}
@@ -182,10 +199,11 @@ Triggered when the zoom level changes (via mouse wheel or pinch gesture). Receiv
 ```
 
 :::tip Use Cases
-- **Zoom indicator**: Display current zoom percentage in the UI
-- **Level of detail**: Conditionally render components based on zoom level
-- **Minimap sync**: Update viewport representation in a minimap
-:::
+
+-   **Zoom indicator**: Display current zoom percentage in the UI
+-   **Level of detail**: Conditionally render components based on zoom level
+-   **Minimap sync**: Update viewport representation in a minimap
+    :::
 
 ## Coordinate Data Structure
 

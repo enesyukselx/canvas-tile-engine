@@ -4,7 +4,11 @@ import type {
     DrawObject,
     EventHandlers,
     onClickCallback,
+    onRightClickCallback,
     onHoverCallback,
+    onMouseDownCallback,
+    onMouseUpCallback,
+    onMouseLeaveCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -22,7 +26,11 @@ export type {
     DrawObject,
     EventHandlers,
     onClickCallback,
+    onRightClickCallback,
     onHoverCallback,
+    onMouseDownCallback,
+    onMouseUpCallback,
+    onMouseLeaveCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -61,17 +69,20 @@ export interface CanvasTileEngineProps {
     /** Callback when a tile is clicked */
     onClick?: onClickCallback;
 
+    /** Callback when a tile is right-clicked */
+    onRightClick?: onRightClickCallback;
+
     /** Callback when hovering over tiles */
     onHover?: onHoverCallback;
 
     /** Callback on mouse down */
-    onMouseDown?: () => void;
+    onMouseDown?: onMouseDownCallback;
 
     /** Callback on mouse up */
-    onMouseUp?: () => void;
+    onMouseUp?: onMouseUpCallback;
 
     /** Callback on mouse leave */
-    onMouseLeave?: () => void;
+    onMouseLeave?: onMouseLeaveCallback;
 
     /** Callback after each draw frame */
     onDraw?: onDrawCallback;

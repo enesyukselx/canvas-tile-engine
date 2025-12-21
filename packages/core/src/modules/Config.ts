@@ -18,6 +18,7 @@ export class Config {
             scale: config.scale,
             minScale: config.minScale ?? config.scale * SCALE_LIMITS.MIN_SCALE_MULTIPLIER,
             maxScale: config.maxScale ?? config.scale * SCALE_LIMITS.MAX_SCALE_MULTIPLIER,
+            gridAligned: config.gridAligned ?? false,
 
             size: {
                 width: config.size.width,
@@ -32,6 +33,7 @@ export class Config {
 
             eventHandlers: {
                 click: config.eventHandlers?.click ?? false,
+                rightClick: config.eventHandlers?.rightClick ?? false,
                 hover: config.eventHandlers?.hover ?? false,
                 drag: config.eventHandlers?.drag ?? false,
                 zoom: config.eventHandlers?.zoom ?? false,

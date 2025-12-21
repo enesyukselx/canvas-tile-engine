@@ -1,4 +1,12 @@
-import { onClickCallback, onHoverCallback, onZoomCallback } from "../../types";
+import {
+    onClickCallback,
+    onRightClickCallback,
+    onHoverCallback,
+    onMouseDownCallback,
+    onMouseLeaveCallback,
+    onMouseUpCallback,
+    onZoomCallback,
+} from "../../types";
 import { Camera, ICamera } from "../Camera";
 import { Config } from "../Config";
 import { CoordinateTransformer } from "../CoordinateTransformer";
@@ -26,6 +34,13 @@ export class EventManager {
         this.gestures.onClick = cb;
     }
 
+    public get onRightClick(): onRightClickCallback | undefined {
+        return this.gestures.onRightClick;
+    }
+    public set onRightClick(cb: onRightClickCallback | undefined) {
+        this.gestures.onRightClick = cb;
+    }
+
     public get onHover(): onHoverCallback | undefined {
         return this.gestures.onHover;
     }
@@ -33,24 +48,24 @@ export class EventManager {
         this.gestures.onHover = cb;
     }
 
-    public get onMouseDown(): (() => void) | undefined {
+    public get onMouseDown(): onMouseDownCallback | undefined {
         return this.gestures.onMouseDown;
     }
-    public set onMouseDown(cb: (() => void) | undefined) {
+    public set onMouseDown(cb: onMouseDownCallback | undefined) {
         this.gestures.onMouseDown = cb;
     }
 
-    public get onMouseUp(): (() => void) | undefined {
+    public get onMouseUp(): onMouseUpCallback | undefined {
         return this.gestures.onMouseUp;
     }
-    public set onMouseUp(cb: (() => void) | undefined) {
+    public set onMouseUp(cb: onMouseUpCallback | undefined) {
         this.gestures.onMouseUp = cb;
     }
 
-    public get onMouseLeave(): (() => void) | undefined {
+    public get onMouseLeave(): onMouseLeaveCallback | undefined {
         return this.gestures.onMouseLeave;
     }
-    public set onMouseLeave(cb: (() => void) | undefined) {
+    public set onMouseLeave(cb: onMouseLeaveCallback | undefined) {
         this.gestures.onMouseLeave = cb;
     }
 
@@ -81,6 +96,7 @@ export class EventManager {
 
         this.binder = new EventBinder(this.canvas, {
             click: this.gestures.handleClick,
+            contextmenu: this.gestures.handleContextMenu,
             mousedown: this.gestures.handleMouseDown,
             mousemove: this.gestures.handleMouseMove,
             mouseup: this.gestures.handleMouseUp,

@@ -4,6 +4,8 @@ export type CanvasTileEngineConfig = {
     maxScale?: number;
     minScale?: number;
     backgroundColor?: string;
+    /** When true, center coordinates are snapped to cell centers (x.5, y.5) for pixel-perfect grid alignment */
+    gridAligned?: boolean;
     size: {
         width: number;
         height: number;
@@ -49,6 +51,7 @@ export type CanvasTileEngineConfig = {
 
 export type EventHandlers = {
     click?: boolean;
+    rightClick?: boolean;
     hover?: boolean;
     drag?: boolean;
     zoom?: boolean;
@@ -65,7 +68,7 @@ export type onDrawCallback = (
     info: { scale: number; width: number; height: number; coords: Coords }
 ) => void;
 
-export type onClickCallback = (
+type MouseEventCallback = (
     coords: {
         raw: Coords;
         snapped: Coords;
@@ -80,7 +83,17 @@ export type onClickCallback = (
     }
 ) => void;
 
-export type onHoverCallback = onClickCallback;
+export type onClickCallback = MouseEventCallback;
+
+export type onHoverCallback = MouseEventCallback;
+
+export type onMouseDownCallback = MouseEventCallback;
+
+export type onMouseUpCallback = MouseEventCallback;
+
+export type onMouseLeaveCallback = MouseEventCallback;
+
+export type onRightClickCallback = MouseEventCallback;
 
 export type onZoomCallback = (scale: number) => void;
 

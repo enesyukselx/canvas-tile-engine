@@ -36,6 +36,17 @@ engine.onClick = (world, canvas, client) => {
 };
 ```
 
+### `onRightClick`
+
+Triggered when the user right clicks on the canvas.
+
+```typescript
+engine.onRightClick = (world, canvas, client) => {
+    console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
+    console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+};
+```
+
 ### `onHover`
 
 Triggered when the mouse moves over the canvas. Useful for tooltips or highlighting cells.
@@ -61,7 +72,7 @@ Triggered when the user presses the mouse button on the canvas. This is useful f
 ```typescript
 let isDrawing = false;
 
-engine.onMouseDown = () => {
+engine.onMouseDown = (world, canvas, client) => {
     isDrawing = true;
     console.log("Mouse button pressed");
 };
@@ -72,7 +83,7 @@ engine.onMouseDown = () => {
 Triggered when the user releases the mouse button. Useful for completing drawing operations or drag actions.
 
 ```typescript
-engine.onMouseUp = () => {
+engine.onMouseUp = (world, canvas, client) => {
     isDrawing = false;
     console.log("Mouse button released");
 };
@@ -85,12 +96,12 @@ Combine `onMouseDown`, `onMouseUp`, and `onHover` to create a painting tool:
 let isDrawing = false;
 const paintedCells = new Set();
 
-engine.onMouseDown = () => {
+engine.onMouseDown = (world, canvas, client) => {
     isDrawing = true;
     paintedCells.clear();
 };
 
-engine.onHover = (world) => {
+engine.onHover = (world, canvas, client) => {
     if (isDrawing) {
         const key = `${world.snapped.x},${world.snapped.y}`;
         if (!paintedCells.has(key)) {
@@ -109,7 +120,7 @@ engine.onHover = (world) => {
     }
 };
 
-engine.onMouseUp = () => {
+engine.onMouseUp = (world, canvas, client) => {
     isDrawing = false;
     console.log("Painted cells:", Array.from(paintedCells));
 };
@@ -211,7 +222,7 @@ panModeBtn.addEventListener("click", () => {
 Triggered when the mouse leaves the canvas area. Useful for cleaning up hover states, hiding tooltips, or stopping drawing operations.
 
 ```typescript
-engine.onMouseLeave = () => {
+engine.onMouseLeave = (world, canvas, client) => {
     console.log("Mouse left the map");
     // Clear highlights or tooltips
     isDrawing = false; // Stop drawing if in progress
@@ -251,10 +262,11 @@ engine.onZoom = (scale) => {
 ```
 
 :::tip Use Cases
-- **Zoom indicator**: Display current zoom percentage in the UI
-- **Level of detail**: Show/hide elements based on zoom level
-- **Minimap sync**: Update viewport representation in a minimap
-:::
+
+-   **Zoom indicator**: Display current zoom percentage in the UI
+-   **Level of detail**: Show/hide elements based on zoom level
+-   **Minimap sync**: Update viewport representation in a minimap
+    :::
 
 ## Coordinate Data Structure
 
@@ -433,8 +445,8 @@ document.addEventListener("keyup", (e) => {
 
 Set or update map boundaries to restrict camera movement to a specific area. This prevents users from panning beyond defined limits.
 
-| Parameter | Type     | Description                                           |
-| :-------- | :------- | :---------------------------------------------------- |
+| Parameter | Type     | Description                                          |
+| :-------- | :------- | :--------------------------------------------------- |
 | `bounds`  | `object` | Boundary limits with `minX`, `maxX`, `minY`, `maxY`. |
 
 ```typescript
@@ -442,35 +454,36 @@ Set or update map boundaries to restrict camera movement to a specific area. Thi
 engine.setBounds({ minX: -100, maxX: 100, minY: -100, maxY: 100 });
 
 // Remove all boundaries
-engine.setBounds({ 
-    minX: -Infinity, 
-    maxX: Infinity, 
-    minY: -Infinity, 
-    maxY: Infinity 
+engine.setBounds({
+    minX: -Infinity,
+    maxX: Infinity,
+    minY: -Infinity,
+    maxY: Infinity,
 });
 
 // Only limit horizontal scrolling
-engine.setBounds({ 
-    minX: 0, 
-    maxX: 500, 
-    minY: -Infinity, 
-    maxY: Infinity 
+engine.setBounds({
+    minX: 0,
+    maxX: 500,
+    minY: -Infinity,
+    maxY: Infinity,
 });
 
 // Limit to positive quadrant only
-engine.setBounds({ 
-    minX: 0, 
-    maxX: 1000, 
-    minY: 0, 
-    maxY: 1000 
+engine.setBounds({
+    minX: 0,
+    maxX: 1000,
+    minY: 0,
+    maxY: 1000,
 });
 ```
 
 **Use Cases:**
-- **Game maps**: Keep players within playable area
-- **Data visualization**: Prevent scrolling beyond data boundaries
-- **Floor plans**: Restrict view to building dimensions
-- **Interactive maps**: Define explorable regions
+
+-   **Game maps**: Keep players within playable area
+-   **Data visualization**: Prevent scrolling beyond data boundaries
+-   **Floor plans**: Restrict view to building dimensions
+-   **Interactive maps**: Define explorable regions
 
 :::info Initial Configuration
 Boundaries can also be set in the initial configuration:
@@ -483,8 +496,7 @@ const engine = new CanvasTileEngine(wrapper, {
         minX: -100,
         maxX: 100,
         minY: -100,
-        maxY: 100
-    }
+        maxY: 100,
+    },
 });
 ```
-:::

@@ -90,6 +90,31 @@ const logPosition = () => {
 };
 ```
 
+#### `getVisibleBounds()`
+
+Returns the world coordinate bounds of the visible viewport. Useful for knowing which cells are on screen.
+
+```tsx
+const placeRandomMine = () => {
+    if (engine.isReady) {
+        const bounds = engine.getVisibleBounds();
+        // { minX: 0, maxX: 10, minY: 0, maxY: 10 }
+
+        const x = bounds.minX + Math.floor(Math.random() * (bounds.maxX - bounds.minX));
+        const y = bounds.minY + Math.floor(Math.random() * (bounds.maxY - bounds.minY));
+
+        console.log("Random position:", x, y);
+    }
+};
+```
+
+| Property | Description |
+| :--- | :--- |
+| `minX` | Left edge of viewport (floored) |
+| `maxX` | Right edge of viewport (ceiled) |
+| `minY` | Top edge of viewport (floored) |
+| `maxY` | Bottom edge of viewport (ceiled) |
+
 ### Tracking Camera Position
 
 Use `onCoordsChange` to track camera movement:
