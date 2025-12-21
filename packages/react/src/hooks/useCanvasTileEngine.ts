@@ -18,6 +18,7 @@ const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
     minScale: 0.5,
     maxScale: 2,
     backgroundColor: "#ffffff",
+    gridAligned: false,
     renderer: "canvas",
     eventHandlers: {
         drag: true,

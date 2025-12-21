@@ -4,6 +4,8 @@ export type CanvasTileEngineConfig = {
     maxScale?: number;
     minScale?: number;
     backgroundColor?: string;
+    /** When true, center coordinates are snapped to cell centers (x.5, y.5) for pixel-perfect grid alignment */
+    gridAligned?: boolean;
     size: {
         width: number;
         height: number;
