@@ -89,32 +89,9 @@ export class GestureController {
             return;
         }
         e.preventDefault();
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const world = this.transformer.screenToWorld(mouseX, mouseY);
-        const screen = this.transformer.worldToScreen(Math.floor(world.x), Math.floor(world.y));
+        const { coords, mouse, client } = this.getEventCoords(e);
 
-        this.onRightClick(
-            {
-                raw: world,
-                snapped: { x: Math.floor(world.x), y: Math.floor(world.y) },
-            },
-            {
-                raw: { x: e.clientX - rect.left, y: e.clientY - rect.top },
-                snapped: {
-                    x: screen.x,
-                    y: screen.y,
-                },
-            },
-            {
-                raw: { x: e.clientX, y: e.clientY },
-                snapped: {
-                    x: screen.x + rect.left,
-                    y: screen.y + rect.top,
-                },
-            }
-        );
+        this.onRightClick(coords, mouse, client);
     };
 
     handleMouseDown = (e: MouseEvent) => {

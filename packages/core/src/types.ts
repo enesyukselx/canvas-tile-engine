@@ -91,7 +91,7 @@ export type onMouseUpCallback = MouseEventCallback;
 
 export type onMouseLeaveCallback = MouseEventCallback;
 
-export type onRightClickCallback = onClickCallback;
+export type onRightClickCallback = MouseEventCallback;
 
 export type onZoomCallback = (scale: number) => void;
 
