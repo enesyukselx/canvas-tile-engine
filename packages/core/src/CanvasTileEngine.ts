@@ -267,6 +267,24 @@ export class CanvasTileEngine {
         return this.camera.getCenter(size.width, size.height);
     }
 
+    /**
+     * Get the visible world coordinate bounds of the viewport.
+     * Returns floored/ceiled values representing which cells are visible.
+     * @returns Visible bounds with min/max coordinates.
+     * @example
+     * ```ts
+     * const bounds = engine.getVisibleBounds();
+     * // { minX: 0, maxX: 10, minY: 0, maxY: 10 }
+     *
+     * // Use for random placement within visible area
+     * const x = bounds.minX + Math.floor(Math.random() * (bounds.maxX - bounds.minX));
+     * ```
+     */
+    getVisibleBounds(): { minX: number; maxX: number; minY: number; maxY: number } {
+        const size = this.viewport.getSize();
+        return this.camera.getVisibleBounds(size.width, size.height);
+    }
+
     /** Set center coordinates from outside (adjusts the camera accordingly). */
     updateCoords(newCenter: Coords) {
         const size = this.viewport.getSize();
