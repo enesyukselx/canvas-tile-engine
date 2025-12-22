@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Examples
 
-You can access the source code for all example projects [here](https://github.com/enesyukselx/canvas-tile-engine/tree/master/apps).
+You can access the source code for all example projects [here](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples).
 
 ### Javascript
 
