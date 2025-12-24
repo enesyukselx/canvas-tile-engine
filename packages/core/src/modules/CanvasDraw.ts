@@ -4,6 +4,7 @@ import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer, type LayerHandle } from "./Layer";
 import { DEFAULT_VALUES, VISIBILITY_BUFFER } from "../constants";
 import { SpatialIndex } from "./SpatialIndex";
+import { applyLineWidth } from "../utils/canvas";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
 const SPATIAL_INDEX_THRESHOLD = 500;
@@ -116,8 +117,10 @@ export class CanvasDraw {
                     ctx.strokeStyle = style.strokeStyle;
                     lastStrokeStyle = style.strokeStyle;
                 }
+
+                let resetAlpha: (() => void) | undefined;
                 if (style?.lineWidth && style.lineWidth !== lastLineWidth) {
-                    ctx.lineWidth = style.lineWidth;
+                    resetAlpha = applyLineWidth(ctx, style.lineWidth);
                     lastLineWidth = style.lineWidth;
                 }
 
@@ -151,6 +154,8 @@ export class CanvasDraw {
                     if (style?.fillStyle) ctx.fill();
                     if (style?.strokeStyle) ctx.stroke();
                 }
+
+                resetAlpha?.();
             }
             ctx.restore();
         });
@@ -166,7 +171,8 @@ export class CanvasDraw {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+
+            const resetAlpha = style?.lineWidth ? applyLineWidth(ctx, style.lineWidth) : undefined;
 
             ctx.beginPath();
             for (const item of list) {
@@ -182,6 +188,8 @@ export class CanvasDraw {
                 ctx.lineTo(b.x, b.y);
             }
             ctx.stroke();
+
+            resetAlpha?.();
             ctx.restore();
         });
     }
@@ -230,8 +238,10 @@ export class CanvasDraw {
                     ctx.strokeStyle = style.strokeStyle;
                     lastStrokeStyle = style.strokeStyle;
                 }
+
+                let resetAlpha: (() => void) | undefined;
                 if (style?.lineWidth && style.lineWidth !== lastLineWidth) {
-                    ctx.lineWidth = style.lineWidth;
+                    resetAlpha = applyLineWidth(ctx, style.lineWidth);
                     lastLineWidth = style.lineWidth;
                 }
 
@@ -239,6 +249,8 @@ export class CanvasDraw {
                 ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
                 if (style?.fillStyle) ctx.fill();
                 if (style?.strokeStyle) ctx.stroke();
+
+                resetAlpha?.();
             }
             ctx.restore();
         });
@@ -277,7 +289,8 @@ export class CanvasDraw {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-            if (style?.lineWidth) ctx.lineWidth = style.lineWidth;
+
+            const resetAlpha = style?.lineWidth ? applyLineWidth(ctx, style.lineWidth) : undefined;
 
             ctx.beginPath();
             for (const points of list) {
@@ -302,6 +315,8 @@ export class CanvasDraw {
                 }
             }
             ctx.stroke();
+
+            resetAlpha?.();
             ctx.restore();
         });
     }
@@ -379,7 +394,7 @@ export class CanvasDraw {
             ctx.save();
 
             ctx.strokeStyle = style.strokeStyle;
-            ctx.lineWidth = style.lineWidth;
+            const resetAlpha = applyLineWidth(ctx, style.lineWidth);
 
             ctx.beginPath();
 
@@ -398,6 +413,7 @@ export class CanvasDraw {
             }
 
             ctx.stroke();
+            resetAlpha();
             ctx.restore();
         });
     }
