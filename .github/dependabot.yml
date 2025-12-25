@@ -4,7 +4,7 @@ updates:
     - package-ecosystem: "github-actions"
       directory: "/"
       schedule:
-          interval: "weekly"
+          interval: "monthly"
       commit-message:
           prefix: "chore(deps)"
       groups:
@@ -19,7 +19,7 @@ updates:
     - package-ecosystem: "npm"
       directory: "/"
       schedule:
-          interval: "weekly"
+          interval: "monthly"
       commit-message:
           prefix: "chore(deps)"
       groups:
@@ -34,54 +34,9 @@ updates:
     - package-ecosystem: "npm"
       directory: "/packages/core"
       schedule:
-          interval: "weekly"
+          interval: "monthly"
       commit-message:
           prefix: "chore(core)"
-      groups:
-          minor-patch:
-              patterns:
-                  - "*"
-              update-types:
-                  - "minor"
-                  - "patch"
-
-    # React package
-    - package-ecosystem: "npm"
-      directory: "/packages/react"
-      schedule:
-          interval: "weekly"
-      commit-message:
-          prefix: "chore(react)"
-      groups:
-          minor-patch:
-              patterns:
-                  - "*"
-              update-types:
-                  - "minor"
-                  - "patch"
-
-    # Examples - Vanilla JS
-    - package-ecosystem: "npm"
-      directory: "/examples/vanilla-js-examples"
-      schedule:
-          interval: "monthly"
-      commit-message:
-          prefix: "chore(examples)"
-      groups:
-          minor-patch:
-              patterns:
-                  - "*"
-              update-types:
-                  - "minor"
-                  - "patch"
-
-    # Examples - React
-    - package-ecosystem: "npm"
-      directory: "/examples/react"
-      schedule:
-          interval: "monthly"
-      commit-message:
-          prefix: "chore(examples)"
       groups:
           minor-patch:
               patterns:
