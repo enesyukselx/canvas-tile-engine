@@ -21,3 +21,4 @@ export type {
 } from "./types";
 export type { LayerHandle } from "./modules/Layer";
 export * from "./constants";
+export { gridToSize } from "./utils/gridToSize";
