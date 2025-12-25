@@ -571,13 +571,56 @@ export class CanvasDraw {
             const viewH = config.size.height / config.scale;
 
             // Source rect in cached canvas (what part of cache to draw)
-            const srcX = (topLeft.x - cachedBounds.minX) * cachedScale;
-            const srcY = (topLeft.y - cachedBounds.minY) * cachedScale;
-            const srcW = viewW * cachedScale;
-            const srcH = viewH * cachedScale;
+            let srcX = (topLeft.x - cachedBounds.minX) * cachedScale;
+            let srcY = (topLeft.y - cachedBounds.minY) * cachedScale;
+            let srcW = viewW * cachedScale;
+            let srcH = viewH * cachedScale;
 
-            // Destination on screen
-            ctx.drawImage(cachedCanvas, srcX, srcY, srcW, srcH, 0, 0, config.size.width, config.size.height);
+            // Destination rect on screen
+            let destX = 0;
+            let destY = 0;
+            let destW = config.size.width;
+            let destH = config.size.height;
+
+            // Clamp source rect to cache bounds (prevent out-of-bounds coordinates)
+            // This fixes rendering issues on mobile browsers (WebKit) when viewport extends beyond cache
+            const cacheWidth = cachedCanvas.width;
+            const cacheHeight = cachedCanvas.height;
+
+            // Clamp left/top (negative source coordinates)
+            if (srcX < 0) {
+                const offsetWorld = -srcX / cachedScale;
+                destX = offsetWorld * config.scale;
+                destW -= destX;
+                srcW += srcX;
+                srcX = 0;
+            }
+            if (srcY < 0) {
+                const offsetWorld = -srcY / cachedScale;
+                destY = offsetWorld * config.scale;
+                destH -= destY;
+                srcH += srcY;
+                srcY = 0;
+            }
+
+            // Clamp right/bottom (source exceeds cache bounds)
+            if (srcX + srcW > cacheWidth) {
+                const excess = srcX + srcW - cacheWidth;
+                const excessWorld = excess / cachedScale;
+                srcW = cacheWidth - srcX;
+                destW -= excessWorld * config.scale;
+            }
+            if (srcY + srcH > cacheHeight) {
+                const excess = srcY + srcH - cacheHeight;
+                const excessWorld = excess / cachedScale;
+                srcH = cacheHeight - srcY;
+                destH -= excessWorld * config.scale;
+            }
+
+            // Only draw if there's something to draw
+            if (srcW > 0 && srcH > 0 && destW > 0 && destH > 0) {
+                ctx.drawImage(cachedCanvas, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
+            }
         });
     }
 
