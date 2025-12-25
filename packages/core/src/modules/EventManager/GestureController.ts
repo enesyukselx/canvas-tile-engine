@@ -163,10 +163,20 @@ export class GestureController {
             return;
         }
 
-        // Handle single finger drag
-        if (!eventHandlers.drag) return;
         if (e.touches.length !== 1) return;
         const t = e.touches[0];
+
+        // Fire onMouseDown callback for touch
+        if (this.onMouseDown) {
+            e.preventDefault();
+            const { coords, mouse, client } = this.getEventCoords(t);
+            this.onMouseDown(coords, mouse, client);
+        }
+
+        // Handle single finger drag
+        if (!eventHandlers.drag) {
+            return;
+        }
         this.isDragging = true;
         this.isPinching = false;
         this.shouldPreventClick = false;
@@ -208,12 +218,24 @@ export class GestureController {
             return;
         }
 
+        if (e.touches.length !== 1) {
+            return;
+        }
+
+        const t = e.touches[0];
+
+        // Fire onHover callback for touch move
+        if (this.onHover && this.config.get().eventHandlers.hover) {
+            e.preventDefault();
+            const { coords, mouse, client } = this.getEventCoords(t);
+            this.onHover(coords, mouse, client);
+        }
+
         // Handle single finger drag
-        if (!this.isDragging || e.touches.length !== 1) {
+        if (!this.isDragging) {
             return;
         }
         e.preventDefault();
-        const t = e.touches[0];
         const dx = t.clientX - this.lastPos.x;
         const dy = t.clientY - this.lastPos.y;
         if (dx !== 0 || dy !== 0) {
@@ -242,6 +264,13 @@ export class GestureController {
                 this.lastPos = { x: t.clientX, y: t.clientY };
             }
             return;
+        }
+
+        // Fire onMouseUp for touch end (use changedTouches for the lifted finger)
+        if (e.changedTouches.length > 0 && this.onMouseUp) {
+            const t = e.changedTouches[0];
+            const { coords, mouse, client } = this.getEventCoords(t);
+            this.onMouseUp(coords, mouse, client);
         }
 
         // All fingers lifted
