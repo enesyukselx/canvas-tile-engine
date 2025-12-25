@@ -1,3 +1,5 @@
+import type { CanvasTileEngineConfig } from "../types";
+
 /**
  * Convert grid-based dimensions to pixel-based config.
  * @param options Grid configuration with columns, rows, and cell size.
@@ -12,7 +14,11 @@
  * // config.scale = 50
  * ```
  */
-export function gridToSize(options: { columns: number; rows: number; cellSize: number }) {
+export function gridToSize(options: {
+    columns: number;
+    rows: number;
+    cellSize: number;
+}): Pick<CanvasTileEngineConfig, "size" | "scale"> {
     return {
         size: {
             width: options.columns * options.cellSize,
