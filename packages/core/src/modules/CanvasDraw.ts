@@ -567,59 +567,79 @@ export class CanvasDraw {
         const cachedScale = cache.scale;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const viewW = config.size.width / config.scale;
-            const viewH = config.size.height / config.scale;
+            const viewportWidth = config.size.width / config.scale;
+            const viewportHeight = config.size.height / config.scale;
 
-            // Source rect in cached canvas (what part of cache to draw)
-            let srcX = (topLeft.x - cachedBounds.minX) * cachedScale;
-            let srcY = (topLeft.y - cachedBounds.minY) * cachedScale;
-            let srcW = viewW * cachedScale;
-            let srcH = viewH * cachedScale;
+            // === Source Rectangle (cached canvas coordinates) ===
+            // These define which region of the offscreen cache canvas to copy FROM
+            // Calculated by finding viewport position relative to cache origin, then scaling to cache resolution
+            let cacheSourceX = (topLeft.x - cachedBounds.minX) * cachedScale;
+            let cacheSourceY = (topLeft.y - cachedBounds.minY) * cachedScale;
+            let cacheSourceWidth = viewportWidth * cachedScale;
+            let cacheSourceHeight = viewportHeight * cachedScale;
 
-            // Destination rect on screen
-            let destX = 0;
-            let destY = 0;
-            let destW = config.size.width;
-            let destH = config.size.height;
+            // === Destination Rectangle (screen coordinates) ===
+            // These define where to draw the copied region TO on the visible canvas
+            // Note: These values get adjusted below when viewport extends beyond cached bounds
+            let screenDestX = 0;
+            let screenDestY = 0;
+            let screenDestWidth = config.size.width;
+            let screenDestHeight = config.size.height;
 
-            // Clamp source rect to cache bounds (prevent out-of-bounds coordinates)
-            // This fixes rendering issues on mobile browsers (WebKit) when viewport extends beyond cache
+            // === Bounds Clamping ===
+            // Problem: When viewport pans beyond the cached area, source coordinates become invalid
+            //          (negative or exceeding cache dimensions). Mobile browsers
+            //          fail silently or render incorrectly with out-of-bounds drawImage coordinates.
+            // Solution: Clamp source rect to valid cache bounds and adjust destination rect to
+            //           maintain correct positioning - only draw the portion that exists in cache.
             const cacheWidth = cachedCanvas.width;
             const cacheHeight = cachedCanvas.height;
 
-            // Clamp left/top (negative source coordinates)
-            if (srcX < 0) {
-                const offsetWorld = -srcX / cachedScale;
-                destX = offsetWorld * config.scale;
-                destW -= destX;
-                srcW += srcX;
-                srcX = 0;
+            // Clamp left/top: When viewport is beyond cache's top-left corner
+            // Shift destination right/down to compensate for the missing cached area
+            if (cacheSourceX < 0) {
+                const offsetWorld = -cacheSourceX / cachedScale;
+                screenDestX = offsetWorld * config.scale;
+                screenDestWidth -= screenDestX;
+                cacheSourceWidth += cacheSourceX;
+                cacheSourceX = 0;
             }
-            if (srcY < 0) {
-                const offsetWorld = -srcY / cachedScale;
-                destY = offsetWorld * config.scale;
-                destH -= destY;
-                srcH += srcY;
-                srcY = 0;
+            if (cacheSourceY < 0) {
+                const offsetWorld = -cacheSourceY / cachedScale;
+                screenDestY = offsetWorld * config.scale;
+                screenDestHeight -= screenDestY;
+                cacheSourceHeight += cacheSourceY;
+                cacheSourceY = 0;
             }
 
-            // Clamp right/bottom (source exceeds cache bounds)
-            if (srcX + srcW > cacheWidth) {
-                const excess = srcX + srcW - cacheWidth;
+            // Clamp right/bottom: When viewport extends past cache's bottom-right corner
+            // Shrink destination to avoid stretching the cached content
+            if (cacheSourceX + cacheSourceWidth > cacheWidth) {
+                const excess = cacheSourceX + cacheSourceWidth - cacheWidth;
                 const excessWorld = excess / cachedScale;
-                srcW = cacheWidth - srcX;
-                destW -= excessWorld * config.scale;
+                cacheSourceWidth = cacheWidth - cacheSourceX;
+                screenDestWidth -= excessWorld * config.scale;
             }
-            if (srcY + srcH > cacheHeight) {
-                const excess = srcY + srcH - cacheHeight;
+            if (cacheSourceY + cacheSourceHeight > cacheHeight) {
+                const excess = cacheSourceY + cacheSourceHeight - cacheHeight;
                 const excessWorld = excess / cachedScale;
-                srcH = cacheHeight - srcY;
-                destH -= excessWorld * config.scale;
+                cacheSourceHeight = cacheHeight - cacheSourceY;
+                screenDestHeight -= excessWorld * config.scale;
             }
 
             // Only draw if there's something to draw
-            if (srcW > 0 && srcH > 0 && destW > 0 && destH > 0) {
-                ctx.drawImage(cachedCanvas, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
+            if (cacheSourceWidth > 0 && cacheSourceHeight > 0 && screenDestWidth > 0 && screenDestHeight > 0) {
+                ctx.drawImage(
+                    cachedCanvas,
+                    cacheSourceX,
+                    cacheSourceY,
+                    cacheSourceWidth,
+                    cacheSourceHeight,
+                    screenDestX,
+                    screenDestY,
+                    screenDestWidth,
+                    screenDestHeight
+                );
             }
         });
     }
