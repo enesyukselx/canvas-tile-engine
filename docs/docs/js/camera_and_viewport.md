@@ -72,7 +72,7 @@ const y = bounds.minY + Math.floor(Math.random() * (bounds.maxY - bounds.minY));
 
 ### Zooming
 
-Zooming is primarily handled by user interaction (mouse wheel), but you can configure the limits.
+Zooming is primarily handled by user interaction (mouse wheel), but you can configure the limits and control zoom programmatically.
 
 **Configuration:**
 
@@ -85,6 +85,25 @@ const config = {
     zoom: true     // Enable mouse wheel zoom
   }
 };
+```
+
+#### `setScale(scale)`
+
+Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds.
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `scale` | `number` | The desired zoom level (pixels per grid unit). |
+
+```typescript
+// Set zoom to 50 pixels per grid unit
+engine.setScale(50);
+
+// Zoom in (larger scale = more zoomed in)
+engine.setScale(100);
+
+// Zoom out (smaller scale = more zoomed out)
+engine.setScale(10);
 ```
 
 ## Viewport & Resizing

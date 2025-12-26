@@ -255,6 +255,15 @@ export class CanvasTileEngine {
     }
 
     /**
+     * Set the canvas scale directly, clamped to min/max bounds.
+     * @param newScale The desired scale value.
+     */
+    setScale(newScale: number) {
+        this.camera.setScale(newScale);
+        this.handleCameraChange();
+    }
+
+    /**
      * Zoom in by a given factor, centered on the viewport.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom in more.
      */

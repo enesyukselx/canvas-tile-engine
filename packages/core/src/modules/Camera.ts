@@ -63,6 +63,12 @@ export interface ICamera {
     zoomByFactor(factor: number, centerX: number, centerY: number): void;
 
     /**
+     * Set the camera scale directly, clamped to min/max bounds.
+     * @param newScale The desired scale value.
+     */
+    setScale(newScale: number): void;
+
+    /**
      * Get the visible world coordinate bounds of the viewport.
      * @param canvasWidth Canvas width in pixels.
      * @param canvasHeight Canvas height in pixels.
@@ -162,6 +168,15 @@ export class Camera implements ICamera {
 
     get scale(): number {
         return this._scale;
+    }
+
+    /**
+     * Set the camera scale directly, clamped to min/max bounds.
+     * @param newScale The desired scale value.
+     */
+    setScale(newScale: number) {
+        this._scale = Math.min(this.maxScale, Math.max(this.minScale, newScale));
+        this.clampToBounds();
     }
 
     pan(deltaScreenX: number, deltaScreenY: number) {

@@ -65,7 +65,7 @@ const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
 /**
  * Engine handle returned by useCanvasTileEngine hook.
  * Provides access to engine methods with proper typing.
- * 
+ *
  * All methods return default/dummy values when engine is not ready,
  * allowing safe usage without null checks.
  */
@@ -104,6 +104,9 @@ export interface EngineHandle {
 
     /** Get current canvas scale */
     getScale(): number;
+
+    /** Set the canvas scale directly, clamped to min/max bounds. */
+    setScale(newScale: number): void;
 
     /** Zoom in by a factor (default: 1.5) */
     zoomIn(factor?: number): void;
@@ -286,6 +289,10 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.getScale() ?? 1;
             },
 
+            setScale(newScale: number) {
+                instanceRef.current?.setScale(newScale);
+            },
+
             zoomIn(factor?: number) {
                 instanceRef.current?.zoomIn(factor);
             },
@@ -343,7 +350,9 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
-                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? DUMMY_LAYER_HANDLE;
+                return (
+                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? DUMMY_LAYER_HANDLE
+                );
             },
 
             addDrawFunction(fn, layer) {

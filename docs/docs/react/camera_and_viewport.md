@@ -153,6 +153,34 @@ const config = {
 };
 ```
 
+### `setScale(scale)`
+
+Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds.
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `scale` | `number` | The desired zoom level (pixels per grid unit). |
+
+```tsx
+const zoomIn = () => {
+    if (engine.isReady) {
+        engine.setScale(100); // Zoom in
+    }
+};
+
+const zoomOut = () => {
+    if (engine.isReady) {
+        engine.setScale(10); // Zoom out
+    }
+};
+
+const resetZoom = () => {
+    if (engine.isReady) {
+        engine.setScale(50); // Reset to default
+    }
+};
+```
+
 ## Viewport & Resizing
 
 ### Auto-Resizing
