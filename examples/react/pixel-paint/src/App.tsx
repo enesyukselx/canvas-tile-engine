@@ -2,6 +2,7 @@ import reactLogo from "./assets/react.svg";
 import "./App.css";
 import { CanvasTileEngine, useCanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 import { useState } from "react";
+import { gridToSize } from "@canvas-tile-engine/react";
 
 const HOVER_LAYER = 1;
 const DRAW_LAYER = 2;
@@ -10,12 +11,12 @@ function App() {
     //
     const engine = useCanvasTileEngine();
     const config: CanvasTileEngineConfig = {
-        scale: 40,
+        ...gridToSize({
+            columns: 10,
+            rows: 10,
+            cellSize: 40,
+        }),
         gridAligned: true,
-        size: {
-            width: 400,
-            height: 400,
-        },
         backgroundColor: "#e6e6e6",
         eventHandlers: {
             hover: true,

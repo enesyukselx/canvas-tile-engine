@@ -44,5 +44,5 @@ export type {
 } from "./types";
 export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
-// Re-export core class with different name
-export { CanvasTileEngine as CanvasTileEngineCore } from "@canvas-tile-engine/core";
+// Re-export core class and utilities
+export { CanvasTileEngine as CanvasTileEngineCore, gridToSize } from "@canvas-tile-engine/core";
