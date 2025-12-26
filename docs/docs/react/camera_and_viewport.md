@@ -108,12 +108,12 @@ const placeRandomMine = () => {
 };
 ```
 
-| Property | Description |
-| :--- | :--- |
-| `minX` | Left edge of viewport (floored) |
-| `maxX` | Right edge of viewport (ceiled) |
-| `minY` | Top edge of viewport (floored) |
-| `maxY` | Bottom edge of viewport (ceiled) |
+| Property | Description                      |
+| :------- | :------------------------------- |
+| `minX`   | Left edge of viewport (floored)  |
+| `maxX`   | Right edge of viewport (ceiled)  |
+| `minY`   | Top edge of viewport (floored)   |
+| `maxY`   | Bottom edge of viewport (ceiled) |
 
 ### Tracking Camera Position
 
@@ -153,32 +153,74 @@ const config = {
 };
 ```
 
+### `zoomIn(factor?)`
+
+Zooms in by a given factor (default: 1.5), centered on the viewport.
+
+```tsx
+const handleZoomIn = () => {
+    engine.zoomIn(); // Zoom in by 1.5x
+    engine.zoomIn(2); // Zoom in by 2x
+};
+```
+
+### `zoomOut(factor?)`
+
+Zooms out by a given factor (default: 1.5), centered on the viewport.
+
+```tsx
+const handleZoomOut = () => {
+    engine.zoomOut(); // Zoom out by 1.5x
+    engine.zoomOut(2); // Zoom out by 2x
+};
+```
+
+### `getScale()`
+
+Returns the current zoom scale.
+
+```tsx
+const logScale = () => {
+    const scale = engine.getScale();
+    console.log("Current scale:", scale); // 50
+};
+```
+
 ### `setScale(scale)`
 
 Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds.
 
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| `scale` | `number` | The desired zoom level (pixels per grid unit). |
+| Parameter | Type     | Description                                    |
+| :-------- | :------- | :--------------------------------------------- |
+| `scale`   | `number` | The desired zoom level (pixels per grid unit). |
 
 ```tsx
-const zoomIn = () => {
+const setZoom = (scale: number) => {
     if (engine.isReady) {
-        engine.setScale(100); // Zoom in
+        engine.setScale(scale);
     }
 };
+```
 
-const zoomOut = () => {
-    if (engine.isReady) {
-        engine.setScale(10); // Zoom out
-    }
-};
+### Example: Zoom Controls
 
-const resetZoom = () => {
-    if (engine.isReady) {
-        engine.setScale(50); // Reset to default
-    }
-};
+```tsx
+function MapWithZoomControls() {
+    const engine = useCanvasTileEngine();
+
+    return (
+        <div>
+            <div>
+                <button onClick={() => engine.zoomIn()}>+</button>
+                <button onClick={() => engine.zoomOut()}>-</button>
+            </div>
+
+            <CanvasTileEngine engine={engine} config={config}>
+                {/* children */}
+            </CanvasTileEngine>
+        </div>
+    );
+}
 ```
 
 ## Viewport & Resizing

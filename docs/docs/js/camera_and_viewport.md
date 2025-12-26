@@ -8,9 +8,9 @@ The engine uses a virtual camera system to navigate the infinite grid. The camer
 
 ## Camera Concepts
 
-- **Center-Based**: The camera is defined by the world coordinate at the exact center of the viewport.
-- **Infinite Grid**: You can pan infinitely in any direction.
-- **Zoom**: Controls how many pixels a single grid unit occupies (`scale`).
+-   **Center-Based**: The camera is defined by the world coordinate at the exact center of the viewport.
+-   **Infinite Grid**: You can pan infinitely in any direction.
+-   **Zoom**: Controls how many pixels a single grid unit occupies (`scale`).
 
 ## Programmatic Control
 
@@ -22,11 +22,11 @@ You can move the camera using the engine instance.
 
 Smoothly animates the camera to a new position.
 
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `x` | `number` | **Required** | Target world X. |
-| `y` | `number` | **Required** | Target world Y. |
-| `duration` | `number` | `500` | Animation duration in ms. |
+| Parameter  | Type     | Default      | Description               |
+| :--------- | :------- | :----------- | :------------------------ |
+| `x`        | `number` | **Required** | Target world X.           |
+| `y`        | `number` | **Required** | Target world Y.           |
+| `duration` | `number` | `500`        | Animation duration in ms. |
 
 ```typescript
 // Pan to coordinates (15, 20) over 1 second
@@ -63,12 +63,12 @@ const x = bounds.minX + Math.floor(Math.random() * (bounds.maxX - bounds.minX));
 const y = bounds.minY + Math.floor(Math.random() * (bounds.maxY - bounds.minY));
 ```
 
-| Property | Description |
-| :--- | :--- |
-| `minX` | Left edge of viewport (floored) |
-| `maxX` | Right edge of viewport (ceiled) |
-| `minY` | Top edge of viewport (floored) |
-| `maxY` | Bottom edge of viewport (ceiled) |
+| Property | Description                      |
+| :------- | :------------------------------- |
+| `minX`   | Left edge of viewport (floored)  |
+| `maxX`   | Right edge of viewport (ceiled)  |
+| `minY`   | Top edge of viewport (floored)   |
+| `maxY`   | Bottom edge of viewport (ceiled) |
 
 ### Zooming
 
@@ -78,22 +78,57 @@ Zooming is primarily handled by user interaction (mouse wheel), but you can conf
 
 ```typescript
 const config = {
-  scale: 20,       // Initial zoom (pixels per grid unit)
-  minScale: 10,    // Minimum zoom out
-  maxScale: 100,   // Maximum zoom in
-  eventHandlers: {
-    zoom: true     // Enable mouse wheel zoom
-  }
+    scale: 20, // Initial zoom (pixels per grid unit)
+    minScale: 10, // Minimum zoom out
+    maxScale: 100, // Maximum zoom in
+    eventHandlers: {
+        zoom: true, // Enable mouse wheel zoom
+    },
 };
+```
+
+#### `zoomIn(factor?)`
+
+Zooms in by a given factor, centered on the viewport.
+
+| Parameter | Type     | Default | Description                                  |
+| :-------- | :------- | :------ | :------------------------------------------- |
+| `factor`  | `number` | `1.5`   | Zoom multiplier. Higher values zoom in more. |
+
+```typescript
+engine.zoomIn(); // Zoom in by 1.5x
+engine.zoomIn(2); // Zoom in by 2x
+```
+
+#### `zoomOut(factor?)`
+
+Zooms out by a given factor, centered on the viewport.
+
+| Parameter | Type     | Default | Description                                   |
+| :-------- | :------- | :------ | :-------------------------------------------- |
+| `factor`  | `number` | `1.5`   | Zoom multiplier. Higher values zoom out more. |
+
+```typescript
+engine.zoomOut(); // Zoom out by 1.5x
+engine.zoomOut(2); // Zoom out by 2x
+```
+
+#### `getScale()`
+
+Returns the current zoom scale.
+
+```typescript
+const scale = engine.getScale();
+console.log(scale); // 50
 ```
 
 #### `setScale(scale)`
 
 Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds.
 
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| `scale` | `number` | The desired zoom level (pixels per grid unit). |
+| Parameter | Type     | Description                                    |
+| :-------- | :------- | :--------------------------------------------- |
+| `scale`   | `number` | The desired zoom level (pixels per grid unit). |
 
 ```typescript
 // Set zoom to 50 pixels per grid unit
@@ -116,10 +151,10 @@ If `eventHandlers.resize` is enabled in the config, the engine will automaticall
 
 ```typescript
 const config = {
-  // ...
-  eventHandlers: {
-    resize: true
-  }
+    // ...
+    eventHandlers: {
+        resize: true,
+    },
 };
 ```
 
