@@ -163,12 +163,15 @@ export class CanvasTileEngine {
         this.config = new Config(config);
 
         const rendererType = config.renderer ?? "canvas";
-        const alignedCenter = config.gridAligned
-            ? { x: Math.floor(center.x) + 0.5, y: Math.floor(center.y) + 0.5 }
-            : center;
+
+        const tilesX = config.size.width / config.scale;
+        const tilesY = config.size.height / config.scale;
+        const alignedXCenter = config.gridAligned && tilesX % 2 === 0 ? Math.floor(center.x) + 0.5 : center.x;
+        const alignedYCenter = config.gridAligned && tilesY % 2 === 0 ? Math.floor(center.y) + 0.5 : center.y;
+
         const initialTopLeft: Coords = {
-            x: alignedCenter.x - config.size.width / (2 * config.scale),
-            y: alignedCenter.y - config.size.height / (2 * config.scale),
+            x: alignedXCenter - config.size.width / (2 * config.scale),
+            y: alignedYCenter - config.size.height / (2 * config.scale),
         };
 
         this.viewport = new ViewportState(config.size.width, config.size.height);
