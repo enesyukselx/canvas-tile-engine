@@ -242,13 +242,17 @@ engine.onCoordsChange = (center) => {
 
 ### `onResize`
 
-Triggered when the canvas is resized.
+Triggered when the canvas is resized (either manually via `resize()` or automatically in responsive mode).
 
 ```typescript
 engine.onResize = () => {
     console.log("Canvas resized to:", engine.getSize());
 };
 ```
+
+:::tip Responsive Mode
+In responsive mode, this callback is triggered whenever the wrapper element size changes.
+:::
 
 ### `onZoom`
 
@@ -338,6 +342,10 @@ Manually updates the canvas size (e.g., when the container resizes or user selec
 // Resize to 800x600 with a smooth transition
 engine.resize(800, 600, 500);
 ```
+
+:::warning Responsive Mode
+This method is disabled when `responsive` mode is enabled. In responsive mode, canvas size is automatically controlled by the wrapper element.
+:::
 
 ### `setEventHandlers`
 

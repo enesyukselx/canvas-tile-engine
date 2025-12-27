@@ -168,7 +168,7 @@ function MapWithMinimap() {
 
 ### `onResize`
 
-Triggered when the canvas is resized.
+Triggered when the canvas is resized (either manually via `resize()` or automatically in responsive mode).
 
 ```tsx
 <CanvasTileEngine
@@ -181,6 +181,10 @@ Triggered when the canvas is resized.
     {/* children */}
 </CanvasTileEngine>
 ```
+
+:::tip Responsive Mode
+In responsive mode, this callback is triggered whenever the wrapper element size changes.
+:::
 
 ### `onZoom`
 
