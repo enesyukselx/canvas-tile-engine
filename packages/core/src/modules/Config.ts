@@ -29,6 +29,8 @@ export class Config {
                 minWidth: config.size.minWidth ?? SIZE_LIMITS.MIN_WIDTH,
             },
 
+            responsive: config.responsive ?? false,
+
             backgroundColor: config.backgroundColor ?? RENDER_DEFAULTS.BACKGROUND_COLOR,
 
             eventHandlers: {
@@ -103,6 +105,7 @@ export class Config {
         return {
             ...cfg,
             size: { ...cfg.size },
+            responsive: cfg.responsive,
             eventHandlers: { ...cfg.eventHandlers },
             bounds: { ...cfg.bounds },
             coordinates: {
