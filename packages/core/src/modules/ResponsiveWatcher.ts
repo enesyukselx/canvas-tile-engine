@@ -18,6 +18,9 @@ export class ResponsiveWatcher {
     /** Initial visible tiles (used for preserve-viewport mode) */
     private initialVisibleTiles: { x: number; y: number };
 
+    /** Width limits derived from scale limits (preserve-viewport mode) */
+    private widthLimits: { min: number; max: number };
+
     /** Callback fired after responsive resize */
     public onResize?: () => void;
 
@@ -38,6 +41,12 @@ export class ResponsiveWatcher {
             x: cfg.size.width / cfg.scale,
             y: cfg.size.height / cfg.scale,
         };
+
+        // Calculate width limits from scale limits (for preserve-viewport mode)
+        this.widthLimits = {
+            min: cfg.minScale * this.initialVisibleTiles.x,
+            max: cfg.maxScale * this.initialVisibleTiles.x,
+        };
     }
 
     start() {
@@ -49,6 +58,16 @@ export class ResponsiveWatcher {
         // Ensure DPR is up to date
         this.viewport.updateDpr();
         this.currentDpr = this.viewport.dpr;
+
+        // In preserve-viewport mode, set width to 100% and apply min/max dimensions
+        if (responsiveMode === "preserve-viewport") {
+            const aspectRatio = this.initialVisibleTiles.y / this.initialVisibleTiles.x;
+            this.wrapper.style.width = "100%";
+            this.wrapper.style.minWidth = `${this.widthLimits.min}px`;
+            this.wrapper.style.maxWidth = `${this.widthLimits.max}px`;
+            this.wrapper.style.minHeight = `${this.widthLimits.min * aspectRatio}px`;
+            this.wrapper.style.maxHeight = `${this.widthLimits.max * aspectRatio}px`;
+        }
 
         // Get initial size from wrapper (user controls via CSS)
         const wrapperRect = this.wrapper.getBoundingClientRect();
@@ -104,14 +123,13 @@ export class ResponsiveWatcher {
 
         if (mode === "preserve-viewport") {
             // Calculate new scale to maintain the same visible tile count
-            // Use width as reference
             const newScale = width / this.initialVisibleTiles.x;
 
             // Calculate height based on configured tile ratio
             const calculatedHeight = Math.round(this.initialVisibleTiles.y * newScale);
             height = calculatedHeight;
 
-            // Apply calculated height to wrapper
+            // Apply calculated height to wrapper (width is 100%, max-width handles limits)
             this.wrapper.style.height = `${calculatedHeight}px`;
 
             // Save current center before changing scale

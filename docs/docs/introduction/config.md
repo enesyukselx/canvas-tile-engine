@@ -37,20 +37,16 @@ Define the canvas dimensions and constraints.
 
 Enable responsive mode to automatically resize the canvas when its container changes size. Two modes are available:
 
-| Mode                | Description                                                                                         |
-| :------------------ | :-------------------------------------------------------------------------------------------------- |
-| `"preserve-scale"`  | Scale stays constant, visible tile count changes as container resizes.                              |
-| `"preserve-viewport"` | Visible tile count stays constant, scale adjusts. Height is auto-calculated based on tile ratio. |
+| Mode                  | Description                                                            |
+| :-------------------- | :--------------------------------------------------------------------- |
+| `"preserve-scale"`    | Scale stays constant, visible tile count changes as container resizes. |
+| `"preserve-viewport"` | Visible tile count stays constant, scale adjusts based on width.       |
+
+#### preserve-scale
+
+The scale remains fixed while the visible tile count changes based on the container size. The wrapper size is fully controlled by your CSS.
 
 ```typescript
-// Example: Canvas fills container, tile count stays same
-const config = {
-    size: { width: 800, height: 600 },
-    scale: 50,
-    responsive: "preserve-viewport",
-};
-
-// Example: Canvas fills container, scale stays same
 const config = {
     size: { width: 800, height: 600 },
     scale: 50,
@@ -58,14 +54,37 @@ const config = {
 };
 ```
 
+#### preserve-viewport
+
+The visible tile count remains fixed while the scale adjusts based on container width. The engine automatically:
+
+- Sets wrapper `width: 100%`
+- Calculates height based on the tile ratio from `size.width` / `size.height`
+- Derives `minWidth` / `maxWidth` from `minScale` / `maxScale`:
+  - `minWidth = minScale × (size.width / scale)`
+  - `maxWidth = maxScale × (size.width / scale)`
+- Derives `minHeight` / `maxHeight` similarly based on the tile ratio
+
+This ensures the scale always stays within `minScale` and `maxScale` bounds.
+
+```typescript
+const config = {
+    size: { width: 800, height: 600 }, // 16×12 tiles at scale 50
+    scale: 50,
+    minScale: 25,  // → minWidth: 400px, minHeight: 300px
+    maxScale: 100, // → maxWidth: 1600px, maxHeight: 1200px
+    responsive: "preserve-viewport",
+};
+```
+
+:::info Automatic Size Limits
+In `preserve-viewport` mode, `size.minWidth`, `size.maxWidth`, `size.minHeight`, and `size.maxHeight` are ignored. The size limits are automatically calculated from `minScale` and `maxScale` to maintain the configured tile count.
+:::
+
 :::warning Limitations
 When responsive mode is enabled:
 - `resize()` method is disabled (canvas size is controlled by the wrapper element)
 - `eventHandlers.resize` is ignored (resizing is handled automatically)
-:::
-
-:::tip Usage
-Set the wrapper element's width via CSS (e.g., `width: 100%`). In `preserve-viewport` mode, height is automatically calculated to maintain the configured tile ratio.
 :::
 
 ## Interactions
