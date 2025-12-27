@@ -10,14 +10,15 @@ The `CanvasTileEngineConfig` object controls the initial state and behavior of t
 
 These are the fundamental settings required to initialize the engine.
 
-| Property          | Type      | Default       | Description                                                                      |
-| :---------------- | :-------- | :------------ | :------------------------------------------------------------------------------- |
-| `scale`           | `number`  | **Required**  | The initial zoom level (pixels per grid unit).                                   |
-| `size`            | `object`  | **Required**  | The dimensions of the canvas. See [Size Options](#size-options).                 |
-| `backgroundColor` | `string`  | `"#ffffff"`   | The background color of the canvas.                                              |
-| `minScale`        | `number`  | `scale * 0.5` | Minimum allowed zoom level.                                                      |
-| `maxScale`        | `number`  | `scale * 2`   | Maximum allowed zoom level.                                                      |
-| `gridAligned`     | `boolean` | `false`       | Snap initial center to cell centers (x.5, y.5) for pixel-perfect grid alignment. |
+| Property          | Type                                              | Default       | Description                                                                      |
+| :---------------- | :------------------------------------------------ | :------------ | :------------------------------------------------------------------------------- |
+| `scale`           | `number`                                          | **Required**  | The initial zoom level (pixels per grid unit).                                   |
+| `size`            | `object`                                          | **Required**  | The dimensions of the canvas. See [Size Options](#size-options).                 |
+| `responsive`      | `"preserve-scale"` \| `"preserve-viewport"` \| `false` | `false`       | Enable responsive mode. See [Responsive Mode](#responsive-mode).                 |
+| `backgroundColor` | `string`                                          | `"#ffffff"`   | The background color of the canvas.                                              |
+| `minScale`        | `number`                                          | `scale * 0.5` | Minimum allowed zoom level.                                                      |
+| `maxScale`        | `number`                                          | `scale * 2`   | Maximum allowed zoom level.                                                      |
+| `gridAligned`     | `boolean`                                         | `false`       | Snap initial center to cell centers (x.5, y.5) for pixel-perfect grid alignment. |
 
 ### Size Options
 
@@ -31,6 +32,60 @@ Define the canvas dimensions and constraints.
 | `minHeight` | `number` | `100`        | Minimum height allowed during resize. |
 | `maxWidth`  | `number` | `Infinity`   | Maximum width allowed during resize.  |
 | `maxHeight` | `number` | `Infinity`   | Maximum height allowed during resize. |
+
+### Responsive Mode
+
+Enable responsive mode to automatically resize the canvas when its container changes size. Two modes are available:
+
+| Mode                  | Description                                                            |
+| :-------------------- | :--------------------------------------------------------------------- |
+| `"preserve-scale"`    | Scale stays constant, visible tile count changes as container resizes. |
+| `"preserve-viewport"` | Visible tile count stays constant, scale adjusts based on width.       |
+
+#### preserve-scale
+
+The scale remains fixed while the visible tile count changes based on the container size. The wrapper size is fully controlled by your CSS.
+
+```typescript
+const config = {
+    size: { width: 800, height: 600 },
+    scale: 50,
+    responsive: "preserve-scale",
+};
+```
+
+#### preserve-viewport
+
+The visible tile count remains fixed while the scale adjusts based on container width. The engine automatically:
+
+- Sets wrapper `width: 100%`
+- Calculates height based on the tile ratio from `size.width` / `size.height`
+- Derives `minWidth` / `maxWidth` from `minScale` / `maxScale`:
+  - `minWidth = minScale × (size.width / scale)`
+  - `maxWidth = maxScale × (size.width / scale)`
+- Derives `minHeight` / `maxHeight` similarly based on the tile ratio
+
+This ensures the scale always stays within `minScale` and `maxScale` bounds.
+
+```typescript
+const config = {
+    size: { width: 800, height: 600 }, // 16×12 tiles at scale 50
+    scale: 50,
+    minScale: 25,  // → minWidth: 400px, minHeight: 300px
+    maxScale: 100, // → maxWidth: 1600px, maxHeight: 1200px
+    responsive: "preserve-viewport",
+};
+```
+
+:::info Automatic Size Limits
+In `preserve-viewport` mode, `size.minWidth`, `size.maxWidth`, `size.minHeight`, and `size.maxHeight` are ignored. The size limits are automatically calculated from `minScale` and `maxScale` to maintain the configured tile count.
+:::
+
+:::warning Limitations
+When responsive mode is enabled:
+- `resize()` method is disabled (canvas size is controlled by the wrapper element)
+- `eventHandlers.resize` is ignored (resizing is handled automatically)
+:::
 
 ## Interactions
 
@@ -142,6 +197,7 @@ export type CanvasTileEngineConfig = {
         maxWidth?: number;
         maxHeight?: number;
     };
+    responsive?: "preserve-scale" | "preserve-viewport" | false;
     eventHandlers?: {
         click?: boolean;
         rightClick?: boolean;

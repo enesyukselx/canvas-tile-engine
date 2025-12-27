@@ -14,6 +14,7 @@ export type CanvasTileEngineConfig = {
         maxWidth?: number;
         maxHeight?: number;
     };
+    responsive?: "preserve-scale" | "preserve-viewport" | false;
     eventHandlers?: EventHandlers;
     bounds?: {
         minX: number;

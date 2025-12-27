@@ -14,6 +14,7 @@ const DUMMY_LAYER_HANDLE: LayerHandle = { layer: -1, id: Symbol("dummy") };
 /** Default config when engine is not ready */
 const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
     size: { width: 0, height: 0, minWidth: 100, minHeight: 100, maxWidth: Infinity, maxHeight: Infinity },
+    responsive: false,
     scale: 1,
     minScale: 0.5,
     maxScale: 2,

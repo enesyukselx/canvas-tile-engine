@@ -112,7 +112,15 @@ export class EventManager {
         if (this.attached) return;
         this.binder.attach();
         this.attached = true;
-        if (this.config.get().eventHandlers.resize && this.camera instanceof Camera) {
+        // ResizeWatcher is disabled in responsive mode - responsive mode handles resizing automatically
+        if (this.config.get().responsive) {
+            if (this.config.get().eventHandlers.resize) {
+                console.warn(
+                    "Canvas Tile Engine: eventHandlers.resize is ignored when responsive mode is enabled. " +
+                        "Resizing is handled automatically."
+                );
+            }
+        } else if (this.config.get().eventHandlers.resize && this.camera instanceof Camera) {
             this.resizeWatcher = new ResizeWatcher(
                 this.canvasWrapper,
                 this.canvas,

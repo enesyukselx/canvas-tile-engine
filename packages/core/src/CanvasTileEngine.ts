@@ -24,6 +24,7 @@ import {
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
 import { RendererFactory } from "./modules/RendererFactory";
+import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
@@ -40,6 +41,7 @@ export class CanvasTileEngine {
     public images: ImageLoader;
     private sizeController: SizeController;
     private animationController: AnimationController;
+    private responsiveWatcher?: ResponsiveWatcher;
 
     public canvasWrapper: HTMLDivElement;
     public canvas: HTMLCanvasElement;
@@ -140,11 +142,18 @@ export class CanvasTileEngine {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
         // Ensure canvas wrapper has relative positioning for absolute canvas inside
-        Object.assign(this.canvasWrapper.style, {
-            position: "relative",
-            width: config.size.width + "px",
-            height: config.size.height + "px",
-        });
+        // In responsive mode, width/height are controlled by user's CSS
+        if (config.responsive) {
+            Object.assign(this.canvasWrapper.style, {
+                position: "relative",
+            });
+        } else {
+            Object.assign(this.canvasWrapper.style, {
+                position: "relative",
+                width: config.size.width + "px",
+                height: config.size.height + "px",
+            });
+        }
         Object.assign(this.canvas.style, {
             position: "absolute",
             top: "0",
@@ -200,6 +209,23 @@ export class CanvasTileEngine {
         );
         this.events.setupEvents();
 
+        // Setup responsive watcher if responsive mode is enabled
+        if (config.responsive) {
+            this.responsiveWatcher = new ResponsiveWatcher(
+                this.canvasWrapper,
+                this.canvas,
+                this.camera,
+                this.renderer,
+                this.viewport,
+                this.config,
+                () => this.handleCameraChange()
+            );
+            this.responsiveWatcher.onResize = () => {
+                this._onResize?.();
+            };
+            this.responsiveWatcher.start();
+        }
+
         // Apply initial bounds if provided
         if (config.bounds) {
             this.camera.setBounds(config.bounds);
@@ -211,6 +237,7 @@ export class CanvasTileEngine {
     /** Tear down listeners and observers. */
     destroy() {
         this.events.destroy();
+        this.responsiveWatcher?.stop();
         this.animationController.cancelAll();
         this.draw?.destroy();
         this.layers?.clear();
@@ -231,6 +258,13 @@ export class CanvasTileEngine {
      * @param onComplete Optional callback fired when resize animation completes.
      */
     resize(width: number, height: number, durationMs: number = 500, onComplete?: () => void) {
+        if (this.config.get().responsive) {
+            console.warn(
+                "Canvas Tile Engine: resize() is disabled when responsive mode is enabled. " +
+                    "Canvas size is controlled by the wrapper element."
+            );
+            return;
+        }
         this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController, () => {
             // Trigger onResize callback after programmatic resize completes
             this._onResize?.();
