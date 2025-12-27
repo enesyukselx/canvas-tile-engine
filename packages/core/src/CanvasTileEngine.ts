@@ -231,6 +231,13 @@ export class CanvasTileEngine {
      * @param onComplete Optional callback fired when resize animation completes.
      */
     resize(width: number, height: number, durationMs: number = 500, onComplete?: () => void) {
+        if (this.config.get().responsive) {
+            console.warn(
+                "Canvas Tile Engine: resize() is disabled when responsive mode is enabled. " +
+                    "Canvas size is controlled by the wrapper element."
+            );
+            return;
+        }
         this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController, () => {
             // Trigger onResize callback after programmatic resize completes
             this._onResize?.();
