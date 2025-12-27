@@ -2,6 +2,15 @@
 
 All notable changes to `@canvas-tile-engine/core` will be documented in this file.
 
+## [0.0.5] - 2025-12-27
+
+-   fix(core): correct gridAligned calculation for odd/even tile counts (#47)
+-   feat: add responsive mode with preserve-scale and preserve-viewport options (#46)
+-   feat: add gridToSize utility for grid-based configuration (#32)
+-   feat: add setScale method to public API (#45)
+-   fix(core): clamp static cache source rect to prevent mobile renderig issues (#34)
+-   fix(core): add touch event support for mouse callbacks (#33)
+
 ## [0.0.4] - 2025-12-24
 
 -   fix: improve lineWidth rendering consistency across browsers
