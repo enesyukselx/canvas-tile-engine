@@ -13,9 +13,12 @@ function App() {
     const config: CanvasTileEngineConfig = {
         ...gridToSize({
             columns: 10,
-            rows: 10,
-            cellSize: 40,
+            rows: 6,
+            cellSize: 100,
         }),
+        minScale: 10,
+        maxScale: 100,
+        responsive: "preserve-viewport",
         gridAligned: true,
         backgroundColor: "#e6e6e6",
         eventHandlers: {
@@ -49,6 +52,9 @@ function App() {
             </div>
             <div className="paint">
                 <CanvasTileEngine
+                    style={{
+                        margin: "0 auto",
+                    }}
                     engine={engine}
                     config={config}
                     onHover={(coords) => {
