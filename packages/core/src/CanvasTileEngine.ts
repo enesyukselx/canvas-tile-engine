@@ -24,6 +24,7 @@ import {
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
 import { RendererFactory } from "./modules/RendererFactory";
+import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
@@ -40,6 +41,7 @@ export class CanvasTileEngine {
     public images: ImageLoader;
     private sizeController: SizeController;
     private animationController: AnimationController;
+    private responsiveWatcher?: ResponsiveWatcher;
 
     public canvasWrapper: HTMLDivElement;
     public canvas: HTMLCanvasElement;
@@ -207,6 +209,23 @@ export class CanvasTileEngine {
         );
         this.events.setupEvents();
 
+        // Setup responsive watcher if responsive mode is enabled
+        if (config.responsive) {
+            this.responsiveWatcher = new ResponsiveWatcher(
+                this.canvasWrapper,
+                this.canvas,
+                this.camera,
+                this.renderer,
+                this.viewport,
+                this.config,
+                () => this.handleCameraChange()
+            );
+            this.responsiveWatcher.onResize = () => {
+                this._onResize?.();
+            };
+            this.responsiveWatcher.start();
+        }
+
         // Apply initial bounds if provided
         if (config.bounds) {
             this.camera.setBounds(config.bounds);
@@ -218,6 +237,7 @@ export class CanvasTileEngine {
     /** Tear down listeners and observers. */
     destroy() {
         this.events.destroy();
+        this.responsiveWatcher?.stop();
         this.animationController.cancelAll();
         this.draw?.destroy();
         this.layers?.clear();
