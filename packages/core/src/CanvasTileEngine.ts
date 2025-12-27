@@ -140,11 +140,18 @@ export class CanvasTileEngine {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
         // Ensure canvas wrapper has relative positioning for absolute canvas inside
-        Object.assign(this.canvasWrapper.style, {
-            position: "relative",
-            width: config.size.width + "px",
-            height: config.size.height + "px",
-        });
+        // In responsive mode, width/height are controlled by user's CSS
+        if (config.responsive) {
+            Object.assign(this.canvasWrapper.style, {
+                position: "relative",
+            });
+        } else {
+            Object.assign(this.canvasWrapper.style, {
+                position: "relative",
+                width: config.size.width + "px",
+                height: config.size.height + "px",
+            });
+        }
         Object.assign(this.canvas.style, {
             position: "absolute",
             top: "0",
