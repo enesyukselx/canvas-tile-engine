@@ -195,6 +195,18 @@ export interface EngineHandle {
 
     /** Image loader instance (undefined until engine mounts) */
     readonly images: CanvasTileEngineCore["images"] | undefined;
+
+    /**
+     * Load an image using the engine's image loader.
+     * Returns a rejected promise if engine is not ready.
+     * @param src - Image URL to load
+     * @param retry - Number of retries on failure (default: 1)
+     * @example
+     * ```tsx
+     * const img = await engine.loadImage("/sprites/player.png");
+     * ```
+     */
+    loadImage(src: string, retry?: number): Promise<HTMLImageElement>;
 }
 
 /**
@@ -374,6 +386,13 @@ export function useCanvasTileEngine(): EngineHandle {
 
             removeLayerHandle(handle) {
                 instanceRef.current?.removeLayerHandle(handle);
+            },
+
+            loadImage(src: string, retry?: number) {
+                if (!instanceRef.current) {
+                    return Promise.reject(new Error("Engine not ready. Wait for isReady before loading images."));
+                }
+                return instanceRef.current.images.load(src, retry);
             },
         }),
         [setInstance]
