@@ -59,7 +59,7 @@ export class ResponsiveWatcher {
         this.viewport.updateDpr();
         this.currentDpr = this.viewport.dpr;
 
-        // In preserve-viewport mode, set width to 100% and apply min/max dimensions
+        // Set wrapper dimensions based on responsive mode
         if (responsiveMode === "preserve-viewport") {
             const aspectRatio = this.initialVisibleTiles.y / this.initialVisibleTiles.x;
             this.wrapper.style.width = "100%";
@@ -67,6 +67,11 @@ export class ResponsiveWatcher {
             this.wrapper.style.maxWidth = `${this.widthLimits.max}px`;
             this.wrapper.style.minHeight = `${this.widthLimits.min * aspectRatio}px`;
             this.wrapper.style.maxHeight = `${this.widthLimits.max * aspectRatio}px`;
+        } else {
+            // preserve-scale: width is responsive, height stays at initial config value
+            const cfg = this.config.get();
+            this.wrapper.style.width = "100%";
+            this.wrapper.style.height = `${cfg.size.height}px`;
         }
 
         // Get initial size from wrapper (user controls via CSS)
