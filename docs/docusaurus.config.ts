@@ -99,29 +99,33 @@ const config: Config = {
             style: "dark",
             links: [
                 {
-                    title: "Docs",
+                    title: "Documentation",
                     items: [
                         {
-                            label: "Documentation",
+                            label: "Getting Started",
                             to: "/docs/introduction/getting_started",
+                        },
+                        {
+                            label: "Configuration",
+                            to: "/docs/introduction/config",
                         },
                     ],
                 },
-                /*{
-                    title: "More",
+                {
+                    title: "Resources",
                     items: [
-                        {
-                            label: "Blog",
-                            to: "/blog",
-                        },
                         {
                             label: "GitHub",
                             href: "https://github.com/enesyukselx/canvas-tile-engine",
                         },
+                        {
+                            label: "npm",
+                            href: "https://www.npmjs.com/package/@canvas-tile-engine/core",
+                        },
                     ],
-                },*/
+                },
             ],
-            copyright: `Copyright © ${new Date().getFullYear()} Canvas Tile Engine, Inc. Built with Docusaurus.`,
+            copyright: `© ${new Date().getFullYear()} Canvas Tile Engine`,
         },
         prism: {
             theme: prismThemes.github,
