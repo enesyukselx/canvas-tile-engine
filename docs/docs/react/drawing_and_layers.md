@@ -32,12 +32,13 @@ Layers control the Z-order of your content. Lower numbers draw first (background
 
 Draw basic geometric shapes. Pass a single object or an array for batch rendering.
 
-| Prop    | Type                         | Default      | Description        |
-| :------ | :--------------------------- | :----------- | :----------------- |
-| `items` | `DrawObject \| DrawObject[]` | **Required** | Shape definitions. |
-| `layer` | `number`                     | `1`          | Rendering layer.   |
+| Prop    | Type                     | Default      | Description        |
+| :------ | :----------------------- | :----------- | :----------------- |
+| `items` | `Rect \| Rect[]`         | **Required** | Shape definitions (for `<Rect>`). |
+| `items` | `Circle \| Circle[]`     | **Required** | Shape definitions (for `<Circle>`). |
+| `layer` | `number`                 | `1`          | Rendering layer.   |
 
-**DrawObject Properties:**
+**Rect / Circle Properties:**
 
 | Property | Type                 | Default                            | Description                                                                                                                 |
 | :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
@@ -94,14 +95,27 @@ Draw straight lines between two points.
 
 | Prop    | Type                                           | Default      | Description       |
 | :------ | :--------------------------------------------- | :----------- | :---------------- |
-| `items` | `{ from: Coords, to: Coords } \| Array`        | **Required** | Line definitions. |
+| `items` | `Line \| Line[]`                               | **Required** | Line definitions. |
 | `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Line style.       |
 | `layer` | `number`                                       | `1`          | Rendering layer.  |
 
+**Line Properties:** `{ from: { x, y }, to: { x, y } }`
+
 ```tsx
+{/* Single line */}
 <CanvasTileEngine.Line
     items={{ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }}
     style={{ strokeStyle: "#fb8500", lineWidth: 3 }}
+    layer={1}
+/>
+
+{/* Multiple lines */}
+<CanvasTileEngine.Line
+    items={[
+        { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
+        { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
+    ]}
+    style={{ strokeStyle: "red", lineWidth: 2 }}
     layer={1}
 />
 ```
@@ -112,11 +126,14 @@ Draw continuous lines through multiple points.
 
 | Prop    | Type                                           | Default      | Description      |
 | :------ | :--------------------------------------------- | :----------- | :--------------- |
-| `items` | `Coords[] \| Coords[][]`                       | **Required** | Points array.    |
+| `items` | `Path \| Path[]`                               | **Required** | Points array.    |
 | `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Path style.      |
 | `layer` | `number`                                       | `1`          | Rendering layer. |
 
+**Path:** An array of `{ x, y }` coordinates.
+
 ```tsx
+{/* Single path */}
 <CanvasTileEngine.Path
     items={[
         { x: 0, y: 0 },
@@ -124,6 +141,16 @@ Draw continuous lines through multiple points.
         { x: 5, y: 5 },
     ]}
     style={{ strokeStyle: "#219ebc", lineWidth: 2 }}
+    layer={1}
+/>
+
+{/* Multiple paths */}
+<CanvasTileEngine.Path
+    items={[
+        [{ x: 0, y: 0 }, { x: 5, y: 5 }],
+        [{ x: 10, y: 0 }, { x: 15, y: 5 }],
+    ]}
+    style={{ strokeStyle: "green", lineWidth: 1 }}
     layer={1}
 />
 ```
@@ -244,7 +271,20 @@ function MapWithImages() {
 
     return (
         <CanvasTileEngine engine={engine} config={config}>
+            {/* Single image */}
             {treeImg && <CanvasTileEngine.Image items={{ x: 2, y: 3, size: 1.5, img: treeImg }} layer={2} />}
+
+            {/* Multiple images (batch rendering) */}
+            {treeImg && (
+                <CanvasTileEngine.Image
+                    items={[
+                        { x: 5, y: 3, size: 1.5, img: treeImg },
+                        { x: 7, y: 3, size: 1.5, img: treeImg, rotate: 45 },
+                        { x: 9, y: 3, size: 2, img: treeImg },
+                    ]}
+                    layer={2}
+                />
+            )}
         </CanvasTileEngine>
     );
 }

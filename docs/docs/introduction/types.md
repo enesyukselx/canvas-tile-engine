@@ -76,31 +76,55 @@ type Circle = {
 
 ### `Text`
 
-Text element with position and content.
+Text element with position, content, and font styling. Extends the DrawObject pattern.
 
 ```typescript
 type Text = {
-    coords: Coords;
+    x: number;
+    y: number;
     text: string;
+    size?: number;
+    origin?: {
+        mode?: "cell" | "self";
+        x?: number;
+        y?: number;
+    };
+    style?: {
+        fillStyle?: string;
+        fontFamily?: string;
+        textAlign?: CanvasTextAlign;
+        textBaseline?: CanvasTextBaseline;
+    };
 };
 ```
 
-| Property | Type     | Description                   |
-| :------- | :------- | :---------------------------- |
-| `coords` | `Coords` | Position in world coordinates |
-| `text`   | `string` | Text content to render        |
+| Property | Type     | Default                            | Description                              |
+| :------- | :------- | :--------------------------------- | :--------------------------------------- |
+| `x`, `y` | `number` | **Required**                       | World coordinates                        |
+| `text`   | `string` | **Required**                       | Text content to render                   |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom) |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                             |
+| `style`  | `object` | `{}`                               | Font styling options                     |
+
+**Style Options:**
+
+| Property       | Type                 | Default        | Description               |
+| :------------- | :------------------- | :------------- | :------------------------ |
+| `fillStyle`    | `string`             | -              | Text color                |
+| `fontFamily`   | `string`             | `"sans-serif"` | Font family               |
+| `textAlign`    | `CanvasTextAlign`    | `"left"`       | Horizontal alignment      |
+| `textBaseline` | `CanvasTextBaseline` | `"top"`        | Vertical baseline         |
 
 ---
 
 ### `Line`
 
-Line between two points.
+Line between two points. Style is passed separately to the draw method.
 
 ```typescript
 type Line = {
     from: Coords;
     to: Coords;
-    style: { strokeStyle?: string; lineWidth?: number };
 };
 ```
 
@@ -108,7 +132,6 @@ type Line = {
 | :------- | :------- | :------------- |
 | `from`   | `Coords` | Starting point |
 | `to`     | `Coords` | Ending point   |
-| `style`  | `object` | Stroke styling |
 
 ---
 
