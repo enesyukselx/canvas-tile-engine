@@ -3,10 +3,13 @@ import type {
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
     Coords,
-    DrawObject,
     EventHandlers,
     LayerHandle,
+    ImageItem,
     Text,
+    Circle,
+    Line,
+    Rect,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -126,23 +129,19 @@ export interface EngineHandle {
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     /** Draw rectangles */
-    drawRect(items: DrawObject | DrawObject[], layer?: number): LayerHandle;
+    drawRect(items: Rect | Rect[], layer?: number): LayerHandle;
 
     /** Draw static rectangles (cached) */
-    drawStaticRect(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle;
+    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw circles */
-    drawCircle(items: DrawObject | DrawObject[], layer?: number): LayerHandle;
+    drawCircle(items: Circle | Circle[], layer?: number): LayerHandle;
 
     /** Draw static circles (cached) */
-    drawStaticCircle(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw lines */
-    drawLine(
-        items: { from: Coords; to: Coords } | { from: Coords; to: Coords }[],
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer?: number
-    ): LayerHandle;
+    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): LayerHandle;
 
     /** Draw text */
     drawText(items: Text | Text[], layer?: number): LayerHandle;
@@ -155,19 +154,10 @@ export interface EngineHandle {
     ): LayerHandle;
 
     /** Draw images */
-    drawImage(
-        items:
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement })
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
-        layer?: number
-    ): LayerHandle;
+    drawImage(items: ImageItem | ImageItem[], layer?: number): LayerHandle;
 
     /** Draw static images (cached) */
-    drawStaticImage(
-        items: (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
-        cacheKey: string,
-        layer?: number
-    ): LayerHandle;
+    drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw grid lines */
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle;

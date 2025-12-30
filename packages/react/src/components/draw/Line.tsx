@@ -1,9 +1,9 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { Coords } from "@canvas-tile-engine/core";
+import type { Line as LineType } from "@canvas-tile-engine/core";
 
 export interface LineProps {
-    items: { from: Coords; to: Coords } | { from: Coords; to: Coords }[];
+    items: LineType | LineType[];
     style?: { strokeStyle?: string; lineWidth?: number };
     layer?: number;
 }

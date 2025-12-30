@@ -115,24 +115,13 @@ export type DrawObject = {
 };
 
 export type Rect = DrawObject;
-export type Line = {
-    from: Coords;
-    to: Coords;
-    style: { strokeStyle?: string; lineWidth?: number };
-};
 
 export type Circle = Omit<DrawObject, "rotate" | "radius">;
-export type Text = {
-    x: number;
-    y: number;
+export type ImageItem = Omit<DrawObject, "style"> & { img: HTMLImageElement };
+export type Text = Omit<DrawObject, "rotate" | "radius" | "size"> & {
     text: string;
     /** Font size in world units (scales with zoom). Default: 1 */
     size?: number;
-    origin?: {
-        mode?: "cell" | "self";
-        x?: number;
-        y?: number;
-    };
     style?: {
         fillStyle?: string;
         /** Font family (default: "sans-serif") */
@@ -141,5 +130,8 @@ export type Text = {
         textBaseline?: CanvasTextBaseline;
     };
 };
+export type Line = {
+    from: Coords;
+    to: Coords;
+};
 export type Path = Coords[];
-export type ImageItem = Omit<DrawObject, "style"> & { img: HTMLImageElement };

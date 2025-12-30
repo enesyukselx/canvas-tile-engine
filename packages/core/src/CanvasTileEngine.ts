@@ -10,7 +10,6 @@ import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
 import {
     Coords,
-    DrawObject,
     CanvasTileEngineConfig,
     onClickCallback,
     onRightClickCallback,
@@ -20,6 +19,12 @@ import {
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    Circle,
+    ImageItem,
+    Text,
+    Rect,
+    Line,
+    Path,
 } from "./types";
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
@@ -552,7 +557,7 @@ export class CanvasTileEngine {
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      */
-    drawRect(items: DrawObject | Array<DrawObject>, layer: number = 1): LayerHandle {
+    drawRect(items: Rect | Array<Rect>, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawRect(items, layer);
     }
 
@@ -565,7 +570,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawStaticRect(items, cacheKey, layer);
     }
 
@@ -577,7 +582,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawStaticCircle(items, cacheKey, layer);
     }
 
@@ -590,11 +595,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticImage(
-        items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
-        cacheKey: string,
-        layer: number = 1
-    ): LayerHandle {
+    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawStaticImage(items, cacheKey, layer);
     }
 
@@ -613,7 +614,7 @@ export class CanvasTileEngine {
      * @param layer Layer order.
      */
     drawLine(
-        items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
+        items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ): LayerHandle {
@@ -625,7 +626,7 @@ export class CanvasTileEngine {
      * @param items Circle definitions.
      * @param layer Layer order.
      */
-    drawCircle(items: DrawObject | Array<DrawObject>, layer: number = 1): LayerHandle {
+    drawCircle(items: Circle | Array<Circle>, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawCircle(items, layer);
     }
 
@@ -650,26 +651,7 @@ export class CanvasTileEngine {
      * ]);
      * ```
      */
-    drawText(
-        items:
-            | Array<{
-                  x: number;
-                  y: number;
-                  text: string;
-                  size?: number;
-                  origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-                  style?: { fillStyle?: string; fontFamily?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline };
-              }>
-            | {
-                  x: number;
-                  y: number;
-                  text: string;
-                  size?: number;
-                  origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-                  style?: { fillStyle?: string; fontFamily?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline };
-              },
-        layer: number = 2
-    ): LayerHandle {
+    drawText(items: Array<Text> | Text, layer: number = 2): LayerHandle {
         return this.ensureCanvasDraw().drawText(items, layer);
     }
 
@@ -680,7 +662,7 @@ export class CanvasTileEngine {
      * @param layer Layer order.
      */
     drawPath(
-        items: Array<Coords[]> | Coords[],
+        items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ): LayerHandle {
@@ -693,12 +675,7 @@ export class CanvasTileEngine {
      * @param items Image definitions.
      * @param layer Layer order.
      */
-    drawImage(
-        items:
-            | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
-        layer: number = 1
-    ): LayerHandle {
+    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawImage(items, layer);
     }
 

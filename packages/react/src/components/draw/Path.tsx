@@ -1,9 +1,9 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { Coords } from "@canvas-tile-engine/core";
+import type { Path as PathType } from "@canvas-tile-engine/core";
 
 export interface PathProps {
-    items: Coords[] | Coords[][];
+    items: PathType | PathType[];
     style?: { strokeStyle?: string; lineWidth?: number };
     layer?: number;
 }

@@ -1,4 +1,4 @@
-import { Coords, CanvasTileEngineConfig, Rect, Circle, Text, Path, ImageItem } from "../types";
+import { Coords, CanvasTileEngineConfig, Rect, Circle, Text, Path, ImageItem, Line } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer, type LayerHandle } from "./Layer";
@@ -162,7 +162,7 @@ export class CanvasDraw {
     }
 
     drawLine(
-        items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
+        items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ): LayerHandle {
