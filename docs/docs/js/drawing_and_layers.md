@@ -185,24 +185,44 @@ engine.drawGridLines(50, 2, "rgba(0, 0, 0, 0.5)", 0); // Coarse grid
 
 ### `drawText`
 
-Render text at a specific world coordinate. Supports single object or array of objects.
+Render text at world coordinates. Supports single object or array of objects. Text size scales with zoom.
 
-| Property | Type       | Default      | Description              |
-| :------- | :--------- | :----------- | :----------------------- |
-| `coords` | `{ x, y }` | **Required** | Position in world space. |
-| `text`   | `string`   | **Required** | The text content.        |
-| `style`  | `object`   | -            | Font styling options.    |
+| Property | Type     | Default                            | Description                              |
+| :------- | :------- | :--------------------------------- | :--------------------------------------- |
+| `x`, `y` | `number` | **Required**                       | World coordinates.                       |
+| `text`   | `string` | **Required**                       | The text content.                        |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
+| `style`  | `object` | -                                  | Font styling options.                    |
 
 **Style Options:**
 
--   `font`: CSS font string (e.g., `"12px Arial"`)
 -   `fillStyle`: Text color
+-   `fontFamily`: Font family (default: `"sans-serif"`)
 -   `textAlign`: `"left"`, `"center"`, `"right"`
 -   `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 
 ```typescript
-engine.drawText({ coords: { x: 5, y: 5 }, text: "Base Camp" }, { font: "14px sans-serif", fillStyle: "white" }, 3);
+// Single text
+engine.drawText({
+    x: 5,
+    y: 5,
+    text: "Base Camp",
+    size: 1,
+    style: { fillStyle: "white", fontFamily: "Arial" }
+}, 3);
+
+// Multiple texts (batch rendering)
+engine.drawText([
+    { x: 0, y: 0, text: "A", size: 2, style: { fillStyle: "red" } },
+    { x: 1, y: 0, text: "B", size: 2, style: { fillStyle: "blue" } },
+    { x: 2, y: 0, text: "C", size: 2, style: { fillStyle: "green" } },
+], 3);
 ```
+
+:::tip Scale-Aware Text
+The `size` property works like other draw methods - it's in world units and scales with zoom. Use `size: 1` for text that fills approximately one tile height.
+:::
 
 ### `drawImage`
 

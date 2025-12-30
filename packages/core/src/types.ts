@@ -123,8 +123,23 @@ export type Line = {
 
 export type Circle = Omit<DrawObject, "rotate" | "radius">;
 export type Text = {
-    coords: Coords;
+    x: number;
+    y: number;
     text: string;
+    /** Font size in world units (scales with zoom). Default: 1 */
+    size?: number;
+    origin?: {
+        mode?: "cell" | "self";
+        x?: number;
+        y?: number;
+    };
+    style?: {
+        fillStyle?: string;
+        /** Font family (default: "sans-serif") */
+        fontFamily?: string;
+        textAlign?: CanvasTextAlign;
+        textBaseline?: CanvasTextBaseline;
+    };
 };
 export type Path = Coords[];
 export type ImageItem = Omit<DrawObject, "style"> & { img: HTMLImageElement };
