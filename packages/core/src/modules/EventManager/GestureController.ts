@@ -280,6 +280,7 @@ export class GestureController {
             this.config.get().eventHandlers.click &&
             this.onClick
         ) {
+            e.preventDefault(); // Prevent synthetic click event from browser
             const t = e.changedTouches[0];
             const { coords, mouse, client } = this.getEventCoords(t);
             this.onClick(coords, mouse, client);
