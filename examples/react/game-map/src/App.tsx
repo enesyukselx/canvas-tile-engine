@@ -123,7 +123,7 @@ export default function App() {
 
             await Promise.all(
                 uniqueUrls.map(async (url) => {
-                    imageCache.set(url, await mainMap.images!.load(url));
+                    imageCache.set(url, await mainMap.loadImage(url));
                 })
             );
 
