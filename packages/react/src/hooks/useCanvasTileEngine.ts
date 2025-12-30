@@ -6,6 +6,7 @@ import type {
     DrawObject,
     EventHandlers,
     LayerHandle,
+    Text,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -144,11 +145,7 @@ export interface EngineHandle {
     ): LayerHandle;
 
     /** Draw text */
-    drawText(
-        items: { coords: Coords; text: string } | { coords: Coords; text: string }[],
-        style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
-        layer?: number
-    ): LayerHandle;
+    drawText(items: Text | Text[], layer?: number): LayerHandle;
 
     /** Draw paths/polylines */
     drawPath(
@@ -346,8 +343,8 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.drawLine(items, style, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
-            drawText(items, style, layer) {
-                return instanceRef.current?.drawText(items, style, layer) ?? DUMMY_LAYER_HANDLE;
+            drawText(items, layer) {
+                return instanceRef.current?.drawText(items, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawPath(items, style, layer) {

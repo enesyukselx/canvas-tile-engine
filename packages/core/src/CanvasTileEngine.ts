@@ -631,16 +631,46 @@ export class CanvasTileEngine {
 
     /**
      * Draw one or many texts at world positions (canvas renderer only).
-     * @param items Text definitions.
-     * @param style Text style overrides.
+     * @param items Text definitions with position, text, size, and style.
      * @param layer Layer order.
+     * @example
+     * ```ts
+     * engine.drawText({
+     *     x: 0,
+     *     y: 0,
+     *     text: "Hello",
+     *     size: 1, // 1 tile height
+     *     style: { fillStyle: "black", fontFamily: "Arial" }
+     * });
+     *
+     * // Multiple texts
+     * engine.drawText([
+     *     { x: 0, y: 0, text: "A", size: 2 },
+     *     { x: 1, y: 0, text: "B", size: 2 }
+     * ]);
+     * ```
      */
     drawText(
-        items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
-        style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
+        items:
+            | Array<{
+                  x: number;
+                  y: number;
+                  text: string;
+                  size?: number;
+                  origin?: { mode?: "cell" | "self"; x?: number; y?: number };
+                  style?: { fillStyle?: string; fontFamily?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline };
+              }>
+            | {
+                  x: number;
+                  y: number;
+                  text: string;
+                  size?: number;
+                  origin?: { mode?: "cell" | "self"; x?: number; y?: number };
+                  style?: { fillStyle?: string; fontFamily?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline };
+              },
         layer: number = 2
     ): LayerHandle {
-        return this.ensureCanvasDraw().drawText(items, style, layer);
+        return this.ensureCanvasDraw().drawText(items, layer);
     }
 
     /**
