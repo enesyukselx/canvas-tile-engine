@@ -30,6 +30,7 @@ import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
 import { RendererFactory } from "./modules/RendererFactory";
 import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
+import { validateCoords, validateScale } from "./utils/validateConfig";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
@@ -417,8 +418,10 @@ export class CanvasTileEngine {
     /**
      * Set the canvas scale directly, clamped to min/max bounds.
      * @param newScale The desired scale value.
+     * @throws {ConfigValidationError} If scale is not a positive finite number.
      */
     setScale(newScale: number) {
+        validateScale(newScale);
         this.camera.setScale(newScale);
         this.handleCameraChange();
     }
@@ -478,8 +481,13 @@ export class CanvasTileEngine {
         return this.camera.getVisibleBounds(size.width, size.height);
     }
 
-    /** Set center coordinates from outside (adjusts the camera accordingly). */
+    /**
+     * Set center coordinates from outside (adjusts the camera accordingly).
+     * @param newCenter The new center coordinates.
+     * @throws {ConfigValidationError} If coordinates are not finite numbers.
+     */
     updateCoords(newCenter: Coords) {
+        validateCoords(newCenter.x, newCenter.y);
         const size = this.viewport.getSize();
         this.camera.setCenter(newCenter, size.width, size.height);
         this.handleCameraChange();
@@ -491,8 +499,10 @@ export class CanvasTileEngine {
      * @param y Target world y.
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
      * @param onComplete Optional callback fired when animation completes.
+     * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
     goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
+        validateCoords(x, y);
         this.animationController.animateMoveTo(x, y, durationMs, onComplete);
     }
 

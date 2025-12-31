@@ -1,5 +1,6 @@
 import { CanvasTileEngineConfig, EventHandlers } from "../types";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
+import { validateConfig, validateBounds } from "../utils/validateConfig";
 
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
@@ -11,8 +12,11 @@ export class Config {
     /**
      * Create a config store with defaults merged from the provided partial config.
      * @param config Incoming configuration values.
+     * @throws {ConfigValidationError} If any config value is invalid.
      */
     constructor(config: CanvasTileEngineConfig) {
+        validateConfig(config);
+
         const base: Required<CanvasTileEngineConfig> = {
             renderer: RENDER_DEFAULTS.RENDERER_TYPE,
             scale: config.scale,
@@ -141,8 +145,11 @@ export class Config {
     /**
      * Update map bounds at runtime.
      * @param bounds New boundary limits. Use Infinity/-Infinity to remove limits on specific axes.
+     * @throws {ConfigValidationError} If bounds are invalid.
      */
     updateBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
+        validateBounds(bounds);
+
         this.config = {
             ...this.config,
             bounds: Object.freeze(bounds),
