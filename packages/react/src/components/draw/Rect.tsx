@@ -1,9 +1,9 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { DrawObject } from "@canvas-tile-engine/core";
+import type { Rect as RectType } from "@canvas-tile-engine/core";
 
 export interface RectProps {
-    items: DrawObject | DrawObject[];
+    items: RectType | RectType[];
     layer?: number;
 }
 

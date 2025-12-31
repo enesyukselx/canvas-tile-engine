@@ -1,4 +1,4 @@
-import { Coords, CanvasTileEngineConfig, Rect, Circle, Text, Path, ImageItem } from "../types";
+import { Coords, CanvasTileEngineConfig, Rect, Circle, Text, Path, ImageItem, Line } from "../types";
 import { ICamera } from "./Camera";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 import { Layer, type LayerHandle } from "./Layer";
@@ -162,7 +162,7 @@ export class CanvasDraw {
     }
 
     drawLine(
-        items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
+        items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ): LayerHandle {
@@ -256,23 +256,38 @@ export class CanvasDraw {
         });
     }
 
-    drawText(
-        items: Array<Text> | Text,
-        style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
-        layer: number = 2
-    ): LayerHandle {
+    drawText(items: Array<Text> | Text, layer: number = 2): LayerHandle {
         const list = Array.isArray(items) ? items : [items];
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            ctx.save();
-            if (style?.font) ctx.font = style.font;
-            if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
-            ctx.textAlign = style?.textAlign ?? "center";
-            ctx.textBaseline = style?.textBaseline ?? "middle";
+        // Build spatial index for large datasets (RBush R-Tree)
+        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
+        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-            for (const item of list) {
-                if (!this.isVisible(item.coords.x, item.coords.y, 0, topLeft, config)) continue;
-                const pos = this.transformer.worldToScreen(item.coords.x, item.coords.y);
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            const bounds = this.getViewportBounds(topLeft, config);
+            const visibleItems = spatialIndex
+                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                : list;
+
+            ctx.save();
+
+            for (const item of visibleItems) {
+                const size = item.size ?? 1;
+                const style = item.style;
+
+                // Skip visibility check if using spatial index (already filtered)
+                if (!spatialIndex && !this.isVisible(item.x, item.y, size, topLeft, config)) continue;
+
+                // Scale-aware font size (world units)
+                const pxSize = size * this.camera.scale * 0.3;
+                const family = style?.fontFamily ?? "sans-serif";
+                ctx.font = `${pxSize}px ${family}`;
+
+                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+                ctx.textAlign = style?.textAlign ?? "center";
+                ctx.textBaseline = style?.textBaseline ?? "middle";
+
+                const pos = this.transformer.worldToScreen(item.x, item.y);
                 ctx.fillText(item.text, pos.x, pos.y);
             }
             ctx.restore();

@@ -1,9 +1,9 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { DrawObject } from "@canvas-tile-engine/core";
+import type { Circle as CircleType } from "@canvas-tile-engine/core";
 
 export interface CircleProps {
-    items: DrawObject | DrawObject[];
+    items: CircleType | CircleType[];
     layer?: number;
 }
 

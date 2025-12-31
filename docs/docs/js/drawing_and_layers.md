@@ -36,11 +36,17 @@ You can use any number for a layer. They are sorted automatically at render time
 
 Draw basic geometric shapes. You can pass a single object or an array of objects for batch rendering.
 
+```typescript
+drawRect(items: Rect | Rect[], layer?: number): LayerHandle
+drawCircle(items: Circle | Circle[], layer?: number): LayerHandle
+```
+
+**Rect / Circle Properties:**
+
 | Property | Type                 | Default                            | Description                                                                                                                     |
 | :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
 | `x`, `y` | `number`             | **Required**                       | World coordinates of the center/origin.                                                                                         |
 | `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                            |
-| `layer`  | `number`             | `1`                                | Rendering layer.                                                                                                                |
 | `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                    |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                   |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                |
@@ -128,24 +134,40 @@ engine.drawRect(
 
 Draw a straight line between two points. Supports single object or array of objects.
 
-| Property | Type | Description |
-| `from` | `{ x, y }` | Start coordinates. |
-| `to` | `{ x, y }` | End coordinates. |
-| `style` | `object` | Line style (`strokeStyle`, `lineWidth`). |
+```typescript
+drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): LayerHandle
+```
+
+**Line Properties:**
+
+| Property | Type       | Description        |
+| :------- | :--------- | :----------------- |
+| `from`   | `{ x, y }` | Start coordinates. |
+| `to`     | `{ x, y }` | End coordinates.   |
 
 ```typescript
+// Single line
 engine.drawLine({ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }, { strokeStyle: "#fb8500", lineWidth: 3 }, 1);
+
+// Multiple lines
+engine.drawLine([
+    { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
+    { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
+], { strokeStyle: "red", lineWidth: 2 }, 1);
 ```
 
 ### `drawPath`
 
 Draw a continuous line through multiple points. Supports a single path (array of points) or an array of paths.
 
-| Property | Type | Description |
-| `items` | `Coords[]` | Array of points `{ x, y }`. |
-| `style` | `object` | Path style (`strokeStyle`, `lineWidth`). |
+```typescript
+drawPath(items: Path | Path[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): LayerHandle
+```
+
+**Path:** An array of `{ x, y }` coordinates.
 
 ```typescript
+// Single path
 engine.drawPath(
     [
         { x: 0, y: 0 },
@@ -155,18 +177,32 @@ engine.drawPath(
     { strokeStyle: "#219ebc", lineWidth: 2 },
     1
 );
+
+// Multiple paths
+engine.drawPath(
+    [
+        [{ x: 0, y: 0 }, { x: 5, y: 5 }],
+        [{ x: 10, y: 0 }, { x: 15, y: 5 }],
+    ],
+    { strokeStyle: "green", lineWidth: 1 },
+    1
+);
 ```
 
 ### `drawGridLines`
 
 Draw grid lines at specified intervals. This is useful for creating grid overlays on your map.
 
-| Property      | Type     | Default      | Description                            |
-| :------------ | :------- | :----------- | :------------------------------------- |
-| `cellSize`    | `number` | **Required** | Size of each grid cell in world units. |
-| `lineWidth`   | `number` | `1`          | Width of grid lines in pixels.         |
-| `strokeStyle` | `string` | `"black"`    | Color of the grid lines.               |
-| `layer`       | `number` | `0`          | Rendering layer.                       |
+```typescript
+drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle
+```
+
+| Parameter     | Type     | Default   | Description                            |
+| :------------ | :------- | :-------- | :------------------------------------- |
+| `cellSize`    | `number` | -         | Size of each grid cell in world units. |
+| `lineWidth`   | `number` | `1`       | Width of grid lines in pixels.         |
+| `strokeStyle` | `string` | `"black"` | Color of the grid lines.               |
+| `layer`       | `number` | `0`       | Rendering layer.                       |
 
 ```typescript
 // Draw a basic grid with 1-unit cells
@@ -185,43 +221,84 @@ engine.drawGridLines(50, 2, "rgba(0, 0, 0, 0.5)", 0); // Coarse grid
 
 ### `drawText`
 
-Render text at a specific world coordinate. Supports single object or array of objects.
+Render text at world coordinates. Supports single object or array of objects. Text size scales with zoom.
 
-| Property | Type       | Default      | Description              |
-| :------- | :--------- | :----------- | :----------------------- |
-| `coords` | `{ x, y }` | **Required** | Position in world space. |
-| `text`   | `string`   | **Required** | The text content.        |
-| `style`  | `object`   | -            | Font styling options.    |
+```typescript
+drawText(items: Text | Text[], layer?: number): LayerHandle
+```
+
+**Text Properties:**
+
+| Property | Type     | Default                            | Description                              |
+| :------- | :------- | :--------------------------------- | :--------------------------------------- |
+| `x`, `y` | `number` | **Required**                       | World coordinates.                       |
+| `text`   | `string` | **Required**                       | The text content.                        |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
+| `style`  | `object` | -                                  | Font styling options.                    |
 
 **Style Options:**
 
--   `font`: CSS font string (e.g., `"12px Arial"`)
 -   `fillStyle`: Text color
+-   `fontFamily`: Font family (default: `"sans-serif"`)
 -   `textAlign`: `"left"`, `"center"`, `"right"`
 -   `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 
 ```typescript
-engine.drawText({ coords: { x: 5, y: 5 }, text: "Base Camp" }, { font: "14px sans-serif", fillStyle: "white" }, 3);
+// Single text
+engine.drawText({
+    x: 5,
+    y: 5,
+    text: "Base Camp",
+    size: 1,
+    style: { fillStyle: "white", fontFamily: "Arial" }
+}, 3);
+
+// Multiple texts (batch rendering)
+engine.drawText([
+    { x: 0, y: 0, text: "A", size: 2, style: { fillStyle: "red" } },
+    { x: 1, y: 0, text: "B", size: 2, style: { fillStyle: "blue" } },
+    { x: 2, y: 0, text: "C", size: 2, style: { fillStyle: "green" } },
+], 3);
 ```
+
+:::tip Scale-Aware Text
+The `size` property works like other draw methods - it's in world units and scales with zoom. Use `size: 1` for text that fills approximately one tile height.
+:::
 
 ### `drawImage`
 
 Draw an image scaled to world units. Supports single object or array of objects.
 
-| Property | Type               | Description                                                        |
-| :------- | :----------------- | :----------------------------------------------------------------- |
-| `img`    | `HTMLImageElement` | The loaded image object.                                           |
-| `x`, `y` | `number`           | World coordinates.                                                 |
-| `size`   | `number`           | Size in grid units (maintains aspect ratio).                       |
-| `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
+```typescript
+drawImage(items: ImageItem | ImageItem[], layer?: number): LayerHandle
+```
+
+**ImageItem Properties:**
+
+| Property | Type               | Default      | Description                                                        |
+| :------- | :----------------- | :----------- | :----------------------------------------------------------------- |
+| `x`, `y` | `number`           | **Required** | World coordinates.                                                 |
+| `img`    | `HTMLImageElement` | **Required** | The loaded image object.                                           |
+| `size`   | `number`           | `1`          | Size in grid units (maintains aspect ratio).                       |
+| `rotate` | `number`           | `0`          | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
+| `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                  |
 
 ```typescript
+// Single image
 const img = await engine.images.load("/assets/tree.png");
 engine.drawImage({ x: 2, y: 3, size: 1.5, img }, 2);
 
-// Draw a rotated image (90 degrees clockwise)
+// Rotated image (90 degrees clockwise)
 const arrow = await engine.images.load("/assets/arrow.png");
 engine.drawImage({ x: 5, y: 3, size: 1, img: arrow, rotate: 90 }, 2);
+
+// Multiple images
+engine.drawImage([
+    { x: 0, y: 0, size: 1, img: treeImg },
+    { x: 2, y: 0, size: 1, img: treeImg },
+    { x: 4, y: 0, size: 1, img: treeImg },
+], 2);
 ```
 
 ## Advanced

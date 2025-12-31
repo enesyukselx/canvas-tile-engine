@@ -3,9 +3,13 @@ import type {
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
     Coords,
-    DrawObject,
     EventHandlers,
     LayerHandle,
+    ImageItem,
+    Text,
+    Circle,
+    Line,
+    Rect,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -125,30 +129,22 @@ export interface EngineHandle {
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     /** Draw rectangles */
-    drawRect(items: DrawObject | DrawObject[], layer?: number): LayerHandle;
+    drawRect(items: Rect | Rect[], layer?: number): LayerHandle;
 
     /** Draw static rectangles (cached) */
-    drawStaticRect(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle;
+    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw circles */
-    drawCircle(items: DrawObject | DrawObject[], layer?: number): LayerHandle;
+    drawCircle(items: Circle | Circle[], layer?: number): LayerHandle;
 
     /** Draw static circles (cached) */
-    drawStaticCircle(items: DrawObject[], cacheKey: string, layer?: number): LayerHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw lines */
-    drawLine(
-        items: { from: Coords; to: Coords } | { from: Coords; to: Coords }[],
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer?: number
-    ): LayerHandle;
+    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): LayerHandle;
 
     /** Draw text */
-    drawText(
-        items: { coords: Coords; text: string } | { coords: Coords; text: string }[],
-        style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
-        layer?: number
-    ): LayerHandle;
+    drawText(items: Text | Text[], layer?: number): LayerHandle;
 
     /** Draw paths/polylines */
     drawPath(
@@ -158,19 +154,10 @@ export interface EngineHandle {
     ): LayerHandle;
 
     /** Draw images */
-    drawImage(
-        items:
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement })
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
-        layer?: number
-    ): LayerHandle;
+    drawImage(items: ImageItem | ImageItem[], layer?: number): LayerHandle;
 
     /** Draw static images (cached) */
-    drawStaticImage(
-        items: (Omit<DrawObject, "style"> & { img: HTMLImageElement })[],
-        cacheKey: string,
-        layer?: number
-    ): LayerHandle;
+    drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number): LayerHandle;
 
     /** Draw grid lines */
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle;
@@ -195,6 +182,18 @@ export interface EngineHandle {
 
     /** Image loader instance (undefined until engine mounts) */
     readonly images: CanvasTileEngineCore["images"] | undefined;
+
+    /**
+     * Load an image using the engine's image loader.
+     * Returns a rejected promise if engine is not ready.
+     * @param src - Image URL to load
+     * @param retry - Number of retries on failure (default: 1)
+     * @example
+     * ```tsx
+     * const img = await engine.loadImage("/sprites/player.png");
+     * ```
+     */
+    loadImage(src: string, retry?: number): Promise<HTMLImageElement>;
 }
 
 /**
@@ -334,8 +333,8 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.drawLine(items, style, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
-            drawText(items, style, layer) {
-                return instanceRef.current?.drawText(items, style, layer) ?? DUMMY_LAYER_HANDLE;
+            drawText(items, layer) {
+                return instanceRef.current?.drawText(items, layer) ?? DUMMY_LAYER_HANDLE;
             },
 
             drawPath(items, style, layer) {
@@ -374,6 +373,13 @@ export function useCanvasTileEngine(): EngineHandle {
 
             removeLayerHandle(handle) {
                 instanceRef.current?.removeLayerHandle(handle);
+            },
+
+            loadImage(src: string, retry?: number) {
+                if (!instanceRef.current) {
+                    return Promise.reject(new Error("Engine not ready. Wait for isReady before loading images."));
+                }
+                return instanceRef.current.images.load(src, retry);
             },
         }),
         [setInstance]

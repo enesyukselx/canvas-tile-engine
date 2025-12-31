@@ -273,9 +273,23 @@ export class GestureController {
             this.onMouseUp(coords, mouse, client);
         }
 
+        // Fire onClick for tap gesture (touch end without drag)
+        if (
+            e.changedTouches.length > 0 &&
+            !this.shouldPreventClick &&
+            this.config.get().eventHandlers.click &&
+            this.onClick
+        ) {
+            e.preventDefault(); // Prevent synthetic click event from browser
+            const t = e.changedTouches[0];
+            const { coords, mouse, client } = this.getEventCoords(t);
+            this.onClick(coords, mouse, client);
+        }
+
         // All fingers lifted
         this.isDragging = false;
         this.isPinching = false;
+        this.shouldPreventClick = false;
         this.canvas.style.cursor = this.config.get().cursor.default || "default";
     };
 

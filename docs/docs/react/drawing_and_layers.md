@@ -32,12 +32,13 @@ Layers control the Z-order of your content. Lower numbers draw first (background
 
 Draw basic geometric shapes. Pass a single object or an array for batch rendering.
 
-| Prop    | Type                         | Default      | Description        |
-| :------ | :--------------------------- | :----------- | :----------------- |
-| `items` | `DrawObject \| DrawObject[]` | **Required** | Shape definitions. |
-| `layer` | `number`                     | `1`          | Rendering layer.   |
+| Prop    | Type                     | Default      | Description        |
+| :------ | :----------------------- | :----------- | :----------------- |
+| `items` | `Rect \| Rect[]`         | **Required** | Shape definitions (for `<Rect>`). |
+| `items` | `Circle \| Circle[]`     | **Required** | Shape definitions (for `<Circle>`). |
+| `layer` | `number`                 | `1`          | Rendering layer.   |
 
-**DrawObject Properties:**
+**Rect / Circle Properties:**
 
 | Property | Type                 | Default                            | Description                                                                                                                 |
 | :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
@@ -94,14 +95,27 @@ Draw straight lines between two points.
 
 | Prop    | Type                                           | Default      | Description       |
 | :------ | :--------------------------------------------- | :----------- | :---------------- |
-| `items` | `{ from: Coords, to: Coords } \| Array`        | **Required** | Line definitions. |
+| `items` | `Line \| Line[]`                               | **Required** | Line definitions. |
 | `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Line style.       |
 | `layer` | `number`                                       | `1`          | Rendering layer.  |
 
+**Line Properties:** `{ from: { x, y }, to: { x, y } }`
+
 ```tsx
+{/* Single line */}
 <CanvasTileEngine.Line
     items={{ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }}
     style={{ strokeStyle: "#fb8500", lineWidth: 3 }}
+    layer={1}
+/>
+
+{/* Multiple lines */}
+<CanvasTileEngine.Line
+    items={[
+        { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
+        { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
+    ]}
+    style={{ strokeStyle: "red", lineWidth: 2 }}
     layer={1}
 />
 ```
@@ -112,11 +126,14 @@ Draw continuous lines through multiple points.
 
 | Prop    | Type                                           | Default      | Description      |
 | :------ | :--------------------------------------------- | :----------- | :--------------- |
-| `items` | `Coords[] \| Coords[][]`                       | **Required** | Points array.    |
+| `items` | `Path \| Path[]`                               | **Required** | Points array.    |
 | `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Path style.      |
 | `layer` | `number`                                       | `1`          | Rendering layer. |
 
+**Path:** An array of `{ x, y }` coordinates.
+
 ```tsx
+{/* Single path */}
 <CanvasTileEngine.Path
     items={[
         { x: 0, y: 0 },
@@ -124,6 +141,16 @@ Draw continuous lines through multiple points.
         { x: 5, y: 5 },
     ]}
     style={{ strokeStyle: "#219ebc", lineWidth: 2 }}
+    layer={1}
+/>
+
+{/* Multiple paths */}
+<CanvasTileEngine.Path
+    items={[
+        [{ x: 0, y: 0 }, { x: 5, y: 5 }],
+        [{ x: 10, y: 0 }, { x: 15, y: 5 }],
+    ]}
+    style={{ strokeStyle: "green", lineWidth: 1 }}
     layer={1}
 />
 ```
@@ -161,28 +188,57 @@ Draw grid lines at specified intervals.
 
 ### `<Text>`
 
-Render text at world coordinates.
+Render text at world coordinates. Text size scales with zoom.
 
-| Prop    | Type                                        | Default      | Description       |
-| :------ | :------------------------------------------ | :----------- | :---------------- |
-| `items` | `{ coords: Coords, text: string } \| Array` | **Required** | Text definitions. |
-| `style` | `object`                                    | -            | Font styling.     |
-| `layer` | `number`                                    | `2`          | Rendering layer.  |
+| Prop    | Type              | Default      | Description       |
+| :------ | :---------------- | :----------- | :---------------- |
+| `items` | `Text \| Text[]`  | **Required** | Text definitions. |
+| `layer` | `number`          | `2`          | Rendering layer.  |
+
+**Text Properties:**
+
+| Property | Type     | Default                            | Description                              |
+| :------- | :------- | :--------------------------------- | :--------------------------------------- |
+| `x`, `y` | `number` | **Required**                       | World coordinates.                       |
+| `text`   | `string` | **Required**                       | The text content.                        |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
+| `style`  | `object` | -                                  | Font styling options.                    |
 
 **Style Options:**
 
--   `font`: CSS font string (e.g., `"12px Arial"`)
 -   `fillStyle`: Text color
+-   `fontFamily`: Font family (default: `"sans-serif"`)
 -   `textAlign`: `"left"`, `"center"`, `"right"`
 -   `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 
 ```tsx
+{/* Single text */}
 <CanvasTileEngine.Text
-    items={{ coords: { x: 5, y: 5 }, text: "Base Camp" }}
-    style={{ font: "14px sans-serif", fillStyle: "white" }}
+    items={{
+        x: 5,
+        y: 5,
+        text: "Base Camp",
+        size: 1,
+        style: { fillStyle: "white", fontFamily: "Arial" }
+    }}
+    layer={3}
+/>
+
+{/* Multiple texts (batch rendering) */}
+<CanvasTileEngine.Text
+    items={[
+        { x: 0, y: 0, text: "A", size: 2, style: { fillStyle: "red" } },
+        { x: 1, y: 0, text: "B", size: 2, style: { fillStyle: "blue" } },
+        { x: 2, y: 0, text: "C", size: 2, style: { fillStyle: "green" } },
+    ]}
     layer={3}
 />
 ```
+
+:::tip Scale-Aware Text
+The `size` property works like other draw components - it's in world units and scales with zoom. Use `size: 1` for text that fills approximately one tile height.
+:::
 
 ### `<Image>`
 
@@ -215,7 +271,20 @@ function MapWithImages() {
 
     return (
         <CanvasTileEngine engine={engine} config={config}>
+            {/* Single image */}
             {treeImg && <CanvasTileEngine.Image items={{ x: 2, y: 3, size: 1.5, img: treeImg }} layer={2} />}
+
+            {/* Multiple images (batch rendering) */}
+            {treeImg && (
+                <CanvasTileEngine.Image
+                    items={[
+                        { x: 5, y: 3, size: 1.5, img: treeImg },
+                        { x: 7, y: 3, size: 1.5, img: treeImg, rotate: 45 },
+                        { x: 9, y: 3, size: 2, img: treeImg },
+                    ]}
+                    layer={2}
+                />
+            )}
         </CanvasTileEngine>
     );
 }

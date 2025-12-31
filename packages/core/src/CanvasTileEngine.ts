@@ -10,7 +10,6 @@ import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
 import { IRenderer } from "./modules/Renderer/Renderer";
 import {
     Coords,
-    DrawObject,
     CanvasTileEngineConfig,
     onClickCallback,
     onRightClickCallback,
@@ -20,6 +19,12 @@ import {
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    Circle,
+    ImageItem,
+    Text,
+    Rect,
+    Line,
+    Path,
 } from "./types";
 import { SizeController } from "./modules/SizeController";
 import { AnimationController } from "./modules/AnimationController";
@@ -46,11 +51,32 @@ export class CanvasTileEngine {
     public canvasWrapper: HTMLDivElement;
     public canvas: HTMLCanvasElement;
 
-    /** Callback: center coordinates change */
+    /**
+     * Callback when center coordinates change (pan or zoom).
+     * @param coords - Center world coordinates: `{ x, y }`
+     * @example
+     * ```ts
+     * engine.onCoordsChange = (coords) => {
+     *     console.log(`Center: ${coords.x}, ${coords.y}`);
+     * };
+     * ```
+     */
     public onCoordsChange?: (coords: Coords) => void;
 
     private _onClick?: onClickCallback;
 
+    /**
+     * Callback when a tile is clicked (mouse or touch tap).
+     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
+     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
+     * @param client - Viewport position: `raw` (exact), `snapped` (tile-aligned)
+     * @example
+     * ```ts
+     * engine.onClick = (coords, mouse, client) => {
+     *     console.log(`Clicked tile: ${coords.snapped.x}, ${coords.snapped.y}`);
+     * };
+     * ```
+     */
     public get onClick(): onClickCallback | undefined {
         return this._onClick;
     }
@@ -61,6 +87,18 @@ export class CanvasTileEngine {
 
     private _onRightClick?: onRightClickCallback;
 
+    /**
+     * Callback when a tile is right-clicked.
+     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
+     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
+     * @param client - Viewport position: `raw` (exact), `snapped` (tile-aligned)
+     * @example
+     * ```ts
+     * engine.onRightClick = (coords) => {
+     *     showContextMenu(coords.snapped.x, coords.snapped.y);
+     * };
+     * ```
+     */
     public get onRightClick(): onRightClickCallback | undefined {
         return this._onRightClick;
     }
@@ -70,6 +108,19 @@ export class CanvasTileEngine {
     }
 
     private _onHover?: onHoverCallback;
+
+    /**
+     * Callback when hovering over tiles.
+     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
+     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
+     * @param client - Viewport position: `raw` (exact), `snapped` (tile-aligned)
+     * @example
+     * ```ts
+     * engine.onHover = (coords) => {
+     *     setHoveredTile({ x: coords.snapped.x, y: coords.snapped.y });
+     * };
+     * ```
+     */
     public get onHover(): onHoverCallback | undefined {
         return this._onHover;
     }
@@ -79,6 +130,19 @@ export class CanvasTileEngine {
     }
 
     private _onMouseDown?: onMouseDownCallback;
+
+    /**
+     * Callback on mouse/touch down.
+     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
+     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
+     * @param client - Viewport position: `raw` (exact), `snapped` (tile-aligned)
+     * @example
+     * ```ts
+     * engine.onMouseDown = (coords) => {
+     *     startPainting(coords.snapped.x, coords.snapped.y);
+     * };
+     * ```
+     */
     public get onMouseDown(): onMouseDownCallback | undefined {
         return this._onMouseDown;
     }
@@ -88,6 +152,19 @@ export class CanvasTileEngine {
     }
 
     private _onMouseUp?: onMouseUpCallback;
+
+    /**
+     * Callback on mouse/touch up.
+     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
+     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
+     * @param client - Viewport position: `raw` (exact), `snapped` (tile-aligned)
+     * @example
+     * ```ts
+     * engine.onMouseUp = (coords) => {
+     *     stopPainting();
+     * };
+     * ```
+     */
     public get onMouseUp(): onMouseUpCallback | undefined {
         return this._onMouseUp;
     }
@@ -97,6 +174,19 @@ export class CanvasTileEngine {
     }
 
     private _onMouseLeave?: onMouseLeaveCallback;
+
+    /**
+     * Callback when mouse/touch leaves the canvas.
+     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
+     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
+     * @param client - Viewport position: `raw` (exact), `snapped` (tile-aligned)
+     * @example
+     * ```ts
+     * engine.onMouseLeave = () => {
+     *     clearHoveredTile();
+     * };
+     * ```
+     */
     public get onMouseLeave(): onMouseLeaveCallback | undefined {
         return this._onMouseLeave;
     }
@@ -106,6 +196,19 @@ export class CanvasTileEngine {
     }
 
     private _onDraw?: onDrawCallback;
+
+    /**
+     * Callback after each draw frame. Use for custom canvas drawing.
+     * @param ctx - The canvas 2D rendering context
+     * @param info - Frame info: `scale`, `width`, `height`, `coords` (center)
+     * @example
+     * ```ts
+     * engine.onDraw = (ctx, info) => {
+     *     ctx.fillStyle = "red";
+     *     ctx.fillText(`Scale: ${info.scale}`, 10, 20);
+     * };
+     * ```
+     */
     public get onDraw(): onDrawCallback | undefined {
         return this._onDraw;
     }
@@ -115,6 +218,16 @@ export class CanvasTileEngine {
     }
 
     private _onResize?: () => void;
+
+    /**
+     * Callback on canvas resize.
+     * @example
+     * ```ts
+     * engine.onResize = () => {
+     *     console.log("Canvas resized:", engine.getSize());
+     * };
+     * ```
+     */
     public get onResize(): (() => void) | undefined {
         return this._onResize;
     }
@@ -124,7 +237,17 @@ export class CanvasTileEngine {
     }
 
     private _onZoom?: (scale: number) => void;
-    /** Callback: zoom level changes (wheel or pinch) */
+
+    /**
+     * Callback when zoom level changes (wheel or pinch).
+     * @param scale - The new scale value
+     * @example
+     * ```ts
+     * engine.onZoom = (scale) => {
+     *     console.log(`Zoom level: ${scale}`);
+     * };
+     * ```
+     */
     public get onZoom(): ((scale: number) => void) | undefined {
         return this._onZoom;
     }
@@ -434,7 +557,7 @@ export class CanvasTileEngine {
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      */
-    drawRect(items: DrawObject | Array<DrawObject>, layer: number = 1): LayerHandle {
+    drawRect(items: Rect | Array<Rect>, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawRect(items, layer);
     }
 
@@ -447,7 +570,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticRect(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawStaticRect(items, cacheKey, layer);
     }
 
@@ -459,7 +582,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticCircle(items: Array<DrawObject>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawStaticCircle(items, cacheKey, layer);
     }
 
@@ -472,11 +595,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticImage(
-        items: Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>,
-        cacheKey: string,
-        layer: number = 1
-    ): LayerHandle {
+    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawStaticImage(items, cacheKey, layer);
     }
 
@@ -495,7 +614,7 @@ export class CanvasTileEngine {
      * @param layer Layer order.
      */
     drawLine(
-        items: Array<{ from: Coords; to: Coords }> | { from: Coords; to: Coords },
+        items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ): LayerHandle {
@@ -507,22 +626,33 @@ export class CanvasTileEngine {
      * @param items Circle definitions.
      * @param layer Layer order.
      */
-    drawCircle(items: DrawObject | Array<DrawObject>, layer: number = 1): LayerHandle {
+    drawCircle(items: Circle | Array<Circle>, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawCircle(items, layer);
     }
 
     /**
      * Draw one or many texts at world positions (canvas renderer only).
-     * @param items Text definitions.
-     * @param style Text style overrides.
+     * @param items Text definitions with position, text, size, and style.
      * @param layer Layer order.
+     * @example
+     * ```ts
+     * engine.drawText({
+     *     x: 0,
+     *     y: 0,
+     *     text: "Hello",
+     *     size: 1, // 1 tile height
+     *     style: { fillStyle: "black", fontFamily: "Arial" }
+     * });
+     *
+     * // Multiple texts
+     * engine.drawText([
+     *     { x: 0, y: 0, text: "A", size: 2 },
+     *     { x: 1, y: 0, text: "B", size: 2 }
+     * ]);
+     * ```
      */
-    drawText(
-        items: Array<{ coords: Coords; text: string }> | { coords: Coords; text: string },
-        style?: { fillStyle?: string; font?: string; textAlign?: CanvasTextAlign; textBaseline?: CanvasTextBaseline },
-        layer: number = 2
-    ): LayerHandle {
-        return this.ensureCanvasDraw().drawText(items, style, layer);
+    drawText(items: Array<Text> | Text, layer: number = 2): LayerHandle {
+        return this.ensureCanvasDraw().drawText(items, layer);
     }
 
     /**
@@ -532,7 +662,7 @@ export class CanvasTileEngine {
      * @param layer Layer order.
      */
     drawPath(
-        items: Array<Coords[]> | Coords[],
+        items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
     ): LayerHandle {
@@ -545,12 +675,7 @@ export class CanvasTileEngine {
      * @param items Image definitions.
      * @param layer Layer order.
      */
-    drawImage(
-        items:
-            | Array<Omit<DrawObject, "style"> & { img: HTMLImageElement }>
-            | (Omit<DrawObject, "style"> & { img: HTMLImageElement }),
-        layer: number = 1
-    ): LayerHandle {
+    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): LayerHandle {
         return this.ensureCanvasDraw().drawImage(items, layer);
     }
 

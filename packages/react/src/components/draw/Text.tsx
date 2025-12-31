@@ -1,33 +1,39 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { Coords } from "@canvas-tile-engine/core";
+import type { Text as TextType } from "@canvas-tile-engine/core";
 
 export interface TextProps {
-    items: { coords: Coords; text: string } | { coords: Coords; text: string }[];
-    style?: {
-        fillStyle?: string;
-        font?: string;
-        textAlign?: CanvasTextAlign;
-        textBaseline?: CanvasTextBaseline;
-    };
+    items: TextType | TextType[];
     layer?: number;
 }
 
 /**
  * Draws text on the canvas.
+ * @example
+ * ```tsx
+ * <Text
+ *     items={{
+ *         x: 0,
+ *         y: 0,
+ *         text: "Hello",
+ *         size: 1,
+ *         style: { fillStyle: "black", fontFamily: "Arial" }
+ *     }}
+ * />
+ * ```
  */
-export const Text = memo(function Text({ items, style, layer = 2 }: TextProps) {
+export const Text = memo(function Text({ items, layer = 2 }: TextProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        const handle = engine.drawText(items, style, layer);
+        const handle = engine.drawText(items, layer);
         requestRender();
         return () => {
             if (handle) {
                 engine.removeLayerHandle(handle);
             }
         };
-    }, [engine, items, style, layer, requestRender]);
+    }, [engine, items, layer, requestRender]);
 
     return null;
 });
