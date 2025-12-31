@@ -125,7 +125,7 @@ const config: Config = {
                     ],
                 },
             ],
-            copyright: `© ${new Date().getFullYear()} Canvas Tile Engine`,
+            copyright: `Copyright © ${new Date().getFullYear()} Canvas Tile Engine, Inc. Built with Docusaurus.`,
         },
         prism: {
             theme: prismThemes.github,
