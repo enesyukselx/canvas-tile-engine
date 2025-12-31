@@ -236,6 +236,7 @@ drawText(items: Text | Text[], layer?: number): LayerHandle
 | `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
 | `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
 | `style`  | `object` | -                                  | Font styling options.                    |
+| `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).   |
 
 **Style Options:**
 
@@ -252,6 +253,16 @@ engine.drawText({
     text: "Base Camp",
     size: 1,
     style: { fillStyle: "white", fontFamily: "Arial" }
+}, 3);
+
+// Rotated text (45 degrees)
+engine.drawText({
+    x: 8,
+    y: 5,
+    text: "Rotated",
+    size: 1,
+    rotate: 45,
+    style: { fillStyle: "yellow" }
 }, 3);
 
 // Multiple texts (batch rendering)

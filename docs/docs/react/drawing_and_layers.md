@@ -204,6 +204,7 @@ Render text at world coordinates. Text size scales with zoom.
 | `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
 | `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
 | `style`  | `object` | -                                  | Font styling options.                    |
+| `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).   |
 
 **Style Options:**
 
@@ -221,6 +222,19 @@ Render text at world coordinates. Text size scales with zoom.
         text: "Base Camp",
         size: 1,
         style: { fillStyle: "white", fontFamily: "Arial" }
+    }}
+    layer={3}
+/>
+
+{/* Rotated text (45 degrees) */}
+<CanvasTileEngine.Text
+    items={{
+        x: 8,
+        y: 5,
+        text: "Rotated",
+        size: 1,
+        rotate: 45,
+        style: { fillStyle: "yellow" }
     }}
     layer={3}
 />

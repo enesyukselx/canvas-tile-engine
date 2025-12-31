@@ -288,7 +288,18 @@ export class CanvasDraw {
                 ctx.textBaseline = style?.textBaseline ?? "middle";
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                ctx.fillText(item.text, pos.x, pos.y);
+
+                const rotationDeg = item.rotate ?? 0;
+                if (rotationDeg !== 0) {
+                    const rotation = rotationDeg * (Math.PI / 180);
+                    ctx.save();
+                    ctx.translate(pos.x, pos.y);
+                    ctx.rotate(rotation);
+                    ctx.fillText(item.text, 0, 0);
+                    ctx.restore();
+                } else {
+                    ctx.fillText(item.text, pos.x, pos.y);
+                }
             }
             ctx.restore();
         });
