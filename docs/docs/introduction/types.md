@@ -95,6 +95,7 @@ type Text = {
         textAlign?: CanvasTextAlign;
         textBaseline?: CanvasTextBaseline;
     };
+    rotate?: number;
 };
 ```
 
@@ -105,6 +106,7 @@ type Text = {
 | `size`   | `number` | `1`                                | Font size in world units (scales with zoom) |
 | `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                             |
 | `style`  | `object` | `{}`                               | Font styling options                     |
+| `rotate` | `number` | `0`                                | Rotation in degrees (clockwise)          |
 
 **Style Options:**
 

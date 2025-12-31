@@ -118,7 +118,7 @@ export type Rect = DrawObject;
 
 export type Circle = Omit<DrawObject, "rotate" | "radius">;
 export type ImageItem = Omit<DrawObject, "style"> & { img: HTMLImageElement };
-export type Text = Omit<DrawObject, "rotate" | "radius" | "size"> & {
+export type Text = Omit<DrawObject, "radius" | "size"> & {
     text: string;
     /** Font size in world units (scales with zoom). Default: 1 */
     size?: number;
