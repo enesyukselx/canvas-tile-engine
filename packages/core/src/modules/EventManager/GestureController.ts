@@ -158,6 +158,7 @@ export class GestureController {
             e.preventDefault();
             this.isPinching = true;
             this.isDragging = false;
+            this.shouldPreventClick = true;
             this.lastPinchDistance = this.getTouchDistance(e.touches);
             this.lastPinchCenter = this.getTouchCenter(e.touches);
             return;
