@@ -14,7 +14,7 @@ The engine includes a built-in `ImageLoader` utility for asynchronous image load
 
 ## Loading Images
 
-Access the loader when `engine.isReady` is `true`:
+Use `engine.loadImage()` when `engine.isReady` is `true`:
 
 ```tsx
 function MapWithImages() {
@@ -22,16 +22,16 @@ function MapWithImages() {
     const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
 
     useEffect(() => {
-        if (!engine.isReady || !engine.images) return;
+        if (!engine.isReady) return;
 
         const loadImages = async () => {
-            const tree = await engine.images!.load("/assets/tree.png");
-            const rock = await engine.images!.load("/assets/rock.png");
+            const tree = await engine.loadImage("/assets/tree.png");
+            const rock = await engine.loadImage("/assets/rock.png");
             setImages({ tree, rock });
         };
 
         loadImages();
-    }, [engine.isReady, engine.images]);
+    }, [engine.isReady]);
 
     const imageItems = useMemo(
         () =>
@@ -62,7 +62,7 @@ function MapWithPreloadedAssets() {
     const [assets, setAssets] = useState<Record<string, HTMLImageElement>>({});
 
     useEffect(() => {
-        if (!engine.isReady || !engine.images) return;
+        if (!engine.isReady) return;
 
         const preload = async () => {
             const urls = {
@@ -74,7 +74,7 @@ function MapWithPreloadedAssets() {
 
             const entries = await Promise.all(
                 Object.entries(urls).map(async ([key, url]) => {
-                    const img = await engine.images!.load(url);
+                    const img = await engine.loadImage(url);
                     return [key, img] as const;
                 })
             );
@@ -84,7 +84,7 @@ function MapWithPreloadedAssets() {
         };
 
         preload();
-    }, [engine.isReady, engine.images]);
+    }, [engine.isReady]);
 
     if (!loaded) {
         return <div>Loading assets...</div>;
@@ -109,17 +109,17 @@ function useLoadedImage(engine: EngineHandle, url: string) {
     const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
-        if (!engine.isReady || !engine.images) return;
+        if (!engine.isReady) return;
 
         setLoading(true);
         setError(null);
 
-        engine.images
-            .load(url)
+        engine
+            .loadImage(url)
             .then(setImage)
             .catch(setError)
             .finally(() => setLoading(false));
-    }, [engine.isReady, engine.images, url]);
+    }, [engine.isReady, url]);
 
     return { image, loading, error };
 }
@@ -168,20 +168,20 @@ function GameMap({ objects }: { objects: MapObject[] }) {
 
     // Load all required assets
     useEffect(() => {
-        if (!engine.isReady || !engine.images) return;
+        if (!engine.isReady) return;
 
         const requiredTypes = [...new Set(objects.map((o) => o.type))];
 
         Promise.all(
             requiredTypes.map(async (type) => {
-                const img = await engine.images!.load(ASSET_URLS[type]);
+                const img = await engine.loadImage(ASSET_URLS[type]);
                 return [type, img] as const;
             })
         ).then((entries) => {
             setAssets(Object.fromEntries(entries));
             setReady(true);
         });
-    }, [engine.isReady, engine.images, objects]);
+    }, [engine.isReady, objects]);
 
     // Build image items
     const imageItems = useMemo(() => {
@@ -221,20 +221,20 @@ function TerrainMap({ tiles }: { tiles: TileData[] }) {
     const [ready, setReady] = useState(false);
 
     useEffect(() => {
-        if (!engine.isReady || !engine.images) return;
+        if (!engine.isReady) return;
 
         const types = [...new Set(tiles.map((t) => t.type))];
 
         Promise.all(
             types.map(async (type) => {
-                const img = await engine.images!.load(`/assets/terrain/${type}.png`);
+                const img = await engine.loadImage(`/assets/terrain/${type}.png`);
                 return [type, img] as const;
             })
         ).then((entries) => {
             setTileImages(Object.fromEntries(entries));
             setReady(true);
         });
-    }, [engine.isReady, engine.images, tiles]);
+    }, [engine.isReady, tiles]);
 
     const terrainItems = useMemo(() => {
         if (!ready) return [];

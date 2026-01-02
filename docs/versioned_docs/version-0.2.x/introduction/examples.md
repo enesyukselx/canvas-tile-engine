@@ -20,6 +20,11 @@ You can access the source code for all example projects [here](https://github.co
 -   [Github](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples/react/game-map)
 -   [Demo](https://react-game-map.netlify.app/)
 
+#### Responsive Game Map Example
+
+-   [Github](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples/react/responsive-game-map)
+-   [Demo](https://react-responsive-game-map.netlify.app/)
+
 #### Pixel Paint Example
 
 -   [Github](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples/react/pixel-paint)

@@ -2,6 +2,15 @@
 
 All notable changes to `@canvas-tile-engine/core` will be documented in this file.
 
+## [0.0.6] - 2026-01-02
+
+-   fix(core): prevent accidental click after pinch-to-zoom
+-   feat(core): add config and runtime validation (#55)
+-   feat(core): add rotation support to drawText (#54)
+-   feat(core): refactor drawText API for consistency (#52)
+-   fix(core): set wrapper height for preserve-scale responsive mode (#49)
+-   fix(core): add touch tap support for click events (#48)
+
 ## [0.0.5] - 2025-12-27
 
 -   fix(core): correct gridAligned calculation for odd/even tile counts (#47)
