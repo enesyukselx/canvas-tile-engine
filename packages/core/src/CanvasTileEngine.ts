@@ -270,10 +270,12 @@ export class CanvasTileEngine {
         if (config.responsive) {
             Object.assign(this.canvasWrapper.style, {
                 position: "relative",
+                overflow: "hidden",
             });
         } else {
             Object.assign(this.canvasWrapper.style, {
                 position: "relative",
+                overflow: "hidden",
                 width: config.size.width + "px",
                 height: config.size.height + "px",
             });
