@@ -130,7 +130,7 @@ export interface EngineHandle {
 
     /** Register a custom draw function */
     addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer?: number
     ): DrawHandle;
 

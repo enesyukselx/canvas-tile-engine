@@ -654,7 +654,7 @@ export class CanvasTileEngine {
      * @returns DrawHandle for removal.
      */
     addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
     ): DrawHandle {
         return this.renderer.getDrawAPI().addDrawFunction(fn, layer);

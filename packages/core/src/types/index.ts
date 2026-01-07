@@ -78,7 +78,7 @@ export interface IRenderer {
 
 export interface IDrawAPI {
     addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer?: number
     ): DrawHandle;
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;

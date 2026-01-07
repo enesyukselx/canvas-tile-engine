@@ -1,7 +1,7 @@
 import { Coords } from ".";
 
 export type onDrawCallback = (
-    ctx: CanvasRenderingContext2D,
+    ctx: unknown,
     info: { scale: number; width: number; height: number; coords: Coords }
 ) => void;
 

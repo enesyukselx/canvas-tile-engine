@@ -156,11 +156,12 @@ export default function App() {
                     />
                     <CanvasTileEngine.DrawFunction layer={3}>
                         {(ctx) => {
+                            const context = ctx as CanvasRenderingContext2D;
                             const cfg = map.getConfig();
                             const centerX = cfg.size.width / 2;
                             const centerY = cfg.size.height / 2;
-                            ctx.fillStyle = "red";
-                            ctx.fillRect(centerX - 5, centerY - 5, 5, 5);
+                            context.fillStyle = "red";
+                            context.fillRect(centerX - 5, centerY - 5, 5, 5);
                         }}
                     </CanvasTileEngine.DrawFunction>
                 </CanvasTileEngine>

@@ -236,6 +236,7 @@ miniMap.onZoom = () => {
 // Draws a rectangle on the mini map representing the current viewport of the main map
 // "onDraw" is a callback for custom drawing on the map's canvas
 miniMap.onDraw = (ctx) => {
+    const context = ctx as CanvasRenderingContext2D;
     const mainCfg = mainMap.getConfig();
     const miniCfg = miniMap.getConfig();
 
@@ -250,18 +251,19 @@ miniMap.onDraw = (ctx) => {
     const rectX = miniCfg.size.width / 2 - rectWidth / 2;
     const rectY = miniCfg.size.height / 2 - rectHeight / 2;
 
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+    context.strokeStyle = "white";
+    context.lineWidth = 2;
+    context.strokeRect(rectX, rectY, rectWidth, rectHeight);
 };
 
 // Custom draw function on the main map to draw a red square at the center
 // This draw function is added with a priority of 3 (to be drawn after other elements)
 mainMap.addDrawFunction((ctx) => {
+    const context = ctx as CanvasRenderingContext2D;
     const centerX = mainMap.getConfig().size.width / 2;
     const centerY = mainMap.getConfig().size.height / 2;
-    ctx.fillStyle = "red";
-    ctx.fillRect(centerX - 5, centerY - 5, 5, 5);
+    context.fillStyle = "red";
+    context.fillRect(centerX - 5, centerY - 5, 5, 5);
 }, 3);
 
 // Handle hover events on the main map
