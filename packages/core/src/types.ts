@@ -277,29 +277,3 @@ export interface ViewportBounds {
     width: number;
     height: number;
 }
-
-// Renderer implementation
-//   class CanvasRenderer implements IRenderer {
-//     private drawAPI: CanvasDraw;
-
-//     init(deps: RendererDependencies) {
-//       this.camera = deps.camera;
-//       this.drawAPI = new CanvasDraw(deps.transformer, deps.camera);
-//       this.bindEvents(deps.gestureHandler);
-//     }
-
-//     getDrawAPI(): IDrawAPI {
-//       return this.drawAPI;
-//     }
-
-//     render() { /* canvas drawing */ }
-//     resize(w, h) { /* resize logic */ }
-//     destroy() { /* cleanup */ }
-//   }
-
-//   // Engine kullanımı
-//   const engine = new Engine(config, new CanvasRenderer(canvas));
-
-//   engine.draw.drawRect({ x: 0, y: 0, size: 1 });
-//   engine.draw.drawCircle([...]);
-//   engine.render();
