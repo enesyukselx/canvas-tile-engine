@@ -26,11 +26,11 @@ jobs:
                   cache: "pnpm"
                   cache-dependency-path: "pnpm-lock.yaml"
 
-            - name: Build core package
-              run: pnpm -w -F @canvas-tile-engine/core build
-
             - name: Install dependencies
               run: pnpm install --no-frozen-lockfile
+
+            - name: Build core package
+              run: pnpm -w -F @canvas-tile-engine/core build
 
             - name: Typecheck Core
               run: pnpm --filter @canvas-tile-engine/core typecheck
