@@ -48,6 +48,9 @@ importers:
       '@canvas-tile-engine/react':
         specifier: workspace:*
         version: link:../../../packages/react
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-canvas
       '@faker-js/faker':
         specifier: ^10.1.0
         version: 10.1.0
@@ -85,6 +88,9 @@ importers:
       '@canvas-tile-engine/react':
         specifier: workspace:*
         version: link:../../../packages/react
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-canvas
       '@faker-js/faker':
         specifier: ^10.1.0
         version: 10.1.0
@@ -122,6 +128,9 @@ importers:
       '@canvas-tile-engine/react':
         specifier: workspace:*
         version: link:../../../packages/react
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-canvas
       '@faker-js/faker':
         specifier: ^10.1.0
         version: 10.1.0
@@ -194,9 +203,6 @@ importers:
       '@canvas-tile-engine/core':
         specifier: workspace:*
         version: link:../core
-      '@canvas-tile-engine/renderer-canvas':
-        specifier: workspace:*
-        version: link:../renderer-canvas
       react:
         specifier: '>=18.0.0'
         version: 19.2.3

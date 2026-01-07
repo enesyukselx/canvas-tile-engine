@@ -10,6 +10,7 @@ import {
 import { INITIAL_COORDS, MAP_BACKGROUND_COLOR } from "./constants";
 import { generateMapObjects, type MapObject } from "./generateMapObjects";
 import { VillageModal } from "./components/VillageModal";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const MINI_MAP_SCALE_THRESHOLD = 25;
 
@@ -130,6 +131,7 @@ export default function App() {
             <div>
                 <CanvasTileEngine
                     engine={map}
+                    renderer={new RendererCanvas()}
                     config={mapConfig}
                     center={INITIAL_COORDS}
                     onClick={

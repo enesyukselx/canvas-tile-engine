@@ -16,6 +16,7 @@ import { generateMapObjects, type MapObject } from "./generateMapObjects";
 import { INITIAL_COORDS, MINI_MAP_SIZE_OPTIONS, MAIN_MAP_SIZE_OPTIONS, MAP_BACKGROUND_COLOR } from "./constants";
 import calculateMiniMapBounds from "./utils/calculateMiniMapBounds";
 import miniMapViewportRectangleDraw from "./utils/miniMapViewportRectangleDraw";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const mainMapConfig: CanvasTileEngineConfig = {
     scale: 50,
@@ -264,6 +265,7 @@ export default function App() {
             <div className="relative">
                 <CanvasTileEngine
                     engine={mainMap}
+                    renderer={new RendererCanvas()}
                     config={mainMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMainMapCoordsChange}
@@ -313,6 +315,7 @@ export default function App() {
             <div className="relative">
                 <CanvasTileEngine
                     engine={miniMap}
+                    renderer={new RendererCanvas()}
                     config={miniMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMiniMapCoordsChange}
