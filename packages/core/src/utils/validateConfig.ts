@@ -42,9 +42,7 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
 
     if (config.minScale !== undefined && config.maxScale !== undefined) {
         if (config.minScale > config.maxScale) {
-            throw configError(
-                `minScale (${config.minScale}) cannot be greater than maxScale (${config.maxScale})`
-            );
+            throw configError(`minScale (${config.minScale}) cannot be greater than maxScale (${config.maxScale})`);
         }
     }
 
