@@ -1,9 +1,20 @@
-import { Coords, CanvasTileEngineConfig, Rect, Circle, Text, Path, ImageItem, Line } from "../types";
-import { ICamera } from "./Camera";
-import { CoordinateTransformer } from "./CoordinateTransformer";
-import { Layer, type LayerHandle } from "./Layer";
-import { DEFAULT_VALUES, VISIBILITY_BUFFER } from "../constants";
-import { SpatialIndex } from "./SpatialIndex";
+import {
+    CanvasTileEngineConfig,
+    Circle,
+    CoordinateTransformer,
+    Coords,
+    DEFAULT_VALUES,
+    DrawHandle,
+    ICamera,
+    ImageItem,
+    Line,
+    Path,
+    Rect,
+    SpatialIndex,
+    Text,
+    VISIBILITY_BUFFER,
+} from "@canvas-tile-engine/core";
+import { Layer } from "./Layer";
 import { applyLineWidth } from "../utils/canvas";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
@@ -68,13 +79,13 @@ export class CanvasDraw {
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer: number = 1
-    ): LayerHandle {
+    ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config);
         });
     }
 
-    drawRect(items: Array<Rect> | Rect, layer: number = 1): LayerHandle {
+    drawRect(items: Array<Rect> | Rect, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -165,7 +176,7 @@ export class CanvasDraw {
         items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ): LayerHandle {
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
@@ -194,7 +205,7 @@ export class CanvasDraw {
         });
     }
 
-    drawCircle(items: Array<Circle> | Circle, layer: number = 1): LayerHandle {
+    drawCircle(items: Array<Circle> | Circle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -256,7 +267,7 @@ export class CanvasDraw {
         });
     }
 
-    drawText(items: Array<Text> | Text, layer: number = 2): LayerHandle {
+    drawText(items: Array<Text> | Text, layer: number = 2): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -309,7 +320,7 @@ export class CanvasDraw {
         items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ): LayerHandle {
+    ): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
@@ -347,7 +358,7 @@ export class CanvasDraw {
         });
     }
 
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): LayerHandle {
+    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -407,7 +418,7 @@ export class CanvasDraw {
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): LayerHandle {
+    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
@@ -548,7 +559,10 @@ export class CanvasDraw {
                 (offscreen as HTMLCanvasElement).height = canvasHeight;
             }
 
-            const offCtx = offscreen.getContext("2d");
+            const offCtx = offscreen.getContext("2d") as
+                | CanvasRenderingContext2D
+                | OffscreenCanvasRenderingContext2D
+                | null;
 
             if (!offCtx) {
                 if (!this.warnedStaticCacheDisabled) {
@@ -578,13 +592,13 @@ export class CanvasDraw {
             this.staticCaches.set(cacheKey, cache);
         }
 
-        return cache || null;
+        return cache ?? null;
     }
 
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
-    private addStaticCacheLayer(cache: StaticCache | null, layer: number): LayerHandle | null {
+    private addStaticCacheLayer(cache: StaticCache | null, layer: number): DrawHandle | null {
         if (!cache) {
             return null;
         }
@@ -678,7 +692,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items")
      * @param layer Layer order
      */
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
@@ -732,7 +746,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache")
      * @param layer Layer order
      */
-    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
             const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
@@ -776,7 +790,7 @@ export class CanvasDraw {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles")
      * @param layer Layer order
      */
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): LayerHandle {
+    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
         let lastFillStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
@@ -810,6 +824,54 @@ export class CanvasDraw {
         } else {
             this.staticCaches.clear();
         }
+    }
+
+    /**
+     * LAYER METHODS
+     */
+    /**
+     * Remove a specific draw callback by handle (canvas renderer only).
+     * Does not clear other callbacks on the same layer.
+     */
+    removeDrawHandle(handle: DrawHandle) {
+        if (!this.layers) {
+            throw new Error("removeDrawHandle is only available when renderer is set to 'canvas'.");
+        }
+        this.layers.remove(handle);
+    }
+
+    /**
+     * Clear all draw callbacks from a specific layer (canvas renderer only).
+     * Use this before redrawing dynamic content to prevent accumulation.
+     * @param layer Layer index to clear.
+     * @example
+     * ```ts
+     * engine.clearLayer(1);
+     * engine.drawRect(newRects, 1);
+     * engine.render();
+     * ```
+     */
+    clearLayer(layer: number) {
+        if (!this.layers) {
+            throw new Error("clearLayer is only available when renderer is set to 'canvas'.");
+        }
+        this.layers.clear(layer);
+    }
+
+    /**
+     * Clear all draw callbacks from all layers (canvas renderer only).
+     * Useful for complete scene reset.
+     * @example
+     * ```ts
+     * engine.clearAll();
+     * // Redraw everything from scratch
+     * ```
+     */
+    clearAll() {
+        if (!this.layers) {
+            throw new Error("clearAll is only available when renderer is set to 'canvas'.");
+        }
+        this.layers.clear();
     }
 
     /**

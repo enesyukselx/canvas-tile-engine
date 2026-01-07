@@ -30,7 +30,7 @@ export const Text = memo(function Text({ items, layer = 2 }: TextProps) {
         requestRender();
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, layer, requestRender]);

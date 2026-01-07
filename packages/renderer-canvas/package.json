@@ -1,0 +1,57 @@
+{
+    "name": "@canvas-tile-engine/renderer-canvas",
+    "version": "0.3.0",
+    "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with Canvas",
+    "author": "Enes Yüksel",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/enesyukselx/canvas-tile-engine.git",
+        "directory": "packages/renderer-canvas"
+    },
+    "homepage": "https://canvastileengine.dev",
+    "bugs": {
+        "url": "https://github.com/enesyukselx/canvas-tile-engine/issues"
+    },
+    "keywords": [
+        "canvas",
+        "tile",
+        "engine",
+        "2d",
+        "map",
+        "game",
+        "grid",
+        "visualization",
+        "interactive",
+        "pan",
+        "zoom"
+    ],
+    "sideEffects": false,
+    "main": "dist/index.cjs",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest",
+        "test:coverage": "vitest run --coverage"
+    },
+    "dependencies": {
+        "rbush": "^4.0.1",
+        "@canvas-tile-engine/core": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/rbush": "^4.0.0"
+    }
+}

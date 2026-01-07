@@ -20,7 +20,7 @@ export const GridLines = memo(function GridLines({ cellSize, lineWidth = 1, stro
         requestRender();
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, cellSize, lineWidth, strokeStyle, layer, requestRender]);

@@ -18,7 +18,7 @@ export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
         requestRender();
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, layer, requestRender]);

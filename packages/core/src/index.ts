@@ -18,7 +18,22 @@ export type {
     Text,
     Path,
     ImageItem,
+    RendererDependencies,
+    IRenderer,
+    IDrawAPI,
+    IImageLoader,
+    DrawHandle,
+    ICamera,
+    LineStyle,
+    Bounds,
+    ViewportBounds,
 } from "./types";
-export type { LayerHandle } from "./modules/Layer";
 export * from "./constants";
 export { gridToSize } from "./utils/gridToSize";
+export { CoordinateTransformer } from "./modules/CoordinateTransformer";
+export { SpatialIndex } from "./modules/SpatialIndex";
+export { ViewportState } from "./modules/ViewportState";
+export { Config } from "./modules/Config";
+export { GestureProcessor } from "./modules/GestureProcessor";
+export type { NormalizedPointer, NormalizedPinch, ProcessedCoords, CanvasBounds } from "./modules/GestureProcessor";
+export { AnimationController } from "./modules/AnimationController";

@@ -17,6 +17,7 @@ import type {
     Path,
     Text,
     ImageItem,
+    IRenderer,
 } from "@canvas-tile-engine/core";
 import type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
@@ -39,6 +40,7 @@ export type {
     Text,
     Path,
     ImageItem,
+    IRenderer,
 };
 
 /**
@@ -47,6 +49,9 @@ export type {
 export interface CanvasTileEngineProps {
     /** Engine handle from useCanvasTileEngine hook (required) */
     engine: EngineHandle;
+
+    /** Renderer instance to use (e.g., new RendererCanvas()) */
+    renderer: IRenderer;
 
     /** Engine configuration */
     config: CanvasTileEngineConfig;

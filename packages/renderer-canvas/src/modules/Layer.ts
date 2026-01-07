@@ -1,6 +1,4 @@
-import { Coords, CanvasTileEngineConfig } from "../types";
-import type { ICamera } from "./Camera";
-import type { CoordinateTransformer } from "./CoordinateTransformer";
+import { CanvasTileEngineConfig, CoordinateTransformer, Coords, ICamera } from "@canvas-tile-engine/core";
 
 /** @internal */
 export type DrawContext = {
@@ -14,7 +12,7 @@ export type DrawContext = {
 /** @internal */
 export type DrawCallback = (dc: DrawContext) => void;
 
-export interface LayerHandle {
+export interface DrawHandle {
     layer: number;
     id: symbol;
 }
@@ -31,7 +29,7 @@ export class Layer {
      * @param layer Layer order; lower numbers draw first.
      * @param fn Callback receiving drawing context.
      */
-    add(layer: number, fn: DrawCallback): LayerHandle {
+    add(layer: number, fn: DrawCallback): DrawHandle {
         const id = Symbol("layer-callback");
         const entry = { id, fn };
         if (!this.layers.has(layer)) this.layers.set(layer, []);
@@ -43,7 +41,7 @@ export class Layer {
      * Remove a previously registered callback.
      * Safe to call multiple times; no-op if not found.
      */
-    remove(handle: LayerHandle) {
+    remove(handle: DrawHandle) {
         const list = this.layers.get(handle.layer);
         if (!list) return;
         this.layers.set(

@@ -18,7 +18,7 @@ export const Circle = memo(function Circle({ items, layer = 1 }: CircleProps) {
         requestRender();
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, layer, requestRender]);

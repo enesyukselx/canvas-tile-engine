@@ -5,7 +5,6 @@ import { ViewportState } from "./ViewportState";
 
 /**
  * Camera contract used by rendering and coordinate transforms.
- * @internal
  */
 export interface ICamera {
     /** Current top-left world x coordinate. */
@@ -74,7 +73,10 @@ export interface ICamera {
      * @param canvasHeight Canvas height in pixels.
      * @returns Visible bounds with min/max coordinates (floored/ceiled to cell boundaries).
      */
-    getVisibleBounds(canvasWidth: number, canvasHeight: number): {
+    getVisibleBounds(
+        canvasWidth: number,
+        canvasHeight: number
+    ): {
         minX: number;
         maxX: number;
         minY: number;
@@ -239,7 +241,10 @@ export class Camera implements ICamera {
         this.clampToBounds();
     }
 
-    getVisibleBounds(canvasWidth: number, canvasHeight: number): {
+    getVisibleBounds(
+        canvasWidth: number,
+        canvasHeight: number
+    ): {
         minX: number;
         maxX: number;
         minY: number;

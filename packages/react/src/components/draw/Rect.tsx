@@ -18,7 +18,7 @@ export const Rect = memo(function Rect({ items, layer = 1 }: RectProps) {
         requestRender();
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, layer, requestRender]);

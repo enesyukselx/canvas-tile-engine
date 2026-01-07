@@ -1,7 +1,6 @@
 /**
  * Holds mutable viewport size for runtime changes (resize, layout).
  * Also tracks device pixel ratio for HiDPI/Retina display support.
- * @internal
  */
 export class ViewportState {
     private width: number;

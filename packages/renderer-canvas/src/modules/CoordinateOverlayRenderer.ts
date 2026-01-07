@@ -1,6 +1,4 @@
-import { Config } from "./Config";
-import { ICamera } from "./Camera";
-import { ViewportState } from "./ViewportState";
+import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
 import { COORDINATE_OVERLAY } from "../constants";
 
 /**

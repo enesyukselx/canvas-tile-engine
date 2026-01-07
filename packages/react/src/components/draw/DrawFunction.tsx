@@ -40,7 +40,7 @@ export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: 
 
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, layer, requestRender]);

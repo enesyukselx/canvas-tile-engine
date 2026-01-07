@@ -53,6 +53,7 @@ import { DrawFunction } from "./draw/DrawFunction";
  */
 function CanvasTileEngineBase({
     engine,
+    renderer,
     config,
     center = { x: 0, y: 0 },
     className,
@@ -139,7 +140,7 @@ function CanvasTileEngineBase({
         }
 
         // Create engine instance
-        const instance = new CanvasTileEngineCore(container, config, center);
+        const instance = new CanvasTileEngineCore(container, config, renderer, center);
 
         // Set up callbacks using stable refs
         instance.onCoordsChange = (coords) => callbacksRef.current.onCoordsChange?.(coords);

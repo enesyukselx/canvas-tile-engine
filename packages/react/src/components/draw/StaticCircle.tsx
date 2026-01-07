@@ -30,7 +30,7 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
 
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, cacheKey, layer, requestRender]);

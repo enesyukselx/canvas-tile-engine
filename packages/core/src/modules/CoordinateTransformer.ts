@@ -4,7 +4,6 @@ import { screenToWorld, worldToScreen } from "../utils/viewport";
 
 /**
  * Transforms coordinates between world space and screen space using the active camera.
- * @internal
  */
 export class CoordinateTransformer {
     /**
