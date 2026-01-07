@@ -3,6 +3,7 @@ name: "Renderer Canvas Package - Typecheck + Lint Checks"
 on:
     push:
         paths:
+            - "packages/core/**"
             - "packages/renderer-canvas/**"
 
 jobs:
