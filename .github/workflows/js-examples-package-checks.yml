@@ -32,6 +32,9 @@ jobs:
             - name: Build core package
               run: pnpm -w -F @canvas-tile-engine/core build
 
+            - name: Build renderer-canvas package
+              run: pnpm -w -F @canvas-tile-engine/renderer-canvas build
+
             - name: Typecheck examples
               run: pnpm -r --filter '{./examples/vanilla-js-examples/**}' typecheck
 
