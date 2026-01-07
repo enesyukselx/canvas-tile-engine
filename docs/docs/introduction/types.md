@@ -99,23 +99,23 @@ type Text = {
 };
 ```
 
-| Property | Type     | Default                            | Description                              |
-| :------- | :------- | :--------------------------------- | :--------------------------------------- |
-| `x`, `y` | `number` | **Required**                       | World coordinates                        |
-| `text`   | `string` | **Required**                       | Text content to render                   |
+| Property | Type     | Default                            | Description                                 |
+| :------- | :------- | :--------------------------------- | :------------------------------------------ |
+| `x`, `y` | `number` | **Required**                       | World coordinates                           |
+| `text`   | `string` | **Required**                       | Text content to render                      |
 | `size`   | `number` | `1`                                | Font size in world units (scales with zoom) |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                             |
-| `style`  | `object` | `{}`                               | Font styling options                     |
-| `rotate` | `number` | `0`                                | Rotation in degrees (clockwise)          |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                                |
+| `style`  | `object` | `{}`                               | Font styling options                        |
+| `rotate` | `number` | `0`                                | Rotation in degrees (clockwise)             |
 
 **Style Options:**
 
-| Property       | Type                 | Default        | Description               |
-| :------------- | :------------------- | :------------- | :------------------------ |
-| `fillStyle`    | `string`             | -              | Text color                |
-| `fontFamily`   | `string`             | `"sans-serif"` | Font family               |
-| `textAlign`    | `CanvasTextAlign`    | `"left"`       | Horizontal alignment      |
-| `textBaseline` | `CanvasTextBaseline` | `"top"`        | Vertical baseline         |
+| Property       | Type                 | Default        | Description          |
+| :------------- | :------------------- | :------------- | :------------------- |
+| `fillStyle`    | `string`             | -              | Text color           |
+| `fontFamily`   | `string`             | `"sans-serif"` | Font family          |
+| `textAlign`    | `CanvasTextAlign`    | `"left"`       | Horizontal alignment |
+| `textBaseline` | `CanvasTextBaseline` | `"top"`        | Vertical baseline    |
 
 ---
 
@@ -256,16 +256,34 @@ type onMouseLeaveCallback = MouseEventCallback;
 Callback for custom drawing after all layers are rendered.
 
 ```typescript
-type onDrawCallback = (
-    ctx: CanvasRenderingContext2D,
-    info: { scale: number; width: number; height: number; coords: Coords }
-) => void;
+type onDrawCallback = (ctx: unknown, info: { scale: number; width: number; height: number; coords: Coords }) => void;
 ```
 
-| Parameter     | Description                               |
-| :------------ | :---------------------------------------- |
-| `ctx`         | Canvas 2D rendering context               |
-| `info.scale`  | Current zoom scale                        |
-| `info.width`  | Canvas width in pixels                    |
-| `info.height` | Canvas height in pixels                   |
-| `info.coords` | Top-left world coordinate of the viewport |
+| Parameter     | Description                                             |
+| :------------ | :------------------------------------------------------ |
+| `ctx`         | Rendering context (type depends on renderer being used) |
+| `info.scale`  | Current zoom scale                                      |
+| `info.width`  | Canvas width in pixels                                  |
+| `info.height` | Canvas height in pixels                                 |
+| `info.coords` | Top-left world coordinate of the viewport               |
+
+**Example usage with Canvas2D renderer:**
+
+```typescript
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas());
+
+engine.onDraw = (ctx) => {
+    // Cast to the appropriate context type for your renderer
+    const context = ctx as CanvasRenderingContext2D;
+
+    context.fillStyle = "red";
+    context.fillRect(info.width / 2 - 5, info.height / 2 - 5, 10, 10);
+};
+```
+
+:::tip
+The `ctx` parameter is typed as `unknown` to support different renderer backends.
+When using `RendererCanvas`, cast it to `CanvasRenderingContext2D`.
+:::

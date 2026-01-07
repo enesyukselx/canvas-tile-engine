@@ -37,8 +37,8 @@ You can use any number for a layer. They are sorted automatically at render time
 Draw basic geometric shapes. You can pass a single object or an array of objects for batch rendering.
 
 ```typescript
-drawRect(items: Rect | Rect[], layer?: number): LayerHandle
-drawCircle(items: Circle | Circle[], layer?: number): LayerHandle
+drawRect(items: Rect | Rect[], layer?: number): DrawHandle
+drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 ```
 
 **Rect / Circle Properties:**
@@ -135,7 +135,7 @@ engine.drawRect(
 Draw a straight line between two points. Supports single object or array of objects.
 
 ```typescript
-drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): LayerHandle
+drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle
 ```
 
 **Line Properties:**
@@ -161,7 +161,7 @@ engine.drawLine([
 Draw a continuous line through multiple points. Supports a single path (array of points) or an array of paths.
 
 ```typescript
-drawPath(items: Path | Path[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): LayerHandle
+drawPath(items: Path | Path[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle
 ```
 
 **Path:** An array of `{ x, y }` coordinates.
@@ -194,7 +194,7 @@ engine.drawPath(
 Draw grid lines at specified intervals. This is useful for creating grid overlays on your map.
 
 ```typescript
-drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle
+drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle
 ```
 
 | Parameter     | Type     | Default   | Description                            |
@@ -224,7 +224,7 @@ engine.drawGridLines(50, 2, "rgba(0, 0, 0, 0.5)", 0); // Coarse grid
 Render text at world coordinates. Supports single object or array of objects. Text size scales with zoom.
 
 ```typescript
-drawText(items: Text | Text[], layer?: number): LayerHandle
+drawText(items: Text | Text[], layer?: number): DrawHandle
 ```
 
 **Text Properties:**
@@ -282,7 +282,7 @@ The `size` property works like other draw methods - it's in world units and scal
 Draw an image scaled to world units. Supports single object or array of objects.
 
 ```typescript
-drawImage(items: ImageItem | ImageItem[], layer?: number): LayerHandle
+drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 ```
 
 **ImageItem Properties:**
@@ -316,20 +316,24 @@ engine.drawImage([
 
 ### Custom Drawing (`addDrawFunction`)
 
-For maximum flexibility, you can register a custom drawing function that gets direct access to the canvas context.
+For maximum flexibility, you can register a custom drawing function that gets direct access to the rendering context.
 
 ```typescript
 engine.addDrawFunction((ctx, coords, config) => {
+    // ctx = Rendering context (type depends on renderer)
     // coords = Top-left world coordinate of the view
     // config = Current engine configuration
 
-    ctx.fillStyle = "purple";
-    ctx.fillRect(100, 100, 50, 50); // Draw in screen pixels
+    // Cast to the appropriate context type for your renderer
+    const context = ctx as CanvasRenderingContext2D;
+
+    context.fillStyle = "purple";
+    context.fillRect(100, 100, 50, 50); // Draw in screen pixels
 }, 4);
 ```
 
 :::tip
-`addDrawFunction()` also returns a layer handle. You can remove the registered callback later via `engine.removeLayerHandle(handle)` (see “Clearing Layers”).
+`addDrawFunction()` also returns a draw handle. You can remove the registered callback later via `engine.removeDrawHandle(handle)` (see "Clearing Layers").
 :::
 
 ### Renderer Hook (`onDraw`)
@@ -338,12 +342,16 @@ The `onDraw` callback runs **after** all layers have been drawn but **before** t
 
 ```typescript
 engine.onDraw = (ctx, info) => {
+    // ctx = Rendering context (type depends on renderer)
     // info contains: { scale, width, height, coords }
 
+    // Cast to the appropriate context type for your renderer
+    const context = ctx as CanvasRenderingContext2D;
+
     // Draw a border around the entire canvas
-    ctx.strokeStyle = "red";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(0, 0, info.width, info.height);
+    context.strokeStyle = "red";
+    context.lineWidth = 5;
+    context.strokeRect(0, 0, info.width, info.height);
 };
 ```
 
@@ -503,12 +511,12 @@ function updateMiniMap() {
 
 When your scene content changes dynamically (e.g., objects change color, get added or removed), you need to clear the layer before redrawing. Without clearing, new draw calls accumulate on top of existing ones.
 
-### Remove a Single Draw Call (`LayerHandle`)
+### Remove a Single Draw Call (`DrawHandle`)
 
-Most `draw*()` methods (and `addDrawFunction`) return a **layer handle** that uniquely identifies the registered draw callback.
+Most `draw*()` methods (and `addDrawFunction`) return a **draw handle** that uniquely identifies the registered draw callback.
 You can keep this handle and later remove **only that specific draw call** without clearing the whole layer.
 
-This is especially useful for temporary overlays (hover highlights, selections, debug helpers) where you want to “add, then remove” a single draw callback.
+This is especially useful for temporary overlays (hover highlights, selections, debug helpers) where you want to "add, then remove" a single draw callback.
 
 ```typescript
 // Add a temporary overlay
@@ -516,7 +524,7 @@ const handle = engine.drawRect({ x: 5, y: 5, size: 1, style: { fillStyle: "rgba(
 engine.render();
 
 // Later: remove only this draw callback (no need to clear the entire layer)
-engine.removeLayerHandle(handle);
+engine.removeDrawHandle(handle);
 engine.render();
 ```
 
@@ -524,12 +532,13 @@ You can also use this with custom drawing functions:
 
 ```typescript
 const hudHandle = engine.addDrawFunction((ctx) => {
-    ctx.fillStyle = "white";
-    ctx.fillText("HUD", 10, 20);
+    const context = ctx as CanvasRenderingContext2D;
+    context.fillStyle = "white";
+    context.fillText("HUD", 10, 20);
 }, 99);
 
 // Remove HUD when no longer needed
-engine.removeLayerHandle(hudHandle);
+engine.removeDrawHandle(hudHandle);
 ```
 
 ### `clearLayer(layer)`
