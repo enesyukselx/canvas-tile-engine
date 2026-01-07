@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo } from "react";
 import { CanvasTileEngine as CanvasTileEngineCore } from "@canvas-tile-engine/core";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 import { EngineContext, type EngineContextValue } from "../context/EngineContext";
 import type { CanvasTileEngineProps } from "../types";
 
@@ -139,8 +140,9 @@ function CanvasTileEngineBase({
             return;
         }
 
-        // Create engine instance
-        const instance = new CanvasTileEngineCore(container, config, renderer, center);
+        // Create engine instance with default RendererCanvas if not provided
+        const rendererInstance = renderer ?? new RendererCanvas();
+        const instance = new CanvasTileEngineCore(container, config, rendererInstance, center);
 
         // Set up callbacks using stable refs
         instance.onCoordsChange = (coords) => callbacksRef.current.onCoordsChange?.(coords);

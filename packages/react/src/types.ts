@@ -50,8 +50,20 @@ export interface CanvasTileEngineProps {
     /** Engine handle from useCanvasTileEngine hook (required) */
     engine: EngineHandle;
 
-    /** Renderer instance to use (e.g., new RendererCanvas()) */
-    renderer: IRenderer;
+    /**
+     * Renderer instance to use.
+     * Defaults to RendererCanvas if not provided.
+     * @example
+     * ```tsx
+     * // Use default CanvasRenderer (recommended)
+     * <CanvasTileEngine config={config} engine={engine} />
+     *
+     * // Or provide custom renderer
+     * import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+     * <CanvasTileEngine config={config} engine={engine} renderer={new RendererCanvas()} />
+     * ```
+     */
+    renderer?: IRenderer;
 
     /** Engine configuration */
     config: CanvasTileEngineConfig;

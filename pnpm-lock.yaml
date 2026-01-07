@@ -194,6 +194,9 @@ importers:
       '@canvas-tile-engine/core':
         specifier: workspace:*
         version: link:../core
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../renderer-canvas
       react:
         specifier: '>=18.0.0'
         version: 19.2.3
