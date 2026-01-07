@@ -22,7 +22,6 @@ import {
 } from "@canvas-tile-engine/core";
 import { CanvasDraw } from "./modules/CanvasDraw";
 import { Layer } from "./modules/Layer";
-import { initStyles } from "./utils/canvas";
 import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
 import { CanvasDebug } from "./modules/CanvasDebug";
 import { EventBinder } from "./modules/EventBinder";
@@ -30,6 +29,7 @@ import { ResizeWatcher } from "./modules/ResizeWatcher";
 import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
 import { ImageLoader } from "./modules/ImageLoader";
 import { SizeController } from "./modules/SizeController";
+import { initStyles } from "./utils/canvas";
 
 export class RendererCanvas implements IRenderer {
     //
@@ -116,6 +116,9 @@ export class RendererCanvas implements IRenderer {
         if (this.gestureProcessor) this.gestureProcessor.onZoom = cb;
     }
 
+    /** Callback fired when camera position changes (drag/zoom). */
+    public onCameraChange?: () => void;
+
     init(deps: RendererDependencies) {
         this.config = deps.config;
         // Initialize canvas
@@ -169,7 +172,10 @@ export class RendererCanvas implements IRenderer {
             this.config,
             this.transformer,
             () => this.canvas.getBoundingClientRect(),
-            () => this.render()
+            () => {
+                this.onCameraChange?.();
+                this.render();
+            }
         );
 
         // Initialize EventBinder with normalized handlers
