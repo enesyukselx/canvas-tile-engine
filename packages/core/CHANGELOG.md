@@ -2,7 +2,15 @@
 
 All notable changes to `@canvas-tile-engine/core` will be documented in this file.
 
-## [0.0.6] - 2026-01-02
+## [0.3.0] - 2026-01-08
+
+-   Add @canvas-tile-engine/renderer-canvas package with Canvas2D implementation ([#59](https://github.com/enesyukselx/canvas-tile-engine/pull/59))
+-   Refactor core package to be DOM-agnostic with IRenderer interface
+-   Renderer now injected via constructor (dependency injection pattern)
+-   Update React package to accept renderer as prop
+-   Update docs, examples, and CI workflows for new architecture
+
+## [0.2.0] - 2026-01-02
 
 -   fix(core): prevent accidental click after pinch-to-zoom
 -   feat(core): add config and runtime validation (#55)
@@ -11,7 +19,7 @@ All notable changes to `@canvas-tile-engine/core` will be documented in this fil
 -   fix(core): set wrapper height for preserve-scale responsive mode (#49)
 -   fix(core): add touch tap support for click events (#48)
 
-## [0.0.5] - 2025-12-27
+## [0.1.0] - 2025-12-27
 
 -   fix(core): correct gridAligned calculation for odd/even tile counts (#47)
 -   feat: add responsive mode with preserve-scale and preserve-viewport options (#46)

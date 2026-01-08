@@ -56,7 +56,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 -   `lineWidth`: Border width in pixels
 
 ```tsx
-<CanvasTileEngine engine={engine} config={config}>
+<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
     {/* Blue square */}
     <CanvasTileEngine.Rect items={{ x: 5, y: 5, size: 1, style: { fillStyle: "#0077be" } }} layer={1} />
 
@@ -284,7 +284,7 @@ function MapWithImages() {
     }, [engine.isReady, engine.images]);
 
     return (
-        <CanvasTileEngine engine={engine} config={config}>
+        <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
             {/* Single image */}
             {treeImg && <CanvasTileEngine.Image items={{ x: 2, y: 3, size: 1.5, img: treeImg }} layer={2} />}
 
@@ -308,7 +308,7 @@ function MapWithImages() {
 
 ### `<DrawFunction>`
 
-For maximum flexibility, use a custom draw function with direct canvas context access.
+For maximum flexibility, use a custom draw function with direct rendering context access.
 
 | Prop       | Type                            | Default      | Description      |
 | :--------- | :------------------------------ | :----------- | :--------------- |
@@ -318,11 +318,15 @@ For maximum flexibility, use a custom draw function with direct canvas context a
 ```tsx
 <CanvasTileEngine.DrawFunction layer={4}>
     {(ctx, coords, config) => {
+        // ctx = Rendering context (type depends on renderer)
         // coords = Top-left world coordinate of the view
         // config = Current engine configuration
 
-        ctx.fillStyle = "purple";
-        ctx.fillRect(100, 100, 50, 50); // Draw in screen pixels
+        // Cast to the appropriate context type for your renderer
+        const context = ctx as CanvasRenderingContext2D;
+
+        context.fillStyle = "purple";
+        context.fillRect(100, 100, 50, 50); // Draw in screen pixels
     }}
 </CanvasTileEngine.DrawFunction>
 ```
@@ -335,11 +339,17 @@ The `onDraw` prop runs after all layers are drawn but before debug overlays.
 <CanvasTileEngine
     engine={engine}
     config={config}
+    renderer={new RendererCanvas()}
     onDraw={(ctx, info) => {
+        // ctx = Rendering context (type depends on renderer)
         // info contains: { scale, width, height, coords }
-        ctx.strokeStyle = "red";
-        ctx.lineWidth = 5;
-        ctx.strokeRect(0, 0, info.width, info.height);
+
+        // Cast to the appropriate context type for your renderer
+        const context = ctx as CanvasRenderingContext2D;
+
+        context.strokeStyle = "red";
+        context.lineWidth = 5;
+        context.strokeRect(0, 0, info.width, info.height);
     }}
 >
     {/* children */}
@@ -434,7 +444,7 @@ function DynamicScene({ seats }) {
     );
 
     return (
-        <CanvasTileEngine engine={engine} config={config}>
+        <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
             <CanvasTileEngine.GridLines cellSize={1} />
             <CanvasTileEngine.Rect items={seatRects} layer={1} />
         </CanvasTileEngine>

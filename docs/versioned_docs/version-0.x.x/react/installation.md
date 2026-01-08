@@ -9,7 +9,7 @@ This page covers how to use `@canvas-tile-engine/react` inside React application
 ## Install
 
 ```bash
-npm install @canvas-tile-engine/react
+npm install @canvas-tile-engine/react @canvas-tile-engine/renderer-canvas
 ```
 
 ## Basic Setup
@@ -18,6 +18,7 @@ The React package provides a declarative API using compound components. Here's a
 
 ```tsx
 import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 function App() {
     const engine = useCanvasTileEngine();
@@ -32,7 +33,7 @@ function App() {
     };
 
     return (
-        <CanvasTileEngine engine={engine} config={config}>
+        <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
             <CanvasTileEngine.GridLines cellSize={1} strokeStyle="rgba(0,0,0,0.2)" />
             <CanvasTileEngine.Rect items={{ x: 5, y: 5, size: 1, style: { fillStyle: "#0077be" } }} layer={1} />
         </CanvasTileEngine>
@@ -76,7 +77,7 @@ useEffect(() => {
 Use compound components as children of `CanvasTileEngine`:
 
 ```tsx
-<CanvasTileEngine engine={engine} config={config}>
+<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
     <CanvasTileEngine.GridLines cellSize={1} />
     <CanvasTileEngine.Rect items={rectangles} layer={1} />
     <CanvasTileEngine.Circle items={circles} layer={2} />
@@ -103,6 +104,7 @@ useEffect(() => {
 | :--------------- | :----------------------- | :--------------- | :--------------------------------- |
 | `engine`         | `EngineHandle`           | **Required**     | Engine handle from the hook.       |
 | `config`         | `CanvasTileEngineConfig` | **Required**     | Engine configuration.              |
+| `renderer`       | `IRenderer`              | **Required**     | Renderer instance (e.g., `new RendererCanvas()`). |
 | `center`         | `{ x, y }`               | `{ x: 0, y: 0 }` | Initial center coordinates.        |
 | `className`      | `string`                 | -                | CSS class for the wrapper div.     |
 | `style`          | `CSSProperties`          | -                | Inline styles for the wrapper div. |

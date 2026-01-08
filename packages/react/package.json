@@ -1,6 +1,6 @@
 {
     "name": "@canvas-tile-engine/react",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "React bindings for Canvas Tile Engine - build interactive 2D grid-based maps with declarative components",
     "author": "Enes Yüksel",
     "license": "MIT",
@@ -47,7 +47,7 @@
     "peerDependencies": {
         "react": ">=18.0.0",
         "react-dom": ">=18.0.0",
-        "@canvas-tile-engine/core": ">=0.2.0"
+        "@canvas-tile-engine/core": ">=0.3.0"
     },
     "dependencies": {
         "@canvas-tile-engine/core": "workspace:*"

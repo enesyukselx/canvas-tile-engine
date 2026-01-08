@@ -47,6 +47,9 @@
         "test": "vitest",
         "test:coverage": "vitest run --coverage"
     },
+    "peerDependencies": {
+        "@canvas-tile-engine/core": ">=0.3.0"
+    },
     "dependencies": {
         "rbush": "^4.0.1",
         "@canvas-tile-engine/core": "workspace:*"
