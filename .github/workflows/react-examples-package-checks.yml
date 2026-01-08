@@ -35,6 +35,9 @@ jobs:
             - name: Build react package
               run: pnpm -w -F @canvas-tile-engine/react build
 
+            - name: Build renderer-canvas package
+              run: pnpm -w -F @canvas-tile-engine/renderer-canvas build
+
             - name: Typecheck examples
               run: pnpm -r --filter '{./examples/react/**}' typecheck
 

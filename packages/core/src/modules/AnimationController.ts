@@ -6,7 +6,6 @@ import { DEFAULT_VALUES } from "../constants";
 /**
  * Manages smooth animations for camera movements and canvas resizing.
  * Handles animation frame scheduling and cleanup.
- * @internal
  */
 export class AnimationController {
     private moveAnimationId?: number;

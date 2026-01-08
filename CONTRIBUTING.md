@@ -25,17 +25,28 @@ This is a monorepo managed with pnpm workspaces:
 ```
 canvas-tile-engine/
 ├── packages/
-│   ├── core/                 # @canvas-tile-engine/core
+│   ├── core/                 # @canvas-tile-engine/core (DOM-agnostic)
 │   │   ├── src/
 │   │   │   ├── CanvasTileEngine.ts    # Main engine class
 │   │   │   ├── modules/               # Internal modules
 │   │   │   │   ├── Camera.ts
-│   │   │   │   ├── CanvasDraw.ts
+│   │   │   │   ├── CoordinateTransformer.ts
+│   │   │   │   ├── GestureProcessor.ts
+│   │   │   │   ├── AnimationController.ts
 │   │   │   │   ├── SpatialIndex.ts
 │   │   │   │   └── ...
 │   │   │   ├── types.ts
 │   │   │   └── index.ts
 │   │   └── tests/
+│   │
+│   ├── renderer-canvas/      # @canvas-tile-engine/renderer-canvas
+│   │   └── src/
+│   │       ├── RendererCanvas.ts      # IRenderer implementation
+│   │       ├── CanvasDraw.ts          # Drawing primitives
+│   │       ├── Layer.ts               # Layer-based rendering
+│   │       ├── EventBinder.ts         # DOM event attachment
+│   │       ├── ImageLoader.ts         # Image loading/caching
+│   │       └── index.ts
 │   │
 │   └── react/                # @canvas-tile-engine/react
 │       └── src/
@@ -98,6 +109,16 @@ pnpm --filter @canvas-tile-engine/core test:coverage
 pnpm --filter @canvas-tile-engine/core typecheck
 ```
 
+### Working on Renderer Canvas Package (`@canvas-tile-engine/renderer-canvas`)
+
+```bash
+# Build the package
+pnpm --filter @canvas-tile-engine/renderer-canvas build
+
+# Start development mode with watch
+pnpm --filter @canvas-tile-engine/renderer-canvas dev
+```
+
 ### Working on React Package (`@canvas-tile-engine/react`)
 
 ```bash
@@ -108,7 +129,7 @@ pnpm --filter @canvas-tile-engine/react dev
 pnpm --filter @canvas-tile-engine/react typecheck
 ```
 
-> **Note:** The React package depends on the Core package. Make sure to build Core first if you've made changes to it.
+> **Note:** The React package depends on Core and Renderer Canvas packages. Make sure to build them first if you've made changes.
 
 ### Running Examples
 
@@ -160,10 +181,16 @@ drawRect(items: DrawObject | Array<DrawObject>, layer: number = 1): LayerHandle
 
 ### File Organization
 
-**Core Package:**
+**Core Package (DOM-agnostic):**
 - One module per file
 - Keep modules in `src/modules/`
 - Export public API from `src/index.ts`
+- No DOM or Canvas dependencies
+
+**Renderer Canvas Package:**
+- Implements `IRenderer` interface from core
+- Keep rendering logic in dedicated modules
+- Export from `src/index.ts`
 
 **React Package:**
 - One component per file
@@ -197,6 +224,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 | Scope | Description |
 |-------|-------------|
 | `core` | Changes to @canvas-tile-engine/core |
+| `r-canvas` | Changes to @canvas-tile-engine/renderer-canvas |
 | `react` | Changes to @canvas-tile-engine/react |
 | `docs` | Documentation changes |
 | `examples` | Example projects |

@@ -4,7 +4,7 @@ import type {
     CanvasTileEngineConfig,
     Coords,
     EventHandlers,
-    LayerHandle,
+    DrawHandle,
     ImageItem,
     Text,
     Circle,
@@ -13,7 +13,7 @@ import type {
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
-const DUMMY_LAYER_HANDLE: LayerHandle = { layer: -1, id: Symbol("dummy") };
+const DUMMY_DRAW_HANDLE: DrawHandle = { layer: -1, id: Symbol("dummy") };
 
 /** Default config when engine is not ready */
 const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
@@ -128,45 +128,45 @@ export interface EngineHandle {
     /** Dynamically update event handlers at runtime */
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
+    /** Register a custom draw function */
+    addDrawFunction(
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        layer?: number
+    ): DrawHandle;
+
     /** Draw rectangles */
-    drawRect(items: Rect | Rect[], layer?: number): LayerHandle;
+    drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
 
     /** Draw static rectangles (cached) */
-    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): LayerHandle;
+    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
 
     /** Draw circles */
-    drawCircle(items: Circle | Circle[], layer?: number): LayerHandle;
+    drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
 
     /** Draw static circles (cached) */
-    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): LayerHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
 
     /** Draw lines */
-    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): LayerHandle;
+    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle;
 
     /** Draw text */
-    drawText(items: Text | Text[], layer?: number): LayerHandle;
+    drawText(items: Text | Text[], layer?: number): DrawHandle;
 
     /** Draw paths/polylines */
     drawPath(
         items: Coords[] | Coords[][],
         style?: { strokeStyle?: string; lineWidth?: number },
         layer?: number
-    ): LayerHandle;
+    ): DrawHandle;
 
     /** Draw images */
-    drawImage(items: ImageItem | ImageItem[], layer?: number): LayerHandle;
+    drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle;
 
     /** Draw static images (cached) */
-    drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number): LayerHandle;
+    drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number): DrawHandle;
 
     /** Draw grid lines */
-    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): LayerHandle;
-
-    /** Add custom draw function */
-    addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer?: number
-    ): LayerHandle;
+    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
 
     /** Clear a specific layer */
     clearLayer(layer: number): void;
@@ -178,7 +178,7 @@ export interface EngineHandle {
     clearStaticCache(cacheKey?: string): void;
 
     /** Remove a previously registered draw callback */
-    removeLayerHandle(handle: LayerHandle): void;
+    removeDrawHandle(handle: DrawHandle): void;
 
     /** Image loader instance (undefined until engine mounts) */
     readonly images: CanvasTileEngineCore["images"] | undefined;
@@ -313,50 +313,48 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.setEventHandlers(handlers);
             },
 
+            addDrawFunction(fn, layer) {
+                return instanceRef.current?.addDrawFunction(fn, layer) ?? DUMMY_DRAW_HANDLE;
+            },
+
             drawRect(items, layer) {
-                return instanceRef.current?.drawRect(items, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawRect(items, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawStaticRect(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawCircle(items, layer) {
-                return instanceRef.current?.drawCircle(items, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawCircle(items, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawStaticCircle(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawLine(items, style, layer) {
-                return instanceRef.current?.drawLine(items, style, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawLine(items, style, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawText(items, layer) {
-                return instanceRef.current?.drawText(items, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawText(items, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawPath(items, style, layer) {
-                return instanceRef.current?.drawPath(items, style, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawPath(items, style, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawImage(items, layer) {
-                return instanceRef.current?.drawImage(items, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawImage(items, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawStaticImage(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
-                return (
-                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? DUMMY_LAYER_HANDLE
-                );
-            },
-
-            addDrawFunction(fn, layer) {
-                return instanceRef.current?.addDrawFunction(fn, layer) ?? DUMMY_LAYER_HANDLE;
+                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? DUMMY_DRAW_HANDLE;
             },
 
             clearLayer(layer) {
@@ -371,15 +369,15 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.clearStaticCache(cacheKey);
             },
 
-            removeLayerHandle(handle) {
-                instanceRef.current?.removeLayerHandle(handle);
+            removeDrawHandle(handle) {
+                instanceRef.current?.removeDrawHandle(handle);
             },
 
             loadImage(src: string, retry?: number) {
                 if (!instanceRef.current) {
                     return Promise.reject(new Error("Engine not ready. Wait for isReady before loading images."));
                 }
-                return instanceRef.current.images.load(src, retry);
+                return instanceRef.current.images.load(src, retry) as Promise<HTMLImageElement>;
             },
         }),
         [setInstance]

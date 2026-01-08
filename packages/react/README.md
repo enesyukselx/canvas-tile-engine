@@ -1,17 +1,22 @@
 # @canvas-tile-engine/react
 
+[![npm version](https://img.shields.io/npm/v/@canvas-tile-engine/react)](https://www.npmjs.com/package/@canvas-tile-engine/react)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@canvas-tile-engine/react)](https://bundlephobia.com/package/@canvas-tile-engine/react)
+[![license](https://img.shields.io/npm/l/@canvas-tile-engine/react)](../../LICENSE)
+
 React bindings for Canvas Tile Engine — build interactive 2D grid-based maps with declarative components.
 
 ## Install
 
 ```bash
-npm install @canvas-tile-engine/react
+npm install @canvas-tile-engine/react @canvas-tile-engine/renderer-canvas
 ```
 
 ## Quick Start
 
 ```tsx
 import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const config = {
     scale: 50,
@@ -27,6 +32,7 @@ function App() {
         <CanvasTileEngine
             engine={engine}
             config={config}
+            renderer={new RendererCanvas()}
             center={{ x: 0, y: 0 }}
             onClick={(coords) => console.log("Clicked:", coords.snapped)}
         >
@@ -37,9 +43,22 @@ function App() {
 }
 ```
 
+## Architecture
+
+The React package wraps `@canvas-tile-engine/core` with declarative components. You inject a renderer via the `renderer` prop:
+
+```tsx
+// Canvas2D
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()} />
+
+// Custom renderer
+<CanvasTileEngine engine={engine} config={config} renderer={new MyCustomRenderer()} />
+```
+
 ## Documentation
 
-Full API reference and examples: [https://www.canvastileengine.dev/docs/react/installation](https://www.canvastileengine.dev/docs/react/installation)
+Full API reference and examples: [canvastileengine.dev](https://canvastileengine.dev/docs/react/installation)
 
 ## License
 

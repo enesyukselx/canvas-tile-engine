@@ -1,37 +1,18 @@
-import { Coords } from "../types";
-import { ICamera } from "./Camera";
-import { Config } from "./Config";
-import { IRenderer } from "./Renderer/Renderer";
-import { ViewportState } from "./ViewportState";
-import { AnimationController } from "./AnimationController";
+import { AnimationController, Config, Coords, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
+/**
+ * Controls canvas size and handles resize animations.
+ * Manages DOM manipulation for wrapper and canvas elements.
+ */
 export class SizeController {
-    private canvasWrapper: HTMLDivElement;
-    private canvas: HTMLCanvasElement;
-    private camera: ICamera;
-    private viewport: ViewportState;
-    private renderer: IRenderer;
-    private config: Config;
-    private onSizeApplied: () => void;
-
     constructor(
-        canvasWrapper: HTMLDivElement,
-        canvas: HTMLCanvasElement,
-        camera: ICamera,
-        renderer: IRenderer,
-        viewport: ViewportState,
-
-        config: Config,
-        onSizeApplied: () => void
-    ) {
-        this.canvasWrapper = canvasWrapper;
-        this.canvas = canvas;
-        this.camera = camera;
-        this.renderer = renderer;
-        this.viewport = viewport;
-        this.config = config;
-        this.onSizeApplied = onSizeApplied;
-    }
+        private canvasWrapper: HTMLDivElement,
+        private canvas: HTMLCanvasElement,
+        private camera: ICamera,
+        private viewport: ViewportState,
+        private config: Config,
+        private onRender: () => void
+    ) {}
 
     /**
      * Manually update canvas size using AnimationController for smooth transitions.
@@ -69,12 +50,24 @@ export class SizeController {
         height = clamp(height, configSize?.minHeight, configSize?.maxHeight);
 
         // Delegate to AnimationController
-        animationController.animateResize(width, height, durationMs, (w, h, center) => this.applySize(w, h, center), onComplete);
+        animationController.animateResize(
+            width,
+            height,
+            durationMs,
+            (w: number, h: number, center: Coords) => this.applySize(w, h, center),
+            onComplete
+        );
     }
 
-    private applySize(nextW: number, nextH: number, center: Coords) {
-        const roundedW = Math.round(nextW);
-        const roundedH = Math.round(nextH);
+    /**
+     * Apply size directly without animation.
+     * @param width New canvas width in pixels.
+     * @param height New canvas height in pixels.
+     * @param center Center coordinates to maintain after resize.
+     */
+    applySize(width: number, height: number, center: Coords) {
+        const roundedW = Math.round(width);
+        const roundedH = Math.round(height);
         const dpr = this.viewport.dpr;
 
         this.viewport.setSize(roundedW, roundedH);
@@ -90,7 +83,6 @@ export class SizeController {
         this.canvas.style.height = `${roundedH}px`;
 
         this.camera.setCenter(center, roundedW, roundedH);
-        this.renderer.resize(roundedW, roundedH);
-        this.onSizeApplied();
+        this.onRender();
     }
 }

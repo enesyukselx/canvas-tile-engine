@@ -31,7 +31,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
 
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, cacheKey, layer, requestRender]);

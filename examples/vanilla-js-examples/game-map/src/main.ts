@@ -1,5 +1,6 @@
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { generateMapObjects } from "./generateMapObjects";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const INITIAL_COORDS = { x: 200, y: 200 };
 const INITIAL_MAIN_MAP_SIZE = 500;
@@ -91,8 +92,8 @@ const mainMapCanvas = document.getElementById("main-map-wrapper") as HTMLDivElem
 const miniMapCanvas = document.getElementById("mini-map-wrapper") as HTMLDivElement;
 
 // Initialize maps
-const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, INITIAL_COORDS);
-const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, INITIAL_COORDS);
+const mainMap = new CanvasTileEngine(mainMapCanvas, mainMapOptions, new RendererCanvas(), INITIAL_COORDS);
+const miniMap = new CanvasTileEngine(miniMapCanvas, miniMapOptions, new RendererCanvas(), INITIAL_COORDS);
 
 // Calculate mini map bounds so its CENTER can move within main map's CENTER range
 // Main map center range: (bounds.min + viewWidth/2) to (bounds.max - viewWidth/2)
@@ -146,7 +147,7 @@ const drawItems = async () => {
     const imageCache = new Map<string, HTMLImageElement>();
     await Promise.all(
         uniqueUrls.map(async (url) => {
-            imageCache.set(url, await mainMap.images.load(url));
+            imageCache.set(url, (await mainMap.images.load(url)) as HTMLImageElement);
         })
     );
 
@@ -235,6 +236,7 @@ miniMap.onZoom = () => {
 // Draws a rectangle on the mini map representing the current viewport of the main map
 // "onDraw" is a callback for custom drawing on the map's canvas
 miniMap.onDraw = (ctx) => {
+    const context = ctx as CanvasRenderingContext2D;
     const mainCfg = mainMap.getConfig();
     const miniCfg = miniMap.getConfig();
 
@@ -249,18 +251,19 @@ miniMap.onDraw = (ctx) => {
     const rectX = miniCfg.size.width / 2 - rectWidth / 2;
     const rectY = miniCfg.size.height / 2 - rectHeight / 2;
 
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+    context.strokeStyle = "white";
+    context.lineWidth = 2;
+    context.strokeRect(rectX, rectY, rectWidth, rectHeight);
 };
 
 // Custom draw function on the main map to draw a red square at the center
 // This draw function is added with a priority of 3 (to be drawn after other elements)
 mainMap.addDrawFunction((ctx) => {
+    const context = ctx as CanvasRenderingContext2D;
     const centerX = mainMap.getConfig().size.width / 2;
     const centerY = mainMap.getConfig().size.height / 2;
-    ctx.fillStyle = "red";
-    ctx.fillRect(centerX - 5, centerY - 5, 5, 5);
+    context.fillStyle = "red";
+    context.fillRect(centerX - 5, centerY - 5, 5, 5);
 }, 3);
 
 // Handle hover events on the main map

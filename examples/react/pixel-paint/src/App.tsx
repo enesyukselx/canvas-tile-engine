@@ -3,6 +3,7 @@ import "./App.css";
 import { CanvasTileEngine, useCanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 import { useState } from "react";
 import { gridToSize } from "@canvas-tile-engine/react";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const HOVER_LAYER = 1;
 const DRAW_LAYER = 2;
@@ -56,6 +57,7 @@ function App() {
                         margin: "0 auto",
                     }}
                     engine={engine}
+                    renderer={new RendererCanvas()}
                     config={config}
                     onHover={(coords) => {
                         if (!isDrawing) {

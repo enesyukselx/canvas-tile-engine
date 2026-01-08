@@ -10,13 +10,13 @@
         "url": "git+https://github.com/enesyukselx/canvas-tile-engine.git"
     },
     "scripts": {
-        "build": "pnpm --filter @canvas-tile-engine/core build && pnpm --filter @canvas-tile-engine/react build",
+        "build": "pnpm --filter @canvas-tile-engine/core build && pnpm --filter @canvas-tile-engine/renderer-canvas build && pnpm --filter @canvas-tile-engine/react build",
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
-        "dev:lib": "pnpm --filter @canvas-tile-engine/core dev && pnpm --filter @canvas-tile-engine/react dev",
+        "dev:lib": "pnpm --filter @canvas-tile-engine/core dev & pnpm --filter @canvas-tile-engine/renderer-canvas dev & pnpm --filter @canvas-tile-engine/react dev",
         "dev:example": "node run-example.js",
         "lint": "pnpm exec eslint .",
         "typecheck": "pnpm -r --filter=!canvas-tile-engine typecheck",
-        "test": "pnpm --filter @canvas-tile-engine/core test",
+        "test": "pnpm --filter @canvas-tile-engine/core test && pnpm --filter @canvas-tile-engine/renderer-canvas test",
         "test:coverage": "pnpm --filter @canvas-tile-engine/core test:coverage"
     },
     "keywords": [],

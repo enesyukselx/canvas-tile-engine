@@ -19,7 +19,7 @@ export const Path = memo(function Path({ items, style, layer = 1 }: PathProps) {
         requestRender();
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, style, layer, requestRender]);

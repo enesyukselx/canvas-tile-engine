@@ -16,6 +16,7 @@ import { generateMapObjects, type MapObject } from "./generateMapObjects";
 import { INITIAL_COORDS, MINI_MAP_SIZE_OPTIONS, MAIN_MAP_SIZE_OPTIONS, MAP_BACKGROUND_COLOR } from "./constants";
 import calculateMiniMapBounds from "./utils/calculateMiniMapBounds";
 import miniMapViewportRectangleDraw from "./utils/miniMapViewportRectangleDraw";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const mainMapConfig: CanvasTileEngineConfig = {
     scale: 50,
@@ -264,6 +265,7 @@ export default function App() {
             <div className="relative">
                 <CanvasTileEngine
                     engine={mainMap}
+                    renderer={new RendererCanvas()}
                     config={mainMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMainMapCoordsChange}
@@ -279,11 +281,12 @@ export default function App() {
                     <CanvasTileEngine.GridLines cellSize={50} lineWidth={4} layer={2} />
                     <CanvasTileEngine.DrawFunction layer={3}>
                         {(ctx) => {
+                            const context = ctx as CanvasRenderingContext2D;
                             const cfg = mainMap.getConfig();
                             const centerX = cfg.size.width / 2;
                             const centerY = cfg.size.height / 2;
-                            ctx.fillStyle = "red";
-                            ctx.fillRect(centerX - 5, centerY - 5, 5, 5);
+                            context.fillStyle = "red";
+                            context.fillRect(centerX - 5, centerY - 5, 5, 5);
                         }}
                     </CanvasTileEngine.DrawFunction>
                 </CanvasTileEngine>
@@ -313,11 +316,18 @@ export default function App() {
             <div className="relative">
                 <CanvasTileEngine
                     engine={miniMap}
+                    renderer={new RendererCanvas()}
                     config={miniMapConfig}
                     center={INITIAL_COORDS}
                     onCoordsChange={handleMiniMapCoordsChange}
                     onResize={recalculateMiniMapBounds}
-                    onDraw={(ctx) => miniMapViewportRectangleDraw(mainMap.getConfig(), miniMap.getConfig(), ctx)}
+                    onDraw={(ctx) =>
+                        miniMapViewportRectangleDraw(
+                            mainMap.getConfig(),
+                            miniMap.getConfig(),
+                            ctx as CanvasRenderingContext2D
+                        )
+                    }
                 >
                     <CanvasTileEngine.StaticRect items={miniMapRects} cacheKey="minimap-items" layer={0} />
                     <CanvasTileEngine.GridLines cellSize={1} lineWidth={0.5} strokeStyle="rgba(0,0,0,1)" layer={3} />

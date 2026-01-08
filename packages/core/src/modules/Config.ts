@@ -4,7 +4,6 @@ import { validateConfig, validateBounds } from "../utils/validateConfig";
 
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
- * @internal
  */
 export class Config {
     private config: Required<CanvasTileEngineConfig>;

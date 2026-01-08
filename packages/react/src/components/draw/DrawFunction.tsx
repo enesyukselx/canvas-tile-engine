@@ -4,7 +4,7 @@ import type { CanvasTileEngineConfig, Coords } from "@canvas-tile-engine/core";
 
 export interface DrawFunctionProps {
     /** The draw function to execute */
-    children: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void;
+    children: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void;
     layer?: number;
 }
 
@@ -40,7 +40,7 @@ export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: 
 
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, layer, requestRender]);

@@ -1,7 +1,4 @@
-import { ICamera } from "./Camera";
-import { Config } from "./Config";
-import { IRenderer } from "./Renderer/Renderer";
-import { ViewportState } from "./ViewportState";
+import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
 /**
  * Watches wrapper element size changes and handles responsive resizing.
@@ -28,10 +25,9 @@ export class ResponsiveWatcher {
         private wrapper: HTMLDivElement,
         private canvas: HTMLCanvasElement,
         private camera: ICamera,
-        private renderer: IRenderer,
         private viewport: ViewportState,
         private config: Config,
-        private onCameraChange: () => void
+        private onRender: () => void
     ) {
         this.currentDpr = this.viewport.dpr;
 
@@ -101,7 +97,7 @@ export class ResponsiveWatcher {
                 this.applySize(width, height, responsiveMode);
 
                 this.onResize?.();
-                this.onCameraChange();
+                this.onRender();
             }
         });
 
@@ -161,9 +157,6 @@ export class ResponsiveWatcher {
         // Update canvas CSS size (logical pixels)
         this.canvas.style.width = `${width}px`;
         this.canvas.style.height = `${height}px`;
-
-        // Let renderer know about the resize
-        this.renderer.resize(width, height);
     }
 
     /**
@@ -193,7 +186,7 @@ export class ResponsiveWatcher {
             this.canvas.style.height = `${height}px`;
 
             this.onResize?.();
-            this.onCameraChange();
+            this.onRender();
         };
 
         window.addEventListener("resize", this.handleWindowResize, { passive: true });

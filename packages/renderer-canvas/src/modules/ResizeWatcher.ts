@@ -1,6 +1,4 @@
-import { Camera } from "../Camera";
-import { Config } from "../Config";
-import { ViewportState } from "../ViewportState";
+import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
 /**
  * Observes canvas resizing and keeps viewport/camera in sync.
@@ -17,7 +15,7 @@ export class ResizeWatcher {
         private wrapper: HTMLDivElement,
         private canvas: HTMLCanvasElement,
         private viewport: ViewportState,
-        private camera: Camera,
+        private camera: ICamera,
         private config: Config,
         private onCameraChange: () => void
     ) {

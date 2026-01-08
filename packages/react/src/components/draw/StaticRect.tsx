@@ -32,7 +32,7 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 
 
         return () => {
             if (handle) {
-                engine.removeLayerHandle(handle);
+                engine.removeDrawHandle(handle);
             }
         };
     }, [engine, items, cacheKey, layer, requestRender]);

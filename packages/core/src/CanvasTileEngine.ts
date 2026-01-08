@@ -1,13 +1,9 @@
 import { Camera } from "./modules/Camera";
 import { Config } from "./modules/Config";
 import { CoordinateTransformer } from "./modules/CoordinateTransformer";
-import { CanvasDraw } from "./modules/CanvasDraw";
-import { EventManager } from "./modules/EventManager";
-import { ImageLoader } from "./modules/ImageLoader";
-import { Layer, type LayerHandle } from "./modules/Layer";
 import { ViewportState } from "./modules/ViewportState";
-import { CanvasRenderer } from "./modules/Renderer/CanvasRenderer";
-import { IRenderer } from "./modules/Renderer/Renderer";
+import { AnimationController } from "./modules/AnimationController";
+import { validateCoords, validateScale } from "./utils/validateConfig";
 import {
     Coords,
     CanvasTileEngineConfig,
@@ -25,12 +21,10 @@ import {
     Rect,
     Line,
     Path,
+    IRenderer,
+    IImageLoader,
+    DrawHandle,
 } from "./types";
-import { SizeController } from "./modules/SizeController";
-import { AnimationController } from "./modules/AnimationController";
-import { RendererFactory } from "./modules/RendererFactory";
-import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
-import { validateCoords, validateScale } from "./utils/validateConfig";
 
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
@@ -40,17 +34,19 @@ export class CanvasTileEngine {
     private camera: Camera;
     private viewport: ViewportState;
     private coordinateTransformer: CoordinateTransformer;
-    private layers?: Layer;
     private renderer: IRenderer;
-    private events: EventManager;
-    private draw?: CanvasDraw;
-    public images: ImageLoader;
-    private sizeController: SizeController;
     private animationController: AnimationController;
-    private responsiveWatcher?: ResponsiveWatcher;
 
     public canvasWrapper: HTMLDivElement;
     public canvas: HTMLCanvasElement;
+
+    /**
+     * Image loader for loading and caching images.
+     * Uses the renderer's platform-specific implementation.
+     */
+    public get images(): IImageLoader {
+        return this.renderer.getImageLoader();
+    }
 
     /**
      * Callback when center coordinates change (pan or zoom).
@@ -83,7 +79,7 @@ export class CanvasTileEngine {
     }
     public set onClick(cb: onClickCallback | undefined) {
         this._onClick = cb;
-        this.events.onClick = cb;
+        this.renderer.onClick = cb;
     }
 
     private _onRightClick?: onRightClickCallback;
@@ -105,7 +101,7 @@ export class CanvasTileEngine {
     }
     public set onRightClick(cb: onRightClickCallback | undefined) {
         this._onRightClick = cb;
-        this.events.onRightClick = cb;
+        this.renderer.onRightClick = cb;
     }
 
     private _onHover?: onHoverCallback;
@@ -127,7 +123,7 @@ export class CanvasTileEngine {
     }
     public set onHover(cb: onHoverCallback | undefined) {
         this._onHover = cb;
-        this.events.onHover = cb;
+        this.renderer.onHover = cb;
     }
 
     private _onMouseDown?: onMouseDownCallback;
@@ -149,7 +145,7 @@ export class CanvasTileEngine {
     }
     public set onMouseDown(cb: onMouseDownCallback | undefined) {
         this._onMouseDown = cb;
-        this.events.onMouseDown = cb;
+        this.renderer.onMouseDown = cb;
     }
 
     private _onMouseUp?: onMouseUpCallback;
@@ -171,7 +167,7 @@ export class CanvasTileEngine {
     }
     public set onMouseUp(cb: onMouseUpCallback | undefined) {
         this._onMouseUp = cb;
-        this.events.onMouseUp = cb;
+        this.renderer.onMouseUp = cb;
     }
 
     private _onMouseLeave?: onMouseLeaveCallback;
@@ -193,7 +189,7 @@ export class CanvasTileEngine {
     }
     public set onMouseLeave(cb: onMouseLeaveCallback | undefined) {
         this._onMouseLeave = cb;
-        this.events.onMouseLeave = cb;
+        this.renderer.onMouseLeave = cb;
     }
 
     private _onDraw?: onDrawCallback;
@@ -215,7 +211,7 @@ export class CanvasTileEngine {
     }
     public set onDraw(cb: onDrawCallback | undefined) {
         this._onDraw = cb;
-        this.getCanvasRenderer().onDraw = cb;
+        this.renderer.onDraw = cb;
     }
 
     private _onResize?: () => void;
@@ -234,7 +230,7 @@ export class CanvasTileEngine {
     }
     public set onResize(cb: (() => void) | undefined) {
         this._onResize = cb;
-        this.events.onResize = cb;
+        this.renderer.onResize = cb;
     }
 
     private _onZoom?: (scale: number) => void;
@@ -254,41 +250,25 @@ export class CanvasTileEngine {
     }
     public set onZoom(cb: ((scale: number) => void) | undefined) {
         this._onZoom = cb;
-        this.events.onZoom = cb;
+        this.renderer.onZoom = cb;
     }
 
     /**
-     * @param canvas Target canvas element.
+     * @param canvasWrapper Canvas wrapper element containing a canvas child.
      * @param config Initial engine configuration.
+     * @param renderer The renderer implementation to use (e.g., RendererCanvas).
      * @param center Initial center in world space.
      */
-    constructor(canvasWrapper: HTMLDivElement, config: CanvasTileEngineConfig, center: Coords = { x: 0, y: 0 }) {
+    constructor(
+        canvasWrapper: HTMLDivElement,
+        config: CanvasTileEngineConfig,
+        renderer: IRenderer,
+        center: Coords = { x: 0, y: 0 }
+    ) {
         this.canvasWrapper = canvasWrapper;
         this.canvas = canvasWrapper.querySelector("canvas")!;
-        // Ensure canvas wrapper has relative positioning for absolute canvas inside
-        // In responsive mode, width/height are controlled by user's CSS
-        if (config.responsive) {
-            Object.assign(this.canvasWrapper.style, {
-                position: "relative",
-                overflow: "hidden",
-            });
-        } else {
-            Object.assign(this.canvasWrapper.style, {
-                position: "relative",
-                overflow: "hidden",
-                width: config.size.width + "px",
-                height: config.size.height + "px",
-            });
-        }
-        Object.assign(this.canvas.style, {
-            position: "absolute",
-            top: "0",
-            left: "0",
-        });
 
         this.config = new Config(config);
-
-        const rendererType = config.renderer ?? "canvas";
 
         const tilesX = config.size.width / config.scale;
         const tilesY = config.size.height / config.scale;
@@ -314,46 +294,21 @@ export class CanvasTileEngine {
         // Initialize animation controller
         this.animationController = new AnimationController(this.camera, this.viewport, () => this.handleCameraChange());
 
-        this.renderer = this.createRenderer(rendererType);
+        // Initialize renderer with dependencies
+        this.renderer = renderer;
+        this.renderer.init({
+            wrapper: this.canvasWrapper,
+            camera: this.camera,
+            viewport: this.viewport,
+            config: this.config,
+            transformer: this.coordinateTransformer,
+        });
 
-        this.images = new ImageLoader();
+        // Connect camera change callback from renderer to engine
+        this.renderer.onCameraChange = () => this.handleCameraChange();
 
-        this.events = new EventManager(
-            this.canvasWrapper,
-            this.canvas,
-            this.camera,
-            this.viewport,
-            this.config,
-            this.coordinateTransformer,
-            () => this.handleCameraChange()
-        );
-        this.sizeController = new SizeController(
-            this.canvasWrapper,
-            this.canvas,
-            this.camera,
-            this.renderer,
-            this.viewport,
-            this.config,
-            () => this.handleCameraChange()
-        );
-        this.events.setupEvents();
-
-        // Setup responsive watcher if responsive mode is enabled
-        if (config.responsive) {
-            this.responsiveWatcher = new ResponsiveWatcher(
-                this.canvasWrapper,
-                this.canvas,
-                this.camera,
-                this.renderer,
-                this.viewport,
-                this.config,
-                () => this.handleCameraChange()
-            );
-            this.responsiveWatcher.onResize = () => {
-                this._onResize?.();
-            };
-            this.responsiveWatcher.start();
-        }
+        // Setup event handling (includes resize/responsive watchers)
+        this.renderer.setupEvents();
 
         // Apply initial bounds if provided
         if (config.bounds) {
@@ -365,12 +320,7 @@ export class CanvasTileEngine {
 
     /** Tear down listeners and observers. */
     destroy() {
-        this.events.destroy();
-        this.responsiveWatcher?.stop();
         this.animationController.cancelAll();
-        this.draw?.destroy();
-        this.layers?.clear();
-        this.images.clear();
         this.renderer.destroy();
     }
 
@@ -394,7 +344,7 @@ export class CanvasTileEngine {
             );
             return;
         }
-        this.sizeController.resizeWithAnimation(width, height, durationMs, this.animationController, () => {
+        this.renderer.resizeWithAnimation(width, height, durationMs, () => {
             // Trigger onResize callback after programmatic resize completes
             this._onResize?.();
             onComplete?.();
@@ -549,32 +499,20 @@ export class CanvasTileEngine {
         this.render();
     }
 
-    // ─── Draw helpers (canvas renderer only) ───────────
+    // ─── Draw helpers ───────────
 
     /**
-     * Register a generic draw callback (canvas renderer only).
-     * @param fn Callback invoked with context, top-left coords, and config.
-     * @param layer Layer order (lower draws first).
-     */
-    addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer: number = 1
-    ): LayerHandle {
-        return this.ensureCanvasDraw().addDrawFunction(fn, layer);
-    }
-
-    /**
-     * Draw one or many rectangles in world space (canvas renderer only).
+     * Draw one or many rectangles in world space.
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      */
-    drawRect(items: Rect | Array<Rect>, layer: number = 1): LayerHandle {
-        return this.ensureCanvasDraw().drawRect(items, layer);
+    drawRect(items: Rect | Array<Rect>, layer: number = 1): DrawHandle {
+        return this.renderer.getDrawAPI().drawRect(items, layer);
     }
 
     /**
-     * Draw rectangles with pre-rendering cache (canvas renderer only).
+     * Draw rectangles with pre-rendering cache.
      * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
      * Ideal for large static datasets like mini-maps where items don't change.
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
@@ -582,24 +520,24 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): LayerHandle {
-        return this.ensureCanvasDraw().drawStaticRect(items, cacheKey, layer);
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
+        return this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
     }
 
     /**
-     * Draw circles with pre-rendering cache (canvas renderer only).
+     * Draw circles with pre-rendering cache.
      * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
      * Ideal for large static datasets like mini-maps where items don't change.
      * @param items Array of circle definitions.
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): LayerHandle {
-        return this.ensureCanvasDraw().drawStaticCircle(items, cacheKey, layer);
+    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
+        return this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
     }
 
     /**
-     * Draw images with pre-rendering cache (canvas renderer only).
+     * Draw images with pre-rendering cache.
      * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
      * Ideal for large static datasets like terrain tiles or static decorations.
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
@@ -607,8 +545,8 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): LayerHandle {
-        return this.ensureCanvasDraw().drawStaticImage(items, cacheKey, layer);
+    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
+        return this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
     }
 
     /**
@@ -616,11 +554,11 @@ export class CanvasTileEngine {
      * @param cacheKey The cache key to clear, or undefined to clear all caches.
      */
     clearStaticCache(cacheKey?: string) {
-        this.ensureCanvasDraw().clearStaticCache(cacheKey);
+        this.renderer.getDrawAPI().clearStaticCache(cacheKey);
     }
 
     /**
-     * Draw one or many lines between world points (canvas renderer only).
+     * Draw one or many lines between world points.
      * @param items Line segments.
      * @param style Line style overrides.
      * @param layer Layer order.
@@ -629,21 +567,21 @@ export class CanvasTileEngine {
         items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ): LayerHandle {
-        return this.ensureCanvasDraw().drawLine(items, style, layer);
+    ): DrawHandle {
+        return this.renderer.getDrawAPI().drawLine(items, style, layer);
     }
 
     /**
-     * Draw one or many circles sized in world units (canvas renderer only).
+     * Draw one or many circles sized in world units.
      * @param items Circle definitions.
      * @param layer Layer order.
      */
-    drawCircle(items: Circle | Array<Circle>, layer: number = 1): LayerHandle {
-        return this.ensureCanvasDraw().drawCircle(items, layer);
+    drawCircle(items: Circle | Array<Circle>, layer: number = 1): DrawHandle {
+        return this.renderer.getDrawAPI().drawCircle(items, layer);
     }
 
     /**
-     * Draw one or many texts at world positions (canvas renderer only).
+     * Draw one or many texts at world positions.
      * @param items Text definitions with position, text, size, and style.
      * @param layer Layer order.
      * @example
@@ -663,12 +601,12 @@ export class CanvasTileEngine {
      * ]);
      * ```
      */
-    drawText(items: Array<Text> | Text, layer: number = 2): LayerHandle {
-        return this.ensureCanvasDraw().drawText(items, layer);
+    drawText(items: Array<Text> | Text, layer: number = 2): DrawHandle {
+        return this.renderer.getDrawAPI().drawText(items, layer);
     }
 
     /**
-     * Draw one or many polylines through world points (canvas renderer only).
+     * Draw one or many polylines through world points.
      * @param items Polyline point collections.
      * @param style Stroke style overrides.
      * @param layer Layer order.
@@ -677,22 +615,22 @@ export class CanvasTileEngine {
         items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
         layer: number = 1
-    ): LayerHandle {
-        return this.ensureCanvasDraw().drawPath(items, style, layer);
+    ): DrawHandle {
+        return this.renderer.getDrawAPI().drawPath(items, style, layer);
     }
 
     /**
-     * Draw one or many images scaled in world units (canvas renderer only).
+     * Draw one or many images scaled in world units.
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Image definitions.
      * @param layer Layer order.
      */
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): LayerHandle {
-        return this.ensureCanvasDraw().drawImage(items, layer);
+    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+        return this.renderer.getDrawAPI().drawImage(items, layer);
     }
 
     /**
-     *  Draw grid lines at specified cell size (canvas renderer only).
+     * Draw grid lines at specified cell size.
      * @param cellSize Size of each grid cell in world units.
      * @example
      * ```ts
@@ -704,23 +642,34 @@ export class CanvasTileEngine {
         lineWidth: number = 1,
         strokeStyle: string = "black",
         layer: number = 0
-    ): LayerHandle {
-        return this.ensureCanvasDraw().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+    ): DrawHandle {
+        return this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
     }
 
     /**
-     * Remove a specific draw callback by handle (canvas renderer only).
+     * Register a custom draw function for complete rendering control.
+     * Useful for complex or one-off drawing operations.
+     * @param fn Function receiving canvas context, top-left coords, and config.
+     * @param layer Layer index (default 1).
+     * @returns DrawHandle for removal.
+     */
+    addDrawFunction(
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        layer: number = 1
+    ): DrawHandle {
+        return this.renderer.getDrawAPI().addDrawFunction(fn, layer);
+    }
+
+    /**
+     * Remove a specific draw callback by handle.
      * Does not clear other callbacks on the same layer.
      */
-    removeLayerHandle(handle: LayerHandle) {
-        if (!this.layers) {
-            throw new Error("removeLayerHandle is only available when renderer is set to 'canvas'.");
-        }
-        this.layers.remove(handle);
+    removeDrawHandle(handle: DrawHandle) {
+        this.renderer.getDrawAPI().removeDrawHandle(handle);
     }
 
     /**
-     * Clear all draw callbacks from a specific layer (canvas renderer only).
+     * Clear all draw callbacks from a specific layer.
      * Use this before redrawing dynamic content to prevent accumulation.
      * @param layer Layer index to clear.
      * @example
@@ -731,14 +680,11 @@ export class CanvasTileEngine {
      * ```
      */
     clearLayer(layer: number) {
-        if (!this.layers) {
-            throw new Error("clearLayer is only available when renderer is set to 'canvas'.");
-        }
-        this.layers.clear(layer);
+        this.renderer.getDrawAPI().clearLayer(layer);
     }
 
     /**
-     * Clear all draw callbacks from all layers (canvas renderer only).
+     * Clear all draw callbacks from all layers.
      * Useful for complete scene reset.
      * @example
      * ```ts
@@ -747,46 +693,7 @@ export class CanvasTileEngine {
      * ```
      */
     clearAll() {
-        if (!this.layers) {
-            throw new Error("clearAll is only available when renderer is set to 'canvas'.");
-        }
-        this.layers.clear();
-    }
-
-    /**
-     * Build the active renderer based on config.
-     * @param type Renderer type requested.
-     */
-    private createRenderer(type: CanvasTileEngineConfig["renderer"]): IRenderer {
-        // Initialize layers and draw helpers for canvas renderer
-        if (type === "canvas") {
-            this.layers = new Layer();
-            this.draw = new CanvasDraw(this.layers, this.coordinateTransformer, this.camera);
-        }
-
-        return RendererFactory.createRenderer(
-            type ?? "canvas",
-            this.canvas,
-            this.camera,
-            this.coordinateTransformer,
-            this.config,
-            this.viewport,
-            this.layers!
-        );
-    }
-
-    private ensureCanvasDraw(): CanvasDraw {
-        if (!this.draw) {
-            throw new Error("Draw helpers are only available when renderer is set to 'canvas'.");
-        }
-        return this.draw;
-    }
-
-    private getCanvasRenderer(): CanvasRenderer {
-        if (!(this.renderer instanceof CanvasRenderer)) {
-            throw new Error("Canvas renderer required for this operation.");
-        }
-        return this.renderer;
+        this.renderer.getDrawAPI().clearAll();
     }
 
     // ─── Internal ───────────────────────────────

@@ -1,8 +1,4 @@
-import { ICamera } from "./Camera";
-import { Config } from "./Config";
-import { CoordinateTransformer } from "./CoordinateTransformer";
-import { ViewportState } from "./ViewportState";
-import { DEBUG_HUD } from "../constants";
+import { Config, DEBUG_HUD, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
 const FPS_SAMPLE_SIZE = 10;
 
@@ -13,7 +9,6 @@ const FPS_SAMPLE_SIZE = 10;
 export class CanvasDebug {
     private ctx: CanvasRenderingContext2D;
     private camera: ICamera;
-    private transformer: CoordinateTransformer;
     private config: Config;
     private viewport: ViewportState;
 
@@ -24,16 +19,9 @@ export class CanvasDebug {
     private fpsLoopRunning = false;
     private onFpsUpdate: (() => void) | null = null;
 
-    constructor(
-        ctx: CanvasRenderingContext2D,
-        camera: ICamera,
-        transformer: CoordinateTransformer,
-        config: Config,
-        viewport: ViewportState
-    ) {
+    constructor(ctx: CanvasRenderingContext2D, camera: ICamera, config: Config, viewport: ViewportState) {
         this.ctx = ctx;
         this.camera = camera;
-        this.transformer = transformer;
         this.config = config;
         this.viewport = viewport;
     }

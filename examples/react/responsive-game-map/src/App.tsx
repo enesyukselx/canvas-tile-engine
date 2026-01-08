@@ -10,6 +10,7 @@ import {
 import { INITIAL_COORDS, MAP_BACKGROUND_COLOR } from "./constants";
 import { generateMapObjects, type MapObject } from "./generateMapObjects";
 import { VillageModal } from "./components/VillageModal";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const MINI_MAP_SCALE_THRESHOLD = 25;
 
@@ -24,6 +25,7 @@ const mapConfig: CanvasTileEngineConfig = {
     responsive: "preserve-scale",
     backgroundColor: MAP_BACKGROUND_COLOR,
     eventHandlers: {
+        hover: true,
         zoom: true,
         drag: true,
         click: true,
@@ -130,17 +132,31 @@ export default function App() {
             <div>
                 <CanvasTileEngine
                     engine={map}
+                    renderer={new RendererCanvas()}
                     config={mapConfig}
                     center={INITIAL_COORDS}
-                    onClick={
-                        scale < 25
-                            ? (coords) => {
-                                  map.setScale(50);
-                                  map.updateCoords({ x: coords.snapped.x, y: coords.snapped.y });
-                                  setScale(50);
-                              }
-                            : handleClick
-                    }
+                    onHover={(coords) => {
+                        if (scale < MINI_MAP_SCALE_THRESHOLD) {
+                            window.document.body.style.cursor = "move";
+                            return;
+                        }
+                        const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
+                        if (item) {
+                            window.document.body.style.cursor = "pointer";
+                        } else {
+                            window.document.body.style.cursor = "move";
+                        }
+                    }}
+                    onClick={(coords) => {
+                        if (scale < MINI_MAP_SCALE_THRESHOLD) {
+                            map.setScale(50);
+                            map.updateCoords({ x: coords.snapped.x, y: coords.snapped.y });
+                            setScale(50);
+                        } else {
+                            window.document.body.style.cursor = "default";
+                            handleClick(coords);
+                        }
+                    }}
                     onZoom={(newScale) => setScale(newScale)}
                 >
                     <CanvasTileEngine.Image items={scale < MINI_MAP_SCALE_THRESHOLD ? [] : imageItems} layer={0} />
@@ -154,11 +170,12 @@ export default function App() {
                     />
                     <CanvasTileEngine.DrawFunction layer={3}>
                         {(ctx) => {
+                            const context = ctx as CanvasRenderingContext2D;
                             const cfg = map.getConfig();
                             const centerX = cfg.size.width / 2;
                             const centerY = cfg.size.height / 2;
-                            ctx.fillStyle = "red";
-                            ctx.fillRect(centerX - 5, centerY - 5, 5, 5);
+                            context.fillStyle = "red";
+                            context.fillRect(centerX - 5, centerY - 5, 5, 5);
                         }}
                     </CanvasTileEngine.DrawFunction>
                 </CanvasTileEngine>

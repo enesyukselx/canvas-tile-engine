@@ -1,9 +1,12 @@
-import { DEFAULT_VALUES } from "../constants";
+import { IImageLoader } from "@canvas-tile-engine/core";
+
+const DEFAULT_IMAGE_LOAD_RETRY_COUNT = 1;
 
 /**
- * Simple image loader with in-memory caching to avoid duplicate network requests.
+ * DOM-based image loader with in-memory caching to avoid duplicate network requests.
+ * Implements IImageLoader for HTMLImageElement.
  */
-export class ImageLoader {
+export class ImageLoader implements IImageLoader<HTMLImageElement> {
     private cache = new Map<string, HTMLImageElement>();
     private inflight = new Map<string, Promise<HTMLImageElement>>();
     private listeners = new Set<() => void>();
@@ -11,7 +14,7 @@ export class ImageLoader {
     /**
      * Register a callback fired when a new image finishes loading.
      */
-    onLoad(cb: () => void) {
+    onLoad(cb: () => void): () => void {
         this.listeners.add(cb);
         return () => this.listeners.delete(cb);
     }
@@ -28,7 +31,7 @@ export class ImageLoader {
      * @param retry How many times to retry on error (default: 1).
      * @returns Promise resolving to the loaded image element.
      */
-    async load(src: string, retry: number = DEFAULT_VALUES.IMAGE_LOAD_RETRY_COUNT): Promise<HTMLImageElement> {
+    async load(src: string, retry: number = DEFAULT_IMAGE_LOAD_RETRY_COUNT): Promise<HTMLImageElement> {
         // Cached
         if (this.cache.has(src)) {
             return this.cache.get(src)!;
