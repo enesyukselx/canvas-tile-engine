@@ -1,5 +1,4 @@
-import { Config, CoordinateTransformer, ICamera, ViewportState } from "@canvas-tile-engine/core";
-import { DEBUG_HUD } from "../constants";
+import { Config, DEBUG_HUD, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
 const FPS_SAMPLE_SIZE = 10;
 

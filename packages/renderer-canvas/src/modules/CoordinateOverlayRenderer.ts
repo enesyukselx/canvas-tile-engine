@@ -1,5 +1,4 @@
-import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
-import { COORDINATE_OVERLAY } from "../constants";
+import { Config, COORDINATE_OVERLAY, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
 /**
  * Renders a coordinate overlay (axes and labels) on top of the canvas.
