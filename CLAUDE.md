@@ -148,4 +148,4 @@ Canvas2D implementation of IRenderer:
 Follow Conventional Commits: `<type>(<scope>): <description>`
 
 Types: feat, fix, docs, style, refactor, test, chore
-Scopes: core, react, renderer-canvas, docs, examples
+Scopes: core, react, r-canvas, docs, examples
