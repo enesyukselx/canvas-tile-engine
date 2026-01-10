@@ -80,13 +80,23 @@ const config: Config = {
                 src: "img/logo.svg",
             },
             items: [
+                /*{ to: "/blog", label: "Blog", position: "left" },*/
+                {
+                    to: "https://www.canvastileengine.com/",
+                    label: "Home",
+                    position: "left",
+                },
+                {
+                    to: "https://www.canvastileengine.com/playground",
+                    label: "Playground",
+                    position: "left",
+                },
                 {
                     type: "docSidebar",
                     sidebarId: "tutorialSidebar",
                     position: "left",
                     label: "Documentation",
                 },
-                /*{ to: "/blog", label: "Blog", position: "left" },*/
                 {
                     href: "https://github.com/enesyukselx/canvas-tile-engine",
                     label: "GitHub",
