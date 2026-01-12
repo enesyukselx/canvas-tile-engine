@@ -48,9 +48,6 @@ export const SIZE_LIMITS = {
 export const RENDER_DEFAULTS = {
     /** Default background color */
     BACKGROUND_COLOR: "#ffffff",
-
-    /** Default renderer type */
-    RENDERER_TYPE: "canvas" as const,
 } as const;
 
 export const COORDINATE_OVERLAY = {

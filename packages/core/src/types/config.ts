@@ -1,5 +1,4 @@
 export type CanvasTileEngineConfig = {
-    renderer?: "canvas";
     scale: number;
     maxScale?: number;
     minScale?: number;

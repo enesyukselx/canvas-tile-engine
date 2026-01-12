@@ -17,7 +17,6 @@ export class Config {
         validateConfig(config);
 
         const base: Required<CanvasTileEngineConfig> = {
-            renderer: RENDER_DEFAULTS.RENDERER_TYPE,
             scale: config.scale,
             minScale: config.minScale ?? config.scale * SCALE_LIMITS.MIN_SCALE_MULTIPLIER,
             maxScale: config.maxScale ?? config.scale * SCALE_LIMITS.MAX_SCALE_MULTIPLIER,
