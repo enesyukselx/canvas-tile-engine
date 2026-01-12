@@ -51,10 +51,6 @@
         "@canvas-tile-engine/core": ">=0.3.0"
     },
     "dependencies": {
-        "rbush": "^4.0.1",
         "@canvas-tile-engine/core": "workspace:*"
-    },
-    "devDependencies": {
-        "@types/rbush": "^4.0.0"
     }
 }
