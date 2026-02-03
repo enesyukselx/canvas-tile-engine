@@ -11,7 +11,11 @@ export class AnimationController {
     private moveAnimationId?: number;
     private resizeAnimationId?: number;
 
-    constructor(private camera: ICamera, private viewport: ViewportState, private onAnimationFrame: () => void) {}
+    constructor(
+        private camera: ICamera,
+        private viewport: ViewportState,
+        private onAnimationFrame: () => void,
+    ) {}
 
     /**
      * Smoothly animate camera movement to target coordinates.
@@ -24,7 +28,7 @@ export class AnimationController {
         targetX: number,
         targetY: number,
         durationMs: number = DEFAULT_VALUES.ANIMATION_DURATION_MS,
-        onComplete?: () => void
+        onComplete?: () => void,
     ) {
         // Cancel any existing move animation
         this.cancelMove();
@@ -80,7 +84,7 @@ export class AnimationController {
         targetHeight: number,
         durationMs: number = DEFAULT_VALUES.ANIMATION_DURATION_MS,
         onApplySize: (width: number, height: number, center: Coords) => void,
-        onComplete?: () => void
+        onComplete?: () => void,
     ) {
         if (targetWidth <= 0 || targetHeight <= 0) {
             return;
