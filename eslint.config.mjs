@@ -45,6 +45,37 @@ const rules = [
         extends: [tseslint.configs.recommendedTypeChecked],
     },
     {
+        files: ["./packages/renderer-canvas/src/**/*.ts", "./packages/renderer-canvas/tsup.config.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/renderer-canvas/tsconfig.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.browser,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
+        files: ["./packages/renderer-canvas/tests/**/*.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/renderer-canvas/tsconfig.vitest.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.node,
+                ...globals.vitest,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
         files: ["./packages/react/src/**/*.ts", "./packages/react/src/**/*.tsx", "./packages/react/tsup.config.ts"],
         languageOptions: {
             parserOptions: {

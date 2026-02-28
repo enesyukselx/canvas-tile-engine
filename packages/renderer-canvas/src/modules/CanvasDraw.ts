@@ -559,6 +559,7 @@ export class CanvasDraw {
                 (offscreen as HTMLCanvasElement).height = canvasHeight;
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
             const offCtx = offscreen.getContext("2d") as
                 | CanvasRenderingContext2D
                 | OffscreenCanvasRenderingContext2D
