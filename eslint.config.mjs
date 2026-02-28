@@ -57,6 +57,9 @@ const rules = [
                 ...globals.browser,
             },
         },
+        rules: {
+            "@typescript-eslint/no-unnecessary-type-assertion": "off",
+        },
         extends: [tseslint.configs.recommendedTypeChecked],
     },
     {
