@@ -388,6 +388,7 @@ export class CanvasDraw {
                 // preserve aspect (use clip dimensions when cropping a spritesheet)
                 const srcW = item.clip ? item.clip.w : item.img.width;
                 const srcH = item.clip ? item.clip.h : item.img.height;
+                if (srcW <= 0 || srcH <= 0) continue;
                 const aspect = srcW / srcH;
 
                 let drawW = pxSize;
@@ -758,13 +759,14 @@ export class CanvasDraw {
      * @param layer Layer order
      */
     drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
-            const img = (item as { img: HTMLImageElement }).img;
-            const clip = (item as { clip?: { x: number; y: number; w: number; h: number } }).clip;
-            const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
+        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item: ImageItem, x, y, pxSize) => {
+            const img = item.img;
+            const clip = item.clip;
+            const rotationDeg = item.rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
             const srcW = clip ? clip.w : img.width;
             const srcH = clip ? clip.h : img.height;
+            if (srcW <= 0 || srcH <= 0) return;
             const aspect = srcW / srcH;
             let drawW = pxSize;
             let drawH = pxSize;
