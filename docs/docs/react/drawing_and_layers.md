@@ -427,17 +427,19 @@ Pre-renders images to an offscreen canvas. Supports `rotate` and `clip` properti
 <CanvasTileEngine.StaticImage items={terrainTiles} cacheKey="terrain-cache" layer={0} />
 
 {/* Spritesheet: pre-render many tiles from a single atlas */}
-<CanvasTileEngine.StaticImage
-    items={tiles.map((tile) => ({
-        x: tile.x,
-        y: tile.y,
-        size: 1,
-        img: spritesheet,
-        clip: { x: tile.frameX, y: tile.frameY, w: 32, h: 32 },
-    }))}
-    cacheKey="terrain-cache"
-    layer={0}
-/>
+{spritesheet && (
+    <CanvasTileEngine.StaticImage
+        items={tiles.map((tile) => ({
+            x: tile.x,
+            y: tile.y,
+            size: 1,
+            img: spritesheet,
+            clip: { x: tile.frameX, y: tile.frameY, w: 32, h: 32 },
+        }))}
+        cacheKey="terrain-cache"
+        layer={0}
+    />
+)}
 ```
 
 :::tip Automatic Cache Management
