@@ -19,7 +19,11 @@ export type DrawObject = {
 export type Rect = DrawObject;
 
 export type Circle = Omit<DrawObject, "rotate" | "radius">;
-export type ImageItem = Omit<DrawObject, "style"> & { img: HTMLImageElement };
+export type ImageItem = Omit<DrawObject, "style"> & {
+    img: HTMLImageElement;
+    /** Source rectangle for spritesheet cropping (pixel coordinates within the image) */
+    clip?: { x: number; y: number; w: number; h: number };
+};
 export type Text = Omit<DrawObject, "radius" | "size"> & {
     text: string;
     /** Font size in world units (scales with zoom). Default: 1 */

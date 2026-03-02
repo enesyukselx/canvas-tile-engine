@@ -294,6 +294,7 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 | `size`   | `number`           | `1`          | Size in grid units (maintains aspect ratio).                       |
 | `rotate` | `number`           | `0`          | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 | `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                  |
+| `clip`   | `{ x, y, w, h }`  | -            | Source rectangle for spritesheet cropping (pixel coordinates within the image). |
 
 ```typescript
 // Single image
@@ -309,6 +310,17 @@ engine.drawImage([
     { x: 0, y: 0, size: 1, img: treeImg },
     { x: 2, y: 0, size: 1, img: treeImg },
     { x: 4, y: 0, size: 1, img: treeImg },
+], 2);
+
+// Spritesheet: draw a single frame from an atlas
+const spritesheet = await engine.images.load("/assets/tiles.png");
+engine.drawImage({ x: 5, y: 3, size: 1, img: spritesheet, clip: { x: 64, y: 0, w: 32, h: 32 } }, 2);
+
+// Spritesheet: multiple tiles from the same atlas
+engine.drawImage([
+    { x: 0, y: 0, size: 1, img: spritesheet, clip: { x: 0,  y: 0, w: 32, h: 32 } }, // tile 0
+    { x: 1, y: 0, size: 1, img: spritesheet, clip: { x: 32, y: 0, w: 32, h: 32 } }, // tile 1
+    { x: 2, y: 0, size: 1, img: spritesheet, clip: { x: 64, y: 0, w: 32, h: 32 } }, // tile 2
 ], 2);
 ```
 
@@ -414,7 +426,7 @@ miniMap.drawStaticCircle(markers, "minimap-markers", 2);
 
 ### `drawStaticImage`
 
-Pre-renders images to an offscreen canvas. Useful for static terrain or decorations with fixed zoom. Supports `rotate` property for rotated images.
+Pre-renders images to an offscreen canvas. Useful for static terrain or decorations with fixed zoom. Supports `rotate` and `clip` properties.
 
 ```typescript
 const terrainTiles = tiles.map((tile) => ({
@@ -426,6 +438,18 @@ const terrainTiles = tiles.map((tile) => ({
 }));
 
 engine.drawStaticImage(terrainTiles, "terrain-cache", 0);
+
+// Spritesheet: pre-render many tiles from a single atlas
+const spritesheet = await engine.images.load("/assets/tileset.png");
+const tilesFromAtlas = tiles.map((tile) => ({
+    x: tile.x,
+    y: tile.y,
+    size: 1,
+    img: spritesheet,
+    clip: { x: tile.frameX, y: tile.frameY, w: 32, h: 32 },
+}));
+
+engine.drawStaticImage(tilesFromAtlas, "terrain-cache", 0);
 ```
 
 ### `clearStaticCache`

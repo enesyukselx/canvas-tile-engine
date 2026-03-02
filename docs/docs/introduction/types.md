@@ -160,7 +160,7 @@ const path: Path = [
 
 ### `ImageItem`
 
-Image element with position, size, and rotation.
+Image element with position, size, rotation, and optional spritesheet clipping.
 
 ```typescript
 type ImageItem = {
@@ -174,6 +174,7 @@ type ImageItem = {
     };
     rotate?: number;
     img: HTMLImageElement;
+    clip?: { x: number; y: number; w: number; h: number };
 };
 ```
 
@@ -184,6 +185,7 @@ type ImageItem = {
 | `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                    |
 | `rotate` | `number`           | `0`                                | Rotation in degrees (clockwise) |
 | `img`    | `HTMLImageElement` | **Required**                       | Loaded image object             |
+| `clip`   | `{ x, y, w, h }`  | -                                  | Source rectangle for spritesheet cropping (pixel coordinates within the image) |
 
 ---
 
