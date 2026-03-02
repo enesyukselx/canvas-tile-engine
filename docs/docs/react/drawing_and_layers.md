@@ -436,7 +436,7 @@ Pre-renders images to an offscreen canvas. Supports `rotate` and `clip` properti
             img: spritesheet,
             clip: { x: tile.frameX, y: tile.frameY, w: 32, h: 32 },
         }))}
-        cacheKey="terrain-cache"
+        cacheKey="terrain-spritesheet-cache"
         layer={0}
     />
 )}
