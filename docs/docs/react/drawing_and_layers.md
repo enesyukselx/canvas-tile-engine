@@ -271,15 +271,18 @@ Draw images scaled to world units.
 | `x`, `y` | `number`           | World coordinates.                                                 |
 | `size`   | `number`           | Size in grid units (maintains aspect ratio).                       |
 | `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
+| `clip`   | `{ x, y, w, h }`  | Source rectangle for spritesheet cropping (pixel coordinates within the image). |
 
 ```tsx
 function MapWithImages() {
     const engine = useCanvasTileEngine();
     const [treeImg, setTreeImg] = useState<HTMLImageElement | null>(null);
+    const [spritesheet, setSpritesheet] = useState<HTMLImageElement | null>(null);
 
     useEffect(() => {
         if (engine.isReady && engine.images) {
             engine.images.load("/assets/tree.png").then(setTreeImg);
+            engine.images.load("/assets/tileset.png").then(setSpritesheet);
         }
     }, [engine.isReady, engine.images]);
 
@@ -295,6 +298,18 @@ function MapWithImages() {
                         { x: 5, y: 3, size: 1.5, img: treeImg },
                         { x: 7, y: 3, size: 1.5, img: treeImg, rotate: 45 },
                         { x: 9, y: 3, size: 2, img: treeImg },
+                    ]}
+                    layer={2}
+                />
+            )}
+
+            {/* Spritesheet: multiple tiles from a single atlas */}
+            {spritesheet && (
+                <CanvasTileEngine.Image
+                    items={[
+                        { x: 0, y: 0, size: 1, img: spritesheet, clip: { x: 0,  y: 0, w: 32, h: 32 } },
+                        { x: 1, y: 0, size: 1, img: spritesheet, clip: { x: 32, y: 0, w: 32, h: 32 } },
+                        { x: 2, y: 0, size: 1, img: spritesheet, clip: { x: 64, y: 0, w: 32, h: 32 } },
                     ]}
                     layer={2}
                 />
@@ -406,10 +421,23 @@ Pre-renders circles to an offscreen canvas.
 
 ### `<StaticImage>`
 
-Pre-renders images to an offscreen canvas. Supports `rotate` property.
+Pre-renders images to an offscreen canvas. Supports `rotate` and `clip` properties.
 
 ```tsx
 <CanvasTileEngine.StaticImage items={terrainTiles} cacheKey="terrain-cache" layer={0} />
+
+{/* Spritesheet: pre-render many tiles from a single atlas */}
+<CanvasTileEngine.StaticImage
+    items={tiles.map((tile) => ({
+        x: tile.x,
+        y: tile.y,
+        size: 1,
+        img: spritesheet,
+        clip: { x: tile.frameX, y: tile.frameY, w: 32, h: 32 },
+    }))}
+    cacheKey="terrain-cache"
+    layer={0}
+/>
 ```
 
 :::tip Automatic Cache Management

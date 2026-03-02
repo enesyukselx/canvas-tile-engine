@@ -385,8 +385,10 @@ export class CanvasDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
 
-                // preserve aspect
-                const aspect = item.img.width / item.img.height;
+                // preserve aspect (use clip dimensions when cropping a spritesheet)
+                const srcW = item.clip ? item.clip.w : item.img.width;
+                const srcH = item.clip ? item.clip.h : item.img.height;
+                const aspect = srcW / srcH;
 
                 let drawW = pxSize;
                 let drawH = pxSize;
@@ -409,10 +411,18 @@ export class CanvasDraw {
                     ctx.save();
                     ctx.translate(centerX, centerY);
                     ctx.rotate(rotation);
-                    ctx.drawImage(item.img, -drawW / 2, -drawH / 2, drawW, drawH);
+                    if (item.clip) {
+                        ctx.drawImage(item.img, item.clip.x, item.clip.y, item.clip.w, item.clip.h, -drawW / 2, -drawH / 2, drawW, drawH);
+                    } else {
+                        ctx.drawImage(item.img, -drawW / 2, -drawH / 2, drawW, drawH);
+                    }
                     ctx.restore();
                 } else {
-                    ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+                    if (item.clip) {
+                        ctx.drawImage(item.img, item.clip.x, item.clip.y, item.clip.w, item.clip.h, offsetX, offsetY, drawW, drawH);
+                    } else {
+                        ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+                    }
                 }
             }
         });
@@ -750,9 +760,12 @@ export class CanvasDraw {
     drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
+            const clip = (item as { clip?: { x: number; y: number; w: number; h: number } }).clip;
             const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
-            const aspect = img.width / img.height;
+            const srcW = clip ? clip.w : img.width;
+            const srcH = clip ? clip.h : img.height;
+            const aspect = srcW / srcH;
             let drawW = pxSize;
             let drawH = pxSize;
 
@@ -769,10 +782,18 @@ export class CanvasDraw {
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(rotation);
-                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                if (clip) {
+                    ctx.drawImage(img, clip.x, clip.y, clip.w, clip.h, -drawW / 2, -drawH / 2, drawW, drawH);
+                } else {
+                    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                }
                 ctx.restore();
             } else {
-                ctx.drawImage(img, imgX, imgY, drawW, drawH);
+                if (clip) {
+                    ctx.drawImage(img, clip.x, clip.y, clip.w, clip.h, imgX, imgY, drawW, drawH);
+                } else {
+                    ctx.drawImage(img, imgX, imgY, drawW, drawH);
+                }
             }
         });
 
