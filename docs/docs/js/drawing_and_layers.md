@@ -452,6 +452,10 @@ const tilesFromAtlas = tiles.map((tile) => ({
 engine.drawStaticImage(tilesFromAtlas, "terrain-cache", 0);
 ```
 
+:::caution Clip changes and the static cache
+`drawStaticImage` keys its offscreen cache by item **positions** (`x`/`y`/`size`) and the current **zoom scale**. Changing only the `clip` (or `img`/`style`) while positions and `cacheKey` stay the same will **not** rebuild the cache. To force a refresh, call `clearStaticCache(cacheKey)` first (or use a new `cacheKey`), or use the dynamic `drawImage` for per-frame sprite animation.
+:::
+
 ### `clearStaticCache`
 
 Clears pre-rendered caches when content changes.

@@ -442,6 +442,10 @@ Pre-renders images to an offscreen canvas. Supports `rotate` and `clip` properti
 )}
 ```
 
+:::caution Clip changes and the static cache
+The offscreen cache is keyed by item **positions** (`x`/`y`/`size`) and the current **zoom scale**. Changing only the `clip` (or `img`/`style`) while positions and `cacheKey` stay the same will **not** rebuild the cache — you'll keep seeing the previously rendered frames. To force a refresh, change the `cacheKey` (the old cache is cleared automatically), or use the dynamic `<Image>` component for per-frame sprite animation.
+:::
+
 :::tip Automatic Cache Management
 Static components automatically:
 
