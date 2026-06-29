@@ -831,18 +831,15 @@ export class CanvasDraw {
      * LAYER METHODS
      */
     /**
-     * Remove a specific draw callback by handle (canvas renderer only).
+     * Remove a specific draw callback by handle.
      * Does not clear other callbacks on the same layer.
      */
     removeDrawHandle(handle: DrawHandle) {
-        if (!this.layers) {
-            throw new Error("removeDrawHandle is only available when renderer is set to 'canvas'.");
-        }
         this.layers.remove(handle);
     }
 
     /**
-     * Clear all draw callbacks from a specific layer (canvas renderer only).
+     * Clear all draw callbacks from a specific layer.
      * Use this before redrawing dynamic content to prevent accumulation.
      * @param layer Layer index to clear.
      * @example
@@ -853,14 +850,11 @@ export class CanvasDraw {
      * ```
      */
     clearLayer(layer: number) {
-        if (!this.layers) {
-            throw new Error("clearLayer is only available when renderer is set to 'canvas'.");
-        }
         this.layers.clear(layer);
     }
 
     /**
-     * Clear all draw callbacks from all layers (canvas renderer only).
+     * Clear all draw callbacks from all layers.
      * Useful for complete scene reset.
      * @example
      * ```ts
@@ -869,9 +863,6 @@ export class CanvasDraw {
      * ```
      */
     clearAll() {
-        if (!this.layers) {
-            throw new Error("clearAll is only available when renderer is set to 'canvas'.");
-        }
         this.layers.clear();
     }
 
