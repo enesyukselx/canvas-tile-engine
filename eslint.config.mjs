@@ -76,6 +76,37 @@ const rules = [
         extends: [tseslint.configs.recommendedTypeChecked],
     },
     {
+        files: ["./packages/renderer-webgl/src/**/*.ts", "./packages/renderer-webgl/tsup.config.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/renderer-webgl/tsconfig.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.browser,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
+        files: ["./packages/renderer-webgl/tests/**/*.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/renderer-webgl/tsconfig.vitest.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.node,
+                ...globals.vitest,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
         files: ["./packages/react/src/**/*.ts", "./packages/react/src/**/*.tsx", "./packages/react/tsup.config.ts"],
         languageOptions: {
             parserOptions: {

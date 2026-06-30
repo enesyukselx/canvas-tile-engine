@@ -51,6 +51,9 @@ importers:
       '@canvas-tile-engine/renderer-canvas':
         specifier: workspace:*
         version: link:../../../packages/renderer-canvas
+      '@canvas-tile-engine/renderer-webgl':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-webgl
       '@faker-js/faker':
         specifier: ^10.3.0
         version: 10.3.0
@@ -218,6 +221,12 @@ importers:
         version: 18.3.7(@types/react@18.3.27)
 
   packages/renderer-canvas:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/renderer-webgl:
     dependencies:
       '@canvas-tile-engine/core':
         specifier: workspace:*
