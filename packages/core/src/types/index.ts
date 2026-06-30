@@ -38,27 +38,35 @@ export interface ViewportBounds {
     height: number;
 }
 
-export interface RendererDependencies {
-    wrapper: HTMLDivElement;
+/**
+ * Dependencies injected into a renderer's `init`.
+ *
+ * `TMount` is the platform-specific mount target the engine is constructed with.
+ * It defaults to `HTMLDivElement` so existing DOM renderers stay source- and
+ * type-compatible; non-DOM renderers (e.g. React Native / Skia) parameterize it
+ * with their own mount type.
+ */
+export interface RendererDependencies<TMount = HTMLDivElement> {
+    wrapper: TMount;
     camera: ICamera;
     viewport: ViewportState;
     config: Config;
     transformer: CoordinateTransformer;
 }
 
-export interface IRenderer {
+export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     // ─── Lifecycle ───
-    init(deps: RendererDependencies): void;
+    init(deps: RendererDependencies<TMount>): void;
     render(): void;
     resize(width: number, height: number): void;
     resizeWithAnimation(width: number, height: number, durationMs: number, onComplete?: () => void): void;
     destroy(): void;
 
     // ─── Draw API ───
-    getDrawAPI(): IDrawAPI;
+    getDrawAPI(): IDrawAPI<TImage>;
 
     // ─── Image Loader ───
-    getImageLoader(): IImageLoader;
+    getImageLoader(): IImageLoader<TImage>;
 
     // ─── Event Control ───
     setupEvents(): void;
@@ -76,7 +84,7 @@ export interface IRenderer {
     onDraw?: onDrawCallback;
 }
 
-export interface IDrawAPI {
+export interface IDrawAPI<TImage = HTMLImageElement> {
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer?: number
@@ -85,12 +93,12 @@ export interface IDrawAPI {
     drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
     drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
-    drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle;
+    drawImage(items: ImageItem<TImage> | ImageItem<TImage>[], layer?: number): DrawHandle;
     drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle;
     drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
-    drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number): DrawHandle;
+    drawStaticImage(items: ImageItem<TImage>[], cacheKey: string, layer?: number): DrawHandle;
     removeDrawHandle(handle: DrawHandle): void;
     clearLayer(layer: number): void;
     clearAll(): void;

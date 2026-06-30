@@ -376,7 +376,7 @@ export function useCanvasTileEngine(): EngineHandle {
                 if (!instanceRef.current) {
                     return Promise.reject(new Error("Engine not ready. Wait for isReady before loading images."));
                 }
-                return instanceRef.current.images.load(src, retry) as Promise<HTMLImageElement>;
+                return instanceRef.current.images.load(src, retry);
             },
         }),
         [setInstance]

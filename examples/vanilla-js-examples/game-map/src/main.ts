@@ -147,7 +147,7 @@ const drawItems = async () => {
     const imageCache = new Map<string, HTMLImageElement>();
     await Promise.all(
         uniqueUrls.map(async (url) => {
-            imageCache.set(url, (await mainMap.images.load(url)) as HTMLImageElement);
+            imageCache.set(url, await mainMap.images.load(url));
         })
     );
 

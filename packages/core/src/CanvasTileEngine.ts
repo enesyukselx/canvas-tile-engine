@@ -29,22 +29,26 @@ import {
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
  */
-export class CanvasTileEngine {
+export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     private config: Config;
     private camera: Camera;
     private viewport: ViewportState;
     private coordinateTransformer: CoordinateTransformer;
-    private renderer: IRenderer;
+    private renderer: IRenderer<TMount, TImage>;
     private animationController: AnimationController;
 
-    public canvasWrapper: HTMLDivElement;
+    public canvasWrapper: TMount;
+    /**
+     * The DOM canvas element, when the mount target is a DOM wrapper.
+     * Undefined at runtime on non-DOM platforms (e.g. React Native / Skia).
+     */
     public canvas: HTMLCanvasElement;
 
     /**
      * Image loader for loading and caching images.
      * Uses the renderer's platform-specific implementation.
      */
-    public get images(): IImageLoader {
+    public get images(): IImageLoader<TImage> {
         return this.renderer.getImageLoader();
     }
 
@@ -260,13 +264,18 @@ export class CanvasTileEngine {
      * @param center Initial center in world space.
      */
     constructor(
-        canvasWrapper: HTMLDivElement,
+        canvasWrapper: TMount,
         config: CanvasTileEngineConfig,
-        renderer: IRenderer,
+        renderer: IRenderer<TMount, TImage>,
         center: Coords = { x: 0, y: 0 }
     ) {
         this.canvasWrapper = canvasWrapper;
-        this.canvas = canvasWrapper.querySelector("canvas")!;
+        // Resolve the DOM canvas only when the mount target is a DOM element.
+        // Non-DOM platforms (e.g. React Native) leave this undefined.
+        const maybeDom = canvasWrapper as { querySelector?: (selector: string) => HTMLCanvasElement | null };
+        this.canvas = (typeof maybeDom?.querySelector === "function"
+            ? maybeDom.querySelector("canvas")
+            : undefined)!;
 
         this.config = new Config(config);
 
@@ -545,7 +554,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
         return this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
     }
 
@@ -625,7 +634,7 @@ export class CanvasTileEngine {
      * @param items Image definitions.
      * @param layer Layer order.
      */
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+    drawImage(items: Array<ImageItem<TImage>> | ImageItem<TImage>, layer: number = 1): DrawHandle {
         return this.renderer.getDrawAPI().drawImage(items, layer);
     }
 
