@@ -10,7 +10,7 @@
         "url": "git+https://github.com/enesyukselx/canvas-tile-engine.git"
     },
     "scripts": {
-        "build": "pnpm --filter @canvas-tile-engine/core build && pnpm --filter @canvas-tile-engine/renderer-canvas build && pnpm --filter @canvas-tile-engine/react build",
+        "build": "pnpm --filter @canvas-tile-engine/core build && pnpm --filter @canvas-tile-engine/renderer-canvas build && pnpm --filter @canvas-tile-engine/renderer-skia build && pnpm --filter @canvas-tile-engine/react build && pnpm --filter @canvas-tile-engine/react-native build",
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "pnpm --filter @canvas-tile-engine/core dev & pnpm --filter @canvas-tile-engine/renderer-canvas dev & pnpm --filter @canvas-tile-engine/react dev",
         "dev:example": "node run-example.js",

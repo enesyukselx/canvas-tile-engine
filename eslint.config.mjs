@@ -76,12 +76,56 @@ const rules = [
         extends: [tseslint.configs.recommendedTypeChecked],
     },
     {
+        files: ["./packages/renderer-skia/src/**/*.ts", "./packages/renderer-skia/tsup.config.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/renderer-skia/tsconfig.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.browser,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
         files: ["./packages/react/src/**/*.ts", "./packages/react/src/**/*.tsx", "./packages/react/tsup.config.ts"],
         languageOptions: {
             parserOptions: {
                 ecmaVersion: "latest",
                 sourceType: "module",
                 project: "./packages/react/tsconfig.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.browser,
+            },
+        },
+        plugins: {
+            react: eslintPluginReact,
+            "react-hooks": eslintPluginReactHooks,
+        },
+        rules: {
+            ...eslintPluginReact.configs.recommended.rules,
+            ...eslintPluginReact.configs["jsx-runtime"].rules,
+            ...eslintPluginReactHooks.configs["recommended-latest"].rules,
+        },
+        settings: {
+            react: {
+                version: "detect",
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
+        files: ["./packages/react-native/src/**/*.ts", "./packages/react-native/src/**/*.tsx", "./packages/react-native/tsup.config.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/react-native/tsconfig.json",
                 tsconfigRootDir: import.meta.dirname,
             },
             globals: {
