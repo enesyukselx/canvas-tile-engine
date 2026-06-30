@@ -1,0 +1,10 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "include": ["src", "tsup.config.ts"],
+    "compilerOptions": {
+        "outDir": "dist",
+        "lib": ["ESNext"],
+        "jsx": "react-jsx",
+        "stripInternal": true
+    }
+}
