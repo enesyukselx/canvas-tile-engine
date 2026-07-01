@@ -147,8 +147,8 @@ const drawItems = async () => {
     const imageCache = new Map<string, HTMLImageElement>();
     await Promise.all(
         uniqueUrls.map(async (url) => {
-            imageCache.set(url, (await mainMap.images.load(url)) as HTMLImageElement);
-        })
+            imageCache.set(url, await mainMap.images.load(url));
+        }),
     );
 
     // Build arrays in single pass
@@ -319,7 +319,7 @@ mainMap.onClick = (coords, _mouse, _client) => {
 
     if (item) {
         alert(
-            `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`
+            `Village: ${item.villageName}\nPlayer: ${item.playerName}\nType: ${item.type}\nCoordinates: ${item.x} | ${item.y}`,
         );
     }
 };

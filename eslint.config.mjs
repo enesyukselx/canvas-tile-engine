@@ -76,6 +76,37 @@ const rules = [
         extends: [tseslint.configs.recommendedTypeChecked],
     },
     {
+        files: ["./packages/renderer-server/src/**/*.ts", "./packages/renderer-server/tsup.config.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/renderer-server/tsconfig.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.node,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
+        files: ["./packages/renderer-server/tests/**/*.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: "./packages/renderer-server/tsconfig.vitest.json",
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.node,
+                ...globals.vitest,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
         files: ["./packages/renderer-webgl/src/**/*.ts", "./packages/renderer-webgl/tsup.config.ts"],
         languageOptions: {
             parserOptions: {
@@ -85,7 +116,7 @@ const rules = [
                 tsconfigRootDir: import.meta.dirname,
             },
             globals: {
-                ...globals.browser,
+                ...globals.node,
             },
         },
         extends: [tseslint.configs.recommendedTypeChecked],
@@ -145,6 +176,20 @@ const rules = [
             },
             globals: {
                 ...globals.browser,
+            },
+        },
+        extends: [tseslint.configs.recommendedTypeChecked],
+    },
+    {
+        files: ["./examples/renderer-server/**/*.ts"],
+        languageOptions: {
+            parserOptions: {
+                ecmaVersion: "latest",
+                sourceType: "module",
+                project: true,
+            },
+            globals: {
+                ...globals.node,
             },
         },
         extends: [tseslint.configs.recommendedTypeChecked],
