@@ -29,22 +29,27 @@ import {
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
  */
-export class CanvasTileEngine {
+export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     private config: Config;
     private camera: Camera;
     private viewport: ViewportState;
     private coordinateTransformer: CoordinateTransformer;
-    private renderer: IRenderer;
+    private renderer: IRenderer<TMount, TImage>;
     private animationController: AnimationController;
 
-    public canvasWrapper: HTMLDivElement;
-    public canvas: HTMLCanvasElement;
+    public canvasWrapper: TMount;
+    /**
+     * The DOM canvas element, when the mount target is a DOM wrapper.
+     * On non-DOM mounts (e.g. React Native / Skia) this is `undefined` at
+     * runtime, and the type reflects that so consumers must null-check.
+     */
+    public canvas: TMount extends HTMLElement ? HTMLCanvasElement : HTMLCanvasElement | undefined;
 
     /**
      * Image loader for loading and caching images.
      * Uses the renderer's platform-specific implementation.
      */
-    public get images(): IImageLoader {
+    public get images(): IImageLoader<TImage> {
         return this.renderer.getImageLoader();
     }
 
@@ -260,13 +265,18 @@ export class CanvasTileEngine {
      * @param center Initial center in world space.
      */
     constructor(
-        canvasWrapper: HTMLDivElement,
+        canvasWrapper: TMount,
         config: CanvasTileEngineConfig,
-        renderer: IRenderer,
-        center: Coords = { x: 0, y: 0 }
+        renderer: IRenderer<TMount, TImage>,
+        center: Coords = { x: 0, y: 0 },
     ) {
         this.canvasWrapper = canvasWrapper;
-        this.canvas = canvasWrapper.querySelector("canvas")!;
+        // Resolve the DOM canvas only when the mount target is a DOM element.
+        // Non-DOM platforms (e.g. React Native) leave this undefined.
+        const maybeDom = canvasWrapper as { querySelector?: (selector: string) => HTMLCanvasElement | null };
+        const resolvedCanvas =
+            typeof maybeDom?.querySelector === "function" ? (maybeDom.querySelector("canvas") ?? undefined) : undefined;
+        this.canvas = resolvedCanvas as this["canvas"];
 
         this.config = new Config(config);
 
@@ -286,7 +296,7 @@ export class CanvasTileEngine {
             this.config.get().scale,
             this.config.get().minScale,
             this.config.get().maxScale,
-            this.viewport
+            this.viewport,
         );
 
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
@@ -340,7 +350,7 @@ export class CanvasTileEngine {
         if (this.config.get().responsive) {
             console.warn(
                 "Canvas Tile Engine: resize() is disabled when responsive mode is enabled. " +
-                    "Canvas size is controlled by the wrapper element."
+                    "Canvas size is controlled by the wrapper element.",
             );
             return;
         }
@@ -545,7 +555,7 @@ export class CanvasTileEngine {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
      * @param layer Layer order (lower draws first).
      */
-    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
         return this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
     }
 
@@ -566,7 +576,7 @@ export class CanvasTileEngine {
     drawLine(
         items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().drawLine(items, style, layer);
     }
@@ -614,7 +624,7 @@ export class CanvasTileEngine {
     drawPath(
         items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().drawPath(items, style, layer);
     }
@@ -625,7 +635,7 @@ export class CanvasTileEngine {
      * @param items Image definitions.
      * @param layer Layer order.
      */
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+    drawImage(items: Array<ImageItem<TImage>> | ImageItem<TImage>, layer: number = 1): DrawHandle {
         return this.renderer.getDrawAPI().drawImage(items, layer);
     }
 
@@ -641,7 +651,7 @@ export class CanvasTileEngine {
         cellSize: number,
         lineWidth: number = 1,
         strokeStyle: string = "black",
-        layer: number = 0
+        layer: number = 0,
     ): DrawHandle {
         return this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
     }
@@ -655,7 +665,7 @@ export class CanvasTileEngine {
      */
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().addDrawFunction(fn, layer);
     }

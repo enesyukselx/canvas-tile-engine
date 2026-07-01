@@ -130,7 +130,7 @@ export interface EngineHandle {
     /** Register a custom draw function */
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer?: number
+        layer?: number,
     ): DrawHandle;
 
     /** Draw rectangles */
@@ -155,7 +155,7 @@ export interface EngineHandle {
     drawPath(
         items: Coords[] | Coords[][],
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer?: number
+        layer?: number,
     ): DrawHandle;
 
     /** Draw images */
@@ -376,10 +376,10 @@ export function useCanvasTileEngine(): EngineHandle {
                 if (!instanceRef.current) {
                     return Promise.reject(new Error("Engine not ready. Wait for isReady before loading images."));
                 }
-                return instanceRef.current.images.load(src, retry) as Promise<HTMLImageElement>;
+                return instanceRef.current.images.load(src, retry);
             },
         }),
-        [setInstance]
+        [setInstance],
     );
 
     return handle;
