@@ -13,7 +13,6 @@ jobs:
     checks:
         name: Typecheck - Lint
         runs-on: ubuntu-22.04
-
         steps:
             - uses: actions/checkout@v6
               with:
