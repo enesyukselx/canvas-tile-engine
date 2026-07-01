@@ -258,6 +258,12 @@ importers:
         specifier: ^25.3.3
         version: 25.3.3
 
+  packages/renderer-webgl:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@babel/code-frame@7.27.1':
