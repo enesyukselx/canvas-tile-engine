@@ -47,6 +47,7 @@
         "build": "tsup",
         "dev": "tsup --watch",
         "typecheck": "tsc --noEmit",
+        "lint": "oxlint",
         "test": "vitest",
         "test:coverage": "vitest run --coverage"
     },

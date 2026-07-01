@@ -15,13 +15,16 @@
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "pnpm --filter @canvas-tile-engine/core dev & pnpm --filter @canvas-tile-engine/renderer-canvas dev & pnpm --filter @canvas-tile-engine/renderer-webgl dev & pnpm --filter @canvas-tile-engine/react dev",
         "dev:example": "node run-example.js",
-        "lint": "pnpm exec eslint .",
+        "lint": "turbo run lint",
         "typecheck": "turbo run typecheck",
         "test": "turbo run test",
         "test:coverage": "turbo run test:coverage"
     },
     "keywords": [],
     "packageManager": "pnpm@10.23.0",
+    "engines": {
+        "node": ">=20.19.0"
+    },
     "dependencies": {
         "concurrently": "^9.2.1",
         "tsup": "^8.5.1",
@@ -30,12 +33,8 @@
     "devDependencies": {
         "@types/node": "^25.3.3",
         "@vitest/coverage-v8": "^4.0.18",
-        "eslint": "^9.39.2",
-        "eslint-plugin-react": "^7.37.5",
-        "eslint-plugin-react-hooks": "^7.0.1",
-        "globals": "^16.5.0",
+        "oxlint": "^1.72.0",
         "turbo": "^2.10.2",
-        "typescript-eslint": "^8.56.1",
         "vitest": "^4.0.18"
     }
 }

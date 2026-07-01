@@ -26,4 +26,4 @@ jobs:
                   cache: "pnpm"
             - run: pnpm install --no-frozen-lockfile
             - run: pnpm run typecheck --affected
-            # - run: pnpm eslint packages/core --ext .ts,.tsx
+            - run: pnpm run lint --affected

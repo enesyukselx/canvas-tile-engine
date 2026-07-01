@@ -15,6 +15,9 @@
             "dependsOn": ["^build"],
             "outputs": ["coverage/**"]
         },
+        "lint": {
+            "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json"]
+        },
         "dev": {
             "persistent": true,
             "cache": false
