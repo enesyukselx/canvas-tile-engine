@@ -11,7 +11,7 @@ on:
             - "pnpm-workspace.yaml"
 jobs:
     checks:
-        name: Typecheck - Lint
+        name: Tests
         runs-on: ubuntu-22.04
 
         steps:
