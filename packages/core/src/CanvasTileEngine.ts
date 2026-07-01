@@ -40,9 +40,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     public canvasWrapper: TMount;
     /**
      * The DOM canvas element, when the mount target is a DOM wrapper.
-     * Undefined at runtime on non-DOM platforms (e.g. React Native / Skia).
+     * On non-DOM mounts (e.g. React Native / Skia) this is `undefined` at
+     * runtime, and the type reflects that so consumers must null-check.
      */
-    public canvas: HTMLCanvasElement;
+    public canvas: TMount extends HTMLElement ? HTMLCanvasElement : HTMLCanvasElement | undefined;
 
     /**
      * Image loader for loading and caching images.
@@ -267,15 +268,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         canvasWrapper: TMount,
         config: CanvasTileEngineConfig,
         renderer: IRenderer<TMount, TImage>,
-        center: Coords = { x: 0, y: 0 }
+        center: Coords = { x: 0, y: 0 },
     ) {
         this.canvasWrapper = canvasWrapper;
         // Resolve the DOM canvas only when the mount target is a DOM element.
         // Non-DOM platforms (e.g. React Native) leave this undefined.
         const maybeDom = canvasWrapper as { querySelector?: (selector: string) => HTMLCanvasElement | null };
-        this.canvas = (typeof maybeDom?.querySelector === "function"
-            ? maybeDom.querySelector("canvas")
-            : undefined)!;
+        const resolvedCanvas =
+            typeof maybeDom?.querySelector === "function" ? (maybeDom.querySelector("canvas") ?? undefined) : undefined;
+        this.canvas = resolvedCanvas as this["canvas"];
 
         this.config = new Config(config);
 
@@ -295,7 +296,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             this.config.get().scale,
             this.config.get().minScale,
             this.config.get().maxScale,
-            this.viewport
+            this.viewport,
         );
 
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
@@ -349,7 +350,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         if (this.config.get().responsive) {
             console.warn(
                 "Canvas Tile Engine: resize() is disabled when responsive mode is enabled. " +
-                    "Canvas size is controlled by the wrapper element."
+                    "Canvas size is controlled by the wrapper element.",
             );
             return;
         }
@@ -575,7 +576,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     drawLine(
         items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().drawLine(items, style, layer);
     }
@@ -623,7 +624,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     drawPath(
         items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().drawPath(items, style, layer);
     }
@@ -650,7 +651,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         cellSize: number,
         lineWidth: number = 1,
         strokeStyle: string = "black",
-        layer: number = 0
+        layer: number = 0,
     ): DrawHandle {
         return this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
     }
@@ -664,7 +665,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().addDrawFunction(fn, layer);
     }

@@ -41,7 +41,8 @@
     "scripts": {
         "build": "tsup",
         "dev": "tsup --watch",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "lint": "oxlint"
     },
     "peerDependencies": {
         "@canvas-tile-engine/core": ">=0.3.0",

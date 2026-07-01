@@ -87,7 +87,7 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
 export interface IDrawAPI<TImage = HTMLImageElement> {
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer?: number
+        layer?: number,
     ): DrawHandle;
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
     drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
@@ -114,7 +114,7 @@ export interface DrawHandle {
  * Platform-agnostic image loader interface.
  * Each renderer implements this with platform-specific image handling.
  */
-export interface IImageLoader<TImage = unknown> {
+export interface IImageLoader<TImage = HTMLImageElement> {
     /**
      * Load an image from URL, with caching.
      * @param src Image URL.
