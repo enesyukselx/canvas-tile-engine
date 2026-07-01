@@ -10,14 +10,15 @@
         "url": "git+https://github.com/enesyukselx/canvas-tile-engine.git"
     },
     "scripts": {
-        "build": "pnpm --filter @canvas-tile-engine/core build && pnpm --filter @canvas-tile-engine/renderer-canvas build && pnpm --filter @canvas-tile-engine/renderer-server build&& pnpm --filter @canvas-tile-engine/renderer-webgl build && pnpm --filter @canvas-tile-engine/react build",
+        "build": "turbo run build --filter=./packages/*",
+        "build:docs": "turbo run build --filter=docs",
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "pnpm --filter @canvas-tile-engine/core dev & pnpm --filter @canvas-tile-engine/renderer-canvas dev & pnpm --filter @canvas-tile-engine/renderer-webgl dev & pnpm --filter @canvas-tile-engine/react dev",
         "dev:example": "node run-example.js",
         "lint": "pnpm exec eslint .",
-        "typecheck": "pnpm -r --filter=!canvas-tile-engine typecheck",
-        "test": "pnpm --filter @canvas-tile-engine/core test && pnpm --filter @canvas-tile-engine/renderer-canvas test && pnpm --filter @canvas-tile-engine/renderer-server test && pnpm --filter @canvas-tile-engine/renderer-webgl test",
-        "test:coverage": "pnpm --filter @canvas-tile-engine/core test:coverage"
+        "typecheck": "turbo run typecheck",
+        "test": "turbo run test",
+        "test:coverage": "turbo run test:coverage"
     },
     "keywords": [],
     "packageManager": "pnpm@10.23.0",
@@ -33,6 +34,7 @@
         "eslint-plugin-react": "^7.37.5",
         "eslint-plugin-react-hooks": "^7.0.1",
         "globals": "^16.5.0",
+        "turbo": "^2.10.2",
         "typescript-eslint": "^8.56.1",
         "vitest": "^4.0.18"
     }

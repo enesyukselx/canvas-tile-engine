@@ -1,0 +1,29 @@
+name: "Typecheck + Lint Checks"
+
+on:
+    push:
+        paths:
+            - "packages/**"
+            - "examples/**"
+            - "package.json"
+            - "turbo.json"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+jobs:
+    checks:
+        name: Typecheck - Lint
+        runs-on: ubuntu-22.04
+
+        steps:
+            - uses: actions/checkout@v6
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 11.9.0
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: "pnpm"
+            - run: pnpm install --no-frozen-lockfile
+            - run: pnpm run typecheck --affected
+            # - run: pnpm eslint packages/core --ext .ts,.tsx
