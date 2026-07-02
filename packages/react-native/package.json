@@ -56,7 +56,6 @@
         "@canvas-tile-engine/renderer-skia": "workspace:*"
     },
     "devDependencies": {
-        "@shopify/react-native-skia": "^2.6.9",
         "@types/react": "^19.0.0",
         "react": "^19.0.0",
         "react-native": "^0.78.0"

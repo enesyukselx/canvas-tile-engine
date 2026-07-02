@@ -281,10 +281,10 @@ importers:
       '@canvas-tile-engine/renderer-skia':
         specifier: workspace:*
         version: link:../renderer-skia
-    devDependencies:
       '@shopify/react-native-skia':
-        specifier: ^2.6.9
+        specifier: '>=2.0.0'
         version: 2.6.9(react-native@0.78.3(@babel/core@7.28.5)(@babel/preset-env@7.29.7(@babel/core@7.28.5))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+    devDependencies:
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.17
