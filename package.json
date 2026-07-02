@@ -26,7 +26,7 @@
         "node": ">=20.19.0"
     },
     "dependencies": {
-        "concurrently": "^9.2.1",
+        "concurrently": "^10.0.3",
         "tsup": "^8.5.1",
         "typescript": "^5.9.3"
     },
