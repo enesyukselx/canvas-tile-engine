@@ -1,24 +1,28 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { CanvasTileEngineConfig, Coords } from "@canvas-tile-engine/core";
+import type { SkCanvas } from "@canvas-tile-engine/renderer-skia";
 
 export interface DrawFunctionProps {
-    /** The draw function to execute */
-    children: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void;
+    /** The draw function to execute, receiving the frame's Skia `SkCanvas`. */
+    children: (canvas: SkCanvas, coords: Coords, config: Required<CanvasTileEngineConfig>) => void;
     layer?: number;
 }
 
 /**
  * Custom draw function component.
- * Allows arbitrary canvas drawing within the engine's render cycle.
+ * Allows arbitrary Skia drawing within the engine's render cycle.
  * Multiple DrawFunction components can share the same layer (additive drawing).
  *
  * @example
  * ```tsx
+ * import { Skia } from "@canvas-tile-engine/react-native";
+ *
  * <DrawFunction layer={3}>
- *   {(ctx, coords, config) => {
- *     ctx.fillStyle = "red";
- *     ctx.fillRect(config.size.width / 2 - 5, config.size.height / 2 - 5, 10, 10);
+ *   {(canvas, coords, config) => {
+ *     const paint = Skia.Paint();
+ *     paint.setColor(Skia.Color("red"));
+ *     canvas.drawRect(Skia.XYWHRect(config.size.width / 2 - 5, config.size.height / 2 - 5, 10, 10), paint);
  *   }}
  * </DrawFunction>
  * ```

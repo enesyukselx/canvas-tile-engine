@@ -48,9 +48,6 @@ importers:
       '@canvas-tile-engine/renderer-skia':
         specifier: workspace:*
         version: link:../../../packages/renderer-skia
-      '@shopify/react-native-skia':
-        specifier: ^2.6.9
-        version: 2.6.9(react-native-reanimated@3.17.5(@babel/core@7.28.5)(react-native@0.79.5(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)
       expo:
         specifier: ~53.0.0
         version: 53.0.27(@babel/core@7.28.5)(react-native@0.79.5(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)
@@ -3339,7 +3336,7 @@ packages:
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
@@ -7092,19 +7089,6 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.57.1':
     optional: true
 
-  '@shopify/react-native-skia@2.6.9(react-native-reanimated@3.17.5(@babel/core@7.28.5)(react-native@0.79.5(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0))(react@19.0.0))(react-native@0.79.5(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)':
-    dependencies:
-      canvaskit-wasm: 0.41.0
-      react: 19.0.0
-      react-native-skia-android: 150.0.0
-      react-native-skia-apple-ios: 150.0.0
-      react-native-skia-apple-macos: 150.0.0
-      react-native-skia-apple-tvos: 150.0.0
-      react-reconciler: 0.31.0(react@19.0.0)
-    optionalDependencies:
-      react-native: 0.79.5(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0)
-      react-native-reanimated: 3.17.5(@babel/core@7.28.5)(react-native@0.79.5(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)
-
   '@shopify/react-native-skia@2.6.9(react-native@0.78.3(@babel/core@7.28.5)(@babel/preset-env@7.29.7(@babel/core@7.28.5))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)':
     dependencies:
       canvaskit-wasm: 0.41.0
@@ -9455,11 +9439,6 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
-
-  react-reconciler@0.31.0(react@19.0.0):
-    dependencies:
-      react: 19.0.0
-      scheduler: 0.25.0
 
   react-reconciler@0.31.0(react@19.2.3):
     dependencies:

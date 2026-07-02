@@ -11,8 +11,7 @@ import type {
     Rect,
     Text,
 } from "@canvas-tile-engine/core";
-import type { SkiaMount } from "@canvas-tile-engine/renderer-skia";
-import type { SkImage } from "@shopify/react-native-skia";
+import type { SkiaMount, SkCanvas, SkImage } from "@canvas-tile-engine/renderer-skia";
 
 /** The concrete engine instance type for the Skia / React Native backend. */
 export type SkiaEngine = CanvasTileEngineCore<SkiaMount, SkImage>;
@@ -47,7 +46,7 @@ export interface EngineHandle {
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     addDrawFunction(
-        fn: (canvas: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (canvas: SkCanvas, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
         layer?: number
     ): DrawHandle;
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
@@ -151,7 +150,15 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             addDrawFunction(fn, layer) {
-                return instanceRef.current?.addDrawFunction(fn, layer) ?? DUMMY_DRAW_HANDLE;
+                // The core API is renderer-agnostic (`ctx: unknown`); on the Skia
+                // backend the canvas is always an SkCanvas, so we narrow it here
+                // to keep the cast out of user code.
+                return (
+                    instanceRef.current?.addDrawFunction(
+                        fn as (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+                        layer
+                    ) ?? DUMMY_DRAW_HANDLE
+                );
             },
             drawRect(items, layer) {
                 return instanceRef.current?.drawRect(items, layer) ?? DUMMY_DRAW_HANDLE;

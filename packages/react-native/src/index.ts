@@ -44,5 +44,20 @@ export type {
 } from "./types";
 export type { EngineHandle, SkiaEngine } from "./hooks/useCanvasTileEngine";
 
+// Re-export the Skia surface (via renderer-skia) so app code never imports from
+// @shopify/react-native-skia directly for custom draw functions or image types.
+export { Skia } from "@canvas-tile-engine/renderer-skia";
+export type {
+    SkCanvas,
+    SkImage,
+    SkPaint,
+    SkFont,
+    SkPath,
+    SkRect,
+    SkPoint,
+    SkRRect,
+    SkiaImageItem,
+} from "@canvas-tile-engine/renderer-skia";
+
 // Re-export core class and utilities
 export { CanvasTileEngine as CanvasTileEngineCore, gridToSize } from "@canvas-tile-engine/core";
