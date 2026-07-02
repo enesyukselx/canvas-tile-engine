@@ -38,11 +38,16 @@ interface TapState {
     moved: boolean;
 }
 
+// RendererSkia's canvas bounds getter always reports { left: 0, top: 0 } (the
+// host has no way to query the canvas's on-screen position), so clientX/Y must
+// already be canvas-relative for GestureProcessor's `- bounds.left/top` math
+// to land correctly. locationX/Y (relative to the touched view) satisfy that;
+// pageX/Y (screen-relative) would not once the canvas is offset on screen.
 const toPointer = (t: NativeTouchEvent): NormalizedPointer => ({
     x: t.locationX,
     y: t.locationY,
-    clientX: t.pageX,
-    clientY: t.pageY,
+    clientX: t.locationX,
+    clientY: t.locationY,
 });
 
 /**
