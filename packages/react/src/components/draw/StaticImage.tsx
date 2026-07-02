@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import { ImageItem } from "@canvas-tile-engine/core";
+import type { ImageItem } from "@canvas-tile-engine/core";
 
 export interface StaticImageProps {
     items: ImageItem[];
