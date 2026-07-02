@@ -18,10 +18,12 @@ import {
     matchFont,
     PaintStyle,
     Skia,
+    type InputRRect,
     type SkCanvas,
     type SkFont,
     type SkImage,
     type SkPaint,
+    type SkRect,
 } from "@shopify/react-native-skia";
 import { Layer } from "./Layer";
 
@@ -123,15 +125,16 @@ export class SkiaDraw {
                 const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
 
                 const rect = Skia.XYWHRect(drawX, drawY, pxSize, pxSize);
+                const rounded = this.hasRadius(radius);
                 if (style?.fillStyle) {
                     this.fillPaint.setColor(Skia.Color(style.fillStyle));
-                    if (radius > 0) canvas.drawRRect(Skia.RRectXY(rect, radius, radius), this.fillPaint);
+                    if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
                     else canvas.drawRect(rect, this.fillPaint);
                 }
                 if (style?.strokeStyle) {
                     this.strokePaint.setColor(Skia.Color(style.strokeStyle));
                     this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
-                    if (radius > 0) canvas.drawRRect(Skia.RRectXY(rect, radius, radius), this.strokePaint);
+                    if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.strokePaint);
                     else canvas.drawRect(rect, this.strokePaint);
                 }
 
@@ -407,10 +410,39 @@ export class SkiaDraw {
         };
     }
 
-    private resolveRadius(radius: number | number[] | undefined, pxSize: number): number {
+    /**
+     * Resolves `Rect.radius` into either a single uniform radius or a
+     * per-corner `[topLeft, topRight, bottomRight, bottomLeft]` tuple,
+     * matching the Canvas2D backend's `ctx.roundRect` corner semantics.
+     */
+    private resolveRadius(radius: number | number[] | undefined, pxSize: number): number | [number, number, number, number] {
         if (radius === undefined) return 0;
-        const value = Array.isArray(radius) ? radius[0] ?? 0 : radius;
-        return Math.max(0, Math.min(value, pxSize / 2));
+        const maxR = pxSize / 2;
+        const clamp = (v: number) => Math.max(0, Math.min(v, maxR));
+
+        if (Array.isArray(radius)) {
+            const [topLeft = 0, topRight = 0, bottomRight = 0, bottomLeft = 0] = radius;
+            return [clamp(topLeft), clamp(topRight), clamp(bottomRight), clamp(bottomLeft)];
+        }
+        return clamp(radius);
+    }
+
+    private hasRadius(radius: number | [number, number, number, number]): boolean {
+        return Array.isArray(radius) ? radius.some((r) => r > 0) : radius > 0;
+    }
+
+    /** Builds an `InputRRect` from a resolved radius, using a non-uniform RRect for per-corner values. */
+    private makeRRect(rect: SkRect, radius: number | [number, number, number, number]): InputRRect {
+        if (!Array.isArray(radius)) return Skia.RRectXY(rect, radius, radius);
+
+        const [topLeft, topRight, bottomRight, bottomLeft] = radius;
+        return {
+            rect,
+            topLeft: { x: topLeft, y: topLeft },
+            topRight: { x: topRight, y: topRight },
+            bottomRight: { x: bottomRight, y: bottomRight },
+            bottomLeft: { x: bottomLeft, y: bottomLeft },
+        };
     }
 
     private computeOriginOffset(
