@@ -9,8 +9,11 @@ export interface StaticRectProps {
 }
 
 /**
- * Draws static rectangles with caching for performance.
- * Ideal for large datasets that don't change frequently.
+ * Draws rectangles via the engine's `drawStaticRect` API.
+ *
+ * Note: on the Skia backend, static draws currently reuse the dynamic path
+ * (no offscreen cache), so `cacheKey` is kept for API compatibility with the
+ * web renderer rather than for performance.
  */
 export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 }: StaticRectProps) {
     const { engine, requestRender } = useEngineContext();

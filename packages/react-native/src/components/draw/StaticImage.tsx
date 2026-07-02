@@ -10,8 +10,11 @@ export interface StaticImageProps {
 }
 
 /**
- * Draws static images with caching for performance.
- * Ideal for terrain tiles or static decorations.
+ * Draws images via the engine's `drawStaticImage` API.
+ *
+ * Note: on the Skia backend, static draws currently reuse the dynamic path
+ * (no offscreen cache), so `cacheKey` is kept for API compatibility with the
+ * web renderer rather than for performance.
  */
 export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();

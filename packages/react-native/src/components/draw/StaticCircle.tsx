@@ -9,7 +9,11 @@ export interface StaticCircleProps {
 }
 
 /**
- * Draws static circles with caching for performance.
+ * Draws circles via the engine's `drawStaticCircle` API.
+ *
+ * Note: on the Skia backend, static draws currently reuse the dynamic path
+ * (no offscreen cache), so `cacheKey` is kept for API compatibility with the
+ * web renderer rather than for performance.
  */
 export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer = 1 }: StaticCircleProps) {
     const { engine, requestRender } = useEngineContext();
