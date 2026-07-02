@@ -24,6 +24,8 @@ import { Skia, type SkCanvas, type SkImage, type SkPaint } from "@shopify/react-
 import { Layer } from "./modules/Layer";
 import { SkiaDraw } from "./modules/SkiaDraw";
 import { SkiaImageLoader } from "./modules/SkiaImageLoader";
+import { SkiaCoordinateOverlayRenderer } from "./modules/SkiaCoordinateOverlayRenderer";
+import { SkiaDebug } from "./modules/SkiaDebug";
 import { SkiaMount } from "./types";
 
 /**
@@ -34,9 +36,6 @@ import { SkiaMount } from "./types";
  * `@canvas-tile-engine/react-native` binding). The host owns mounting, layout
  * and gestures; it forwards normalized pointer input via the `dispatch*` methods
  * and supplies the canvas via {@link SkiaMount.present}.
- *
- * Note: the coordinate overlay and debug HUD from the Canvas2D renderer are not
- * yet implemented here; `onDraw` and all primitive/text drawing are supported.
  */
 export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     private mount!: SkiaMount;
@@ -47,6 +46,8 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     private layers!: Layer;
     private drawAPI!: SkiaDraw;
     private bgPaint!: SkPaint;
+    private coordinateOverlayRenderer!: SkiaCoordinateOverlayRenderer;
+    private debugOverlay?: SkiaDebug;
 
     private gestureProcessor!: GestureProcessor;
     private animationController!: AnimationController;
@@ -126,6 +127,17 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         this.bgPaint = Skia.Paint();
         this.bgPaint.setAntiAlias(false);
 
+        this.coordinateOverlayRenderer = new SkiaCoordinateOverlayRenderer(this.camera, this.config, this.viewport);
+
+        if (this.config.get().debug?.enabled) {
+            this.debugOverlay = new SkiaDebug(this.camera, this.config, this.viewport);
+            // Start FPS loop if fps hud is enabled
+            if (this.config.get().debug?.hud?.fps) {
+                this.debugOverlay.setFpsUpdateCallback(() => this.render());
+                this.debugOverlay.startFpsLoop();
+            }
+        }
+
         this.gestureProcessor = new GestureProcessor(
             this.camera,
             this.config,
@@ -187,6 +199,20 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
             height: config.size.height,
             coords: topLeft,
         });
+
+        // Coordinate overlay
+        if (this.coordinateOverlayRenderer.shouldDraw(this.camera.scale)) {
+            this.coordinateOverlayRenderer.draw(canvas);
+        }
+
+        // Debug overlay
+        if (config.debug?.enabled && this.debugOverlay) {
+            if (config.debug?.hud?.fps) {
+                this.debugOverlay.setFpsUpdateCallback(() => this.render());
+                this.debugOverlay.startFpsLoop();
+            }
+            this.debugOverlay.draw(canvas);
+        }
     }
 
     resize(width: number, height: number): void {
@@ -215,13 +241,16 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         this.animationController?.cancelAll();
         this.drawAPI?.destroy();
         this.layers?.clear();
+        this.debugOverlay?.destroy();
         this.imageLoader.clear();
     }
 
     // ─── Host → renderer gesture forwarding ───
     //
     // The React Native binding normalizes touch events into NormalizedPointer
-    // (canvas-relative x/y, plus page-relative clientX/clientY) and calls these.
+    // (canvas-relative x/y and clientX/clientY — the canvas bounds getter above
+    // always reports { left: 0, top: 0 }, so both must share that reference
+    // frame) and calls these.
 
     dispatchTap(pointer: NormalizedPointer): void {
         this.gestureProcessor.handleClick(pointer);
