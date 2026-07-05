@@ -69,4 +69,15 @@ describe("CanvasTileEngine", () => {
             expect(onZoom).toHaveBeenCalledWith(0.5);
         });
     });
+
+    describe("setBounds", () => {
+        it("fires onCoordsChange since bounds can clamp the camera", () => {
+            // Engine starts centered at (0, 0); these bounds force a clamp.
+            engine.setBounds({ minX: 1000, maxX: 3000, minY: 1000, maxY: 3000 });
+            expect(onCoordsChange).toHaveBeenCalled();
+            const coords = onCoordsChange.mock.calls[0][0];
+            expect(coords.x).toBeGreaterThan(500);
+            expect(coords.y).toBeGreaterThan(500);
+        });
+    });
 });

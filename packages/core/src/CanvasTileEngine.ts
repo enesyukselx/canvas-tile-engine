@@ -512,7 +512,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
         this.config.updateBounds(bounds);
         this.camera.setBounds(bounds);
-        this.render();
+        // setBounds may clamp the camera position, so notify like the other
+        // camera-mutating APIs (also renders).
+        this.handleCameraChange();
     }
 
     // ─── Draw helpers ───────────
