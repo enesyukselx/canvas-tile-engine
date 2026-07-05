@@ -120,7 +120,7 @@ export class SkiaDraw {
                 const cx = drawX + pxSize / 2;
                 const cy = drawY + pxSize / 2;
                 const rotation = item.rotate ?? 0;
-                const radius = this.resolveRadius(item.radius, pxSize);
+                const radius = this.resolveRadius(item.radius);
 
                 const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
 
@@ -413,18 +413,28 @@ export class SkiaDraw {
     /**
      * Resolves `Rect.radius` into either a single uniform radius or a
      * per-corner `[topLeft, topRight, bottomRight, bottomLeft]` tuple,
-     * matching the Canvas2D backend's `ctx.roundRect` corner semantics.
+     * matching the Canvas2D backend's `ctx.roundRect` corner semantics:
+     * shorter arrays expand CSS-style ([all], [tl+br, tr+bl], [tl, tr+bl, br]).
+     * Overflow handling is left to Skia's RRect, which scales radii down
+     * proportionally to fit the rect just like `roundRect` does.
      */
-    private resolveRadius(radius: number | number[] | undefined, pxSize: number): number | [number, number, number, number] {
+    private resolveRadius(radius: number | number[] | undefined): number | [number, number, number, number] {
         if (radius === undefined) return 0;
-        const maxR = pxSize / 2;
-        const clamp = (v: number) => Math.max(0, Math.min(v, maxR));
+        if (!Array.isArray(radius)) return Math.max(0, radius);
 
-        if (Array.isArray(radius)) {
-            const [topLeft = 0, topRight = 0, bottomRight = 0, bottomLeft = 0] = radius;
-            return [clamp(topLeft), clamp(topRight), clamp(bottomRight), clamp(bottomLeft)];
+        const r = radius.map((v) => Math.max(0, v ?? 0));
+        switch (r.length) {
+            case 0:
+                return 0;
+            case 1:
+                return r[0];
+            case 2:
+                return [r[0], r[1], r[0], r[1]];
+            case 3:
+                return [r[0], r[1], r[2], r[1]];
+            default:
+                return [r[0], r[1], r[2], r[3]];
         }
-        return clamp(radius);
     }
 
     private hasRadius(radius: number | [number, number, number, number]): boolean {
