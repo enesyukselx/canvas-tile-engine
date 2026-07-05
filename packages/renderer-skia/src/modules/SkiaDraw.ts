@@ -20,6 +20,7 @@ import {
     Skia,
     type InputRRect,
     type SkCanvas,
+    type SkColor,
     type SkFont,
     type SkImage,
     type SkPaint,
@@ -45,6 +46,7 @@ export class SkiaDraw {
     private strokePaint: SkPaint;
     private imagePaint: SkPaint;
     private fontCache = new Map<string, SkFont>();
+    private colorCache = new Map<string, SkColor>();
 
     constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {
         this.fillPaint = Skia.Paint();
@@ -127,12 +129,12 @@ export class SkiaDraw {
                 const rect = Skia.XYWHRect(drawX, drawY, pxSize, pxSize);
                 const rounded = this.hasRadius(radius);
                 if (style?.fillStyle) {
-                    this.fillPaint.setColor(Skia.Color(style.fillStyle));
+                    this.fillPaint.setColor(this.color(style.fillStyle));
                     if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
                     else canvas.drawRect(rect, this.fillPaint);
                 }
                 if (style?.strokeStyle) {
-                    this.strokePaint.setColor(Skia.Color(style.strokeStyle));
+                    this.strokePaint.setColor(this.color(style.strokeStyle));
                     this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
                     if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.strokePaint);
                     else canvas.drawRect(rect, this.strokePaint);
@@ -170,11 +172,11 @@ export class SkiaDraw {
                 const cy = drawY + radius;
 
                 if (style?.fillStyle) {
-                    this.fillPaint.setColor(Skia.Color(style.fillStyle));
+                    this.fillPaint.setColor(this.color(style.fillStyle));
                     canvas.drawCircle(cx, cy, radius, this.fillPaint);
                 }
                 if (style?.strokeStyle) {
-                    this.strokePaint.setColor(Skia.Color(style.strokeStyle));
+                    this.strokePaint.setColor(this.color(style.strokeStyle));
                     this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
                     canvas.drawCircle(cx, cy, radius, this.strokePaint);
                 }
@@ -190,7 +192,7 @@ export class SkiaDraw {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            this.strokePaint.setColor(Skia.Color(style?.strokeStyle ?? "#000000"));
+            this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
             this.strokePaint.setStrokeWidth(style?.lineWidth ?? 1);
 
             for (const item of list) {
@@ -227,7 +229,7 @@ export class SkiaDraw {
                 // Scale-aware font size (world units), matching the Canvas2D renderer.
                 const pxSize = size * this.camera.scale * 0.3;
                 const font = this.getFont(style?.fontFamily ?? "sans-serif", pxSize);
-                this.fillPaint.setColor(Skia.Color(style?.fillStyle ?? "#000000"));
+                this.fillPaint.setColor(this.color(style?.fillStyle ?? "#000000"));
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const { x, y } = this.alignText(item.text, pos, font, style?.textAlign, style?.textBaseline);
@@ -248,7 +250,7 @@ export class SkiaDraw {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            this.strokePaint.setColor(Skia.Color(style?.strokeStyle ?? "#000000"));
+            this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
             this.strokePaint.setStrokeWidth(style?.lineWidth ?? 1);
 
             for (const points of list) {
@@ -337,7 +339,7 @@ export class SkiaDraw {
             const startY = Math.floor(topLeft.y / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
             const endY = Math.ceil((topLeft.y + viewH) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
 
-            this.strokePaint.setColor(Skia.Color(style.strokeStyle));
+            this.strokePaint.setColor(this.color(style.strokeStyle));
             this.strokePaint.setStrokeWidth(style.lineWidth);
 
             for (let x = startX; x <= endX; x += cellSize) {
@@ -394,9 +396,23 @@ export class SkiaDraw {
     destroy() {
         this.layers.clear();
         this.fontCache.clear();
+        this.colorCache.clear();
     }
 
     // ─── Helpers ───
+
+    /**
+     * Parse a CSS color string once and reuse the result — `Skia.Color` is a
+     * native parse per call, which adds up over thousands of items per frame.
+     */
+    private color(value: string): SkColor {
+        let parsed = this.colorCache.get(value);
+        if (!parsed) {
+            parsed = Skia.Color(value);
+            this.colorCache.set(value, parsed);
+        }
+        return parsed;
+    }
 
     private resolveOrigin(origin: { mode?: string; x?: number; y?: number } | undefined): {
         mode: "cell" | "self";
