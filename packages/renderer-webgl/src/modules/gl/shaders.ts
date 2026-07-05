@@ -14,14 +14,14 @@ export const SHAPE_VERTEX_SHADER = `
 attribute vec2 a_position;
 attribute vec2 a_local;
 attribute vec2 a_halfSize;
-attribute float a_radius;
+attribute vec4 a_radius;
 attribute vec4 a_color;
 
 uniform vec2 u_resolution;
 
 varying vec2 v_local;
 varying vec2 v_halfSize;
-varying float v_radius;
+varying vec4 v_radius;
 varying vec4 v_color;
 
 void main() {
@@ -35,25 +35,30 @@ void main() {
 `;
 
 /**
- * Signed-distance rounded box. With derivatives available we anti-alias the
- * edge across one pixel; this single shape covers sharp rects, rounded rects
- * and circles (circle = box where radius == halfSize).
+ * Signed-distance rounded box with per-corner radii. With derivatives available
+ * we anti-alias the edge across one pixel; this single shape covers sharp rects,
+ * rounded rects and circles (circle = box where radius == halfSize).
+ *
+ * Radius packing (local space is y-down): x = bottom-right, y = top-right,
+ * z = bottom-left, w = top-left.
  */
 const SHAPE_FRAGMENT_BODY = `
 precision mediump float;
 
 varying vec2 v_local;
 varying vec2 v_halfSize;
-varying float v_radius;
+varying vec4 v_radius;
 varying vec4 v_color;
 
-float sdRoundBox(vec2 p, vec2 b, float r) {
-    vec2 q = abs(p) - b + r;
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+float sdRoundBox(vec2 p, vec2 b, vec4 r) {
+    vec2 rr = (p.x > 0.0) ? r.xy : r.zw;
+    float cr = (p.y > 0.0) ? rr.x : rr.y;
+    vec2 q = abs(p) - b + cr;
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - cr;
 }
 
 void main() {
-    float r = min(v_radius, min(v_halfSize.x, v_halfSize.y));
+    vec4 r = min(v_radius, vec4(min(v_halfSize.x, v_halfSize.y)));
     float dist = sdRoundBox(v_local, v_halfSize, r);
     float alpha = EDGE_ALPHA;
     if (alpha <= 0.0) discard;
@@ -61,10 +66,21 @@ void main() {
 }
 `;
 
-/** Fragment shader variant that anti-aliases using screen-space derivatives. */
-export const SHAPE_FRAGMENT_SHADER_AA =
-    "#extension GL_OES_standard_derivatives : enable\n" +
-    SHAPE_FRAGMENT_BODY.replace("EDGE_ALPHA", "1.0 - smoothstep(-fwidth(dist), fwidth(dist), dist)");
+const SHAPE_FRAGMENT_AA_BODY = SHAPE_FRAGMENT_BODY.replace(
+    "EDGE_ALPHA",
+    "1.0 - smoothstep(-fwidth(dist), fwidth(dist), dist)"
+);
+
+/**
+ * Fragment shader variant that anti-aliases using screen-space derivatives.
+ * WebGL1 requires the OES_standard_derivatives extension directive; in WebGL2
+ * derivatives are core and the directive must be omitted.
+ */
+export function shapeFragmentShaderAA(isWebGL2: boolean): string {
+    return isWebGL2
+        ? SHAPE_FRAGMENT_AA_BODY
+        : "#extension GL_OES_standard_derivatives : enable\n" + SHAPE_FRAGMENT_AA_BODY;
+}
 
 /** Fallback fragment shader (hard edge) when derivatives are unsupported. */
 export const SHAPE_FRAGMENT_SHADER_HARD = SHAPE_FRAGMENT_BODY.replace("EDGE_ALPHA", "dist < 0.0 ? 1.0 : 0.0");

@@ -169,7 +169,7 @@ export class WebGLDraw {
                         cy,
                         halfW: radius,
                         halfH: radius,
-                        radius,
+                        radius: [radius, radius, radius, radius],
                         rotation: 0,
                         color: this.colorParser.parse(style.fillStyle),
                     });
@@ -444,10 +444,49 @@ export class WebGLDraw {
         };
     }
 
-    private resolveRadius(radius: number | number[] | undefined, pxSize: number): number {
-        if (radius === undefined) return 0;
-        const value = Array.isArray(radius) ? radius[0] ?? 0 : radius;
-        return Math.max(0, Math.min(value, pxSize / 2));
+    /**
+     * Normalize a radius value to per-corner radii [topLeft, topRight,
+     * bottomRight, bottomLeft], following `ctx.roundRect` semantics: shorter
+     * arrays expand CSS-style, and when adjacent radii overflow an edge all
+     * radii are scaled down proportionally.
+     */
+    private resolveRadius(radius: number | number[] | undefined, pxSize: number): [number, number, number, number] {
+        if (radius === undefined) return [0, 0, 0, 0];
+
+        let tl: number, tr: number, br: number, bl: number;
+        if (Array.isArray(radius)) {
+            const r = radius.map((v) => Math.max(0, v ?? 0));
+            switch (r.length) {
+                case 0:
+                    tl = tr = br = bl = 0;
+                    break;
+                case 1:
+                    tl = tr = br = bl = r[0];
+                    break;
+                case 2:
+                    tl = br = r[0];
+                    tr = bl = r[1];
+                    break;
+                case 3:
+                    tl = r[0];
+                    tr = bl = r[1];
+                    br = r[2];
+                    break;
+                default:
+                    [tl, tr, br, bl] = r;
+            }
+        } else {
+            tl = tr = br = bl = Math.max(0, radius);
+        }
+
+        const scale = Math.min(
+            1,
+            pxSize / (tl + tr) || 1,
+            pxSize / (tr + br) || 1,
+            pxSize / (br + bl) || 1,
+            pxSize / (bl + tl) || 1
+        );
+        return [tl * scale, tr * scale, br * scale, bl * scale];
     }
 
     private computeOriginOffset(
@@ -507,10 +546,22 @@ export class WebGLDraw {
         const tr = corner(hw, -hh);
         const br = corner(hw, hh);
         const bl = corner(-hw, hh);
-        this.pushLine(lines, tl, tr, color, lineWidth);
-        this.pushLine(lines, tr, br, color, lineWidth);
-        this.pushLine(lines, br, bl, color, lineWidth);
-        this.pushLine(lines, bl, tl, color, lineWidth);
+
+        // Horizontal edges are extended by half the stroke width and vertical
+        // edges shrunk by the same amount, so the corner squares are covered
+        // exactly once — no gaps and no double-blend overlap.
+        const half = Math.max(lineWidth, 1) / 2;
+        const ux = cos * half; // along tl→tr
+        const uy = sin * half;
+        const vx = -sin * half; // along tl→bl
+        const vy = cos * half;
+
+        this.pushLine(lines, { x: tl.x - ux, y: tl.y - uy }, { x: tr.x + ux, y: tr.y + uy }, color, lineWidth);
+        this.pushLine(lines, { x: bl.x - ux, y: bl.y - uy }, { x: br.x + ux, y: br.y + uy }, color, lineWidth);
+        if (h > half * 2) {
+            this.pushLine(lines, { x: tl.x + vx, y: tl.y + vy }, { x: bl.x - vx, y: bl.y - vy }, color, lineWidth);
+            this.pushLine(lines, { x: tr.x + vx, y: tr.y + vy }, { x: br.x - vx, y: br.y - vy }, color, lineWidth);
+        }
     }
 
     private pushCircleStroke(
@@ -521,11 +572,23 @@ export class WebGLDraw {
         color: RGBA,
         lineWidth: number
     ) {
+        // Extend each chord by the miter length so adjacent segments meet
+        // without gaps on the outside of the joint.
+        const ext = (Math.max(lineWidth, 1) / 2) * Math.tan(Math.PI / CIRCLE_STROKE_SEGMENTS);
         let prev: Coords = { x: cx + radius, y: cy };
         for (let i = 1; i <= CIRCLE_STROKE_SEGMENTS; i++) {
             const angle = (i / CIRCLE_STROKE_SEGMENTS) * Math.PI * 2;
             const curr: Coords = { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
-            this.pushLine(lines, prev, curr, color, lineWidth);
+            const len = Math.hypot(curr.x - prev.x, curr.y - prev.y) || 1;
+            const dx = ((curr.x - prev.x) / len) * ext;
+            const dy = ((curr.y - prev.y) / len) * ext;
+            this.pushLine(
+                lines,
+                { x: prev.x - dx, y: prev.y - dy },
+                { x: curr.x + dx, y: curr.y + dy },
+                color,
+                lineWidth
+            );
             prev = curr;
         }
     }
