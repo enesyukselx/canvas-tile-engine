@@ -27,9 +27,15 @@ export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: 
     const { engine, requestRender } = useEngineContext();
     const fnRef = useRef(children);
 
-    // Keep function ref updated
+    // Keep function ref updated. When the draw function changes, repaint so
+    // the canvas reflects it — otherwise state captured by the closure would
+    // stay stale on screen until the next pan/zoom. Memoize `children` with
+    // useCallback to skip repaints when nothing it draws has changed.
     useEffect(() => {
-        fnRef.current = children;
+        if (fnRef.current !== children) {
+            fnRef.current = children;
+            requestRender();
+        }
     });
 
     useEffect(() => {
