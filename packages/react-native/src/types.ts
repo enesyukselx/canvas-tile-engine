@@ -57,6 +57,10 @@ export interface CanvasTileEngineProps {
 
     /**
      * Renderer instance to use.
+     *
+     * Read once when the engine is created (on first layout) — passing a
+     * different renderer later is ignored. Remount the component (e.g. with a
+     * `key`) to switch renderers.
      * @example
      * ```tsx
      * import { RendererSkia } from "@canvas-tile-engine/renderer-skia";
@@ -65,10 +69,17 @@ export interface CanvasTileEngineProps {
      */
     renderer: RendererSkia;
 
-    /** Engine configuration. `size` is overridden by the measured layout size. */
+    /**
+     * Engine configuration. `size` is overridden by the measured layout size.
+     *
+     * Read once when the engine is created (on first layout) — later changes
+     * to this prop are ignored. Use runtime APIs for dynamic updates
+     * (`engine.setBounds`, `engine.setEventHandlers`, ...) or remount the
+     * component (e.g. with a `key`) to apply a whole new config.
+     */
     config: CanvasTileEngineConfig;
 
-    /** Initial center coordinates */
+    /** Initial center coordinates. Read once on creation; use `engine.updateCoords`/`engine.goCoords` to move later. */
     center?: Coords;
 
     /** Additional styles for the wrapper View */

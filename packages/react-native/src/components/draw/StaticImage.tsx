@@ -4,6 +4,11 @@ import type { ImageItem } from "@canvas-tile-engine/core";
 import type { SkImage } from "@shopify/react-native-skia";
 
 export interface StaticImageProps {
+    /**
+     * Items to draw. Compared by reference: a new array identity re-registers
+     * the draw callback (and rebuilds the spatial index for 500+ items), so
+     * keep it stable with useMemo/useState instead of an inline literal.
+     */
     items: ImageItem<SkImage>[];
     cacheKey: string;
     layer?: number;

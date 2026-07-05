@@ -3,6 +3,11 @@ import { useEngineContext } from "../../context/EngineContext";
 import type { Rect as RectType } from "@canvas-tile-engine/core";
 
 export interface RectProps {
+    /**
+     * Items to draw. Compared by reference: a new array identity re-registers
+     * the draw callback (and rebuilds the spatial index for 500+ items), so
+     * keep it stable with useMemo/useState instead of an inline literal.
+     */
     items: RectType | RectType[];
     layer?: number;
 }

@@ -83,6 +83,10 @@ const toPointer = (t: NativeTouchEvent): NormalizedPointer => ({
  * }
  * ```
  */
+// NOTE: Do not wrap this component in memo(). `engine.isReady` is read from a
+// ref, so the `isReady && children` gate below only re-evaluates because the
+// hook's setState re-renders the parent. With a stable engine handle, memo()
+// would skip that re-render and the declarative children would never mount.
 function CanvasTileEngineBase({
     engine,
     renderer,
