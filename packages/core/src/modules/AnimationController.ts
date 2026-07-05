@@ -4,6 +4,15 @@ import { ViewportState } from "./ViewportState";
 import { DEFAULT_VALUES } from "../constants";
 
 /**
+ * Whether frame scheduling is available. Headless environments (e.g. the
+ * server renderer under Node) have no requestAnimationFrame; animations
+ * complete instantly there instead of crashing.
+ */
+function canAnimate(): boolean {
+    return typeof requestAnimationFrame === "function";
+}
+
+/**
  * Manages smooth animations for camera movements and canvas resizing.
  * Handles animation frame scheduling and cleanup.
  */
@@ -33,8 +42,8 @@ export class AnimationController {
         // Cancel any existing move animation
         this.cancelMove();
 
-        // Instant move if duration is 0 or negative
-        if (durationMs <= 0) {
+        // Instant move if duration is 0/negative or frames can't be scheduled
+        if (durationMs <= 0 || !canAnimate()) {
             const size = this.viewport.getSize();
             this.camera.setCenter({ x: targetX, y: targetY }, size.width, size.height);
             this.onAnimationFrame();
@@ -96,8 +105,8 @@ export class AnimationController {
         const prev = this.viewport.getSize();
         const center = this.camera.getCenter(prev.width, prev.height);
 
-        // Instant resize if duration is 0 or negative
-        if (durationMs <= 0) {
+        // Instant resize if duration is 0/negative or frames can't be scheduled
+        if (durationMs <= 0 || !canAnimate()) {
             onApplySize(targetWidth, targetHeight, center);
             onComplete?.();
             return;
