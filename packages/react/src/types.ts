@@ -52,6 +52,9 @@ export interface CanvasTileEngineProps {
 
     /**
      * Renderer instance to use.
+     *
+     * Read once when the engine mounts — passing a different renderer later is
+     * ignored. Remount the component (e.g. with a `key`) to switch renderers.
      * @example
      * ```tsx
      * import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
@@ -60,10 +63,17 @@ export interface CanvasTileEngineProps {
      */
     renderer: IRenderer;
 
-    /** Engine configuration */
+    /**
+     * Engine configuration.
+     *
+     * Read once when the engine mounts — later changes to this prop are
+     * ignored. Use runtime APIs for dynamic updates (`engine.setBounds`,
+     * `engine.setEventHandlers`, `engine.resize`, ...) or remount the
+     * component (e.g. with a `key`) to apply a whole new config.
+     */
     config: CanvasTileEngineConfig;
 
-    /** Initial center coordinates */
+    /** Initial center coordinates. Read once on mount; use `engine.updateCoords`/`engine.goCoords` to move later. */
     center?: Coords;
 
     /** Additional class name for the wrapper div */
