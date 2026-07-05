@@ -136,11 +136,11 @@ export class RendererCanvas implements IRenderer {
             this.config.get().size.height
         );
 
-        this.canvasContext = this.canvas.getContext("2d")!;
-
-        if (!this.canvasContext) {
+        const canvasContext = this.canvas.getContext("2d");
+        if (!canvasContext) {
             throw new Error("Failed to get 2D canvas context");
         }
+        this.canvasContext = canvasContext;
 
         this.transformer = deps.transformer;
         this.viewport = deps.viewport;
@@ -173,8 +173,10 @@ export class RendererCanvas implements IRenderer {
             this.transformer,
             () => this.canvas.getBoundingClientRect(),
             () => {
+                // The engine's handleCameraChange (wired via onCameraChange)
+                // triggers the render; calling render() here too would paint
+                // every gesture frame twice.
                 this.onCameraChange?.();
-                this.render();
             }
         );
 
