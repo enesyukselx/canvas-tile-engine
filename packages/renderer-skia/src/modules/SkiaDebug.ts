@@ -1,5 +1,6 @@
 import { DEBUG_HUD, type Config, type ICamera, type ViewportState } from "@canvas-tile-engine/core";
 import { matchFont, Skia, type SkCanvas, type SkFont, type SkPaint } from "@shopify/react-native-skia";
+import { DEFAULT_MONOSPACE } from "../utils/fonts";
 
 const FPS_SAMPLE_SIZE = 10;
 
@@ -34,7 +35,7 @@ export class SkiaDebug {
         this.textPaint.setAntiAlias(true);
         this.textPaint.setColor(Skia.Color("#00ff99"));
 
-        this.font = matchFont({ fontFamily: "monospace", fontSize: 12 });
+        this.font = matchFont({ fontFamily: DEFAULT_MONOSPACE, fontSize: 12 });
     }
 
     /**

@@ -27,6 +27,7 @@ import {
     type SkRect,
 } from "@shopify/react-native-skia";
 import { Layer } from "./Layer";
+import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
 const SPATIAL_INDEX_THRESHOLD = 500;
@@ -228,7 +229,7 @@ export class SkiaDraw {
 
                 // Scale-aware font size (world units), matching the Canvas2D renderer.
                 const pxSize = size * this.camera.scale * 0.3;
-                const font = this.getFont(style?.fontFamily ?? "sans-serif", pxSize);
+                const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize);
                 this.fillPaint.setColor(this.color(style?.fillStyle ?? "#000000"));
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);

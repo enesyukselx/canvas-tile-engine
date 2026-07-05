@@ -1,5 +1,6 @@
 import { COORDINATE_OVERLAY, type Config, type ICamera, type ViewportState } from "@canvas-tile-engine/core";
 import { Skia, matchFont, type SkCanvas, type SkFont, type SkPaint } from "@shopify/react-native-skia";
+import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
 /**
  * Renders a coordinate overlay (axes and labels) on top of the canvas.
@@ -97,7 +98,7 @@ export class SkiaCoordinateOverlayRenderer {
         const px = Math.max(1, Math.round(size));
         let font = this.fontCache.get(px);
         if (!font) {
-            font = matchFont({ fontFamily: "sans-serif", fontSize: px });
+            font = matchFont({ fontFamily: DEFAULT_SANS_SERIF, fontSize: px });
             this.fontCache.set(px, font);
         }
         return font;
