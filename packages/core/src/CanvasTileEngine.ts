@@ -384,7 +384,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     setScale(newScale: number) {
         validateScale(newScale);
+        const prevScale = this.camera.scale;
         this.camera.setScale(newScale);
+        this.notifyZoomIfChanged(prevScale);
         this.handleCameraChange();
     }
 
@@ -394,7 +396,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     zoomIn(factor: number = 1.5) {
         const size = this.viewport.getSize();
+        const prevScale = this.camera.scale;
         this.camera.zoomByFactor(factor, size.width / 2, size.height / 2);
+        this.notifyZoomIfChanged(prevScale);
         this.handleCameraChange();
     }
 
@@ -404,7 +408,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     zoomOut(factor: number = 1.5) {
         const size = this.viewport.getSize();
+        const prevScale = this.camera.scale;
         this.camera.zoomByFactor(1 / factor, size.width / 2, size.height / 2);
+        this.notifyZoomIfChanged(prevScale);
         this.handleCameraChange();
     }
 
@@ -707,6 +713,17 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     // ─── Internal ───────────────────────────────
+
+    /**
+     * Fire onZoom for programmatic zoom changes (setScale/zoomIn/zoomOut),
+     * matching the wheel/pinch paths which notify via the GestureProcessor.
+     * Skipped when clamping left the scale unchanged.
+     */
+    private notifyZoomIfChanged(prevScale: number) {
+        if (this.camera.scale !== prevScale) {
+            this._onZoom?.(this.camera.scale);
+        }
+    }
 
     private handleCameraChange() {
         if (this.onCoordsChange) {
