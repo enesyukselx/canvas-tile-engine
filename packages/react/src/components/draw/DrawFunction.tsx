@@ -41,6 +41,9 @@ export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: 
         return () => {
             if (handle) {
                 engine.removeDrawHandle(handle);
+                // Repaint so the removed items disappear immediately; safe on
+                // full unmount too — the handle no-ops once the engine is gone.
+                requestRender();
             }
         };
     }, [engine, layer, requestRender]);

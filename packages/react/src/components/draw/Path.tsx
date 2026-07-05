@@ -20,6 +20,9 @@ export const Path = memo(function Path({ items, style, layer = 1 }: PathProps) {
         return () => {
             if (handle) {
                 engine.removeDrawHandle(handle);
+                // Repaint so the removed items disappear immediately; safe on
+                // full unmount too — the handle no-ops once the engine is gone.
+                requestRender();
             }
         };
     }, [engine, items, style, layer, requestRender]);

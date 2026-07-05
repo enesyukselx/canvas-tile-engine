@@ -31,6 +31,9 @@ export const Text = memo(function Text({ items, layer = 2 }: TextProps) {
         return () => {
             if (handle) {
                 engine.removeDrawHandle(handle);
+                // Repaint so the removed items disappear immediately; safe on
+                // full unmount too — the handle no-ops once the engine is gone.
+                requestRender();
             }
         };
     }, [engine, items, layer, requestRender]);

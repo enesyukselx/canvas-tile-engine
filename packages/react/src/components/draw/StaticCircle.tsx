@@ -31,6 +31,9 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
         return () => {
             if (handle) {
                 engine.removeDrawHandle(handle);
+                // Repaint so the removed items disappear immediately; safe on
+                // full unmount too — the handle no-ops once the engine is gone.
+                requestRender();
             }
         };
     }, [engine, items, cacheKey, layer, requestRender]);
