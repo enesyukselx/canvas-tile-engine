@@ -14,7 +14,7 @@ import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 export class SkiaCoordinateOverlayRenderer {
     private borderPaint: SkPaint;
     private textPaint: SkPaint;
-    private fontCache = new Map<number, SkFont>();
+    private font?: SkFont;
 
     constructor(private camera: ICamera, private config: Config, private viewport: ViewportState) {
         this.borderPaint = Skia.Paint();
@@ -94,14 +94,13 @@ export class SkiaCoordinateOverlayRenderer {
         return scale >= min && scale <= max;
     }
 
+    /** Single cached font; the size is set per frame so labels scale continuously. */
     private getFont(size: number): SkFont {
-        const px = Math.max(1, Math.round(size));
-        let font = this.fontCache.get(px);
-        if (!font) {
-            font = matchFont({ fontFamily: DEFAULT_SANS_SERIF, fontSize: px });
-            this.fontCache.set(px, font);
+        if (!this.font) {
+            this.font = matchFont({ fontFamily: DEFAULT_SANS_SERIF, fontSize: size });
         }
-        return font;
+        this.font.setSize(size);
+        return this.font;
     }
 
     /** Draws text centered on (x, y), matching Canvas2D's `textAlign: "center"` / `textBaseline: "middle"`. */

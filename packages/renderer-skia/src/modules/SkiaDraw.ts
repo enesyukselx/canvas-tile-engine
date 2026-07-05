@@ -499,14 +499,18 @@ export class SkiaDraw {
         return count;
     }
 
+    /**
+     * One cached font per family; the size is set per call so text scales
+     * continuously with zoom (fonts are snapshotted into the recorded picture
+     * at draw time, so mutating the shared instance between draws is safe).
+     */
     private getFont(family: string, size: number): SkFont {
-        const px = Math.max(1, Math.round(size));
-        const key = `${family}|${px}`;
-        let font = this.fontCache.get(key);
+        let font = this.fontCache.get(family);
         if (!font) {
-            font = matchFont({ fontFamily: family, fontSize: px });
-            this.fontCache.set(key, font);
+            font = matchFont({ fontFamily: family, fontSize: size });
+            this.fontCache.set(family, font);
         }
+        font.setSize(size);
         return font;
     }
 
