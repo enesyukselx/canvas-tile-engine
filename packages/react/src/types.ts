@@ -61,7 +61,7 @@ export interface CanvasTileEngineProps {
      * <CanvasTileEngine config={config} engine={engine} renderer={new RendererCanvas()} />
      * ```
      */
-    renderer: IRenderer;
+        renderer: IRenderer;
 
     /**
      * Engine configuration.
