@@ -33,7 +33,7 @@ const engine = new CanvasTileEngine(
         eventHandlers: { drag: true, zoom: true, click: true },
     },
     new RendererCanvas(),
-    { x: 0, y: 0 }
+    { x: 0, y: 0 },
 );
 
 engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#f9c74f" } });

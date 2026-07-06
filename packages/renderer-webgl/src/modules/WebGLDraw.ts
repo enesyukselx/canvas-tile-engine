@@ -35,14 +35,18 @@ const CIRCLE_STROKE_SEGMENTS = 48;
 export class WebGLDraw {
     private colorParser = new ColorParser();
 
-    constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {}
+    constructor(
+        private layers: Layer,
+        private transformer: CoordinateTransformer,
+        private camera: ICamera,
+    ) {}
 
     private isVisible(
         x: number,
         y: number,
         sizeWorld: number,
         topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>
+        config: Required<CanvasTileEngineConfig>,
     ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
@@ -66,7 +70,7 @@ export class WebGLDraw {
 
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config);
@@ -124,7 +128,7 @@ export class WebGLDraw {
                         pxSize,
                         rotation,
                         this.colorParser.parse(style.strokeStyle),
-                        style.lineWidth ?? 1
+                        style.lineWidth ?? 1,
                     );
                 }
             }
@@ -182,7 +186,7 @@ export class WebGLDraw {
                         cy,
                         radius,
                         this.colorParser.parse(style.strokeStyle),
-                        style.lineWidth ?? 1
+                        style.lineWidth ?? 1,
                     );
                 }
             }
@@ -195,7 +199,7 @@ export class WebGLDraw {
     drawLine(
         items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
@@ -269,7 +273,7 @@ export class WebGLDraw {
     drawPath(
         items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
@@ -484,7 +488,7 @@ export class WebGLDraw {
             pxSize / (tl + tr) || 1,
             pxSize / (tr + br) || 1,
             pxSize / (br + bl) || 1,
-            pxSize / (bl + tl) || 1
+            pxSize / (bl + tl) || 1,
         );
         return [tl * scale, tr * scale, br * scale, bl * scale];
     }
@@ -493,7 +497,7 @@ export class WebGLDraw {
         pos: Coords,
         pxSize: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
-        camera: ICamera
+        camera: ICamera,
     ) {
         if (origin.mode === "cell") {
             const cell = camera.scale;
@@ -532,7 +536,7 @@ export class WebGLDraw {
         h: number,
         rotation: number,
         color: RGBA,
-        lineWidth: number
+        lineWidth: number,
     ) {
         const cos = Math.cos(rotation);
         const sin = Math.sin(rotation);
@@ -570,7 +574,7 @@ export class WebGLDraw {
         cy: number,
         radius: number,
         color: RGBA,
-        lineWidth: number
+        lineWidth: number,
     ) {
         // Extend each chord by the miter length so adjacent segments meet
         // without gaps on the outside of the joint.
@@ -587,7 +591,7 @@ export class WebGLDraw {
                 { x: prev.x - dx, y: prev.y - dy },
                 { x: curr.x + dx, y: curr.y + dy },
                 color,
-                lineWidth
+                lineWidth,
             );
             prev = curr;
         }

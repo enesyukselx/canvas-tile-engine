@@ -39,7 +39,11 @@ export class CanvasDraw {
     private staticCacheSupported: boolean;
     private warnedStaticCacheDisabled = false;
 
-    constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {
+    constructor(
+        private layers: Layer,
+        private transformer: CoordinateTransformer,
+        private camera: ICamera,
+    ) {
         this.staticCacheSupported = typeof OffscreenCanvas !== "undefined" || typeof document !== "undefined";
     }
 
@@ -54,7 +58,7 @@ export class CanvasDraw {
         y: number,
         sizeWorld: number,
         topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>
+        config: Required<CanvasTileEngineConfig>,
     ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
@@ -78,7 +82,7 @@ export class CanvasDraw {
 
     addDrawFunction(
         fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config);
@@ -164,7 +168,7 @@ export class CanvasDraw {
     drawLine(
         items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
@@ -298,7 +302,7 @@ export class CanvasDraw {
     drawPath(
         items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
@@ -441,7 +445,7 @@ export class CanvasDraw {
      */
     private fillStrokePath(
         ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number }
+        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
     ) {
         if (style?.fillStyle) ctx.fill();
         if (style?.strokeStyle) {
@@ -455,7 +459,7 @@ export class CanvasDraw {
         pos: Coords,
         pxSize: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
-        camera: ICamera
+        camera: ICamera,
     ) {
         if (origin.mode === "cell") {
             const cell = camera.scale;
@@ -482,7 +486,7 @@ export class CanvasDraw {
             size?: number;
             radius?: number | number[];
             origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-        }
+        },
     >(
         items: T[],
         cacheKey: string,
@@ -491,8 +495,8 @@ export class CanvasDraw {
             item: T,
             x: number,
             y: number,
-            pxSize: number
-        ) => void
+            pxSize: number,
+        ) => void,
     ): StaticCache | null {
         if (!this.staticCacheSupported) {
             if (!this.warnedStaticCacheDisabled) {
@@ -696,7 +700,7 @@ export class CanvasDraw {
                     screenDestX,
                     screenDestY,
                     screenDestWidth,
-                    screenDestHeight
+                    screenDestHeight,
                 );
             }
         });

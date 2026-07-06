@@ -75,7 +75,7 @@ export interface ICamera {
      */
     getVisibleBounds(
         canvasWidth: number,
-        canvasHeight: number
+        canvasHeight: number,
     ): {
         minX: number;
         maxX: number;
@@ -243,7 +243,7 @@ export class Camera implements ICamera {
 
     getVisibleBounds(
         canvasWidth: number,
-        canvasHeight: number
+        canvasHeight: number,
     ): {
         minX: number;
         maxX: number;

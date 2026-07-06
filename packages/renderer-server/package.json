@@ -49,7 +49,9 @@
         "typecheck": "tsc --noEmit",
         "lint": "oxlint",
         "test": "vitest",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
     },
     "engines": {
         "node": ">=18"

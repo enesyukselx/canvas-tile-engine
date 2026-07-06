@@ -118,7 +118,7 @@ export class CanvasDebug {
         if (config.debug.hud.tilesInView) {
             const { width, height } = this.viewport.getSize();
             datas.push(
-                `Tiles in view: ${Math.ceil(width / this.camera.scale)} x ${Math.ceil(height / this.camera.scale)}`
+                `Tiles in view: ${Math.ceil(width / this.camera.scale)} x ${Math.ceil(height / this.camera.scale)}`,
             );
         }
 
@@ -134,7 +134,7 @@ export class CanvasDebug {
             width - DEBUG_HUD.PANEL_WIDTH - DEBUG_HUD.PADDING,
             DEBUG_HUD.PADDING / 2,
             DEBUG_HUD.PANEL_WIDTH,
-            datas.length * DEBUG_HUD.LINE_HEIGHT + DEBUG_HUD.PADDING
+            datas.length * DEBUG_HUD.LINE_HEIGHT + DEBUG_HUD.PADDING,
         );
 
         this.ctx.fillStyle = "#00ff99";
@@ -144,7 +144,7 @@ export class CanvasDebug {
             this.ctx.fillText(
                 datas[i],
                 width - DEBUG_HUD.PANEL_WIDTH - DEBUG_HUD.PADDING + 5,
-                18 + i * DEBUG_HUD.LINE_HEIGHT
+                18 + i * DEBUG_HUD.LINE_HEIGHT,
             );
         }
 

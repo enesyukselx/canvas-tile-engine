@@ -53,7 +53,7 @@ describe("CanvasDraw lineWidth handling", () => {
                 { x: 3, y: 3, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
                 { x: 5, y: 5, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
             ],
-            1
+            1,
         );
         render(ctx);
 
@@ -68,10 +68,7 @@ describe("CanvasDraw lineWidth handling", () => {
         const { draw, render } = setup();
         const { ctx, fills } = makeRecordingCtx();
 
-        draw.drawRect(
-            [{ x: 1, y: 1, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineWidth: 0.5 } }],
-            1
-        );
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineWidth: 0.5 } }], 1);
         render(ctx);
 
         expect(fills).toHaveLength(1);
@@ -87,7 +84,7 @@ describe("CanvasDraw lineWidth handling", () => {
                 { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 8 } },
                 { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } }, // no lineWidth
             ],
-            1
+            1,
         );
         render(ctx);
 
@@ -105,7 +102,7 @@ describe("CanvasDraw lineWidth handling", () => {
                 { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
                 { x: 3, y: 3, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
             ],
-            1
+            1,
         );
         render(ctx);
 

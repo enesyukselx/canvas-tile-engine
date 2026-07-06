@@ -19,7 +19,7 @@ export class ResizeWatcher {
         private viewport: ViewportState,
         private camera: ICamera,
         private config: Config,
-        private onCameraChange: () => void
+        private onCameraChange: () => void,
     ) {
         this.currentDpr = this.viewport.dpr;
     }

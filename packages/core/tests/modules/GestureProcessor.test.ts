@@ -80,7 +80,7 @@ describe("GestureProcessor", () => {
             expect(onClick).toHaveBeenCalledWith(
                 expect.objectContaining({ raw: expect.any(Object) as unknown, snapped: expect.any(Object) as unknown }),
                 expect.objectContaining({ raw: expect.any(Object) as unknown, snapped: expect.any(Object) as unknown }),
-                expect.objectContaining({ raw: expect.any(Object) as unknown, snapped: expect.any(Object) as unknown })
+                expect.objectContaining({ raw: expect.any(Object) as unknown, snapped: expect.any(Object) as unknown }),
             );
         });
 

@@ -80,7 +80,7 @@ function App() {
                                         fillStyle: currentColor,
                                     },
                                 },
-                                lastDrawLayer + 1
+                                lastDrawLayer + 1,
                             );
                         }
 

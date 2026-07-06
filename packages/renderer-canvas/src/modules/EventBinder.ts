@@ -16,7 +16,10 @@ type HandlerMap = {
  * @internal
  */
 export class EventBinder {
-    constructor(private canvas: HTMLCanvasElement, private handlers: HandlerMap) {}
+    constructor(
+        private canvas: HTMLCanvasElement,
+        private handlers: HandlerMap,
+    ) {}
 
     attach() {
         if (this.handlers.click) {

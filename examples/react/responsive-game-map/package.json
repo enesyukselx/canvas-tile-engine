@@ -7,7 +7,9 @@
         "dev": "vite",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
     },
     "devDependencies": {
         "@types/react": "^18.3.0",
