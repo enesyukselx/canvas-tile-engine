@@ -21,6 +21,9 @@ export const GridLines = memo(function GridLines({ cellSize, lineWidth = 1, stro
         return () => {
             if (handle) {
                 engine.removeDrawHandle(handle);
+                // Repaint so the removed items disappear immediately; safe on
+                // full unmount too — the handle no-ops once the engine is gone.
+                requestRender();
             }
         };
     }, [engine, cellSize, lineWidth, strokeStyle, layer, requestRender]);

@@ -3,6 +3,11 @@ import { useEngineContext } from "../../context/EngineContext";
 import type { Rect as RectType } from "@canvas-tile-engine/core";
 
 export interface StaticRectProps {
+    /**
+     * Items to draw. Compared by reference: a new array identity re-registers
+     * the draw callback (and rebuilds the spatial index for 500+ items), so
+     * keep it stable with useMemo/useState instead of an inline literal.
+     */
     items: RectType[];
     cacheKey: string;
     layer?: number;
@@ -33,6 +38,9 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 
         return () => {
             if (handle) {
                 engine.removeDrawHandle(handle);
+                // Repaint so the removed items disappear immediately; safe on
+                // full unmount too — the handle no-ops once the engine is gone.
+                requestRender();
             }
         };
     }, [engine, items, cacheKey, layer, requestRender]);
