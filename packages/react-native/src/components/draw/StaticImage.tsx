@@ -1,6 +1,7 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { ImageItem } from "@canvas-tile-engine/core";
+import type { SkImage } from "@shopify/react-native-skia";
 
 export interface StaticImageProps {
     /**
@@ -8,14 +9,18 @@ export interface StaticImageProps {
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
      */
-    items: ImageItem[];
+    items: ImageItem<SkImage>[];
     cacheKey: string;
     layer?: number;
 }
 
 /**
- * Draws static images with caching for performance.
- * Ideal for terrain tiles or static decorations.
+ * Draws images via the engine's `drawStaticImage` API.
+ *
+ * On the Skia backend the items are recorded once into an SkPicture (keyed by
+ * `cacheKey`) and replayed per frame under the camera transform, so prefer
+ * this over `Image` for large item sets that don't change — per-frame cost is
+ * independent of item count.
  */
 export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();

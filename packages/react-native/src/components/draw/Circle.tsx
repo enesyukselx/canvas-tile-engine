@@ -1,25 +1,25 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { ImageItem } from "@canvas-tile-engine/core";
+import type { Circle as CircleType } from "@canvas-tile-engine/core";
 
-export interface ImageProps {
+export interface CircleProps {
     /**
      * Items to draw. Compared by reference: a new array identity re-registers
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
      */
-    items: ImageItem | ImageItem[];
+    items: CircleType | CircleType[];
     layer?: number;
 }
 
 /**
- * Draws images on the canvas.
+ * Draws circles on the canvas.
  */
-export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
+export const Circle = memo(function Circle({ items, layer = 1 }: CircleProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        const handle = engine.drawImage(items, layer);
+        const handle = engine.drawCircle(items, layer);
         requestRender();
         return () => {
             if (handle) {

@@ -1,23 +1,27 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { ImageItem } from "@canvas-tile-engine/core";
+import type { Circle as CircleType } from "@canvas-tile-engine/core";
 
-export interface StaticImageProps {
+export interface StaticCircleProps {
     /**
      * Items to draw. Compared by reference: a new array identity re-registers
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
      */
-    items: ImageItem[];
+    items: CircleType[];
     cacheKey: string;
     layer?: number;
 }
 
 /**
- * Draws static images with caching for performance.
- * Ideal for terrain tiles or static decorations.
+ * Draws circles via the engine's `drawStaticCircle` API.
+ *
+ * On the Skia backend the items are recorded once into an SkPicture (keyed by
+ * `cacheKey`) and replayed per frame under the camera transform, so prefer
+ * this over `Circle` for large item sets that don't change — per-frame cost
+ * is independent of item count.
  */
-export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
+export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer = 1 }: StaticCircleProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
 
@@ -31,7 +35,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
             prevCacheKeyRef.current = cacheKey;
         }
 
-        const handle = engine.drawStaticImage(items, cacheKey, layer);
+        const handle = engine.drawStaticCircle(items, cacheKey, layer);
         requestRender();
 
         return () => {

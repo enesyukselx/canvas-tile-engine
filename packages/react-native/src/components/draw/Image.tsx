@@ -1,6 +1,7 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
 import type { ImageItem } from "@canvas-tile-engine/core";
+import type { SkImage } from "@shopify/react-native-skia";
 
 export interface ImageProps {
     /**
@@ -8,7 +9,7 @@ export interface ImageProps {
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
      */
-    items: ImageItem | ImageItem[];
+    items: ImageItem<SkImage> | ImageItem<SkImage>[];
     layer?: number;
 }
 

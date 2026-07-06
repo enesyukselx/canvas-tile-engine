@@ -1,25 +1,26 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { ImageItem } from "@canvas-tile-engine/core";
+import type { Path as PathType } from "@canvas-tile-engine/core";
 
-export interface ImageProps {
+export interface PathProps {
     /**
      * Items to draw. Compared by reference: a new array identity re-registers
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
      */
-    items: ImageItem | ImageItem[];
+    items: PathType | PathType[];
+    style?: { strokeStyle?: string; lineWidth?: number };
     layer?: number;
 }
 
 /**
- * Draws images on the canvas.
+ * Draws paths/polylines on the canvas.
  */
-export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
+export const Path = memo(function Path({ items, style, layer = 1 }: PathProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        const handle = engine.drawImage(items, layer);
+        const handle = engine.drawPath(items, style, layer);
         requestRender();
         return () => {
             if (handle) {
@@ -29,7 +30,7 @@ export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender]);
+    }, [engine, items, style, layer, requestRender]);
 
     return null;
 });

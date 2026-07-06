@@ -1,25 +1,27 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { ImageItem } from "@canvas-tile-engine/core";
 
-export interface ImageProps {
-    /**
-     * Items to draw. Compared by reference: a new array identity re-registers
-     * the draw callback (and rebuilds the spatial index for 500+ items), so
-     * keep it stable with useMemo/useState instead of an inline literal.
-     */
-    items: ImageItem | ImageItem[];
+export interface GridLinesProps {
+    cellSize: number;
+    lineWidth?: number;
+    strokeStyle?: string;
     layer?: number;
 }
 
 /**
- * Draws images on the canvas.
+ * Draws grid lines on the canvas.
+ * Multiple GridLines can share the same layer (additive drawing).
  */
-export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
+export const GridLines = memo(function GridLines({
+    cellSize,
+    lineWidth = 1,
+    strokeStyle = "black",
+    layer = 0,
+}: GridLinesProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        const handle = engine.drawImage(items, layer);
+        const handle = engine.drawGridLines(cellSize, lineWidth, strokeStyle, layer);
         requestRender();
         return () => {
             if (handle) {
@@ -29,7 +31,7 @@ export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender]);
+    }, [engine, cellSize, lineWidth, strokeStyle, layer, requestRender]);
 
     return null;
 });

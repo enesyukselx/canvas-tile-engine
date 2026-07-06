@@ -1,23 +1,27 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { ImageItem } from "@canvas-tile-engine/core";
+import type { Rect as RectType } from "@canvas-tile-engine/core";
 
-export interface StaticImageProps {
+export interface StaticRectProps {
     /**
      * Items to draw. Compared by reference: a new array identity re-registers
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
      */
-    items: ImageItem[];
+    items: RectType[];
     cacheKey: string;
     layer?: number;
 }
 
 /**
- * Draws static images with caching for performance.
- * Ideal for terrain tiles or static decorations.
+ * Draws rectangles via the engine's `drawStaticRect` API.
+ *
+ * On the Skia backend the items are recorded once into an SkPicture (keyed by
+ * `cacheKey`) and replayed per frame under the camera transform, so prefer
+ * this over `Rect` for large item sets that don't change — per-frame cost is
+ * independent of item count.
  */
-export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
+export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 }: StaticRectProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
 
@@ -26,12 +30,13 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
             return;
         }
 
+        // Clear previous cache if cacheKey changed
         if (prevCacheKeyRef.current !== cacheKey) {
             engine.clearStaticCache(prevCacheKeyRef.current);
             prevCacheKeyRef.current = cacheKey;
         }
 
-        const handle = engine.drawStaticImage(items, cacheKey, layer);
+        const handle = engine.drawStaticRect(items, cacheKey, layer);
         requestRender();
 
         return () => {
@@ -44,6 +49,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
         };
     }, [engine, items, cacheKey, layer, requestRender]);
 
+    // Cleanup cache on unmount
     useEffect(() => {
         return () => {
             engine.clearStaticCache(cacheKey);

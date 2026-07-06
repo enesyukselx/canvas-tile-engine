@@ -1,0 +1,14 @@
+{
+    "expo": {
+        "name": "CTE Responsive Game Map",
+        "slug": "cte-responsive-game-map",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "userInterfaceStyle": "dark",
+        "newArchEnabled": true,
+        "assetBundlePatterns": ["assets/**/*"],
+        "ios": { "supportsTablet": true, "bundleIdentifier": "dev.canvastileengine.example" },
+        "android": { "package": "dev.canvastileengine.example" },
+        "web": { "bundler": "metro" }
+    }
+}

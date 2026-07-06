@@ -1,25 +1,37 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { ImageItem } from "@canvas-tile-engine/core";
+import type { Text as TextType } from "@canvas-tile-engine/core";
 
-export interface ImageProps {
+export interface TextProps {
     /**
      * Items to draw. Compared by reference: a new array identity re-registers
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
      */
-    items: ImageItem | ImageItem[];
+    items: TextType | TextType[];
     layer?: number;
 }
 
 /**
- * Draws images on the canvas.
+ * Draws text on the canvas.
+ * @example
+ * ```tsx
+ * <Text
+ *     items={{
+ *         x: 0,
+ *         y: 0,
+ *         text: "Hello",
+ *         size: 1,
+ *         style: { fillStyle: "black", fontFamily: "Arial" }
+ *     }}
+ * />
+ * ```
  */
-export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
+export const Text = memo(function Text({ items, layer = 2 }: TextProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        const handle = engine.drawImage(items, layer);
+        const handle = engine.drawText(items, layer);
         requestRender();
         return () => {
             if (handle) {
