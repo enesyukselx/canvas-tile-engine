@@ -380,14 +380,15 @@ function CanvasTileEngineBase({
                 onResponderTerminate={onResponderTerminate}
                 onResponderTerminationRequest={() => false}
             >
-                {size.width > 0 && size.height > 0 && (
-                    // pointerEvents="none": the canvas is purely visual — all
-                    // gestures are handled by the wrapper View's responder, so
-                    // the Skia view must never intercept touches itself.
-                    <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
-                        {picture && <Picture picture={picture} />}
-                    </Canvas>
-                )}
+                {size.width > 0 &&
+                    size.height > 0 && (
+                        // pointerEvents="none": the canvas is purely visual — all
+                        // gestures are handled by the wrapper View's responder, so
+                        // the Skia view must never intercept touches itself.
+                        <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
+                            {picture && <Picture picture={picture} />}
+                        </Canvas>
+                    )}
             </View>
             {/* Render children (draw components) only when engine is ready */}
             {engine.isReady && children}
