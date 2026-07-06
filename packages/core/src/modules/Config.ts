@@ -80,7 +80,7 @@ export class Config {
                 },
             },
         };
-        this.config = {
+        this.config = Object.freeze({
             ...base,
             size: Object.freeze(base.size),
             eventHandlers: Object.freeze(base.eventHandlers),
@@ -95,35 +95,22 @@ export class Config {
                 hud: Object.freeze(base.debug.hud),
                 eventHandlers: Object.freeze(base.debug.eventHandlers),
             }),
-        };
+        });
     }
 
     /**
-     * Get a defensive copy of the current configuration.
+     * Get the current configuration as an immutable snapshot.
+     *
+     * The returned object is deeply frozen and shared — do not mutate it.
+     * Runtime updates (`updateEventHandlers`, `updateBounds`) replace the
+     * snapshot with a new frozen object, so previously returned references
+     * keep their old values. Returning the frozen instance avoids the deep
+     * copy this method used to make on every call (it runs on every pointer
+     * event and every rendered frame).
      * @returns Normalized configuration snapshot e.g. `{ scale: 1, size: { width: 800, height: 600 }, ... }`.
      */
     get(): Readonly<Required<CanvasTileEngineConfig>> {
-        const cfg = this.config;
-        return {
-            ...cfg,
-            size: { ...cfg.size },
-            responsive: cfg.responsive,
-            eventHandlers: { ...cfg.eventHandlers },
-            bounds: { ...cfg.bounds },
-            coordinates: {
-                ...cfg.coordinates,
-                shownScaleRange: {
-                    min: cfg.coordinates.shownScaleRange?.min ?? 0,
-                    max: cfg.coordinates.shownScaleRange?.max ?? Infinity,
-                },
-            },
-            cursor: { ...cfg.cursor },
-            debug: {
-                ...cfg.debug,
-                hud: { ...cfg.debug.hud },
-                eventHandlers: { ...cfg.debug.eventHandlers },
-            },
-        };
+        return this.config;
     }
 
     /**
@@ -131,13 +118,13 @@ export class Config {
      * @param handlers Partial event handlers to update.
      */
     updateEventHandlers(handlers: Partial<EventHandlers>) {
-        this.config = {
+        this.config = Object.freeze({
             ...this.config,
             eventHandlers: Object.freeze({
                 ...this.config.eventHandlers,
                 ...handlers,
             }),
-        };
+        });
     }
 
     /**
@@ -148,9 +135,9 @@ export class Config {
     updateBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
         validateBounds(bounds);
 
-        this.config = {
+        this.config = Object.freeze({
             ...this.config,
-            bounds: Object.freeze(bounds),
-        };
+            bounds: Object.freeze({ ...bounds }),
+        });
     }
 }

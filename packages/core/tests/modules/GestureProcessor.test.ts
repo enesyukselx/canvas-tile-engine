@@ -286,6 +286,16 @@ describe("GestureProcessor", () => {
 
                 expect(zoomByFactorMock).toHaveBeenCalled();
             });
+
+            it("does not blow up the zoom when the pinch starts at (near) zero distance", () => {
+                // Both fingers land on the same point: distance 0. Without a
+                // guard the next move would divide by zero and snap the zoom
+                // to its limit.
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(100, 100, 100, 100)]);
+                processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
+
+                expect(zoomByFactorMock).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+            });
         });
 
         describe("handleTouchEnd", () => {

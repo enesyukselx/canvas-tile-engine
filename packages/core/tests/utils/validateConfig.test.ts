@@ -35,6 +35,23 @@ describe("validateConfig", () => {
             expect(() => validateConfig({ ...validConfig, minScale: 10, maxScale: 100 })).not.toThrow();
         });
 
+        it("throws when scale is below minScale", () => {
+            expect(() => validateConfig({ ...validConfig, scale: 5, minScale: 10 })).toThrow(
+                "scale (5) cannot be less than minScale (10)"
+            );
+        });
+
+        it("throws when scale is above maxScale", () => {
+            expect(() => validateConfig({ ...validConfig, scale: 200, maxScale: 100 })).toThrow(
+                "scale (200) cannot be greater than maxScale (100)"
+            );
+        });
+
+        it("accepts scale equal to minScale or maxScale", () => {
+            expect(() => validateConfig({ ...validConfig, scale: 10, minScale: 10 })).not.toThrow();
+            expect(() => validateConfig({ ...validConfig, scale: 100, maxScale: 100 })).not.toThrow();
+        });
+
         it("throws when minScale > maxScale", () => {
             expect(() => validateConfig({ ...validConfig, minScale: 100, maxScale: 10 })).toThrow(
                 "minScale (100) cannot be greater than maxScale (10)"
