@@ -3,8 +3,10 @@ import {
     LINE_FRAGMENT_SHADER,
     LINE_VERTEX_SHADER,
     shapeFragmentShaderAA,
+    SHAPE_FRAGMENT_SHADER_AA_300,
     SHAPE_FRAGMENT_SHADER_HARD,
     SHAPE_VERTEX_SHADER,
+    SHAPE_VERTEX_SHADER_300,
     TEXTURE_FRAGMENT_SHADER,
     TEXTURE_VERTEX_SHADER,
 } from "./shaders";
@@ -115,12 +117,27 @@ export class GLRenderer {
     constructor(gl: GL) {
         this.gl = gl;
 
-        // In WebGL2 derivatives are core; OES_standard_derivatives only exists on WebGL1.
+        // Derivatives (fwidth) are core in GLSL ES 3.00 but not in ESSL 1.00, and some
+        // WebGL2 drivers reject the OES_standard_derivatives extension pragma outright
+        // rather than polyfilling it onto ESSL 1.00. So WebGL2 gets a real
+        // `#version 300 es` shape shader pair (guaranteed to work, no extension
+        // needed); WebGL1 keeps the ESSL 1.00 shader gated on the extension being
+        // present, falling back to a hard (non-AA) edge otherwise.
         const isWebGL2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
-        const hasDerivatives = isWebGL2 || !!gl.getExtension("OES_standard_derivatives");
-        const shapeFragment = hasDerivatives ? shapeFragmentShaderAA(isWebGL2) : SHAPE_FRAGMENT_SHADER_HARD;
+        let shapeVertex: string;
+        let shapeFragment: string;
+        if (isWebGL2) {
+            shapeVertex = SHAPE_VERTEX_SHADER_300;
+            shapeFragment = SHAPE_FRAGMENT_SHADER_AA_300;
+        } else if (gl.getExtension("OES_standard_derivatives")) {
+            shapeVertex = SHAPE_VERTEX_SHADER;
+            shapeFragment = shapeFragmentShaderAA();
+        } else {
+            shapeVertex = SHAPE_VERTEX_SHADER;
+            shapeFragment = SHAPE_FRAGMENT_SHADER_HARD;
+        }
 
-        const shapeProgram = this.createProgram(SHAPE_VERTEX_SHADER, shapeFragment);
+        const shapeProgram = this.createProgram(shapeVertex, shapeFragment);
         this.shape = {
             program: shapeProgram,
             a_position: gl.getAttribLocation(shapeProgram, "a_position"),
