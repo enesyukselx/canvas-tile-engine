@@ -42,7 +42,9 @@
         "build": "tsup",
         "dev": "tsup --watch",
         "typecheck": "tsc --noEmit",
-        "lint": "oxlint"
+        "lint": "oxlint",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
     },
     "peerDependencies": {
         "@canvas-tile-engine/core": ">=0.3.0",
