@@ -101,7 +101,6 @@ export class CanvasDraw {
             ctx.save();
             let lastFillStyle: string | undefined;
             let lastStrokeStyle: string | undefined;
-            let lastLineWidth: number | undefined;
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
@@ -129,12 +128,6 @@ export class CanvasDraw {
                     lastStrokeStyle = style.strokeStyle;
                 }
 
-                let resetAlpha: (() => void) | undefined;
-                if (style?.lineWidth && style.lineWidth !== lastLineWidth) {
-                    resetAlpha = applyLineWidth(ctx, style.lineWidth);
-                    lastLineWidth = style.lineWidth;
-                }
-
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
 
@@ -152,8 +145,7 @@ export class CanvasDraw {
                     } else {
                         ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
                     }
-                    if (style?.fillStyle) ctx.fill();
-                    if (style?.strokeStyle) ctx.stroke();
+                    this.fillStrokePath(ctx, style);
                     ctx.restore();
                 } else {
                     ctx.beginPath();
@@ -162,11 +154,8 @@ export class CanvasDraw {
                     } else {
                         ctx.rect(drawX, drawY, pxSize, pxSize);
                     }
-                    if (style?.fillStyle) ctx.fill();
-                    if (style?.strokeStyle) ctx.stroke();
+                    this.fillStrokePath(ctx, style);
                 }
-
-                resetAlpha?.();
             }
             ctx.restore();
         });
@@ -221,7 +210,6 @@ export class CanvasDraw {
             ctx.save();
             let lastFillStyle: string | undefined;
             let lastStrokeStyle: string | undefined;
-            let lastLineWidth: number | undefined;
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
@@ -250,18 +238,9 @@ export class CanvasDraw {
                     lastStrokeStyle = style.strokeStyle;
                 }
 
-                let resetAlpha: (() => void) | undefined;
-                if (style?.lineWidth && style.lineWidth !== lastLineWidth) {
-                    resetAlpha = applyLineWidth(ctx, style.lineWidth);
-                    lastLineWidth = style.lineWidth;
-                }
-
                 ctx.beginPath();
                 ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
-                if (style?.fillStyle) ctx.fill();
-                if (style?.strokeStyle) ctx.stroke();
-
-                resetAlpha?.();
+                this.fillStrokePath(ctx, style);
             }
             ctx.restore();
         });
@@ -455,6 +434,23 @@ export class CanvasDraw {
         });
     }
 
+    /**
+     * Fill and/or stroke the current path based on the item's style.
+     * The lineWidth (default 1) is applied per stroke so the sub-pixel alpha
+     * fallback only affects the stroke, never the fill or neighboring items.
+     */
+    private fillStrokePath(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number }
+    ) {
+        if (style?.fillStyle) ctx.fill();
+        if (style?.strokeStyle) {
+            const resetAlpha = applyLineWidth(ctx, style.lineWidth ?? 1);
+            ctx.stroke();
+            resetAlpha();
+        }
+    }
+
     private computeOriginOffset(
         pos: Coords,
         pxSize: number,
@@ -479,7 +475,15 @@ export class CanvasDraw {
      * Helper to create or get a static cache for pre-rendered content.
      * Handles bounds calculation, canvas creation, and rebuild logic.
      */
-    private getOrCreateStaticCache<T extends { x: number; y: number; size?: number; radius?: number | number[] }>(
+    private getOrCreateStaticCache<
+        T extends {
+            x: number;
+            y: number;
+            size?: number;
+            radius?: number | number[];
+            origin?: { mode?: "cell" | "self"; x?: number; y?: number };
+        }
+    >(
         items: T[],
         cacheKey: string,
         renderFn: (
@@ -495,6 +499,10 @@ export class CanvasDraw {
                 console.warn("[CanvasDraw] Static cache disabled: OffscreenCanvas not available.");
                 this.warnedStaticCacheDisabled = true;
             }
+            return null;
+        }
+
+        if (items.length === 0) {
             return null;
         }
 
@@ -577,8 +585,17 @@ export class CanvasDraw {
             for (const item of items) {
                 const size = item.size ?? 1;
                 const pxSize = size * renderScale;
-                const x = (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale - pxSize / 2;
-                const y = (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale - pxSize / 2;
+                const origin = {
+                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    x: item.origin?.x ?? 0.5,
+                    y: item.origin?.y ?? 0.5,
+                };
+                // Cache-space equivalent of worldToScreen: cache pixel 0 is world minX.
+                const pos = {
+                    x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
+                    y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
+                };
+                const { x, y } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
 
                 renderFn(offCtx, item, x, y, pxSize);
             }
@@ -695,6 +712,7 @@ export class CanvasDraw {
      */
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
         let lastFillStyle: string | undefined;
+        let lastStrokeStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const style = item.style;
@@ -706,6 +724,10 @@ export class CanvasDraw {
                 ctx.fillStyle = style.fillStyle;
                 lastFillStyle = style.fillStyle;
             }
+            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                ctx.strokeStyle = style.strokeStyle;
+                lastStrokeStyle = style.strokeStyle;
+            }
 
             if (rotationDeg !== 0) {
                 const centerX = x + pxSize / 2;
@@ -713,22 +735,22 @@ export class CanvasDraw {
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(rotation);
+                ctx.beginPath();
                 if (radius && ctx.roundRect) {
-                    ctx.beginPath();
                     ctx.roundRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize, radius);
-                    ctx.fill();
                 } else {
-                    ctx.fillRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                    ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
                 }
+                this.fillStrokePath(ctx, style);
                 ctx.restore();
             } else {
+                ctx.beginPath();
                 if (radius && ctx.roundRect) {
-                    ctx.beginPath();
                     ctx.roundRect(x, y, pxSize, pxSize, radius);
-                    ctx.fill();
                 } else {
-                    ctx.fillRect(x, y, pxSize, pxSize);
+                    ctx.rect(x, y, pxSize, pxSize);
                 }
+                this.fillStrokePath(ctx, style);
             }
         });
 
@@ -793,6 +815,7 @@ export class CanvasDraw {
      */
     drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
         let lastFillStyle: string | undefined;
+        let lastStrokeStyle: string | undefined;
 
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const style = item.style;
@@ -802,10 +825,14 @@ export class CanvasDraw {
                 ctx.fillStyle = style.fillStyle;
                 lastFillStyle = style.fillStyle;
             }
+            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                ctx.strokeStyle = style.strokeStyle;
+                lastStrokeStyle = style.strokeStyle;
+            }
 
             ctx.beginPath();
             ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
-            ctx.fill();
+            this.fillStrokePath(ctx, style);
         });
 
         if (!cache) {
@@ -817,6 +844,12 @@ export class CanvasDraw {
 
     /**
      * Clear a static cache
+     *
+     * Note: the pre-rendered bitmap is reused as long as the item bounds and the
+     * scale at registration time are unchanged — edits that only change item
+     * colors/styles are not detected automatically. To refresh content, remove
+     * the old draw handle, call this method, and register the `drawStatic*`
+     * call again (already-registered layers keep blitting their old bitmap).
      * @param cacheKey The cache key to clear, or undefined to clear all
      */
     clearStaticCache(cacheKey?: string) {
