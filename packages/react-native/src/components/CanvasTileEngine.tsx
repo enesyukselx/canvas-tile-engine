@@ -38,6 +38,12 @@ import { DrawFunction } from "./draw/DrawFunction";
 const TAP_MOVE_THRESHOLD = 8;
 const TAP_TIME_THRESHOLD = 300;
 
+// No tap may fire within this window after a multi-touch gesture. iOS can drop
+// touch bookkeeping mid-pinch (RN's "trackedTouchCount" warning) and release
+// the responder while one finger is still down; that finger then re-grants as
+// a fresh gesture whose lift would otherwise register as a clean tap.
+const MULTI_TOUCH_TAP_COOLDOWN_MS = 400;
+
 interface TapState {
     x: number;
     y: number;
@@ -240,36 +246,120 @@ function CanvasTileEngineBase({
 
     // ─── Touch → renderer gesture forwarding ───
 
-    const onResponderGrant = useCallback((e: GestureResponderEvent) => {
-        const pointers = e.nativeEvent.touches.map(toPointer);
-        rendererRef.current.dispatchTouchStart(pointers);
-        tapRef.current =
-            pointers.length === 1 ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false } : null;
+    // Number of touches last forwarded to the engine. The responder grant only
+    // fires for the first finger — RN delivers later finger downs/ups via
+    // onResponderStart/onResponderEnd — so the count is tracked to re-dispatch
+    // touchStart/touchEnd whenever it changes, mirroring DOM touchstart/touchend
+    // semantics that GestureProcessor's pinch handling expects.
+    const touchCountRef = useRef(0);
+
+    // True once the current gesture has ever had more than one finger down.
+    // Kept separately from tapRef because iOS can drop individual touch-start
+    // events (RN then warns "Ended a touch event which was not counted in
+    // trackedTouchCount"), so any single signal of a second finger — start,
+    // end, or move — must permanently disqualify the gesture as a tap.
+    const multiTouchRef = useRef(false);
+    // Timestamp of the last multi-touch evidence, for the tap cooldown window.
+    const lastMultiTouchAtRef = useRef(0);
+
+    const markMultiTouch = useCallback(() => {
+        multiTouchRef.current = true;
+        lastMultiTouchAtRef.current = Date.now();
+        tapRef.current = null;
     }, []);
 
-    const onResponderMove = useCallback((e: GestureResponderEvent) => {
-        const pointers = e.nativeEvent.touches.map(toPointer);
-        rendererRef.current.dispatchTouchMove(pointers);
-        const tap = tapRef.current;
-        if (tap && pointers.length === 1) {
-            if (Math.hypot(pointers[0].x - tap.x, pointers[0].y - tap.y) > TAP_MOVE_THRESHOLD) {
-                tap.moved = true;
+    const onResponderGrant = useCallback(
+        (e: GestureResponderEvent) => {
+            const pointers = e.nativeEvent.touches.map(toPointer);
+            touchCountRef.current = pointers.length;
+            multiTouchRef.current = false;
+            if (pointers.length > 1) markMultiTouch();
+            rendererRef.current.dispatchTouchStart(pointers);
+            tapRef.current =
+                pointers.length === 1 ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false } : null;
+        },
+        [markMultiTouch],
+    );
+
+    // Fires for each finger down while we already hold the responder. The first
+    // finger is handled by grant (same touch count → skipped here); additional
+    // fingers re-dispatch touchStart so the engine enters/rebases pinch mode.
+    const onResponderStart = useCallback(
+        (e: GestureResponderEvent) => {
+            const pointers = e.nativeEvent.touches.map(toPointer);
+            if (pointers.length > 1) markMultiTouch();
+            if (pointers.length === touchCountRef.current) return;
+            touchCountRef.current = pointers.length;
+            rendererRef.current.dispatchTouchStart(pointers);
+        },
+        [markMultiTouch],
+    );
+
+    // Fires for each finger lift. The final lift is left to release/terminate,
+    // which carries the changed pointer for tap detection; only mid-gesture
+    // drops (pinch → drag handoff) are dispatched here.
+    const onResponderEnd = useCallback(
+        (e: GestureResponderEvent) => {
+            const remaining = e.nativeEvent.touches.map(toPointer);
+            // A finger lifting while others remain proves this was a multi-touch gesture.
+            if (remaining.length >= 1) markMultiTouch();
+            if (remaining.length === 0 || remaining.length === touchCountRef.current) return;
+            touchCountRef.current = remaining.length;
+            rendererRef.current.dispatchTouchEnd(remaining);
+        },
+        [markMultiTouch],
+    );
+
+    const onResponderMove = useCallback(
+        (e: GestureResponderEvent) => {
+            const pointers = e.nativeEvent.touches.map(toPointer);
+            if (pointers.length > 1) markMultiTouch();
+
+            // Safety net: if a finger-count change wasn't delivered via
+            // onResponderStart/End, resync the engine before forwarding moves.
+            if (pointers.length !== touchCountRef.current) {
+                const prev = touchCountRef.current;
+                touchCountRef.current = pointers.length;
+                if (pointers.length > prev) rendererRef.current.dispatchTouchStart(pointers);
+                else rendererRef.current.dispatchTouchEnd(pointers);
+                return;
             }
-        } else {
-            tapRef.current = null;
-        }
-    }, []);
+
+            rendererRef.current.dispatchTouchMove(pointers);
+            const tap = tapRef.current;
+            if (tap && pointers.length === 1) {
+                if (Math.hypot(pointers[0].x - tap.x, pointers[0].y - tap.y) > TAP_MOVE_THRESHOLD) {
+                    tap.moved = true;
+                }
+            } else {
+                tapRef.current = null;
+            }
+        },
+        [markMultiTouch],
+    );
 
     const endTouch = useCallback((e: GestureResponderEvent, allowTap: boolean) => {
         const remaining = e.nativeEvent.touches.map(toPointer);
-        const changed = toPointer(e.nativeEvent);
+        // Suppress the tap paths both during a multi-touch gesture and in the
+        // cooldown window after one: broken iOS touch tracking can release the
+        // responder early and re-grant the still-down finger as a "new"
+        // gesture, whose lift would otherwise look like a clean tap.
+        const suppressTap =
+            multiTouchRef.current || Date.now() - lastMultiTouchAtRef.current < MULTI_TOUCH_TAP_COOLDOWN_MS;
+        // The changed pointer triggers the engine's own mouseUp/click path, so
+        // it is withheld whenever taps are suppressed: if iOS dropped the
+        // second finger's start event, the engine never entered pinch mode and
+        // would otherwise treat the final lift as a clean tap.
+        const changed = suppressTap ? undefined : toPointer(e.nativeEvent);
+        touchCountRef.current = remaining.length;
         rendererRef.current.dispatchTouchEnd(remaining, changed);
 
         const tap = tapRef.current;
-        if (allowTap && tap && !tap.moved && Date.now() - tap.time < TAP_TIME_THRESHOLD) {
-            rendererRef.current.dispatchTap(changed);
+        if (allowTap && !suppressTap && tap && !tap.moved && Date.now() - tap.time < TAP_TIME_THRESHOLD) {
+            rendererRef.current.dispatchTap(toPointer(e.nativeEvent));
         }
         tapRef.current = null;
+        if (remaining.length === 0) multiTouchRef.current = false;
     }, []);
 
     const onResponderRelease = useCallback((e: GestureResponderEvent) => endTouch(e, true), [endTouch]);
@@ -283,13 +373,18 @@ function CanvasTileEngineBase({
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => true}
                 onResponderGrant={onResponderGrant}
+                onResponderStart={onResponderStart}
+                onResponderEnd={onResponderEnd}
                 onResponderMove={onResponderMove}
                 onResponderRelease={onResponderRelease}
                 onResponderTerminate={onResponderTerminate}
                 onResponderTerminationRequest={() => false}
             >
                 {size.width > 0 && size.height > 0 && (
-                    <Canvas style={{ width: size.width, height: size.height }}>
+                    // pointerEvents="none": the canvas is purely visual — all
+                    // gestures are handled by the wrapper View's responder, so
+                    // the Skia view must never intercept touches itself.
+                    <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
                         {picture && <Picture picture={picture} />}
                     </Canvas>
                 )}
