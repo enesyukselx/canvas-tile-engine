@@ -85,6 +85,14 @@ export class RendererWebGL implements IRenderer {
         e.preventDefault();
     };
 
+    private handleContextRestored = (): void => {
+        // All GL resources (programs, buffers, textures) died with the lost
+        // context; rebuild them on the restored context and repaint. Textures
+        // are re-uploaded lazily on the next draw.
+        this.glRenderer = new GLRenderer(this.gl);
+        this.render();
+    };
+
     /** Optional user-provided draw hook executed after engine layers. */
     public onDraw?: onDrawCallback;
 
@@ -165,6 +173,7 @@ export class RendererWebGL implements IRenderer {
         // Acquire the WebGL context for the primary canvas.
         this.gl = getWebGLContext(this.canvas);
         this.canvas.addEventListener("webglcontextlost", this.handleContextLost, false);
+        this.canvas.addEventListener("webglcontextrestored", this.handleContextRestored, false);
         this.glRenderer = new GLRenderer(this.gl);
 
         // Create the transparent 2D overlay stacked on top of the WebGL canvas.
@@ -357,6 +366,19 @@ export class RendererWebGL implements IRenderer {
         return this.imageLoader;
     }
 
+    /**
+     * Drop the cached GPU texture for an image source so the next frame
+     * re-uploads its current pixels.
+     *
+     * Image sources are uploaded to the GPU once and cached; dimension changes
+     * are detected automatically, but mutating a source's pixels at the same
+     * size (e.g. redrawing an offscreen canvas) requires this call. The
+     * Canvas2D renderer has no such cache and always paints current pixels.
+     */
+    invalidateTexture(source: TexImageSource): void {
+        this.glRenderer.invalidateTexture(source);
+    }
+
     render(): void {
         const size = this.viewport.getSize();
         const dpr = this.viewport.dpr;
@@ -441,6 +463,7 @@ export class RendererWebGL implements IRenderer {
             this.eventsAttached = false;
         }
         this.canvas.removeEventListener("webglcontextlost", this.handleContextLost, false);
+        this.canvas.removeEventListener("webglcontextrestored", this.handleContextRestored, false);
         this.resizeWatcher?.stop();
         this.resizeWatcher = undefined;
         this.responsiveWatcher?.stop();
