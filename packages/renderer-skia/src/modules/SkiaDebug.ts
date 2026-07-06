@@ -4,6 +4,10 @@ import { DEFAULT_MONOSPACE } from "../utils/fonts";
 
 const FPS_SAMPLE_SIZE = 10;
 
+// The React Native canvas usually extends edge-to-edge under the status bar /
+// notch, which would hide a HUD anchored to the very top — push it below.
+const HUD_TOP_OFFSET = 50;
+
 /**
  * Skia debug overlay: draws HUD information (mirrors the Canvas2D `CanvasDebug`).
  *
@@ -143,7 +147,7 @@ export class SkiaDebug {
         canvas.drawRect(
             Skia.XYWHRect(
                 width - DEBUG_HUD.PANEL_WIDTH - DEBUG_HUD.PADDING,
-                DEBUG_HUD.PADDING / 2,
+                HUD_TOP_OFFSET + DEBUG_HUD.PADDING / 2,
                 DEBUG_HUD.PANEL_WIDTH,
                 datas.length * DEBUG_HUD.LINE_HEIGHT + DEBUG_HUD.PADDING,
             ),
@@ -154,7 +158,7 @@ export class SkiaDebug {
             canvas.drawText(
                 datas[i],
                 width - DEBUG_HUD.PANEL_WIDTH - DEBUG_HUD.PADDING + 5,
-                18 + i * DEBUG_HUD.LINE_HEIGHT,
+                HUD_TOP_OFFSET + 18 + i * DEBUG_HUD.LINE_HEIGHT,
                 this.textPaint,
                 this.font,
             );
