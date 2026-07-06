@@ -46,6 +46,15 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
         }
     }
 
+    // The initial scale must lie within the zoom limits, otherwise the camera
+    // starts out of range and snaps on the first zoom interaction.
+    if (config.minScale !== undefined && config.scale < config.minScale) {
+        throw configError(`scale (${config.scale}) cannot be less than minScale (${config.minScale})`);
+    }
+    if (config.maxScale !== undefined && config.scale > config.maxScale) {
+        throw configError(`scale (${config.scale}) cannot be greater than maxScale (${config.maxScale})`);
+    }
+
     // Size validation
     if (!config.size || typeof config.size !== "object") {
         throw configError("size is required and must be an object");
