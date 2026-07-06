@@ -9,11 +9,21 @@ The API is **1:1 with [`@canvas-tile-engine/react`](../react)** — same `useCan
 
 ## Install
 
+**Expo** — let `expo install` pick the Skia version tested against your SDK:
+
 ```bash
-npm install @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia @shopify/react-native-skia
+npx expo install @shopify/react-native-skia
+npm install @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia
 ```
 
-> `@shopify/react-native-skia` requires `react-native-reanimated`. Follow its [installation guide](https://shopify.github.io/react-native-skia/docs/getting-started/installation).
+**Bare React Native:**
+
+```bash
+npm install @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia @shopify/react-native-skia
+cd ios && pod install
+```
+
+> `@shopify/react-native-skia` is a **native module** and must be a direct dependency of your app so autolinking compiles it into the binary. Expo Go bundles it, so a missing entry only surfaces when you make a development or release build. It also requires `react-native-reanimated` — see its [installation guide](https://shopify.github.io/react-native-skia/docs/getting-started/installation).
 
 ## Usage
 

@@ -13,6 +13,8 @@ Most apps should not use this package directly — use [`@canvas-tile-engine/rea
 npm install @canvas-tile-engine/renderer-skia @shopify/react-native-skia
 ```
 
+> On Expo, install the Skia dependency with `npx expo install @shopify/react-native-skia` instead so the version matches your SDK. It is a native module: it must be a direct dependency of the app for autolinking (Expo Go bundles it, so the mistake only shows up in development/release builds).
+
 ## How it works
 
 -   Primitives (`drawRect`, `drawCircle`, `drawImage`, `drawText`, `drawLine`, `drawPath`, `drawGridLines`) are drawn onto an `SkCanvas` that the host records into a frame `SkPicture` once per camera change.
@@ -23,7 +25,7 @@ npm install @canvas-tile-engine/renderer-skia @shopify/react-native-skia
 ### Differences from the Canvas2D renderer
 
 -   **Static caches** (`drawStaticRect/Circle/Image`) record the item set once into an `SkPicture` (keyed by `cacheKey`) and replay it per frame under the camera transform — per-frame cost is independent of item count, making them the right choice for thousands of non-changing items.
--   **Coordinate overlay and debug HUD** are not yet implemented for Skia.
+-   **Debug HUD** is offset ~50dp from the top so it stays visible below the status bar / notch on edge-to-edge canvases.
 -   Drawing happens in logical (dp) units; Skia handles device pixel ratio for you.
 
 ## Mount contract
