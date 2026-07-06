@@ -18,6 +18,12 @@
         "lint": {
             "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json"]
         },
+        "format": {
+            "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxfmtrc.json"]
+        },
+        "format:check": {
+            "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxfmtrc.json"]
+        },
         "dev": {
             "persistent": true,
             "cache": false

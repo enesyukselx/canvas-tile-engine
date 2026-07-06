@@ -6,7 +6,9 @@
     "scripts": {
         "start": "tsx src/main.ts",
         "render": "tsx src/main.ts",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
     },
     "dependencies": {
         "@canvas-tile-engine/core": "workspace:*",

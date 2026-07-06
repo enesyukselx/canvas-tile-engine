@@ -45,6 +45,8 @@
         "dev": "tsup --watch",
         "typecheck": "tsc --noEmit",
         "lint": "oxlint",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check",
         "test": "vitest",
         "test:coverage": "vitest run --coverage"
     },
