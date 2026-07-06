@@ -17,9 +17,10 @@ export interface StaticImageProps {
 /**
  * Draws images via the engine's `drawStaticImage` API.
  *
- * Note: on the Skia backend, static draws currently reuse the dynamic path
- * (no offscreen cache), so `cacheKey` is kept for API compatibility with the
- * web renderer rather than for performance.
+ * On the Skia backend the items are recorded once into an SkPicture (keyed by
+ * `cacheKey`) and replayed per frame under the camera transform, so prefer
+ * this over `Image` for large item sets that don't change — per-frame cost is
+ * independent of item count.
  */
 export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();
