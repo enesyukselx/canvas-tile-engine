@@ -122,9 +122,6 @@ importers:
       '@canvas-tile-engine/renderer-canvas':
         specifier: workspace:*
         version: link:../../../packages/renderer-canvas
-      '@canvas-tile-engine/renderer-webgl':
-        specifier: workspace:*
-        version: link:../../../packages/renderer-webgl
       '@faker-js/faker':
         specifier: ^10.5.0
         version: 10.5.0
@@ -187,9 +184,6 @@ importers:
       '@canvas-tile-engine/renderer-canvas':
         specifier: workspace:*
         version: link:../../../packages/renderer-canvas
-      '@canvas-tile-engine/renderer-webgl':
-        specifier: workspace:*
-        version: link:../../../packages/renderer-webgl
       '@faker-js/faker':
         specifier: ^10.5.0
         version: 10.5.0
