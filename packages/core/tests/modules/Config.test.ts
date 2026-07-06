@@ -232,19 +232,20 @@ describe("Config", () => {
     });
 
     describe("get", () => {
-        it("returns a defensive copy", () => {
+        it("returns the same snapshot reference until an update happens", () => {
             const config = new Config(minimalConfig);
             const result1 = config.get();
             const result2 = config.get();
-            expect(result1).not.toBe(result2);
-            expect(result1.size).not.toBe(result2.size);
-            expect(result1.eventHandlers).not.toBe(result2.eventHandlers);
+            expect(result1).toBe(result2);
         });
 
         it("prevents mutation of returned config", () => {
             const config = new Config(minimalConfig);
             const result = config.get();
-            (result as { scale: number }).scale = 999;
+            // Frozen snapshot: assignment throws in strict mode
+            expect(() => {
+                (result as { scale: number }).scale = 999;
+            }).toThrow(TypeError);
             expect(config.get().scale).toBe(1);
         });
     });
@@ -321,6 +322,37 @@ describe("Config", () => {
             expect(() => {
                 config.updateBounds({ minX: 0, maxX: 100, minY: 100, maxY: 0 });
             }).toThrow();
+        });
+    });
+
+    describe("immutable snapshots", () => {
+        it("returns a frozen snapshot from get()", () => {
+            const config = new Config(minimalConfig);
+            const result = config.get();
+            expect(Object.isFrozen(result)).toBe(true);
+            expect(Object.isFrozen(result.size)).toBe(true);
+            expect(Object.isFrozen(result.eventHandlers)).toBe(true);
+            expect(Object.isFrozen(result.bounds)).toBe(true);
+        });
+
+        it("keeps previously returned snapshots unchanged after updates", () => {
+            const config = new Config(minimalConfig);
+            const before = config.get();
+            config.updateEventHandlers({ drag: true });
+            const after = config.get();
+
+            expect(before.eventHandlers.drag).toBe(false);
+            expect(after.eventHandlers.drag).toBe(true);
+            expect(after).not.toBe(before);
+        });
+
+        it("does not freeze the caller's bounds object on updateBounds", () => {
+            const config = new Config(minimalConfig);
+            const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 100 };
+            config.updateBounds(bounds);
+            expect(Object.isFrozen(bounds)).toBe(false);
+            bounds.maxX = 200; // caller can keep using its own object
+            expect(config.get().bounds.maxX).toBe(100);
         });
     });
 });
