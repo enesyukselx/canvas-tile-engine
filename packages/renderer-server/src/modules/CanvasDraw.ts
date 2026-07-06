@@ -50,7 +50,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
         private layers: Layer,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
-        private createOffscreen: OffscreenCanvasFactory
+        private createOffscreen: OffscreenCanvasFactory,
     ) {}
 
     private isVisible(
@@ -58,7 +58,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
         y: number,
         sizeWorld: number,
         topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>
+        config: Required<CanvasTileEngineConfig>,
     ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
@@ -87,7 +87,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
      */
     addDrawFunction(
         fn: (ctx: SKRSContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config);
@@ -173,7 +173,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
     drawLine(
         items: Array<Line> | Line,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
@@ -307,7 +307,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
     drawPath(
         items: Array<Path> | Path,
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
@@ -450,7 +450,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
      */
     private fillStrokePath(
         ctx: SKRSContext2D,
-        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number }
+        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
     ) {
         if (style?.fillStyle) ctx.fill();
         if (style?.strokeStyle) {
@@ -464,7 +464,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
         pos: Coords,
         pxSize: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
-        camera: ICamera
+        camera: ICamera,
     ) {
         if (origin.mode === "cell") {
             const cell = camera.scale;
@@ -491,11 +491,11 @@ export class CanvasDraw implements IDrawAPI<Image> {
             size?: number;
             radius?: number | number[];
             origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-        }
+        },
     >(
         items: T[],
         cacheKey: string,
-        renderFn: (ctx: SKRSContext2D, item: T, x: number, y: number, pxSize: number) => void
+        renderFn: (ctx: SKRSContext2D, item: T, x: number, y: number, pxSize: number) => void,
     ): StaticCache | null {
         if (items.length === 0) {
             return null;
@@ -664,7 +664,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
                     screenDestX,
                     screenDestY,
                     screenDestWidth,
-                    screenDestHeight
+                    screenDestHeight,
                 );
             }
         });

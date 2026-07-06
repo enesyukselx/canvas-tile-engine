@@ -27,7 +27,7 @@ export class ResponsiveWatcher {
         private camera: ICamera,
         private viewport: ViewportState,
         private config: Config,
-        private onRender: () => void
+        private onRender: () => void,
     ) {
         this.currentDpr = this.viewport.dpr;
 

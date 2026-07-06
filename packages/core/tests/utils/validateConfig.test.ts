@@ -37,13 +37,13 @@ describe("validateConfig", () => {
 
         it("throws when scale is below minScale", () => {
             expect(() => validateConfig({ ...validConfig, scale: 5, minScale: 10 })).toThrow(
-                "scale (5) cannot be less than minScale (10)"
+                "scale (5) cannot be less than minScale (10)",
             );
         });
 
         it("throws when scale is above maxScale", () => {
             expect(() => validateConfig({ ...validConfig, scale: 200, maxScale: 100 })).toThrow(
-                "scale (200) cannot be greater than maxScale (100)"
+                "scale (200) cannot be greater than maxScale (100)",
             );
         });
 
@@ -54,7 +54,7 @@ describe("validateConfig", () => {
 
         it("throws when minScale > maxScale", () => {
             expect(() => validateConfig({ ...validConfig, minScale: 100, maxScale: 10 })).toThrow(
-                "minScale (100) cannot be greater than maxScale (10)"
+                "minScale (100) cannot be greater than maxScale (10)",
             );
         });
 
@@ -78,85 +78,85 @@ describe("validateConfig", () => {
     describe("size validation", () => {
         it("throws when size is missing", () => {
             expect(() => validateConfig({ scale: 50 } as CanvasTileEngineConfig)).toThrow(
-                "size is required and must be an object"
+                "size is required and must be an object",
             );
         });
 
         it("throws on zero width", () => {
             expect(() => validateConfig({ ...validConfig, size: { width: 0, height: 500 } })).toThrow(
-                "size.width must be positive"
+                "size.width must be positive",
             );
         });
 
         it("throws on zero height", () => {
             expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 0 } })).toThrow(
-                "size.height must be positive"
+                "size.height must be positive",
             );
         });
 
         it("throws on negative width", () => {
             expect(() => validateConfig({ ...validConfig, size: { width: -100, height: 500 } })).toThrow(
-                "size.width must be positive"
+                "size.width must be positive",
             );
         });
 
         it("throws on NaN width", () => {
             expect(() => validateConfig({ ...validConfig, size: { width: NaN, height: 500 } })).toThrow(
-                "size.width must be a finite number"
+                "size.width must be a finite number",
             );
         });
 
         it("throws on NaN height", () => {
             expect(() => validateConfig({ ...validConfig, size: { width: 500, height: NaN } })).toThrow(
-                "size.height must be a finite number"
+                "size.height must be a finite number",
             );
         });
 
         it("throws on negative minWidth", () => {
-            expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: -5 } })
-            ).toThrow("size.minWidth must be positive");
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: -5 } })).toThrow(
+                "size.minWidth must be positive",
+            );
         });
 
         it("throws on negative maxWidth", () => {
-            expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, maxWidth: -5 } })
-            ).toThrow("size.maxWidth must be positive");
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, maxWidth: -5 } })).toThrow(
+                "size.maxWidth must be positive",
+            );
         });
 
         it("throws on negative minHeight", () => {
-            expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: -5 } })
-            ).toThrow("size.minHeight must be positive");
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: -5 } })).toThrow(
+                "size.minHeight must be positive",
+            );
         });
 
         it("throws on negative maxHeight", () => {
-            expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, maxHeight: -5 } })
-            ).toThrow("size.maxHeight must be positive");
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, maxHeight: -5 } })).toThrow(
+                "size.maxHeight must be positive",
+            );
         });
 
         it("accepts valid minWidth <= maxWidth", () => {
             expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: 200, maxWidth: 800 } })
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: 200, maxWidth: 800 } }),
             ).not.toThrow();
         });
 
         it("throws when minWidth > maxWidth", () => {
             expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: 800, maxWidth: 400 } })
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: 800, maxWidth: 400 } }),
             ).toThrow("size.minWidth (800) cannot be greater than size.maxWidth (400)");
         });
 
         it("accepts valid minHeight <= maxHeight", () => {
             expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: 200, maxHeight: 800 } })
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: 200, maxHeight: 800 } }),
             ).not.toThrow();
         });
 
         it("throws when minHeight > maxHeight", () => {
             expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: 800, maxHeight: 400 } })
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: 800, maxHeight: 400 } }),
             ).toThrow("size.minHeight (800) cannot be greater than size.maxHeight (400)");
         });
     });
@@ -164,7 +164,7 @@ describe("validateConfig", () => {
     describe("bounds validation", () => {
         it("accepts valid bounds", () => {
             expect(() =>
-                validateConfig({ ...validConfig, bounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 } })
+                validateConfig({ ...validConfig, bounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 } }),
             ).not.toThrow();
         });
 
@@ -173,7 +173,7 @@ describe("validateConfig", () => {
                 validateConfig({
                     ...validConfig,
                     bounds: { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity },
-                })
+                }),
             ).not.toThrow();
         });
 
@@ -182,7 +182,7 @@ describe("validateConfig", () => {
                 validateConfig({
                     ...validConfig,
                     bounds: { minX: "0" as unknown as number, maxX: 100, minY: 0, maxY: 100 },
-                })
+                }),
             ).toThrow("bounds.minX and bounds.maxX must be numbers");
         });
 
@@ -191,19 +191,19 @@ describe("validateConfig", () => {
                 validateConfig({
                     ...validConfig,
                     bounds: { minX: 0, maxX: 100, minY: null as unknown as number, maxY: 100 },
-                })
+                }),
             ).toThrow("bounds.minY and bounds.maxY must be numbers");
         });
 
         it("throws when minX >= maxX (finite)", () => {
             expect(() =>
-                validateConfig({ ...validConfig, bounds: { minX: 100, maxX: 50, minY: 0, maxY: 100 } })
+                validateConfig({ ...validConfig, bounds: { minX: 100, maxX: 50, minY: 0, maxY: 100 } }),
             ).toThrow("bounds.minX (100) must be less than bounds.maxX (50)");
         });
 
         it("throws when minY >= maxY (finite)", () => {
             expect(() =>
-                validateConfig({ ...validConfig, bounds: { minX: 0, maxX: 100, minY: 100, maxY: 50 } })
+                validateConfig({ ...validConfig, bounds: { minX: 0, maxX: 100, minY: 100, maxY: 50 } }),
             ).toThrow("bounds.minY (100) must be less than bounds.maxY (50)");
         });
     });
@@ -216,31 +216,31 @@ describe("validateBounds", () => {
 
     it("accepts Infinity bounds", () => {
         expect(() =>
-            validateBounds({ minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity })
+            validateBounds({ minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity }),
         ).not.toThrow();
     });
 
     it("throws when minX/maxX are not numbers", () => {
-        expect(() =>
-            validateBounds({ minX: "0" as unknown as number, maxX: 100, minY: 0, maxY: 100 })
-        ).toThrow("bounds.minX and bounds.maxX must be numbers");
+        expect(() => validateBounds({ minX: "0" as unknown as number, maxX: 100, minY: 0, maxY: 100 })).toThrow(
+            "bounds.minX and bounds.maxX must be numbers",
+        );
     });
 
     it("throws when minY/maxY are not numbers", () => {
-        expect(() =>
-            validateBounds({ minX: 0, maxX: 100, minY: undefined as unknown as number, maxY: 100 })
-        ).toThrow("bounds.minY and bounds.maxY must be numbers");
+        expect(() => validateBounds({ minX: 0, maxX: 100, minY: undefined as unknown as number, maxY: 100 })).toThrow(
+            "bounds.minY and bounds.maxY must be numbers",
+        );
     });
 
     it("throws when minX >= maxX", () => {
         expect(() => validateBounds({ minX: 100, maxX: 50, minY: 0, maxY: 100 })).toThrow(
-            "bounds.minX (100) must be less than bounds.maxX (50)"
+            "bounds.minX (100) must be less than bounds.maxX (50)",
         );
     });
 
     it("throws when minY >= maxY", () => {
         expect(() => validateBounds({ minX: 0, maxX: 100, minY: 100, maxY: 50 })).toThrow(
-            "bounds.minY (100) must be less than bounds.maxY (50)"
+            "bounds.minY (100) must be less than bounds.maxY (50)",
         );
     });
 });

@@ -167,7 +167,7 @@ export class RendererWebGL implements IRenderer {
             this.canvas,
             this.config.get().responsive,
             this.config.get().size.width,
-            this.config.get().size.height
+            this.config.get().size.height,
         );
 
         // Acquire the WebGL context for the primary canvas.
@@ -196,7 +196,7 @@ export class RendererWebGL implements IRenderer {
             this.overlayCtx,
             this.camera,
             this.config,
-            this.viewport
+            this.viewport,
         );
 
         if (this.config.get().debug?.enabled) {
@@ -215,7 +215,7 @@ export class RendererWebGL implements IRenderer {
             () => this.canvas.getBoundingClientRect(),
             () => {
                 this.onCameraChange?.();
-            }
+            },
         );
 
         // Initialize EventBinder with normalized handlers
@@ -241,7 +241,7 @@ export class RendererWebGL implements IRenderer {
             this.camera,
             this.viewport,
             this.config,
-            () => this.render()
+            () => this.render(),
         );
     }
 
@@ -256,7 +256,7 @@ export class RendererWebGL implements IRenderer {
             if (this.config.get().eventHandlers?.resize) {
                 console.warn(
                     "Canvas Tile Engine: eventHandlers.resize is ignored when responsive mode is enabled. " +
-                        "Resizing is handled automatically."
+                        "Resizing is handled automatically.",
                 );
             }
             this.responsiveWatcher = new ResponsiveWatcher(
@@ -266,7 +266,7 @@ export class RendererWebGL implements IRenderer {
                 this.camera,
                 this.viewport,
                 this.config,
-                () => this.render()
+                () => this.render(),
             );
             this.responsiveWatcher.onResize = () => {
                 if (this.onResize) {
@@ -282,7 +282,7 @@ export class RendererWebGL implements IRenderer {
                 this.viewport,
                 this.camera,
                 this.config,
-                () => this.render()
+                () => this.render(),
             );
             this.resizeWatcher.onResize = () => {
                 if (this.onResize) {
@@ -446,7 +446,7 @@ export class RendererWebGL implements IRenderer {
         if (this.config.get().responsive) {
             console.warn(
                 "Canvas Tile Engine: resizeWithAnimation() is disabled when responsive mode is enabled. " +
-                    "Canvas size is controlled by the wrapper element."
+                    "Canvas size is controlled by the wrapper element.",
             );
             return;
         }

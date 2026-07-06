@@ -20,7 +20,7 @@ export class CoordinateTransformer {
     worldToScreen(worldX: number, worldY: number): Coords {
         return worldToScreen(
             { x: worldX, y: worldY },
-            { x: this.camera.x, y: this.camera.y, scale: this.camera.scale }
+            { x: this.camera.x, y: this.camera.y, scale: this.camera.scale },
         );
     }
 
@@ -33,7 +33,7 @@ export class CoordinateTransformer {
     screenToWorld(screenX: number, screenY: number): Coords {
         return screenToWorld(
             { x: screenX, y: screenY },
-            { x: this.camera.x, y: this.camera.y, scale: this.camera.scale }
+            { x: this.camera.x, y: this.camera.y, scale: this.camera.scale },
         );
     }
 }

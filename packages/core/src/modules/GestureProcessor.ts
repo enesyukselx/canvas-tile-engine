@@ -103,7 +103,7 @@ export class GestureProcessor {
         private config: Config,
         private transformer: CoordinateTransformer,
         private canvasBoundsGetter: () => CanvasBounds,
-        private onCameraChange: () => void
+        private onCameraChange: () => void,
     ) {}
 
     /**

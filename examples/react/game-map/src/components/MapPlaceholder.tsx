@@ -47,9 +47,7 @@ export function MapPlaceholder({ width, height, label = "Loading..." }: MapPlace
                 </div>
 
                 {/* Label */}
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                    {label}
-                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">{label}</span>
             </div>
         </div>
     );

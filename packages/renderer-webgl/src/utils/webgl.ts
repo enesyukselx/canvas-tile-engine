@@ -9,7 +9,7 @@ export function initStyles(
     canvas: HTMLCanvasElement,
     isResponsive: CanvasTileEngineConfig["responsive"],
     width?: number,
-    height?: number
+    height?: number,
 ) {
     if (isResponsive) {
         Object.assign(canvasWrapper.style, {

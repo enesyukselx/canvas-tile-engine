@@ -13,7 +13,7 @@ export class SizeController {
         private camera: ICamera,
         private viewport: ViewportState,
         private config: Config,
-        private onRender: () => void
+        private onRender: () => void,
     ) {}
 
     /**
@@ -24,7 +24,7 @@ export class SizeController {
         height: number,
         durationMs: number,
         animationController: AnimationController,
-        onComplete?: () => void
+        onComplete?: () => void,
     ) {
         if (width <= 0 || height <= 0) {
             return;
@@ -50,7 +50,7 @@ export class SizeController {
             height,
             durationMs,
             (w: number, h: number, center: Coords) => this.applySize(w, h, center),
-            onComplete
+            onComplete,
         );
     }
 

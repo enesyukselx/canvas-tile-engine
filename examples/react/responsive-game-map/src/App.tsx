@@ -82,7 +82,7 @@ export default function App() {
             await Promise.all(
                 uniqueUrls.map(async (url) => {
                     imageCache.set(url, await map.loadImage(url));
-                })
+                }),
             );
 
             // Build arrays

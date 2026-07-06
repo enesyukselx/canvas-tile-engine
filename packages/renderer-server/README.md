@@ -100,12 +100,12 @@ engine.drawText({ x: 0, y: 0, text: "Hello", style: { fontFamily: "Inter" } }, 2
 
 ## Output API
 
-| Method | Returns | Notes |
-| --- | --- | --- |
-| `renderer.toBuffer(format?, quality?)` | `Buffer` | Synchronous encode |
-| `renderer.encode(format?, quality?)` | `Promise<Buffer>` | Async, avoids blocking the event loop |
-| `renderer.getCanvas()` | `Canvas` | Underlying `@napi-rs/canvas` canvas |
-| `renderer.getContext()` | `SKRSContext2D` | Underlying 2D context |
+| Method                                 | Returns           | Notes                                 |
+| -------------------------------------- | ----------------- | ------------------------------------- |
+| `renderer.toBuffer(format?, quality?)` | `Buffer`          | Synchronous encode                    |
+| `renderer.encode(format?, quality?)`   | `Promise<Buffer>` | Async, avoids blocking the event loop |
+| `renderer.getCanvas()`                 | `Canvas`          | Underlying `@napi-rs/canvas` canvas   |
+| `renderer.getContext()`                | `SKRSContext2D`   | Underlying 2D context                 |
 
 `format` is `"png" | "jpeg" | "webp"` (default `"png"`). `quality` is `0–100` for `jpeg`/`webp` (ignored for `png`).
 

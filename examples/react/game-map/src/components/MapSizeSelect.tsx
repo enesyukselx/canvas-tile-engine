@@ -12,10 +12,7 @@ interface MapSizeSelectProps {
 export function MapSizeSelect({ id, label, value, options, onChange }: MapSizeSelectProps) {
     return (
         <div className="mt-4 p-4 bg-zinc-800/50 border border-zinc-700">
-            <label
-                htmlFor={id}
-                className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2"
-            >
+            <label htmlFor={id} className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
                 {label}
             </label>
             <div className="relative">
@@ -41,12 +38,7 @@ export function MapSizeSelect({ id, label, value, options, onChange }: MapSizeSe
                     ))}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg
-                        className="w-4 h-4 text-zinc-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
+                    <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="square" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                 </div>
@@ -54,4 +46,3 @@ export function MapSizeSelect({ id, label, value, options, onChange }: MapSizeSe
         </div>
     );
 }
-

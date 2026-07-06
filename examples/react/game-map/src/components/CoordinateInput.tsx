@@ -67,15 +67,15 @@ export function CoordinateInput({
                     text-white text-sm font-bold uppercase tracking-wide
                     border-2
                     transition-all duration-200
-                    ${disabled
-                        ? 'bg-zinc-600 border-zinc-500 cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-emerald-600 to-emerald-500 border-emerald-400 cursor-pointer hover:from-emerald-500 hover:to-emerald-400 hover:border-emerald-300 active:scale-95'
+                    ${
+                        disabled
+                            ? "bg-zinc-600 border-zinc-500 cursor-not-allowed opacity-50"
+                            : "bg-gradient-to-r from-emerald-600 to-emerald-500 border-emerald-400 cursor-pointer hover:from-emerald-500 hover:to-emerald-400 hover:border-emerald-300 active:scale-95"
                     }
                 `}
             >
-                {disabled ? 'Going...' : 'Go'}
+                {disabled ? "Going..." : "Go"}
             </button>
         </div>
     );
 }
-

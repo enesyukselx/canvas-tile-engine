@@ -125,7 +125,7 @@ export default function App() {
             await Promise.all(
                 uniqueUrls.map(async (url) => {
                     imageCache.set(url, await mainMap.loadImage(url));
-                })
+                }),
             );
 
             // Build arrays
@@ -166,7 +166,7 @@ export default function App() {
                 maxX: Infinity,
                 minY: -Infinity,
                 maxY: Infinity,
-            }
+            },
         );
     }, [mainMap, miniMap]);
 
@@ -203,7 +203,7 @@ export default function App() {
     const handleHover = (
         coords: { raw: { x: number; y: number }; snapped: { x: number; y: number } },
         _mouse: unknown,
-        client: { raw: { x: number; y: number }; snapped: { x: number; y: number } }
+        client: { raw: { x: number; y: number }; snapped: { x: number; y: number } },
     ) => {
         const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
 
@@ -325,7 +325,7 @@ export default function App() {
                         miniMapViewportRectangleDraw(
                             mainMap.getConfig(),
                             miniMap.getConfig(),
-                            ctx as CanvasRenderingContext2D
+                            ctx as CanvasRenderingContext2D,
                         )
                     }
                 >

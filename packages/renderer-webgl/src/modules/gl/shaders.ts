@@ -68,7 +68,7 @@ void main() {
 
 const SHAPE_FRAGMENT_AA_BODY = SHAPE_FRAGMENT_BODY.replace(
     "EDGE_ALPHA",
-    "1.0 - smoothstep(-fwidth(dist), fwidth(dist), dist)"
+    "1.0 - smoothstep(-fwidth(dist), fwidth(dist), dist)",
 );
 
 /**

@@ -47,7 +47,7 @@ export class Layer {
         if (!list) return;
         this.layers.set(
             handle.layer,
-            list.filter((entry) => entry.id !== handle.id)
+            list.filter((entry) => entry.id !== handle.id),
         );
     }
 
