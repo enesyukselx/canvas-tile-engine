@@ -12,6 +12,10 @@ import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
 
+// Below this pinch distance (px) the scale factor is degenerate: two fingers
+// nearly on the same point would divide by ~0 and snap the zoom to its limit.
+const MIN_PINCH_DISTANCE = 1;
+
 /**
  * Normalized pointer input - renderer-agnostic format.
  * All coordinates should be canvas-relative.
@@ -264,7 +268,8 @@ export class GestureProcessor {
             const bounds = this.canvasBoundsGetter();
 
             // Calculate zoom factor from pinch distance change
-            const scaleFactor = currentDistance / this.lastPinchDistance;
+            const scaleFactor =
+                this.lastPinchDistance >= MIN_PINCH_DISTANCE ? currentDistance / this.lastPinchDistance : 1;
 
             // Get pinch center relative to canvas
             const centerX = currentCenter.x - bounds.left;

@@ -50,6 +50,7 @@ The renderer paints onto **two stacked canvases** inside the wrapper:
 
 -   **Layer ordering across surfaces.** Because text and user draw functions live on the upper 2D canvas, they always composite **above** every WebGL primitive, regardless of their layer index. Ordering *within* each surface is preserved.
 -   **Static caches.** `drawStaticRect`, `drawStaticCircle` and `drawStaticImage` delegate to their dynamic counterparts — with WebGL a full layer already renders in a single batched draw call, so the offscreen pre-render cache is unnecessary.
+-   **Texture caching.** Image sources are uploaded to the GPU once and cached. Dimension changes (a resized canvas, a swapped `img.src` with different size) are detected and re-uploaded automatically, but mutating a source's pixels at the same size requires calling `renderer.invalidateTexture(source)` — the Canvas2D renderer always paints the source's current pixels.
 -   **Requires WebGL.** The renderer prefers WebGL 2 and falls back to WebGL 1. If neither is available, `init()` throws; use `RendererCanvas` as a fallback.
 
 ## License
