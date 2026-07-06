@@ -168,9 +168,10 @@ export default function App() {
                 }}
                 onZoom={(newScale) => setScale(newScale)}
             >
-                <CanvasTileEngine.Image
+                <CanvasTileEngine.StaticImage
                     items={isMini ? [] : imageItems}
                     layer={0}
+                    cacheKey="map-images"
                 />
                 <CanvasTileEngine.Circle
                     items={isMini ? [] : circleItems}
