@@ -2,9 +2,11 @@ import { RGBA } from "../../utils/color";
 import {
     LINE_FRAGMENT_SHADER,
     LINE_VERTEX_SHADER,
-    SHAPE_FRAGMENT_SHADER_AA,
+    shapeFragmentShaderAA,
+    SHAPE_FRAGMENT_SHADER_AA_300,
     SHAPE_FRAGMENT_SHADER_HARD,
     SHAPE_VERTEX_SHADER,
+    SHAPE_VERTEX_SHADER_300,
     TEXTURE_FRAGMENT_SHADER,
     TEXTURE_VERTEX_SHADER,
 } from "./shaders";
@@ -19,8 +21,8 @@ export interface ShapeInstance {
     halfW: number;
     /** Half height in CSS pixels. */
     halfH: number;
-    /** Corner radius in CSS pixels (0 = sharp). */
-    radius: number;
+    /** Corner radii in CSS pixels, [topLeft, topRight, bottomRight, bottomLeft] (0 = sharp). */
+    radius: [number, number, number, number];
     /** Rotation around the center in radians. */
     rotation: number;
     /** Normalized RGBA color. */
@@ -57,7 +59,7 @@ export interface ImageInstance {
 
 type GL = WebGLRenderingContext;
 
-const SHAPE_FLOATS_PER_VERTEX = 11; // pos(2) local(2) halfSize(2) radius(1) color(4)
+const SHAPE_FLOATS_PER_VERTEX = 14; // pos(2) local(2) halfSize(2) radius(4) color(4)
 const LINE_FLOATS_PER_VERTEX = 6; // pos(2) color(4)
 const TEXTURE_FLOATS_PER_VERTEX = 4; // pos(2) texcoord(2)
 
@@ -107,7 +109,7 @@ export class GLRenderer {
     private lineBuffer: WebGLBuffer;
     private textureBuffer: WebGLBuffer;
 
-    private textures = new Map<TexImageSource, WebGLTexture>();
+    private textures = new Map<TexImageSource, { texture: WebGLTexture; width: number; height: number }>();
 
     private cssWidth = 0;
     private cssHeight = 0;
@@ -115,10 +117,27 @@ export class GLRenderer {
     constructor(gl: GL) {
         this.gl = gl;
 
-        const hasDerivatives = !!gl.getExtension("OES_standard_derivatives");
-        const shapeFragment = hasDerivatives ? SHAPE_FRAGMENT_SHADER_AA : SHAPE_FRAGMENT_SHADER_HARD;
+        // Derivatives (fwidth) are core in GLSL ES 3.00 but not in ESSL 1.00, and some
+        // WebGL2 drivers reject the OES_standard_derivatives extension pragma outright
+        // rather than polyfilling it onto ESSL 1.00. So WebGL2 gets a real
+        // `#version 300 es` shape shader pair (guaranteed to work, no extension
+        // needed); WebGL1 keeps the ESSL 1.00 shader gated on the extension being
+        // present, falling back to a hard (non-AA) edge otherwise.
+        const isWebGL2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+        let shapeVertex: string;
+        let shapeFragment: string;
+        if (isWebGL2) {
+            shapeVertex = SHAPE_VERTEX_SHADER_300;
+            shapeFragment = SHAPE_FRAGMENT_SHADER_AA_300;
+        } else if (gl.getExtension("OES_standard_derivatives")) {
+            shapeVertex = SHAPE_VERTEX_SHADER;
+            shapeFragment = shapeFragmentShaderAA();
+        } else {
+            shapeVertex = SHAPE_VERTEX_SHADER;
+            shapeFragment = SHAPE_FRAGMENT_SHADER_HARD;
+        }
 
-        const shapeProgram = this.createProgram(SHAPE_VERTEX_SHADER, shapeFragment);
+        const shapeProgram = this.createProgram(shapeVertex, shapeFragment);
         this.shape = {
             program: shapeProgram,
             a_position: gl.getAttribLocation(shapeProgram, "a_position"),
@@ -152,7 +171,10 @@ export class GLRenderer {
         this.textureBuffer = this.createBuffer();
 
         gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        // Separate alpha blend keeps destination alpha at a_s + a_d(1-a_s); plain
+        // blendFunc would square the source alpha in the alpha channel, leaving the
+        // (alpha: true) canvas partially transparent under translucent/AA pixels.
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         // Texcoords map screen-top to v=0, which already matches the top row of an
         // uploaded image, so the source must NOT be flipped on upload.
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -220,7 +242,11 @@ export class GLRenderer {
                 data[o++] = ly;
                 data[o++] = s.halfW;
                 data[o++] = s.halfH;
-                data[o++] = s.radius;
+                // Shader quadrant-select order: (bottomRight, topRight, bottomLeft, topLeft)
+                data[o++] = s.radius[2];
+                data[o++] = s.radius[1];
+                data[o++] = s.radius[3];
+                data[o++] = s.radius[0];
                 data[o++] = s.color[0];
                 data[o++] = s.color[1];
                 data[o++] = s.color[2];
@@ -237,8 +263,8 @@ export class GLRenderer {
         this.enableAttrib(this.shape.a_position, 2, stride, 0);
         this.enableAttrib(this.shape.a_local, 2, stride, 2 * 4);
         this.enableAttrib(this.shape.a_halfSize, 2, stride, 4 * 4);
-        this.enableAttrib(this.shape.a_radius, 1, stride, 6 * 4);
-        this.enableAttrib(this.shape.a_color, 4, stride, 7 * 4);
+        this.enableAttrib(this.shape.a_radius, 4, stride, 6 * 4);
+        this.enableAttrib(this.shape.a_color, 4, stride, 10 * 4);
 
         gl.drawArrays(gl.TRIANGLES, 0, shapes.length * 6);
 
@@ -305,8 +331,9 @@ export class GLRenderer {
     // ─── Images ───
 
     /**
-     * Draw textured quads. Each item is drawn with its own texture bind; callers
-     * should keep the same texture grouped together for fewer state changes.
+     * Draw textured quads. Consecutive items sharing the same texture and alpha
+     * collapse into a single buffer upload and draw call, so callers should keep
+     * items with the same texture grouped together. Paint order is preserved.
      */
     drawImages(items: ImageInstance[]) {
         if (items.length === 0) return;
@@ -319,42 +346,56 @@ export class GLRenderer {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.textureBuffer);
 
         const stride = TEXTURE_FLOATS_PER_VERTEX * 4;
+        this.enableAttrib(this.texture.a_position, 2, stride, 0);
+        this.enableAttrib(this.texture.a_texcoord, 2, stride, 2 * 4);
 
-        for (const item of items) {
-            const cx = item.x + item.w / 2;
-            const cy = item.y + item.h / 2;
-            const hw = item.w / 2;
-            const hh = item.h / 2;
-            const cos = Math.cos(item.rotation);
-            const sin = Math.sin(item.rotation);
+        const order = [0, 1, 2, 0, 2, 3];
 
-            // Corner local offsets with their texcoords. Screen-top maps to v=0,
-            // matching the top row of the (un-flipped) uploaded image.
-            const corners = [
-                [-hw, -hh, 0, 0],
-                [hw, -hh, 1, 0],
-                [hw, hh, 1, 1],
-                [-hw, hh, 0, 1],
-            ];
+        let start = 0;
+        while (start < items.length) {
+            const { texture, alpha } = items[start];
+            let end = start + 1;
+            while (end < items.length && items[end].texture === texture && items[end].alpha === alpha) {
+                end++;
+            }
 
-            const order = [0, 1, 2, 0, 2, 3];
-            const data = new Float32Array(6 * TEXTURE_FLOATS_PER_VERTEX);
+            const count = end - start;
+            const data = new Float32Array(count * 6 * TEXTURE_FLOATS_PER_VERTEX);
             let o = 0;
-            for (const i of order) {
-                const [lx, ly, u, v] = corners[i];
-                data[o++] = cx + lx * cos - ly * sin;
-                data[o++] = cy + lx * sin + ly * cos;
-                data[o++] = u;
-                data[o++] = v;
+
+            for (let idx = start; idx < end; idx++) {
+                const item = items[idx];
+                const cx = item.x + item.w / 2;
+                const cy = item.y + item.h / 2;
+                const hw = item.w / 2;
+                const hh = item.h / 2;
+                const cos = Math.cos(item.rotation);
+                const sin = Math.sin(item.rotation);
+
+                // Corner local offsets with their texcoords. Screen-top maps to v=0,
+                // matching the top row of the (un-flipped) uploaded image.
+                const corners = [
+                    [-hw, -hh, 0, 0],
+                    [hw, -hh, 1, 0],
+                    [hw, hh, 1, 1],
+                    [-hw, hh, 0, 1],
+                ];
+
+                for (const i of order) {
+                    const [lx, ly, u, v] = corners[i];
+                    data[o++] = cx + lx * cos - ly * sin;
+                    data[o++] = cy + lx * sin + ly * cos;
+                    data[o++] = u;
+                    data[o++] = v;
+                }
             }
 
             gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-            this.enableAttrib(this.texture.a_position, 2, stride, 0);
-            this.enableAttrib(this.texture.a_texcoord, 2, stride, 2 * 4);
+            gl.uniform1f(this.texture.u_alpha, alpha);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.drawArrays(gl.TRIANGLES, 0, count * 6);
 
-            gl.uniform1f(this.texture.u_alpha, item.alpha);
-            gl.bindTexture(gl.TEXTURE_2D, item.texture);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            start = end;
         }
 
         this.disableAttrib(this.texture.a_position);
@@ -363,17 +404,27 @@ export class GLRenderer {
 
     /**
      * Get (or lazily upload) a texture for an image source. Returns null if the
-     * source has no dimensions yet (e.g. an image that has not loaded).
+     * source has no dimensions yet (e.g. an image that has not loaded). If the
+     * source's dimensions changed since upload (e.g. a resized canvas or a
+     * swapped img src), its pixels are re-uploaded automatically; same-size
+     * content mutations require {@link invalidateTexture}.
      */
     getTexture(source: TexImageSource): WebGLTexture | null {
-        const existing = this.textures.get(source);
-        if (existing) return existing;
-
         const width = (source as { width?: number }).width ?? 0;
         const height = (source as { height?: number }).height ?? 0;
         if (!width || !height) return null;
 
         const gl = this.gl;
+        const existing = this.textures.get(source);
+        if (existing) {
+            if (existing.width === width && existing.height === height) return existing.texture;
+            gl.bindTexture(gl.TEXTURE_2D, existing.texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            existing.width = width;
+            existing.height = height;
+            return existing.texture;
+        }
+
         const texture = gl.createTexture();
         if (!texture) return null;
 
@@ -384,14 +435,22 @@ export class GLRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
 
-        this.textures.set(source, texture);
+        this.textures.set(source, { texture, width, height });
         return texture;
+    }
+
+    /** Drop the cached texture for a source so the next draw re-uploads its pixels. */
+    invalidateTexture(source: TexImageSource) {
+        const entry = this.textures.get(source);
+        if (!entry) return;
+        this.gl.deleteTexture(entry.texture);
+        this.textures.delete(source);
     }
 
     /** Release all GPU resources. */
     dispose() {
         const gl = this.gl;
-        for (const texture of this.textures.values()) {
+        for (const { texture } of this.textures.values()) {
             gl.deleteTexture(texture);
         }
         this.textures.clear();

@@ -3,6 +3,11 @@ import { useEngineContext } from "../../context/EngineContext";
 import type { Text as TextType } from "@canvas-tile-engine/core";
 
 export interface TextProps {
+    /**
+     * Items to draw. Compared by reference: a new array identity re-registers
+     * the draw callback (and rebuilds the spatial index for 500+ items), so
+     * keep it stable with useMemo/useState instead of an inline literal.
+     */
     items: TextType | TextType[];
     layer?: number;
 }
@@ -31,6 +36,9 @@ export const Text = memo(function Text({ items, layer = 2 }: TextProps) {
         return () => {
             if (handle) {
                 engine.removeDrawHandle(handle);
+                // Repaint so the removed items disappear immediately; safe on
+                // full unmount too — the handle no-ops once the engine is gone.
+                requestRender();
             }
         };
     }, [engine, items, layer, requestRender]);

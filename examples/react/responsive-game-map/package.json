@@ -7,7 +7,9 @@
         "dev": "vite",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
     },
     "devDependencies": {
         "@types/react": "^18.3.0",
@@ -19,10 +21,10 @@
     "dependencies": {
         "@canvas-tile-engine/react": "workspace:*",
         "@canvas-tile-engine/renderer-canvas": "workspace:*",
-        "@faker-js/faker": "^10.3.0",
-        "@tailwindcss/vite": "^4.2.1",
+        "@faker-js/faker": "^10.5.0",
+        "@tailwindcss/vite": "^4.3.2",
         "react": "^18.3.0",
         "react-dom": "^18.3.0",
-        "tailwindcss": "^4.2.1"
+        "tailwindcss": "^4.3.2"
     }
 }

@@ -1,7 +1,7 @@
 import { CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 
 // Calculate mini map bounds
-// Mini map bounds should be calculated based on main map bounds. 
+// Mini map bounds should be calculated based on main map bounds.
 const calculateMiniMapBounds = (mainMapConfig: CanvasTileEngineConfig, miniMapConfig: CanvasTileEngineConfig) => {
     const mainBounds = mainMapConfig.bounds;
 

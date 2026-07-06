@@ -20,12 +20,7 @@ npm install @canvas-tile-engine/renderer-canvas
 import { CanvasTileEngine } from "@canvas-tile-engine/core";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
-const engine = new CanvasTileEngine(
-    wrapper,
-    config,
-    new RendererCanvas(),
-    { x: 0, y: 0 }
-);
+const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), { x: 0, y: 0 });
 ```
 
 ### With React
@@ -38,11 +33,7 @@ function App() {
     const engine = useCanvasTileEngine();
 
     return (
-        <CanvasTileEngine
-            engine={engine}
-            config={config}
-            renderer={new RendererCanvas()}
-        >
+        <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
             {/* children */}
         </CanvasTileEngine>
     );

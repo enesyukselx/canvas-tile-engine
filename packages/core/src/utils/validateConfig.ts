@@ -46,6 +46,15 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
         }
     }
 
+    // The initial scale must lie within the zoom limits, otherwise the camera
+    // starts out of range and snaps on the first zoom interaction.
+    if (config.minScale !== undefined && config.scale < config.minScale) {
+        throw configError(`scale (${config.scale}) cannot be less than minScale (${config.minScale})`);
+    }
+    if (config.maxScale !== undefined && config.scale > config.maxScale) {
+        throw configError(`scale (${config.scale}) cannot be greater than maxScale (${config.maxScale})`);
+    }
+
     // Size validation
     if (!config.size || typeof config.size !== "object") {
         throw configError("size is required and must be an object");
@@ -82,7 +91,7 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
     if (config.size.minWidth !== undefined && config.size.maxWidth !== undefined) {
         if (config.size.minWidth > config.size.maxWidth) {
             throw configError(
-                `size.minWidth (${config.size.minWidth}) cannot be greater than size.maxWidth (${config.size.maxWidth})`
+                `size.minWidth (${config.size.minWidth}) cannot be greater than size.maxWidth (${config.size.maxWidth})`,
             );
         }
     }
@@ -90,7 +99,7 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
     if (config.size.minHeight !== undefined && config.size.maxHeight !== undefined) {
         if (config.size.minHeight > config.size.maxHeight) {
             throw configError(
-                `size.minHeight (${config.size.minHeight}) cannot be greater than size.maxHeight (${config.size.maxHeight})`
+                `size.minHeight (${config.size.minHeight}) cannot be greater than size.maxHeight (${config.size.maxHeight})`,
             );
         }
     }

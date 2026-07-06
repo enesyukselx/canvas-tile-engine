@@ -43,7 +43,7 @@ export class CoordinateOverlayRenderer {
             COORDINATE_OVERLAY.BORDER_WIDTH,
             height - COORDINATE_OVERLAY.BORDER_WIDTH,
             width,
-            COORDINATE_OVERLAY.BORDER_WIDTH
+            COORDINATE_OVERLAY.BORDER_WIDTH,
         );
 
         // Set text properties for coordinates
@@ -52,7 +52,7 @@ export class CoordinateOverlayRenderer {
         // Adjust font size based on scale (min 8px, max 12px)
         const fontSize = Math.min(
             COORDINATE_OVERLAY.MAX_FONT_SIZE,
-            Math.max(COORDINATE_OVERLAY.MIN_FONT_SIZE, this.camera.scale * COORDINATE_OVERLAY.FONT_SIZE_SCALE_FACTOR)
+            Math.max(COORDINATE_OVERLAY.MIN_FONT_SIZE, this.camera.scale * COORDINATE_OVERLAY.FONT_SIZE_SCALE_FACTOR),
         );
         this.ctx.font = `${fontSize}px Arial`;
         this.ctx.textAlign = "center";

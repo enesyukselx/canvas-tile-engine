@@ -13,7 +13,7 @@ export function computeZoom(
     deltaY: number,
     minScale: number,
     maxScale: number,
-    mouse: { x: number; y: number }
+    mouse: { x: number; y: number },
 ): { topLeft: Coords; scale: number } {
     const limitedDelta = Math.min(Math.max(deltaY, DEFAULT_VALUES.MIN_WHEEL_DELTA), DEFAULT_VALUES.MAX_WHEEL_DELTA);
     const scaleFactor = Math.exp(-limitedDelta * DEFAULT_VALUES.ZOOM_SENSITIVITY);

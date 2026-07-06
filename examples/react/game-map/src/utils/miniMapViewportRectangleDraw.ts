@@ -3,7 +3,7 @@ import { CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 const miniMapViewportRectangleDraw = (
     mainMapConfig: CanvasTileEngineConfig,
     miniMapConfig: CanvasTileEngineConfig,
-    ctx: CanvasRenderingContext2D
+    ctx: CanvasRenderingContext2D,
 ) => {
     const ratio = miniMapConfig.scale / mainMapConfig.scale;
     const rectWidth = mainMapConfig.size.width * ratio;

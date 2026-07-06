@@ -168,7 +168,9 @@ async function main() {
     mainMap.destroy();
     miniMap.destroy();
 
-    console.log(`Wrote output/main-map.png (${mainPng.length} bytes) and output/mini-map.png (${miniPng.length} bytes)`);
+    console.log(
+        `Wrote output/main-map.png (${mainPng.length} bytes) and output/mini-map.png (${miniPng.length} bytes)`,
+    );
     console.log(`Done in ${Date.now() - t0}ms`);
 }
 

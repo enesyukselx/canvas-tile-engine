@@ -2,7 +2,7 @@ import { Coords } from ".";
 
 export type onDrawCallback = (
     ctx: unknown,
-    info: { scale: number; width: number; height: number; coords: Coords }
+    info: { scale: number; width: number; height: number; coords: Coords },
 ) => void;
 
 type MouseEventCallback = (
@@ -17,7 +17,7 @@ type MouseEventCallback = (
     client: {
         raw: Coords;
         snapped: Coords;
-    }
+    },
 ) => void;
 
 export type onClickCallback = MouseEventCallback;

@@ -17,6 +17,8 @@
         "dev:example": "node run-example.js",
         "lint": "turbo run lint",
         "typecheck": "turbo run typecheck",
+        "format": "turbo run format",
+        "format:check": "turbo run format:check",
         "test": "turbo run test",
         "test:coverage": "turbo run test:coverage"
     },
@@ -26,15 +28,16 @@
         "node": ">=20.19.0"
     },
     "dependencies": {
-        "concurrently": "^9.2.1",
+        "concurrently": "^10.0.3",
         "tsup": "^8.5.1",
         "typescript": "^5.9.3"
     },
     "devDependencies": {
         "@types/node": "^25.3.3",
-        "@vitest/coverage-v8": "^4.0.18",
+        "@vitest/coverage-v8": "^4.1.9",
+        "oxfmt": "^0.57.0",
         "oxlint": "^1.72.0",
         "turbo": "^2.10.2",
-        "vitest": "^4.0.18"
+        "vitest": "^4.1.9"
     }
 }

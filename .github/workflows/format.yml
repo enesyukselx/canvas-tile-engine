@@ -1,0 +1,44 @@
+name: "Format"
+
+on:
+    pull_request:
+        paths:
+            - "packages/**"
+            - "examples/**"
+            - "package.json"
+            - "turbo.json"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - ".oxfmtrc.json"
+
+permissions:
+    contents: write
+
+jobs:
+    format:
+        name: Format
+        runs-on: ubuntu-22.04
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  ref: ${{ github.event.pull_request.head.ref }}
+                  fetch-depth: 2
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.23.0
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: "pnpm"
+            - run: pnpm install --no-frozen-lockfile
+            - run: pnpm run format --affected
+            - name: Commit formatting changes
+              run: |
+                  if [ -n "$(git status --porcelain)" ]; then
+                      git config user.name "github-actions[bot]"
+                      git config user.email "github-actions[bot]@users.noreply.github.com"
+                      git add -A
+                      git commit -m "style: apply oxfmt formatting"
+                      git push origin HEAD:${{ github.event.pull_request.head.ref }}
+                  fi

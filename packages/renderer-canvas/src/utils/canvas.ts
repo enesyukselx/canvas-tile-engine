@@ -5,7 +5,7 @@ export function initStyles(
     canvas: HTMLCanvasElement,
     isResponsive: CanvasTileEngineConfig["responsive"],
     width?: number,
-    height?: number
+    height?: number,
 ) {
     if (isResponsive) {
         Object.assign(canvasWrapper.style, {
@@ -40,7 +40,7 @@ export function initStyles(
  */
 export function applyLineWidth(
     ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-    lineWidth: number
+    lineWidth: number,
 ): () => void {
     if (lineWidth >= 1) {
         ctx.lineWidth = lineWidth;

@@ -10,10 +10,7 @@ export function VillageModal({ item, visible, onClose }: VillageModalProps) {
     if (!visible || !item) return null;
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center"
-            onClick={onClose}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
@@ -24,9 +21,7 @@ export function VillageModal({ item, visible, onClose }: VillageModalProps) {
             >
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-zinc-700 bg-zinc-800 px-6 py-4">
-                    <h2 className="text-lg font-bold uppercase tracking-wider text-white">
-                        Village Details
-                    </h2>
+                    <h2 className="text-lg font-bold uppercase tracking-wider text-white">Village Details</h2>
                     <button
                         onClick={onClose}
                         className="
@@ -47,27 +42,19 @@ export function VillageModal({ item, visible, onClose }: VillageModalProps) {
                 <div className="p-6">
                     <div className="space-y-4">
                         <div className="flex items-center justify-between border-b border-zinc-700 pb-3">
-                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                                Player
-                            </span>
-                            <span className="text-sm font-semibold text-white">
-                                {item.playerName}
-                            </span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Player</span>
+                            <span className="text-sm font-semibold text-white">{item.playerName}</span>
                         </div>
 
                         <div className="flex items-center justify-between border-b border-zinc-700 pb-3">
                             <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
                                 Village Name
                             </span>
-                            <span className="text-sm font-semibold text-white">
-                                {item.villageName}
-                            </span>
+                            <span className="text-sm font-semibold text-white">{item.villageName}</span>
                         </div>
 
                         <div className="flex items-center justify-between border-b border-zinc-700 pb-3">
-                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                                Type
-                            </span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Type</span>
                             <span className="border border-emerald-600 bg-emerald-900/30 px-3 py-1 text-xs font-bold uppercase text-emerald-400">
                                 {item.type}
                             </span>

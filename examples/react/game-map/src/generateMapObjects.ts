@@ -74,7 +74,7 @@ export const generateMapObjects = (
     count: number,
     originX: number = 0,
     originY: number = 0,
-    spacing: number = 1
+    spacing: number = 1,
 ): MapObject[] => {
     const objects: MapObject[] = [];
     const usedCoordinates = new Set<string>();

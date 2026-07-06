@@ -14,4 +14,3 @@ declare module "/terrains/*" {
     const src: string;
     export default src;
 }
-

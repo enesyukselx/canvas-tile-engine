@@ -229,4 +229,30 @@ describe("AnimationController", () => {
             expect(controller.isAnimating()).toBe(false);
         });
     });
+
+    describe("without requestAnimationFrame (headless environments)", () => {
+        beforeEach(() => {
+            // Node has no requestAnimationFrame; drop the stub to simulate it.
+            vi.unstubAllGlobals();
+        });
+
+        it("completes animateMoveTo instantly instead of crashing", () => {
+            const onComplete = vi.fn();
+            controller.animateMoveTo(100, 100, 500, onComplete);
+
+            expect(setCenterMock).toHaveBeenCalledWith({ x: 100, y: 100 }, 800, 600);
+            expect(onAnimationFrame).toHaveBeenCalled();
+            expect(onComplete).toHaveBeenCalled();
+            expect(controller.isAnimating()).toBe(false);
+        });
+
+        it("completes animateResize instantly instead of crashing", () => {
+            const onApplySize = vi.fn();
+            const onComplete = vi.fn();
+            controller.animateResize(1000, 800, 500, onApplySize, onComplete);
+
+            expect(onApplySize).toHaveBeenCalledWith(1000, 800, { x: 50, y: 50 });
+            expect(onComplete).toHaveBeenCalled();
+        });
+    });
 });
