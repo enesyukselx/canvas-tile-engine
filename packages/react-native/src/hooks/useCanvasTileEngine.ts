@@ -47,7 +47,7 @@ export interface EngineHandle {
 
     addDrawFunction(
         fn: (canvas: SkCanvas, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer?: number
+        layer?: number,
     ): DrawHandle;
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
@@ -58,7 +58,7 @@ export interface EngineHandle {
     drawPath(
         items: Coords[] | Coords[][],
         style?: { strokeStyle?: string; lineWidth?: number },
-        layer?: number
+        layer?: number,
     ): DrawHandle;
     drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
     drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
@@ -156,7 +156,7 @@ export function useCanvasTileEngine(): EngineHandle {
                 return (
                     instanceRef.current?.addDrawFunction(
                         fn as (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-                        layer
+                        layer,
                     ) ?? DUMMY_DRAW_HANDLE
                 );
             },
@@ -211,6 +211,6 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current.images.load(src, retry);
             },
         }),
-        [setInstance]
+        [setInstance],
     );
 }

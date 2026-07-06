@@ -61,14 +61,14 @@ The `config.size` you pass is a placeholder — the component measures its `View
 
 ## How it differs from the web package
 
-| | `@canvas-tile-engine/react` | `@canvas-tile-engine/react-native` |
-| --- | --- | --- |
-| Renderer | `RendererCanvas` / `RendererWebGL` | `RendererSkia` |
-| Mount | `<div><canvas/></div>` | Skia `<Canvas>` inside a `<View>` |
-| Styling | `className` / `CSSProperties` | `ViewStyle` |
-| Images | `HTMLImageElement` | `SkImage` (`engine.loadImage(uri)`) |
-| `onDraw` ctx | `CanvasRenderingContext2D` | `SkCanvas` |
-| Gestures | DOM mouse/touch/wheel | touch pan + pinch (tap = click) |
+|              | `@canvas-tile-engine/react`        | `@canvas-tile-engine/react-native`  |
+| ------------ | ---------------------------------- | ----------------------------------- |
+| Renderer     | `RendererCanvas` / `RendererWebGL` | `RendererSkia`                      |
+| Mount        | `<div><canvas/></div>`             | Skia `<Canvas>` inside a `<View>`   |
+| Styling      | `className` / `CSSProperties`      | `ViewStyle`                         |
+| Images       | `HTMLImageElement`                 | `SkImage` (`engine.loadImage(uri)`) |
+| `onDraw` ctx | `CanvasRenderingContext2D`         | `SkCanvas`                          |
+| Gestures     | DOM mouse/touch/wheel              | touch pan + pinch (tap = click)     |
 
 Everything else — the hook handle, draw components, layers, culling, camera/coordinate math — is identical.
 

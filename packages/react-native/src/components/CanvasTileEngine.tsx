@@ -7,7 +7,14 @@ import {
     type LayoutChangeEvent,
     type NativeTouchEvent,
 } from "react-native";
-import { Canvas, createPicture, Picture, type SkCanvas, type SkPicture, type SkImage } from "@shopify/react-native-skia";
+import {
+    Canvas,
+    createPicture,
+    Picture,
+    type SkCanvas,
+    type SkPicture,
+    type SkImage,
+} from "@shopify/react-native-skia";
 import { CanvasTileEngine as CanvasTileEngineCore, type NormalizedPointer } from "@canvas-tile-engine/core";
 import type { SkiaMount } from "@canvas-tile-engine/renderer-skia";
 import { EngineContext, type EngineContextValue } from "../context/EngineContext";
@@ -175,13 +182,10 @@ function CanvasTileEngineBase({
                 setPicture(createPicture(paint, { width, height }));
             },
         }),
-        []
+        [],
     );
 
-    const contextValue = useMemo<EngineContextValue>(
-        () => ({ engine, requestRender }),
-        [engine, requestRender]
-    );
+    const contextValue = useMemo<EngineContextValue>(() => ({ engine, requestRender }), [engine, requestRender]);
 
     const wireCallbacks = useCallback((instance: CanvasTileEngineCore<SkiaMount, SkImage>) => {
         instance.onCoordsChange = (coords) => callbacksRef.current.onCoordsChange?.(coords);
@@ -222,7 +226,7 @@ function CanvasTileEngineBase({
         },
         // Engine is created once; config/center are read at creation time.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [engine, mount, renderer, wireCallbacks]
+        [engine, mount, renderer, wireCallbacks],
     );
 
     // Tear down on unmount.
