@@ -22,7 +22,7 @@ npm install @canvas-tile-engine/renderer-skia @shopify/react-native-skia
 
 ### Differences from the Canvas2D renderer
 
--   **Static caches** (`drawStaticRect/Circle/Image`) reuse the dynamic path — Skia records each layer in a single pass, so the offscreen pre-render cache is unnecessary.
+-   **Static caches** (`drawStaticRect/Circle/Image`) record the item set once into an `SkPicture` (keyed by `cacheKey`) and replay it per frame under the camera transform — per-frame cost is independent of item count, making them the right choice for thousands of non-changing items.
 -   **Coordinate overlay and debug HUD** are not yet implemented for Skia.
 -   Drawing happens in logical (dp) units; Skia handles device pixel ratio for you.
 

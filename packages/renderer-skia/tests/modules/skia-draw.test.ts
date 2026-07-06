@@ -3,7 +3,7 @@ import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
 import { SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "../../src/modules/Layer";
-import { colorParseCalls, matchFontCalls, type MockFont, type MockPaint } from "../mocks/react-native-skia";
+import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
 
 interface Op {
     op: string;
@@ -13,25 +13,8 @@ interface Op {
 // Recording canvas: paints are shared and mutated between draws, so state is
 // captured at call time (mirroring Skia's snapshot-on-record semantics).
 function makeCanvas() {
-    const ops: Op[] = [];
-    const canvas = {
-        save: () => 1,
-        restoreToCount: () => {},
-        rotate: () => {},
-        drawRect: (rect: unknown, paint: MockPaint) =>
-            ops.push({ op: "rect", rect, style: paint.style, color: paint.color, strokeWidth: paint.strokeWidth }),
-        drawRRect: (rrect: unknown, paint: MockPaint) =>
-            ops.push({ op: "rrect", rrect, style: paint.style, color: paint.color }),
-        drawCircle: (cx: number, cy: number, r: number, paint: MockPaint) =>
-            ops.push({ op: "circle", cx, cy, r, style: paint.style, strokeWidth: paint.strokeWidth }),
-        drawLine: (x1: number, y1: number, x2: number, y2: number, paint: MockPaint) =>
-            ops.push({ op: "line", x1, y1, x2, y2, strokeWidth: paint.strokeWidth }),
-        drawText: (text: string, x: number, y: number, _paint: MockPaint, font: MockFont) =>
-            ops.push({ op: "text", text, x, y, fontSize: font.size }),
-        drawPath: () => ops.push({ op: "path" }),
-        drawImageRect: () => ops.push({ op: "image" }),
-    } as unknown as SkCanvas;
-    return { canvas, ops };
+    const { canvas, ops } = makeRecordingCanvas();
+    return { canvas: canvas as unknown as SkCanvas, ops: ops as Op[] };
 }
 
 function setup(scale = 10) {
@@ -42,7 +25,7 @@ function setup(scale = 10) {
     const config = { size: { width: 100, height: 100 }, scale } as never;
     const render = (canvas: SkCanvas) =>
         layers.drawAll({ canvas, camera, transformer, config, topLeft: { x: 0, y: 0 } });
-    return { draw, render };
+    return { draw, render, camera };
 }
 
 beforeEach(() => {
@@ -151,6 +134,92 @@ describe("text rendering", () => {
         render(canvas);
 
         expect(matchFontCalls).toHaveLength(1);
+    });
+});
+
+describe("static picture cache", () => {
+    const items = [
+        { x: 1, y: 1, size: 1, style: { fillStyle: "#f00" } },
+        { x: 3, y: 3, size: 1, style: { fillStyle: "#0f0" } },
+    ];
+
+    it("replays one cached picture per frame instead of per-item draw calls", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticRect(items, "cache-a", 1);
+        render(canvas);
+        render(canvas);
+
+        // No per-item rects hit the frame canvas — only picture replays.
+        expect(ops.filter((o) => o.op === "rect")).toHaveLength(0);
+        const pictureOps = ops.filter((o) => o.op === "picture");
+        expect(pictureOps).toHaveLength(2);
+        // Both frames replay the same recording.
+        expect(pictureOps[0].picture).toBe(pictureOps[1].picture);
+        const picture = pictureOps[0].picture as MockPicture;
+        expect(picture.ops.filter((o) => o.op === "rect")).toHaveLength(2);
+    });
+
+    it("records geometry identical to the dynamic path", () => {
+        const dynamic = setup();
+        const dynamicCanvas = makeCanvas();
+        dynamic.draw.drawRect(items, 1);
+        dynamic.render(dynamicCanvas.canvas);
+        const dynamicRects = dynamicCanvas.ops.filter((o) => o.op === "rect").map((o) => o.rect);
+
+        const stat = setup();
+        const staticCanvas = makeCanvas();
+        stat.draw.drawStaticRect(items, "cache-b", 1);
+        stat.render(staticCanvas.canvas);
+        const picture = staticCanvas.ops.find((o) => o.op === "picture")?.picture as MockPicture;
+        const staticRects = picture.ops.filter((o) => o.op === "rect").map((o) => o.rect);
+
+        expect(staticRects).toEqual(dynamicRects);
+    });
+
+    it("replays with the scale ratio when the camera zooms after recording", () => {
+        const { draw, render, camera } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticRect(items, "cache-c", 1);
+        render(canvas);
+        (camera as { scale: number }).scale = 20;
+        render(canvas);
+
+        const scaleOps = ops.filter((o) => o.op === "scale");
+        expect(scaleOps[0]).toMatchObject({ sx: 1, sy: 1 });
+        expect(scaleOps[1]).toMatchObject({ sx: 2, sy: 2 });
+    });
+
+    it("re-records after clearStaticCache, reuses otherwise", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        const first = draw.drawStaticRect(items, "cache-d", 1);
+        render(canvas);
+        draw.removeDrawHandle(first);
+
+        // Same cacheKey without clearing → same picture instance.
+        const second = draw.drawStaticRect(items, "cache-d", 1);
+        render(canvas);
+        draw.removeDrawHandle(second);
+
+        // After clearing → a fresh recording.
+        draw.clearStaticCache("cache-d");
+        draw.drawStaticRect(items, "cache-d", 1);
+        render(canvas);
+
+        const pictures = ops.filter((o) => o.op === "picture").map((o) => o.picture);
+        expect(pictures).toHaveLength(3);
+        expect(pictures[1]).toBe(pictures[0]);
+        expect(pictures[2]).not.toBe(pictures[0]);
+    });
+
+    it("draws nothing for an empty item list", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticRect([], "cache-e", 1);
+        render(canvas);
+        expect(ops).toHaveLength(0);
     });
 });
 

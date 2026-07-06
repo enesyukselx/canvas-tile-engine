@@ -20,7 +20,7 @@ import {
     RendererDependencies,
     ViewportState,
 } from "@canvas-tile-engine/core";
-import { Skia, type SkCanvas, type SkImage, type SkPaint } from "@shopify/react-native-skia";
+import { Skia, type SkCanvas, type SkImage, type SkPaint, type SkPicture } from "@shopify/react-native-skia";
 import { Layer } from "./modules/Layer";
 import { SkiaDraw } from "./modules/SkiaDraw";
 import { SkiaImageLoader } from "./modules/SkiaImageLoader";
@@ -53,6 +53,12 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     private animationController!: AnimationController;
 
     private imageLoader = new SkiaImageLoader();
+
+    /**
+     * Scene (background + layers + overlays) recorded once per {@link render}
+     * and replayed on overlay-only presents — see {@link paintFrame}.
+     */
+    private scenePicture: SkPicture | null = null;
 
     /** Optional user-provided draw hook executed after engine layers. */
     public onDraw?: onDrawCallback;
@@ -131,9 +137,12 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
 
         if (this.config.get().debug?.enabled) {
             this.debugOverlay = new SkiaDebug(this.camera, this.config, this.viewport);
-            // Start FPS loop if fps hud is enabled
+            // Start FPS loop if fps hud is enabled. The update only re-presents
+            // the cached scene picture with a fresh HUD on top — re-recording
+            // the whole scene here would make the FPS display itself the
+            // dominant frame cost on large maps.
             if (this.config.get().debug?.hud?.fps) {
-                this.debugOverlay.setFpsUpdateCallback(() => this.render());
+                this.debugOverlay.setFpsUpdateCallback(() => this.presentCached());
                 this.debugOverlay.startFpsLoop();
             }
         }
@@ -171,13 +180,35 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     }
 
     render(): void {
+        this.scenePicture = null;
+        this.mount.present((canvas) => this.paintFrame(canvas));
+    }
+
+    /** Re-present without invalidating the scene — only the debug HUD is redrawn fresh. */
+    private presentCached(): void {
         this.mount.present((canvas) => this.paintFrame(canvas));
     }
 
     private paintFrame(canvas: SkCanvas): void {
+        if (!this.scenePicture) {
+            this.scenePicture = this.recordScene();
+        }
+        canvas.drawPicture(this.scenePicture);
+
+        // Debug overlay is drawn outside the scene picture so HUD updates
+        // (FPS ticks) can re-present without re-recording the scene.
+        if (this.config.get().debug?.enabled && this.debugOverlay) {
+            this.debugOverlay.draw(canvas);
+        }
+    }
+
+    private recordScene(): SkPicture {
         const size = this.viewport.getSize();
         const config = { ...this.config.get(), size: { ...size }, scale: this.camera.scale };
         const topLeft: Coords = { x: this.camera.x, y: this.camera.y };
+
+        const recorder = Skia.PictureRecorder();
+        const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, size.width, size.height));
 
         // Background
         this.bgPaint.setColor(Skia.Color(config.backgroundColor));
@@ -205,14 +236,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
             this.coordinateOverlayRenderer.draw(canvas);
         }
 
-        // Debug overlay
-        if (config.debug?.enabled && this.debugOverlay) {
-            if (config.debug?.hud?.fps) {
-                this.debugOverlay.setFpsUpdateCallback(() => this.render());
-                this.debugOverlay.startFpsLoop();
-            }
-            this.debugOverlay.draw(canvas);
-        }
+        return recorder.finishRecordingAsPicture();
     }
 
     resize(width: number, height: number): void {
@@ -243,6 +267,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         this.layers?.clear();
         this.debugOverlay?.destroy();
         this.imageLoader.clear();
+        this.scenePicture = null;
     }
 
     // ─── Host → renderer gesture forwarding ───

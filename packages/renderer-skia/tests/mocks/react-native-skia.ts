@@ -38,6 +38,64 @@ const makePaint = (): MockPaint => {
 /** Every string passed to Skia.Color, for asserting parse/cache behavior. */
 export const colorParseCalls: string[] = [];
 
+export interface MockOp {
+    op: string;
+    [key: string]: unknown;
+}
+
+export interface MockPicture {
+    __picture: true;
+    bounds: unknown;
+    ops: MockOp[];
+}
+
+/**
+ * Op-recording canvas used by the PictureRecorder mock (and reusable from
+ * tests as a frame canvas). Paint state is captured at call time, mirroring
+ * Skia's snapshot-on-record semantics.
+ */
+export function makeRecordingCanvas() {
+    const ops: MockOp[] = [];
+    const canvas = {
+        save: () => ops.length,
+        restoreToCount() {},
+        rotate(deg: number, px: number, py: number) {
+            ops.push({ op: "rotate", deg, px, py });
+        },
+        translate(x: number, y: number) {
+            ops.push({ op: "translate", x, y });
+        },
+        scale(sx: number, sy: number) {
+            ops.push({ op: "scale", sx, sy });
+        },
+        drawRect(rect: unknown, paint: MockPaint) {
+            ops.push({ op: "rect", rect, style: paint.style, color: paint.color, strokeWidth: paint.strokeWidth });
+        },
+        drawRRect(rrect: unknown, paint: MockPaint) {
+            ops.push({ op: "rrect", rrect, style: paint.style, color: paint.color });
+        },
+        drawCircle(cx: number, cy: number, r: number, paint: MockPaint) {
+            ops.push({ op: "circle", cx, cy, r, style: paint.style, strokeWidth: paint.strokeWidth });
+        },
+        drawLine(x1: number, y1: number, x2: number, y2: number, paint: MockPaint) {
+            ops.push({ op: "line", x1, y1, x2, y2, strokeWidth: paint.strokeWidth });
+        },
+        drawText(text: string, x: number, y: number, _paint: MockPaint, font: { size: number }) {
+            ops.push({ op: "text", text, x, y, fontSize: font.size });
+        },
+        drawPath() {
+            ops.push({ op: "path" });
+        },
+        drawImageRect(img: unknown, src: unknown, dest: unknown) {
+            ops.push({ op: "image", img, src, dest });
+        },
+        drawPicture(picture: MockPicture) {
+            ops.push({ op: "picture", picture });
+        },
+    };
+    return { canvas, ops };
+}
+
 export const Skia = {
     Paint: makePaint,
     Color: (value: string) => {
@@ -59,6 +117,20 @@ export const Skia = {
                 },
             };
         },
+    },
+    PictureRecorder: () => {
+        let recording: { canvas: unknown; ops: MockOp[] } | null = null;
+        let bounds: unknown;
+        return {
+            beginRecording(cullRect?: unknown) {
+                recording = makeRecordingCanvas();
+                bounds = cullRect;
+                return recording.canvas;
+            },
+            finishRecordingAsPicture(): MockPicture {
+                return { __picture: true, bounds, ops: recording?.ops ?? [] };
+            },
+        };
     },
 };
 

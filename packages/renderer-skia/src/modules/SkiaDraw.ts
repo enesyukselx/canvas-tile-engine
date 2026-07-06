@@ -24,6 +24,7 @@ import {
     type SkFont,
     type SkImage,
     type SkPaint,
+    type SkPicture,
     type SkRect,
 } from "@shopify/react-native-skia";
 import { Layer } from "./Layer";
@@ -48,6 +49,8 @@ export class SkiaDraw {
     private imagePaint: SkPaint;
     private fontCache = new Map<string, SkFont>();
     private colorCache = new Map<string, SkColor>();
+    // Pre-recorded pictures for the drawStatic* variants, keyed by cacheKey.
+    private staticPictureCache = new Map<string, { picture: SkPicture; recordScale: number }>();
 
     constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {
         this.fillPaint = Skia.Paint();
@@ -112,38 +115,44 @@ export class SkiaDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
-                const origin = this.resolveOrigin(item.origin);
-                const style = item.style;
 
                 if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
-                const cx = drawX + pxSize / 2;
-                const cy = drawY + pxSize / 2;
-                const rotation = item.rotate ?? 0;
-                const radius = this.resolveRadius(item.radius);
-
-                const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
-
-                const rect = Skia.XYWHRect(drawX, drawY, pxSize, pxSize);
-                const rounded = this.hasRadius(radius);
-                if (style?.fillStyle) {
-                    this.fillPaint.setColor(this.color(style.fillStyle));
-                    if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
-                    else canvas.drawRect(rect, this.fillPaint);
-                }
-                if (style?.strokeStyle) {
-                    this.strokePaint.setColor(this.color(style.strokeStyle));
-                    this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
-                    if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.strokePaint);
-                    else canvas.drawRect(rect, this.strokePaint);
-                }
-
-                if (count !== -1) canvas.restoreToCount(count);
+                this.paintRect(canvas, item, pos, this.camera.scale);
             }
         });
+    }
+
+    /** Paint a single rect at a resolved position; `cellSize` is the pixel size of one world cell. */
+    private paintRect(canvas: SkCanvas, item: Rect, pos: Coords, cellSize: number) {
+        const size = item.size ?? 1;
+        const origin = this.resolveOrigin(item.origin);
+        const style = item.style;
+        const pxSize = size * cellSize;
+        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, cellSize);
+        const cx = drawX + pxSize / 2;
+        const cy = drawY + pxSize / 2;
+        const rotation = item.rotate ?? 0;
+        const radius = this.resolveRadius(item.radius);
+
+        const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
+
+        const rect = Skia.XYWHRect(drawX, drawY, pxSize, pxSize);
+        const rounded = this.hasRadius(radius);
+        if (style?.fillStyle) {
+            this.fillPaint.setColor(this.color(style.fillStyle));
+            if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
+            else canvas.drawRect(rect, this.fillPaint);
+        }
+        if (style?.strokeStyle) {
+            this.strokePaint.setColor(this.color(style.strokeStyle));
+            this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
+            if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.strokePaint);
+            else canvas.drawRect(rect, this.strokePaint);
+        }
+
+        if (count !== -1) canvas.restoreToCount(count);
     }
 
     drawCircle(items: Array<Circle> | Circle, layer: number = 1): DrawHandle {
@@ -160,29 +169,35 @@ export class SkiaDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
-                const origin = this.resolveOrigin(item.origin);
-                const style = item.style;
 
                 if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
-                const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
-                const cx = drawX + radius;
-                const cy = drawY + radius;
-
-                if (style?.fillStyle) {
-                    this.fillPaint.setColor(this.color(style.fillStyle));
-                    canvas.drawCircle(cx, cy, radius, this.fillPaint);
-                }
-                if (style?.strokeStyle) {
-                    this.strokePaint.setColor(this.color(style.strokeStyle));
-                    this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
-                    canvas.drawCircle(cx, cy, radius, this.strokePaint);
-                }
+                this.paintCircle(canvas, item, pos, this.camera.scale);
             }
         });
+    }
+
+    /** Paint a single circle at a resolved position; `cellSize` is the pixel size of one world cell. */
+    private paintCircle(canvas: SkCanvas, item: Circle, pos: Coords, cellSize: number) {
+        const size = item.size ?? 1;
+        const origin = this.resolveOrigin(item.origin);
+        const style = item.style;
+        const pxSize = size * cellSize;
+        const radius = pxSize / 2;
+        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, cellSize);
+        const cx = drawX + radius;
+        const cy = drawY + radius;
+
+        if (style?.fillStyle) {
+            this.fillPaint.setColor(this.color(style.fillStyle));
+            canvas.drawCircle(cx, cy, radius, this.fillPaint);
+        }
+        if (style?.strokeStyle) {
+            this.strokePaint.setColor(this.color(style.strokeStyle));
+            this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
+            canvas.drawCircle(cx, cy, radius, this.strokePaint);
+        }
     }
 
     drawLine(
@@ -293,41 +308,48 @@ export class SkiaDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
-                const origin = this.resolveOrigin(item.origin);
 
                 if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
 
-                const img = item.img;
-                const imgW = img.width();
-                const imgH = img.height();
-                if (!imgW || !imgH) continue;
-
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
-
-                // preserve aspect
-                const aspect = imgW / imgH;
-                let drawW = pxSize;
-                let drawH = pxSize;
-                if (aspect > 1) drawH = pxSize / aspect;
-                else drawW = pxSize * aspect;
-
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
-                const offsetX = baseX + (pxSize - drawW) / 2;
-                const offsetY = baseY + (pxSize - drawH) / 2;
-                const rotation = item.rotate ?? 0;
-
-                const cx = offsetX + drawW / 2;
-                const cy = offsetY + drawH / 2;
-                const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
-
-                const src = Skia.XYWHRect(0, 0, imgW, imgH);
-                const dest = Skia.XYWHRect(offsetX, offsetY, drawW, drawH);
-                canvas.drawImageRect(img, src, dest, this.imagePaint);
-
-                if (count !== -1) canvas.restoreToCount(count);
+                this.paintImage(canvas, item, pos, this.camera.scale);
             }
         });
+    }
+
+    /** Paint a single image at a resolved position; `cellSize` is the pixel size of one world cell. */
+    private paintImage(canvas: SkCanvas, item: ImageItem<SkImage>, pos: Coords, cellSize: number) {
+        const size = item.size ?? 1;
+        const origin = this.resolveOrigin(item.origin);
+
+        const img = item.img;
+        const imgW = img.width();
+        const imgH = img.height();
+        if (!imgW || !imgH) return;
+
+        const pxSize = size * cellSize;
+
+        // preserve aspect
+        const aspect = imgW / imgH;
+        let drawW = pxSize;
+        let drawH = pxSize;
+        if (aspect > 1) drawH = pxSize / aspect;
+        else drawW = pxSize * aspect;
+
+        const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, cellSize);
+        const offsetX = baseX + (pxSize - drawW) / 2;
+        const offsetY = baseY + (pxSize - drawH) / 2;
+        const rotation = item.rotate ?? 0;
+
+        const cx = offsetX + drawW / 2;
+        const cy = offsetY + drawH / 2;
+        const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
+
+        const src = Skia.XYWHRect(0, 0, imgW, imgH);
+        const dest = Skia.XYWHRect(offsetX, offsetY, drawW, drawH);
+        canvas.drawImageRect(img, src, dest, this.imagePaint);
+
+        if (count !== -1) canvas.restoreToCount(count);
     }
 
     drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
@@ -359,25 +381,121 @@ export class SkiaDraw {
 
     // ─── Static variants ───
     //
-    // Skia records each layer into the frame picture in a single pass, so the
-    // offscreen pre-render cache used by the Canvas2D renderer is unnecessary;
-    // the static variants reuse the dynamic path.
+    // Unlike the dynamic draw* methods, which re-issue one Skia call per visible
+    // item on every frame (each a JSI hop on React Native), the static variants
+    // record the full item set once into an SkPicture and replay it per frame
+    // with a single drawPicture under the camera transform. Replay cost is a
+    // handful of calls regardless of item count — this is the Skia equivalent
+    // of the Canvas2D renderer's offscreen cache. The picture is recorded at
+    // the camera scale active at record time, so px-denominated style values
+    // (lineWidth, radius) scale with zoom afterwards, matching how the Canvas2D
+    // raster cache scales.
 
-    drawStaticRect(items: Array<Rect>, _cacheKey: string, layer: number = 1): DrawHandle {
-        return this.drawRect(items, layer);
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
+        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
+            this.paintRect(canvas, item, pos, cellSize)
+        );
     }
 
-    drawStaticCircle(items: Array<Circle>, _cacheKey: string, layer: number = 1): DrawHandle {
-        return this.drawCircle(items, layer);
+    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
+        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
+            this.paintCircle(canvas, item, pos, cellSize)
+        );
     }
 
-    drawStaticImage(items: Array<ImageItem<SkImage>>, _cacheKey: string, layer: number = 1): DrawHandle {
-        return this.drawImage(items, layer);
+    drawStaticImage(items: Array<ImageItem<SkImage>>, cacheKey: string, layer: number = 1): DrawHandle {
+        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
+            this.paintImage(canvas, item, pos, cellSize)
+        );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    clearStaticCache(_cacheKey?: string) {
-        // No offscreen caches are kept in the Skia renderer.
+    clearStaticCache(cacheKey?: string) {
+        // Only drop the references: a still-registered layer callback may keep
+        // replaying its picture, so native memory is reclaimed by the GC
+        // finalizer rather than an explicit dispose here.
+        if (cacheKey === undefined) this.staticPictureCache.clear();
+        else this.staticPictureCache.delete(cacheKey);
+    }
+
+    /**
+     * Register a layer callback that replays a cached picture of `items` under
+     * the current camera transform, recording it first if `cacheKey` is new.
+     */
+    private addStaticPictureLayer<T extends { x: number; y: number; size?: number }>(
+        cacheKey: string,
+        items: T[],
+        layer: number,
+        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void
+    ): DrawHandle {
+        if (items.length === 0) {
+            return this.layers.add(layer, () => {});
+        }
+
+        let entry = this.staticPictureCache.get(cacheKey);
+        if (!entry) {
+            entry = this.recordStaticPicture(items, paintItem);
+            this.staticPictureCache.set(cacheKey, entry);
+        }
+        const { picture, recordScale } = entry;
+
+        return this.layers.add(layer, ({ canvas, topLeft }) => {
+            // worldToScreen(w) = (w + CELL_CENTER_OFFSET - topLeft) * scale, and
+            // the picture was recorded with a camera at (0, 0, recordScale), so
+            // the recorded coordinates only miss the -topLeft term and the
+            // scale ratio.
+            const scale = this.camera.scale;
+            const count = canvas.save();
+            canvas.translate(-topLeft.x * scale, -topLeft.y * scale);
+            canvas.scale(scale / recordScale, scale / recordScale);
+            canvas.drawPicture(picture);
+            canvas.restoreToCount(count);
+        });
+    }
+
+    /** Record `items` into a picture using a camera fixed at (0, 0) and the current scale. */
+    private recordStaticPicture<T extends { x: number; y: number; size?: number }>(
+        items: T[],
+        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void
+    ): { picture: SkPicture; recordScale: number } {
+        const recordScale = this.camera.scale;
+
+        // Cull rect covering all items, padded by one world unit for origin
+        // offsets and rotation — same bounds heuristic as the Canvas2D cache.
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const item of items) {
+            const half = (item.size ?? 1) / 2;
+            if (item.x - half < minX) minX = item.x - half;
+            if (item.x + half > maxX) maxX = item.x + half;
+            if (item.y - half < minY) minY = item.y - half;
+            if (item.y + half > maxY) maxY = item.y + half;
+        }
+        minX -= 1;
+        minY -= 1;
+        maxX += 1;
+        maxY += 1;
+
+        const recorder = Skia.PictureRecorder();
+        const canvas = recorder.beginRecording(
+            Skia.XYWHRect(
+                (minX + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+                (minY + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+                (maxX - minX) * recordScale,
+                (maxY - minY) * recordScale
+            )
+        );
+
+        for (const item of items) {
+            const pos = {
+                x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+                y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+            };
+            paintItem(canvas, item, pos, recordScale);
+        }
+
+        return { picture: recorder.finishRecordingAsPicture(), recordScale };
     }
 
     // ─── Layer management ───
@@ -398,6 +516,7 @@ export class SkiaDraw {
         this.layers.clear();
         this.fontCache.clear();
         this.colorCache.clear();
+        this.staticPictureCache.clear();
     }
 
     // ─── Helpers ───
@@ -476,10 +595,10 @@ export class SkiaDraw {
         pos: Coords,
         pxSize: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
-        camera: ICamera
+        cellSize: number
     ) {
         if (origin.mode === "cell") {
-            const cell = camera.scale;
+            const cell = cellSize;
             return {
                 x: pos.x - cell / 2 + origin.x * cell - pxSize / 2,
                 y: pos.y - cell / 2 + origin.y * cell - pxSize / 2,
