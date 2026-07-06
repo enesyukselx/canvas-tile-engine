@@ -12,7 +12,12 @@ export interface GridLinesProps {
  * Draws grid lines on the canvas.
  * Multiple GridLines can share the same layer (additive drawing).
  */
-export const GridLines = memo(function GridLines({ cellSize, lineWidth = 1, strokeStyle = "black", layer = 0 }: GridLinesProps) {
+export const GridLines = memo(function GridLines({
+    cellSize,
+    lineWidth = 1,
+    strokeStyle = "black",
+    layer = 0,
+}: GridLinesProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {

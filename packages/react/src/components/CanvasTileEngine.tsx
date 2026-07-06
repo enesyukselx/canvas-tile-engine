@@ -130,7 +130,7 @@ function CanvasTileEngineBase({
             engine,
             requestRender,
         }),
-        [engine, requestRender]
+        [engine, requestRender],
     );
 
     // Initialize engine when component mounts
