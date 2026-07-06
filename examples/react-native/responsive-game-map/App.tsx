@@ -31,6 +31,13 @@ const mapConfig: CanvasTileEngineConfig = {
         drag: true,
         click: true,
     },
+    debug: {
+        enabled: true,
+        hud: {
+            enabled: true,
+            fps: true,
+        },
+    },
     coordinates: {
         enabled: true,
         shownScaleRange: { min: 30, max: 80 },
@@ -56,7 +63,11 @@ export default function App() {
     const [modalVisible, setModalVisible] = useState(false);
 
     // Generate map objects (memoized)
-    const items = useMemo(() => generateMapObjects(3000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2), []);
+    const items = useMemo(
+        () =>
+            generateMapObjects(10000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2),
+        [],
+    );
 
     // Coordinate-based Map for O(1) click lookups
     const itemsByCoord = useMemo(() => {
@@ -106,7 +117,12 @@ export default function App() {
                     });
                 }
 
-                newRectItems.push({ x: item.x, y: item.y, size: 0.7, style: { fillStyle: item.color } });
+                newRectItems.push({
+                    x: item.x,
+                    y: item.y,
+                    size: 0.7,
+                    style: { fillStyle: item.color },
+                });
             }
 
             setImageItems(newImageItems);
@@ -118,7 +134,9 @@ export default function App() {
     }, [map, map.isReady, items]);
 
     const handleClick = (coords: { snapped: { x: number; y: number } }) => {
-        const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
+        const item = itemsByCoord.get(
+            `${coords.snapped.x},${coords.snapped.y}`,
+        );
         if (item) {
             setModalItem(item);
             setModalVisible(true);
@@ -139,7 +157,10 @@ export default function App() {
                 onClick={(coords) => {
                     if (isMini) {
                         map.setScale(50);
-                        map.updateCoords({ x: coords.snapped.x, y: coords.snapped.y });
+                        map.updateCoords({
+                            x: coords.snapped.x,
+                            y: coords.snapped.y,
+                        });
                         setScale(50);
                     } else {
                         handleClick(coords);
@@ -147,23 +168,44 @@ export default function App() {
                 }}
                 onZoom={(newScale) => setScale(newScale)}
             >
-                <CanvasTileEngine.Image items={isMini ? [] : imageItems} layer={0} />
-                <CanvasTileEngine.Circle items={isMini ? [] : circleItems} layer={1} />
-                <CanvasTileEngine.Rect items={isMini ? rectItems : []} layer={1} />
+                <CanvasTileEngine.Image
+                    items={isMini ? [] : imageItems}
+                    layer={0}
+                />
+                <CanvasTileEngine.Circle
+                    items={isMini ? [] : circleItems}
+                    layer={1}
+                />
+                <CanvasTileEngine.StaticRect
+                    items={isMini ? rectItems : []}
+                    cacheKey="mini-map-rects"
+                    layer={1}
+                />
                 <CanvasTileEngine.GridLines cellSize={5} layer={2} />
-                <CanvasTileEngine.GridLines cellSize={50} lineWidth={isMini ? 2 : 4} layer={2} />
+                <CanvasTileEngine.GridLines
+                    cellSize={50}
+                    lineWidth={isMini ? 2 : 4}
+                    layer={2}
+                />
                 <CanvasTileEngine.DrawFunction layer={3}>
                     {(canvas, _coords, config) => {
                         const cx = config.size.width / 2;
                         const cy = config.size.height / 2;
                         const paint = Skia.Paint();
                         paint.setColor(Skia.Color("red"));
-                        canvas.drawRect(Skia.XYWHRect(cx - 5, cy - 5, 10, 10), paint);
+                        canvas.drawRect(
+                            Skia.XYWHRect(cx - 5, cy - 5, 10, 10),
+                            paint,
+                        );
                     }}
                 </CanvasTileEngine.DrawFunction>
             </CanvasTileEngine>
 
-            <VillageModal item={modalItem} visible={modalVisible} onClose={() => setModalVisible(false)} />
+            <VillageModal
+                item={modalItem}
+                visible={modalVisible}
+                onClose={() => setModalVisible(false)}
+            />
         </View>
     );
 }
