@@ -279,11 +279,15 @@ export class GestureProcessor {
             // Apply zoom
             this.camera.zoomByFactor(scaleFactor, centerX, centerY);
 
-            // Also pan if pinch center moved
-            const dx = currentCenter.x - this.lastPinchCenter.x;
-            const dy = currentCenter.y - this.lastPinchCenter.y;
-            if (dx !== 0 || dy !== 0) {
-                this.camera.pan(dx, dy);
+            // Also pan if pinch center moved. Skipped in "center" mode: fingers
+            // never move symmetrically, so following the midpoint would drift
+            // the camera away from the fixed anchor the mode promises.
+            if (!centerMode) {
+                const dx = currentCenter.x - this.lastPinchCenter.x;
+                const dy = currentCenter.y - this.lastPinchCenter.y;
+                if (dx !== 0 || dy !== 0) {
+                    this.camera.pan(dx, dy);
+                }
             }
 
             this.lastPinchDistance = currentDistance;
