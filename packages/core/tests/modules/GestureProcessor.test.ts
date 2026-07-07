@@ -324,6 +324,25 @@ describe("GestureProcessor", () => {
                 expect(zoomByFactorMock).toHaveBeenCalledWith(expect.any(Number), 400, 300);
             });
 
+            it("pans when the pinch midpoint moves in pointer mode", () => {
+                config.updateEventHandlers({ zoom: "pointer" });
+
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                // Both fingers shift +60 on x: midpoint moves (150, 150) -> (210, 150)
+                processor.handleTouchMove([createPointer(160, 100, 160, 100), createPointer(260, 200, 260, 200)]);
+
+                expect(panMock).toHaveBeenCalledWith(60, 0);
+            });
+
+            it("does not pan when the pinch midpoint moves in center mode", () => {
+                config.updateEventHandlers({ zoom: "center" });
+
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                processor.handleTouchMove([createPointer(160, 100, 160, 100), createPointer(260, 200, 260, 200)]);
+
+                expect(panMock).not.toHaveBeenCalled();
+            });
+
             it("does not blow up the zoom when the pinch starts at (near) zero distance", () => {
                 // Both fingers land on the same point: distance 0. Without a
                 // guard the next move would divide by zero and snap the zoom
