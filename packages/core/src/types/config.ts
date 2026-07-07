@@ -49,11 +49,19 @@ export type CanvasTileEngineConfig = {
     };
 };
 
+/**
+ * Anchor point for zoom interactions (wheel and pinch):
+ * - `"pointer"` — zoom toward the mouse cursor / pinch midpoint.
+ * - `"center"` — zoom toward the center of the canvas.
+ */
+export type ZoomMode = "pointer" | "center";
+
 export type EventHandlers = {
     click?: boolean;
     rightClick?: boolean;
     hover?: boolean;
     drag?: boolean;
-    zoom?: boolean;
+    /** Zoom behavior: `false` disables zoom, `true` is shorthand for `"pointer"`. */
+    zoom?: boolean | ZoomMode;
     resize?: boolean;
 };

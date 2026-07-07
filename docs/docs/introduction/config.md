@@ -98,14 +98,14 @@ Control how the user interacts with the map via `eventHandlers`.
 | `rightClick` | `false` | Enable right click events on grid cells.            |
 | `hover`      | `false` | Enable hover events and tracking.                   |
 | `drag`       | `false` | Enable panning by dragging the map.                 |
-| `zoom`       | `false` | Enable zooming with the mouse wheel.                |
+| `zoom`       | `false` | Enable zooming with the mouse wheel and pinch gestures. Accepts `false`, `"pointer"` (zoom toward the cursor / pinch midpoint) or `"center"` (zoom toward the canvas center). `true` is shorthand for `"pointer"`. |
 | `resize`     | `false` | Automatically resize canvas when container changes. |
 
 ```typescript
 // Example usage
 eventHandlers: {
   drag: true,
-  zoom: true,
+  zoom: "pointer", // or "center", or true (same as "pointer")
   click: true
 }
 ```
@@ -203,7 +203,7 @@ export type CanvasTileEngineConfig = {
         rightClick?: boolean;
         hover?: boolean;
         drag?: boolean;
-        zoom?: boolean;
+        zoom?: boolean | "pointer" | "center";
         resize?: boolean;
     };
     coordinates?: {

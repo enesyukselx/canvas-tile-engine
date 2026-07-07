@@ -27,7 +27,7 @@ const mapConfig: CanvasTileEngineConfig = {
     size: { width: 0, height: 0 },
     backgroundColor: MAP_BACKGROUND_COLOR,
     eventHandlers: {
-        zoom: true,
+        zoom: "center",
         drag: true,
         click: true,
     },

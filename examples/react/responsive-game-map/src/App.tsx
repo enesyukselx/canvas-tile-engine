@@ -26,7 +26,7 @@ const mapConfig: CanvasTileEngineConfig = {
     backgroundColor: MAP_BACKGROUND_COLOR,
     eventHandlers: {
         hover: true,
-        zoom: true,
+        zoom: "center",
         drag: true,
         click: true,
     },
@@ -105,7 +105,12 @@ export default function App() {
                     });
                 }
 
-                newRectItems.push({ x: item.x, y: item.y, size: 0.7, style: { fillStyle: item.color } });
+                newRectItems.push({
+                    x: item.x,
+                    y: item.y,
+                    size: 0.7,
+                    style: { fillStyle: item.color },
+                });
             }
 
             setImageItems(newImageItems);
@@ -150,7 +155,10 @@ export default function App() {
                     onClick={(coords) => {
                         if (scale < MINI_MAP_SCALE_THRESHOLD) {
                             map.setScale(50);
-                            map.updateCoords({ x: coords.snapped.x, y: coords.snapped.y });
+                            map.updateCoords({
+                                x: coords.snapped.x,
+                                y: coords.snapped.y,
+                            });
                             setScale(50);
                         } else {
                             window.document.body.style.cursor = "default";
