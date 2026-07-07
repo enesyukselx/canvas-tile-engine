@@ -296,6 +296,45 @@ describe("GestureProcessor", () => {
                 expect(panMock).toHaveBeenCalledWith(50, 50);
             });
 
+            it("does not pan for finger jitter inside the slop radius", () => {
+                processor.handleTouchStart([createPointer(100, 100, 100, 100)]);
+                processor.handleTouchMove([createPointer(104, 103, 104, 103)]);
+                processor.handleTouchMove([createPointer(101, 99, 101, 99)]);
+
+                expect(panMock).not.toHaveBeenCalled();
+            });
+
+            it("keeps a jittery touch eligible as a tap", () => {
+                const onClick = vi.fn();
+                processor.onClick = onClick;
+
+                processor.handleTouchStart([createPointer(100, 100, 100, 100)]);
+                processor.handleTouchMove([createPointer(104, 103, 104, 103)]);
+                processor.handleTouchEnd([], createPointer(104, 103, 104, 103));
+
+                expect(onClick).toHaveBeenCalledTimes(1);
+            });
+
+            it("starts panning from the current position once the slop is passed", () => {
+                processor.handleTouchStart([createPointer(100, 100, 100, 100)]);
+                // Inside slop: absorbed, becomes the new pan origin
+                processor.handleTouchMove([createPointer(104, 100, 104, 100)]);
+                // Past slop: pans by the delta from the last absorbed position
+                processor.handleTouchMove([createPointer(120, 100, 120, 100)]);
+
+                expect(panMock).toHaveBeenCalledTimes(1);
+                expect(panMock).toHaveBeenCalledWith(16, 0);
+            });
+
+            it("does not apply slop after a pinch hands off to drag", () => {
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                processor.handleTouchEnd([createPointer(100, 100, 100, 100)]);
+                // Sub-slop movement must pan immediately mid-gesture
+                processor.handleTouchMove([createPointer(103, 100, 103, 100)]);
+
+                expect(panMock).toHaveBeenCalledWith(3, 0);
+            });
+
             it("zooms with two finger pinch", () => {
                 processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
                 // Spread fingers apart (zoom in)

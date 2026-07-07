@@ -16,6 +16,14 @@ import { CoordinateTransformer } from "./CoordinateTransformer";
 // nearly on the same point would divide by ~0 and snap the zoom to its limit.
 const MIN_PINCH_DISTANCE = 1;
 
+// Touch drag slop: a single finger must travel this far (px) from where it
+// landed before panning starts, so the jitter of a finger pressing down or
+// lifting off never nudges the map. Kept equal to the react-native binding's
+// TAP_MOVE_THRESHOLD so any movement small enough to count as a tap is also
+// guaranteed not to pan. Applies to touch only — mouse input is precise and
+// keeps pixel-accurate drag.
+const TOUCH_DRAG_SLOP_PX = 8;
+
 /**
  * Normalized pointer input - renderer-agnostic format.
  * All coordinates should be canvas-relative.
@@ -88,6 +96,11 @@ export class GestureProcessor {
     private isPinching = false;
     private lastPinchDistance = 0;
     private lastPinchCenter = { x: 0, y: 0 };
+
+    // Touch drag slop state: panning is suppressed until the finger travels
+    // TOUCH_DRAG_SLOP_PX from touchStartPos (bypassed on pinch→drag handoff).
+    private touchStartPos = { x: 0, y: 0 };
+    private touchSlopPassed = true;
 
     // User callbacks
     public onClick?: onClickCallback;
@@ -258,6 +271,8 @@ export class GestureProcessor {
         this.isPinching = false;
         this.shouldPreventClick = false;
         this.lastPos = { x: pointer.clientX, y: pointer.clientY };
+        this.touchStartPos = { x: pointer.clientX, y: pointer.clientY };
+        this.touchSlopPassed = false;
     };
 
     handleTouchMove = (pointers: NormalizedPointer[]): void => {
@@ -315,6 +330,17 @@ export class GestureProcessor {
         if (!this.isDragging) {
             return;
         }
+        // Absorb movement inside the slop radius: no pan, and the gesture
+        // stays eligible as a tap (shouldPreventClick is left untouched).
+        if (!this.touchSlopPassed) {
+            const travelX = pointer.clientX - this.touchStartPos.x;
+            const travelY = pointer.clientY - this.touchStartPos.y;
+            if (Math.hypot(travelX, travelY) < TOUCH_DRAG_SLOP_PX) {
+                this.lastPos = { x: pointer.clientX, y: pointer.clientY };
+                return;
+            }
+            this.touchSlopPassed = true;
+        }
         const dx = pointer.clientX - this.lastPos.x;
         const dy = pointer.clientY - this.lastPos.y;
         if (dx !== 0 || dy !== 0) {
@@ -340,6 +366,8 @@ export class GestureProcessor {
                 this.isDragging = true;
                 const pointer = remainingPointers[0];
                 this.lastPos = { x: pointer.clientX, y: pointer.clientY };
+                // Continuation of an intentional gesture — no slop dead zone
+                this.touchSlopPassed = true;
             }
             return;
         }

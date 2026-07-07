@@ -34,7 +34,9 @@ import { StaticImage } from "./draw/StaticImage";
 import { DrawFunction } from "./draw/DrawFunction";
 
 // Tap heuristics: a touch that moves less than this (dp) and lasts less than
-// this (ms) is treated as a tap/click.
+// this (ms) is treated as a tap/click. Kept equal to core's
+// TOUCH_DRAG_SLOP_PX (GestureProcessor) so a tap-sized movement also never
+// pans the map.
 const TAP_MOVE_THRESHOLD = 8;
 const TAP_TIME_THRESHOLD = 300;
 
