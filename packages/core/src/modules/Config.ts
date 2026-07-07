@@ -1,6 +1,12 @@
-import { CanvasTileEngineConfig, EventHandlers } from "../types";
+import { CanvasTileEngineConfig, EventHandlers, ZoomMode } from "../types";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
 import { validateConfig, validateBounds } from "../utils/validateConfig";
+
+/** Normalize the zoom setting so consumers only see a mode or `false` (`true` means `"pointer"`). */
+function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
+    if (zoom === true) return "pointer";
+    return zoom || false;
+}
 
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
@@ -40,7 +46,7 @@ export class Config {
                 rightClick: config.eventHandlers?.rightClick ?? false,
                 hover: config.eventHandlers?.hover ?? false,
                 drag: config.eventHandlers?.drag ?? false,
-                zoom: config.eventHandlers?.zoom ?? false,
+                zoom: normalizeZoom(config.eventHandlers?.zoom),
                 resize: config.eventHandlers?.resize ?? false,
             },
 
@@ -118,12 +124,16 @@ export class Config {
      * @param handlers Partial event handlers to update.
      */
     updateEventHandlers(handlers: Partial<EventHandlers>) {
+        const merged = {
+            ...this.config.eventHandlers,
+            ...handlers,
+        };
+        if ("zoom" in handlers) {
+            merged.zoom = normalizeZoom(handlers.zoom);
+        }
         this.config = Object.freeze({
             ...this.config,
-            eventHandlers: Object.freeze({
-                ...this.config.eventHandlers,
-                ...handlers,
-            }),
+            eventHandlers: Object.freeze(merged),
         });
     }
 

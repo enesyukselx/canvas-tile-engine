@@ -246,6 +246,23 @@ describe("GestureProcessor", () => {
 
             expect(zoomMock).not.toHaveBeenCalled();
         });
+
+        it("anchors zoom at the pointer in pointer mode", () => {
+            config.updateEventHandlers({ zoom: "pointer" });
+
+            processor.handleWheel(createPointer(100, 100, 120, 130), -50);
+
+            expect(zoomMock).toHaveBeenCalledWith(120, 130, -50, canvasBounds);
+        });
+
+        it("anchors zoom at the canvas center in center mode", () => {
+            config.updateEventHandlers({ zoom: "center" });
+
+            processor.handleWheel(createPointer(100, 100, 120, 130), -50);
+
+            // Canvas is 800x600 at (0, 0), so its center is (400, 300)
+            expect(zoomMock).toHaveBeenCalledWith(400, 300, -50, canvasBounds);
+        });
     });
 
     describe("touch handlers", () => {
@@ -285,6 +302,26 @@ describe("GestureProcessor", () => {
                 processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
 
                 expect(zoomByFactorMock).toHaveBeenCalled();
+            });
+
+            it("anchors pinch zoom at the pinch midpoint in pointer mode", () => {
+                config.updateEventHandlers({ zoom: "pointer" });
+
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
+
+                // Pinch midpoint is (150, 150), canvas offset is (0, 0)
+                expect(zoomByFactorMock).toHaveBeenCalledWith(expect.any(Number), 150, 150);
+            });
+
+            it("anchors pinch zoom at the canvas center in center mode", () => {
+                config.updateEventHandlers({ zoom: "center" });
+
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
+
+                // Canvas is 800x600, so its center is (400, 300)
+                expect(zoomByFactorMock).toHaveBeenCalledWith(expect.any(Number), 400, 300);
             });
 
             it("does not blow up the zoom when the pinch starts at (near) zero distance", () => {

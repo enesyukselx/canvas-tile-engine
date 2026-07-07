@@ -271,9 +271,10 @@ export class GestureProcessor {
             const scaleFactor =
                 this.lastPinchDistance >= MIN_PINCH_DISTANCE ? currentDistance / this.lastPinchDistance : 1;
 
-            // Get pinch center relative to canvas
-            const centerX = currentCenter.x - bounds.left;
-            const centerY = currentCenter.y - bounds.top;
+            // Zoom anchor relative to canvas: pinch midpoint, or canvas center in "center" mode
+            const centerMode = this.config.get().eventHandlers.zoom === "center";
+            const centerX = centerMode ? bounds.width / 2 : currentCenter.x - bounds.left;
+            const centerY = centerMode ? bounds.height / 2 : currentCenter.y - bounds.top;
 
             // Apply zoom
             this.camera.zoomByFactor(scaleFactor, centerX, centerY);
@@ -360,9 +361,14 @@ export class GestureProcessor {
     // ─── Wheel Zoom Handler ───────────────────────────────
 
     handleWheel = (pointer: NormalizedPointer, deltaY: number): void => {
-        if (!this.config.get().eventHandlers.zoom) return;
+        const zoom = this.config.get().eventHandlers.zoom;
+        if (!zoom) return;
         const bounds = this.canvasBoundsGetter();
-        this.camera.zoom(pointer.clientX, pointer.clientY, deltaY, bounds as DOMRect);
+        const anchor =
+            zoom === "center"
+                ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
+                : { x: pointer.clientX, y: pointer.clientY };
+        this.camera.zoom(anchor.x, anchor.y, deltaY, bounds as DOMRect);
         if (this.onZoom) {
             this.onZoom(this.camera.scale);
         }

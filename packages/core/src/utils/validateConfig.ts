@@ -104,6 +104,12 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
         }
     }
 
+    // Event handler validation
+    const zoom = config.eventHandlers?.zoom;
+    if (zoom !== undefined && typeof zoom !== "boolean" && zoom !== "pointer" && zoom !== "center") {
+        throw configError(`eventHandlers.zoom must be a boolean, "pointer" or "center", got ${zoom}`);
+    }
+
     // Bounds validation
     if (config.bounds) {
         const { minX, maxX, minY, maxY } = config.bounds;

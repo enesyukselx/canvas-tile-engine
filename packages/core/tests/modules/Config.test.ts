@@ -137,8 +137,40 @@ describe("Config", () => {
             const result = config.get();
             expect(result.eventHandlers.click).toBe(true);
             expect(result.eventHandlers.drag).toBe(true);
-            expect(result.eventHandlers.zoom).toBe(true);
+            expect(result.eventHandlers.zoom).toBe("pointer");
             expect(result.eventHandlers.hover).toBe(false);
+        });
+
+        it('normalizes zoom: true to "pointer"', () => {
+            const config = new Config({
+                ...minimalConfig,
+                eventHandlers: { zoom: true },
+            });
+            expect(config.get().eventHandlers.zoom).toBe("pointer");
+        });
+
+        it("keeps explicit zoom modes as-is", () => {
+            const pointerConfig = new Config({
+                ...minimalConfig,
+                eventHandlers: { zoom: "pointer" },
+            });
+            expect(pointerConfig.get().eventHandlers.zoom).toBe("pointer");
+
+            const centerConfig = new Config({
+                ...minimalConfig,
+                eventHandlers: { zoom: "center" },
+            });
+            expect(centerConfig.get().eventHandlers.zoom).toBe("center");
+        });
+
+        it("throws on invalid zoom mode", () => {
+            expect(
+                () =>
+                    new Config({
+                        ...minimalConfig,
+                        eventHandlers: { zoom: "corner" as unknown as boolean },
+                    }),
+            ).toThrow(/eventHandlers.zoom/);
         });
 
         it("applies default bounds as infinity", () => {
@@ -268,7 +300,19 @@ describe("Config", () => {
             const result = config.get();
             expect(result.eventHandlers.click).toBe(true);
             expect(result.eventHandlers.drag).toBe(true);
-            expect(result.eventHandlers.zoom).toBe(true);
+            expect(result.eventHandlers.zoom).toBe("pointer");
+        });
+
+        it("normalizes zoom when updated at runtime", () => {
+            const config = new Config(minimalConfig);
+            config.updateEventHandlers({ zoom: true });
+            expect(config.get().eventHandlers.zoom).toBe("pointer");
+
+            config.updateEventHandlers({ zoom: "center" });
+            expect(config.get().eventHandlers.zoom).toBe("center");
+
+            config.updateEventHandlers({ zoom: false });
+            expect(config.get().eventHandlers.zoom).toBe(false);
         });
 
         it("can disable event handlers", () => {

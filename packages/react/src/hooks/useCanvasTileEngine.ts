@@ -26,7 +26,7 @@ const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
     gridAligned: false,
     eventHandlers: {
         drag: true,
-        zoom: true,
+        zoom: "pointer",
         hover: false,
         click: false,
         rightClick: false,
