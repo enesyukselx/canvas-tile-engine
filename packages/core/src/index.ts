@@ -15,3 +15,5 @@ export type { NormalizedPointer, NormalizedPinch, ProcessedCoords, CanvasBounds 
 export { AnimationController } from "./modules/AnimationController";
 export { SpriteSheet } from "./modules/SpriteSheet";
 export type { SpriteSheetOptions } from "./modules/SpriteSheet";
+export { SpriteAnimator } from "./modules/SpriteAnimator";
+export type { SpriteAnimation } from "./modules/SpriteAnimator";
