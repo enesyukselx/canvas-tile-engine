@@ -46,5 +46,10 @@ export type {
 export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
 // Re-export core class and utilities
-export { CanvasTileEngine as CanvasTileEngineCore, gridToSize, SpriteSheet, SpriteAnimator } from "@canvas-tile-engine/core";
+export {
+    CanvasTileEngine as CanvasTileEngineCore,
+    gridToSize,
+    SpriteSheet,
+    SpriteAnimator,
+} from "@canvas-tile-engine/core";
 export type { SpriteRect, SpriteSheetOptions, SpriteAnimation } from "@canvas-tile-engine/core";
