@@ -36,16 +36,16 @@ async function main() {
     // ─── Static frames: pick single frames from the sheet, no animation ───
     const staticItems: ImageItem[] = [];
     for (let row = 0; row < 4; row++) {
-        staticItems.push({ x: 1, y: row * 2 + 1, size: 1.5, img, sprite: sheet.frame(0, row) });
+        staticItems.push({ x: 8, y: row + 1, size: 1, img, sprite: sheet.frame(0, row) });
     }
     engine.drawImage(staticItems);
 
     // ─── Animated dragons: one per sheet row, driven by SpriteAnimator ───
     const dragons = [
-        { x: 5, y: 1, size: 4, row: 0 },
-        { x: 9, y: 1, size: 4, row: 1 },
-        { x: 5, y: 6, size: 4, row: 2 },
-        { x: 9, y: 6, size: 4, row: 3 },
+        { x: 1, y: 2, size: 1, row: 0 },
+        { x: 2, y: 2, size: 1, row: 1 },
+        { x: 3, y: 2, size: 1, row: 2 },
+        { x: 4, y: 2, size: 1, row: 3 },
     ];
 
     const controllers: Array<{ item: ImageItem; animator: SpriteAnimator }> = [];
