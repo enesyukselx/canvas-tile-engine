@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="stylesheet" href="./src/style.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>spritesheet</title>
+    </head>
+
+    <body>
+        <div class="page">
+            <h1>Spritesheet &amp; Animation</h1>
+            <p class="hint">
+                One 432&times;512 sheet (3 columns &times; 4 rows, 144&times;128 frames). Left column: fixed frames via
+                <code>sheet.frame(col, row)</code>. Right side: dragons animated with <code>SpriteAnimator</code>. Drag
+                to pan, scroll to zoom.
+            </p>
+            <div id="map-wrapper" style="width: 800px; height: 600px">
+                <canvas></canvas>
+            </div>
+        </div>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>
