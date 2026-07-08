@@ -7,6 +7,7 @@ import type { CanvasTileEngineProps } from "../types";
 import { Rect } from "./draw/Rect";
 import { Circle } from "./draw/Circle";
 import { Image } from "./draw/Image";
+import { Sprite } from "./draw/Sprite";
 import { GridLines } from "./draw/GridLines";
 import { Line } from "./draw/Line";
 import { Text } from "./draw/Text";
@@ -194,6 +195,7 @@ export const CanvasTileEngine = Object.assign(CanvasTileEngineBase, {
     Rect,
     Circle,
     Image,
+    Sprite,
     GridLines,
     Line,
     Text,
