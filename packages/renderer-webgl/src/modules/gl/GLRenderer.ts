@@ -55,6 +55,12 @@ export interface ImageInstance {
     rotation: number;
     /** Opacity multiplier in [0, 1]. */
     alpha: number;
+    /** Normalized texcoord of the left/top edge (default: 0). Used for spritesheet frames. */
+    u0?: number;
+    v0?: number;
+    /** Normalized texcoord of the right/bottom edge (default: 1). Used for spritesheet frames. */
+    u1?: number;
+    v1?: number;
 }
 
 type GL = WebGLRenderingContext;
@@ -372,13 +378,18 @@ export class GLRenderer {
                 const cos = Math.cos(item.rotation);
                 const sin = Math.sin(item.rotation);
 
-                // Corner local offsets with their texcoords. Screen-top maps to v=0,
-                // matching the top row of the (un-flipped) uploaded image.
+                // Corner local offsets with their texcoords. Screen-top maps to v0,
+                // matching the top row of the (un-flipped) uploaded image. The UV
+                // rect defaults to the full texture; sprite frames narrow it.
+                const u0 = item.u0 ?? 0;
+                const v0 = item.v0 ?? 0;
+                const u1 = item.u1 ?? 1;
+                const v1 = item.v1 ?? 1;
                 const corners = [
-                    [-hw, -hh, 0, 0],
-                    [hw, -hh, 1, 0],
-                    [hw, hh, 1, 1],
-                    [-hw, hh, 0, 1],
+                    [-hw, -hh, u0, v0],
+                    [hw, -hh, u1, v0],
+                    [hw, hh, u1, v1],
+                    [-hw, hh, u0, v1],
                 ];
 
                 for (const i of order) {

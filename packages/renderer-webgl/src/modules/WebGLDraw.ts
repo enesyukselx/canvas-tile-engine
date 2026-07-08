@@ -333,8 +333,13 @@ export class WebGLDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
 
-                // preserve aspect
-                const aspect = item.img.width / item.img.height;
+                // Spritesheet source rect; defaults to the whole image
+                const sprite = item.sprite;
+                const srcW = sprite?.w ?? item.img.width;
+                const srcH = sprite?.h ?? item.img.height;
+
+                // preserve aspect (of the sprite frame when one is set)
+                const aspect = srcW / srcH;
                 let drawW = pxSize;
                 let drawH = pxSize;
                 if (aspect > 1) drawH = pxSize / aspect;
@@ -345,7 +350,7 @@ export class WebGLDraw {
                 const offsetY = baseY + (pxSize - drawH) / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
 
-                images.push({
+                const instance: ImageInstance = {
                     texture,
                     x: offsetX,
                     y: offsetY,
@@ -353,7 +358,17 @@ export class WebGLDraw {
                     h: drawH,
                     rotation,
                     alpha: 1,
-                });
+                };
+
+                if (sprite) {
+                    // Normalize the pixel rect into 0..1 texcoords
+                    instance.u0 = sprite.x / item.img.width;
+                    instance.v0 = sprite.y / item.img.height;
+                    instance.u1 = (sprite.x + sprite.w) / item.img.width;
+                    instance.v1 = (sprite.y + sprite.h) / item.img.height;
+                }
+
+                images.push(instance);
             }
 
             gl.drawImages(images);
