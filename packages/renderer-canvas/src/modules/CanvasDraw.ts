@@ -11,6 +11,7 @@ import {
     Path,
     Rect,
     SpatialIndex,
+    SpriteRect,
     Text,
     VISIBILITY_BUFFER,
 } from "@canvas-tile-engine/core";
@@ -341,6 +342,25 @@ export class CanvasDraw {
         });
     }
 
+    /**
+     * Draw an image, optionally cropped to a spritesheet source rectangle.
+     */
+    private blitImage(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        img: HTMLImageElement,
+        sprite: SpriteRect | undefined,
+        dx: number,
+        dy: number,
+        dw: number,
+        dh: number,
+    ) {
+        if (sprite) {
+            ctx.drawImage(img, sprite.x, sprite.y, sprite.w, sprite.h, dx, dy, dw, dh);
+        } else {
+            ctx.drawImage(img, dx, dy, dw, dh);
+        }
+    }
+
     drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
@@ -368,8 +388,10 @@ export class CanvasDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
 
-                // preserve aspect
-                const aspect = item.img.width / item.img.height;
+                // preserve aspect (of the sprite frame when one is set)
+                const srcW = item.sprite?.w ?? item.img.width;
+                const srcH = item.sprite?.h ?? item.img.height;
+                const aspect = srcW / srcH;
 
                 let drawW = pxSize;
                 let drawH = pxSize;
@@ -392,10 +414,10 @@ export class CanvasDraw {
                     ctx.save();
                     ctx.translate(centerX, centerY);
                     ctx.rotate(rotation);
-                    ctx.drawImage(item.img, -drawW / 2, -drawH / 2, drawW, drawH);
+                    this.blitImage(ctx, item.img, item.sprite, -drawW / 2, -drawH / 2, drawW, drawH);
                     ctx.restore();
                 } else {
-                    ctx.drawImage(item.img, offsetX, offsetY, drawW, drawH);
+                    this.blitImage(ctx, item.img, item.sprite, offsetX, offsetY, drawW, drawH);
                 }
             }
         });
@@ -776,9 +798,12 @@ export class CanvasDraw {
     drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
+            const sprite = (item as { sprite?: SpriteRect }).sprite;
             const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
-            const aspect = img.width / img.height;
+            const srcW = sprite?.w ?? img.width;
+            const srcH = sprite?.h ?? img.height;
+            const aspect = srcW / srcH;
             let drawW = pxSize;
             let drawH = pxSize;
 
@@ -795,10 +820,10 @@ export class CanvasDraw {
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(rotation);
-                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH);
                 ctx.restore();
             } else {
-                ctx.drawImage(img, imgX, imgY, drawW, drawH);
+                this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH);
             }
         });
 
