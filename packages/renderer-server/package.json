@@ -57,10 +57,10 @@
         "node": ">=18"
     },
     "peerDependencies": {
-        "@canvas-tile-engine/core": ">=0.3.0"
+        "@canvas-tile-engine/core": ">=0.4.0"
     },
     "dependencies": {
-        "@canvas-tile-engine/core": "workspace:*",
+        "@canvas-tile-engine/core": "workspace:^",
         "@napi-rs/canvas": "^0.1.60"
     },
     "devDependencies": {
