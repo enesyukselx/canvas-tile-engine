@@ -74,17 +74,17 @@ import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 
 ## Components
 
-| Component | Draws |
-| --- | --- |
-| `CanvasTileEngine.Rect` / `StaticRect` | Dynamic or cached rectangles. |
-| `CanvasTileEngine.Circle` / `StaticCircle` | Dynamic or cached circles. |
-| `CanvasTileEngine.Image` / `StaticImage` | Images or spritesheet source rectangles. |
-| `CanvasTileEngine.Sprite` | Animated spritesheet frames. |
-| `CanvasTileEngine.GridLines` | Infinite grid lines in world space. |
-| `CanvasTileEngine.Line` | Line segments between world points. |
-| `CanvasTileEngine.Path` | Polylines through world points. |
-| `CanvasTileEngine.Text` | Text positioned in world space. |
-| `CanvasTileEngine.DrawFunction` | Custom renderer-specific drawing. |
+| Component                                  | Draws                                    |
+| ------------------------------------------ | ---------------------------------------- |
+| `CanvasTileEngine.Rect` / `StaticRect`     | Dynamic or cached rectangles.            |
+| `CanvasTileEngine.Circle` / `StaticCircle` | Dynamic or cached circles.               |
+| `CanvasTileEngine.Image` / `StaticImage`   | Images or spritesheet source rectangles. |
+| `CanvasTileEngine.Sprite`                  | Animated spritesheet frames.             |
+| `CanvasTileEngine.GridLines`               | Infinite grid lines in world space.      |
+| `CanvasTileEngine.Line`                    | Line segments between world points.      |
+| `CanvasTileEngine.Path`                    | Polylines through world points.          |
+| `CanvasTileEngine.Text`                    | Text positioned in world space.          |
+| `CanvasTileEngine.DrawFunction`            | Custom renderer-specific drawing.        |
 
 For large arrays, keep `items` stable with `useMemo` or state. A new array identity re-registers the draw callback and can rebuild spatial indexes.
 

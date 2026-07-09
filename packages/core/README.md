@@ -93,26 +93,26 @@ new CanvasTileEngine(wrapper, config, new MyCustomRenderer());
 
 Official renderers:
 
-| Package | Surface |
-| --- | --- |
-| [`@canvas-tile-engine/renderer-canvas`](../renderer-canvas) | HTML Canvas2D |
-| [`@canvas-tile-engine/renderer-webgl`](../renderer-webgl) | WebGL with a 2D overlay |
-| [`@canvas-tile-engine/renderer-skia`](../renderer-skia) | React Native Skia |
+| Package                                                     | Surface                        |
+| ----------------------------------------------------------- | ------------------------------ |
+| [`@canvas-tile-engine/renderer-canvas`](../renderer-canvas) | HTML Canvas2D                  |
+| [`@canvas-tile-engine/renderer-webgl`](../renderer-webgl)   | WebGL with a 2D overlay        |
+| [`@canvas-tile-engine/renderer-skia`](../renderer-skia)     | React Native Skia              |
 | [`@canvas-tile-engine/renderer-server`](../renderer-server) | Headless Node.js image buffers |
 
 ## Useful APIs
 
-| API | Purpose |
-| --- | --- |
-| `engine.render()` | Render the current scene. |
-| `engine.updateCoords({ x, y })` | Move the camera center immediately. |
-| `engine.goCoords(x, y, durationMs)` | Animate the camera center. |
-| `engine.setScale(scale)` / `zoomIn()` / `zoomOut()` | Control zoom programmatically. |
-| `engine.getVisibleBounds()` | Read the visible world bounds for culling, lazy loading, or UI state. |
-| `engine.setBounds(bounds)` | Clamp camera movement. |
-| `engine.setEventHandlers(partial)` | Enable or disable interactions at runtime. |
-| `engine.clearLayer(layer)` / `clearAll()` | Replace dynamic content safely. |
-| `engine.images.load(src)` | Load platform-specific image handles through the active renderer. |
+| API                                                 | Purpose                                                               |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| `engine.render()`                                   | Render the current scene.                                             |
+| `engine.updateCoords({ x, y })`                     | Move the camera center immediately.                                   |
+| `engine.goCoords(x, y, durationMs)`                 | Animate the camera center.                                            |
+| `engine.setScale(scale)` / `zoomIn()` / `zoomOut()` | Control zoom programmatically.                                        |
+| `engine.getVisibleBounds()`                         | Read the visible world bounds for culling, lazy loading, or UI state. |
+| `engine.setBounds(bounds)`                          | Clamp camera movement.                                                |
+| `engine.setEventHandlers(partial)`                  | Enable or disable interactions at runtime.                            |
+| `engine.clearLayer(layer)` / `clearAll()`           | Replace dynamic content safely.                                       |
+| `engine.images.load(src)`                           | Load platform-specific image handles through the active renderer.     |
 
 ## Sprites
 

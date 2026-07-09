@@ -78,12 +78,12 @@ engine.destroy();
 
 ## Output API
 
-| Method | Returns | Notes |
-| --- | --- | --- |
-| `renderer.toBuffer(format?, quality?)` | `Buffer` | Synchronous encode. |
-| `renderer.encode(format?, quality?)` | `Promise<Buffer>` | Async encode; better for servers. |
-| `renderer.getCanvas()` | `Canvas` | Underlying `@napi-rs/canvas` canvas. |
-| `renderer.getContext()` | `SKRSContext2D` | Underlying 2D context. |
+| Method                                 | Returns           | Notes                                |
+| -------------------------------------- | ----------------- | ------------------------------------ |
+| `renderer.toBuffer(format?, quality?)` | `Buffer`          | Synchronous encode.                  |
+| `renderer.encode(format?, quality?)`   | `Promise<Buffer>` | Async encode; better for servers.    |
+| `renderer.getCanvas()`                 | `Canvas`          | Underlying `@napi-rs/canvas` canvas. |
+| `renderer.getContext()`                | `SKRSContext2D`   | Underlying 2D context.               |
 
 `format` is `"png"`, `"jpeg"`, or `"webp"` and defaults to `"png"`. `quality` is `0-100` for JPEG/WebP and is ignored for PNG.
 
