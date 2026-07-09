@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Canvas Tile Engine is a monorepo containing a lightweight library for building interactive 2D grid-based maps and visualizations using HTML Canvas. It provides camera controls, coordinate transformations, rendering, and user interactions.
+Canvas Tile Engine is a pnpm/Turborepo monorepo for building zoomable 2D grid surfaces: maps, game boards, minimaps, editors, pixel tools, and data-heavy spatial UIs.
 
-The architecture follows a modular renderer pattern with dependency injection, separating core calculations from platform-specific rendering implementations.
+The engine is renderer-agnostic. `@canvas-tile-engine/core` owns camera state, coordinate transforms, event callback plumbing, draw APIs, sprites, viewport culling, static caches, and spatial indexing. Platform packages inject renderers for Canvas2D, WebGL, React Native Skia, and headless Node.js image output.
 
 ## Commands
 
@@ -14,16 +14,19 @@ The architecture follows a modular renderer pattern with dependency injection, s
 # Install dependencies
 pnpm install
 
-# Build all packages (core must build before react, renderer-canvas is standalone)
+# Build published packages
 pnpm build
 
-# Build renderer-canvas separately
-pnpm --filter @canvas-tile-engine/renderer-canvas build
+# Build docs
+pnpm build:docs
 
-# Run development mode (core + vanilla example)
+# Run package watch mode plus the default vanilla example
 pnpm dev
 
-# Run specific example
+# Watch library packages only
+pnpm dev:lib
+
+# Run a specific example
 pnpm dev:example --example=<example-name>
 
 # Lint all packages
@@ -32,120 +35,191 @@ pnpm lint
 # Type check all packages
 pnpm typecheck
 
-# Run tests (core package only)
+# Format all packages
+pnpm format
+
+# Check formatting
+pnpm format:check
+
+# Run tests
 pnpm test
 
 # Run tests with coverage
 pnpm test:coverage
-
-# Run a single test file
-pnpm --filter @canvas-tile-engine/core test -- <test-file-pattern>
-
-# Watch mode for tests
-pnpm --filter @canvas-tile-engine/core test -- --watch
 ```
 
-### Package-specific commands
+### Package-Specific Commands
 
 ```bash
-# Core package
-pnpm --filter @canvas-tile-engine/core dev       # Watch mode
-pnpm --filter @canvas-tile-engine/core test      # Run tests
-pnpm --filter @canvas-tile-engine/core typecheck # Type check
+# Core
+pnpm --filter @canvas-tile-engine/core dev
+pnpm --filter @canvas-tile-engine/core build
+pnpm --filter @canvas-tile-engine/core test
+pnpm --filter @canvas-tile-engine/core typecheck
 
-# React package
-pnpm --filter @canvas-tile-engine/react dev      # Watch mode
+# React
+pnpm --filter @canvas-tile-engine/react dev
+pnpm --filter @canvas-tile-engine/react build
 pnpm --filter @canvas-tile-engine/react typecheck
 
-# Renderer Canvas package
-pnpm --filter @canvas-tile-engine/renderer-canvas build
-pnpm --filter @canvas-tile-engine/renderer-canvas dev
+# React Native
+pnpm --filter @canvas-tile-engine/react-native dev
+pnpm --filter @canvas-tile-engine/react-native build
+pnpm --filter @canvas-tile-engine/react-native typecheck
+
+# Renderers
+pnpm --filter @canvas-tile-engine/renderer-canvas test
+pnpm --filter @canvas-tile-engine/renderer-webgl test
+pnpm --filter @canvas-tile-engine/renderer-skia test
+pnpm --filter @canvas-tile-engine/renderer-server test
 ```
+
+### Examples
+
+```bash
+pnpm --filter vanilla-js-game-map dev
+pnpm --filter vanilla-js-spritesheet dev
+pnpm --filter react-game-map dev
+pnpm --filter react-responsive-game-map dev
+pnpm --filter react-pixel-paint dev
+pnpm --filter react-spritesheet dev
+pnpm --filter renderer-server-game-map start
+```
+
+For example development against local package changes, run `pnpm dev:lib` in one terminal and the example command in another.
 
 ## Architecture
 
 ### Monorepo Structure
 
--   `packages/core/` - `@canvas-tile-engine/core`: Framework-agnostic engine (DOM-agnostic calculations)
--   `packages/renderer-canvas/` - `@canvas-tile-engine/renderer-canvas`: Canvas2D renderer implementation
--   `packages/react/` - `@canvas-tile-engine/react`: React bindings (depends on core)
--   `examples/` - Example projects (vanilla-js-examples/, react/)
--   `docs/` - Docusaurus documentation site
+- `packages/core/` - `@canvas-tile-engine/core`: renderer-agnostic engine, config, camera, gestures, draw API contracts, sprites, and spatial indexing.
+- `packages/react/` - `@canvas-tile-engine/react`: React bindings with `useCanvasTileEngine` and compound draw components.
+- `packages/react-native/` - `@canvas-tile-engine/react-native`: React Native bindings with the same component API, mounted through Skia.
+- `packages/renderer-canvas/` - `@canvas-tile-engine/renderer-canvas`: HTML Canvas2D renderer.
+- `packages/renderer-webgl/` - `@canvas-tile-engine/renderer-webgl`: WebGL renderer with a Canvas2D overlay.
+- `packages/renderer-skia/` - `@canvas-tile-engine/renderer-skia`: React Native Skia renderer.
+- `packages/renderer-server/` - `@canvas-tile-engine/renderer-server`: headless Node.js renderer for PNG/JPEG/WebP buffers.
+- `examples/` - Vite, React, React Native, spritesheet, and server-rendering examples.
+- `docs/` - Docusaurus documentation site.
 
-### Core Package (`packages/core/src/`)
+### Core Package
 
-The main class is `CanvasTileEngine.ts` which orchestrates these modules:
+Main entry: `packages/core/src/CanvasTileEngine.ts`.
 
-**Core Modules (DOM-agnostic):**
+Important modules:
 
--   **Camera.ts** - Pan, zoom, and position management
--   **Config.ts** - Configuration validation and defaults
--   **ViewportState.ts** - Viewport dimensions and DPR tracking
--   **CoordinateTransformer.ts** - World-to-screen coordinate conversion
--   **GestureProcessor.ts** - Normalized pointer/touch input handling
--   **AnimationController.ts** - Smooth camera animations (pan, zoom, resize)
--   **SpatialIndex.ts** - R-Tree (rbush) for viewport culling on large datasets
+- `Camera.ts` - pan, zoom, bounds, and center management.
+- `Config.ts` - config normalization and defaults.
+- `ViewportState.ts` - viewport dimensions and DPR tracking.
+- `CoordinateTransformer.ts` - world/screen coordinate conversion.
+- `GestureProcessor.ts` - normalized pointer/touch/wheel input handling.
+- `AnimationController.ts` - smooth move, zoom, and resize animation support.
+- `SpatialIndex.ts` - RBush-backed viewport culling for large item sets.
+- `SpriteSheet.ts` and `SpriteAnimator.ts` - spritesheet frame calculation and animation scheduling.
 
-**Key Interfaces:**
+Key public contracts:
 
--   **IRenderer** - Renderer contract (init, render, destroy, getDrawAPI, etc.)
--   **IDrawAPI** - Drawing primitives interface
--   **IImageLoader** - Image loading interface
+- `IRenderer<TMount, TImage>` - renderer lifecycle and callback contract.
+- `IDrawAPI<TImage>` - drawing primitive interface implemented by renderers.
+- `IImageLoader<TImage>` - renderer-specific image loading.
 
-### Renderer Canvas Package (`packages/renderer-canvas/src/`)
+### Renderer Packages
 
-Canvas2D implementation of IRenderer:
+`renderer-canvas`:
 
--   **RendererCanvas.ts** - Main IRenderer implementation
--   **CanvasDraw.ts** - Drawing primitives (rect, image, gridlines, text, circle, line, path)
--   **Layer.ts** - Layer-based rendering with draw order
--   **EventBinder.ts** - DOM event attachment
--   **ResizeWatcher.ts** - ResizeObserver handling
--   **ResponsiveWatcher.ts** - Responsive mode handling
--   **ImageLoader.ts** - Image loading and caching
--   **SizeController.ts** - Animated canvas resize logic
--   **CoordinateOverlayRenderer.ts** - Coordinate grid overlay
--   **CanvasDebug.ts** - Debug HUD rendering
+- Uses one HTML canvas and a Canvas2D context.
+- Supports DOM mouse/touch/wheel events, resize watchers, high-DPI sizing, coordinate overlay, debug HUD, and offscreen static caches.
+- `addDrawFunction` registers layer-ordered custom drawing and receives `CanvasRenderingContext2D`.
 
-### React Package (`packages/react/src/`)
+`renderer-webgl`:
 
--   **components/CanvasTileEngine.tsx** - Main component with compound pattern
--   **components/draw/** - Declarative draw components (Rect, GridLines, Image, DrawFunction, etc.)
--   **hooks/** - `useCanvasTileEngine` for engine instance management
--   **context/** - React context for engine access
+- Creates a WebGL canvas plus a transparent Canvas2D overlay.
+- WebGL draws rects, circles, images, lines, paths, and grid lines.
+- Overlay draws text, coordinate overlay, debug HUD, `addDrawFunction`, and `onDraw`.
+- Static draw helpers delegate to dynamic drawing because WebGL already batches layer geometry.
+- `invalidateTexture(source)` exists for advanced same-size image/canvas content mutation cases.
 
-### Key Patterns
+`renderer-skia`:
 
-1. **Dependency Injection**: Renderer is injected via constructor
+- Implements `IRenderer<SkiaMount, SkImage>`.
+- Most app code should use `@canvas-tile-engine/react-native`, which wires layout, gestures, and Skia presentation.
+- Static draw helpers record non-changing item sets into Skia pictures.
 
-    ```ts
-    import { CanvasTileEngine } from "@canvas-tile-engine/core";
-    import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+`renderer-server`:
 
-    const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), center);
-    ```
+- Uses `@napi-rs/canvas` with no DOM and no interaction/event loop.
+- `renderToBuffer()` is the preferred one-shot API.
+- Supports PNG/JPEG/WebP output, font registration, image loading from paths, static caches, and custom drawing via `SKRSContext2D`.
 
-2. **Coordinate system**: World coordinates are grid-based; the engine transforms to screen pixels
+### React Packages
 
-3. **Draw handles**: Draw methods return `DrawHandle` for removing draw callbacks
+`@canvas-tile-engine/react`:
 
-4. **Static caching**: `drawStatic*` methods cache to offscreen canvas for performance
+- Main component uses the compound pattern: `CanvasTileEngine.Rect`, `Circle`, `Image`, `Sprite`, `GridLines`, `Line`, `Text`, `Path`, `StaticRect`, `StaticCircle`, `StaticImage`, `DrawFunction`.
+- `useCanvasTileEngine()` returns a stable handle; methods no-op before mount and `isReady` indicates the real engine is attached.
+- `config`, `center`, and `renderer` are read on mount. Use runtime APIs for changes or remount with a new `key`.
+- Keep large `items` arrays stable with `useMemo` or state to avoid re-registering draw callbacks and rebuilding indexes.
 
-5. **Event callbacks**: Set via `engine.onClick`, `engine.onHover`, etc.
+`@canvas-tile-engine/react-native`:
 
-6. **React usage**:
+- Mirrors the React API and component names.
+- Uses `RendererSkia`; styling is `ViewStyle`; image handles are `SkImage`.
+- `config.size` is a placeholder because the native component measures its `View` with `onLayout`.
+- Native touch input feeds the same callback names; do not document separate gesture event names unless the public API adds them.
 
-    ```tsx
-    import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
-    import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+## Key Patterns
 
-    const engine = useCanvasTileEngine();
-    <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()} />;
-    ```
+### Renderer Injection
+
+```ts
+import { CanvasTileEngine } from "@canvas-tile-engine/core";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), center);
+```
+
+### React Usage
+
+```tsx
+import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const engine = useCanvasTileEngine();
+
+<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
+    <CanvasTileEngine.GridLines cellSize={1} layer={0} />
+    <CanvasTileEngine.Rect items={tiles} layer={1} />
+</CanvasTileEngine>;
+```
+
+### Server Rendering
+
+```ts
+import { renderToBuffer } from "@canvas-tile-engine/renderer-server";
+
+const png = await renderToBuffer({
+    config,
+    pixelRatio: 2,
+    draw: (engine) => {
+        engine.drawGridLines(1, 1, "#334155", 0);
+        engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#22c55e" } }, 1);
+    },
+});
+```
+
+## Repository Conventions
+
+- Use package scripts and root `turbo run` delegation. Do not add root scripts that manually chain package logic.
+- Prefer existing renderer and draw API patterns over new abstractions.
+- Use `apply_patch` for manual file edits.
+- Do not revert unrelated user changes.
+- Keep README/package docs consistent with `README.md` and package-level README files.
+- Use ASCII in docs unless the surrounding file already requires otherwise.
 
 ## Commit Convention
 
-Follow Conventional Commits: `<type>(<scope>): <description>`
+Follow Conventional Commits: `<type>(<scope>): <description>`.
 
-Types: feat, fix, docs, style, refactor, test, chore
-Scopes: core, react, r-canvas, docs, examples
+Common types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
+
+Common scopes: `core`, `react`, `react-native`, `r-canvas`, `r-webgl`, `r-skia`, `r-server`, `docs`, `examples`.
