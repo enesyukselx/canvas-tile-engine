@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.0
+
+### Minor Changes
+
+- 2068dac: Catch-up release: everything merged since 0.3.0.
+
+    **Features**
+
+    - Declarative `<CanvasTileEngine.Sprite>` compound component for spritesheet animation (frames/fps/loop/playing/onComplete); re-exports `SpriteSheet`, `SpriteAnimator` and sprite types from core (#107)
+
+    **Fixes**
+
+    - Repaint canvas on draw component unmount and on `DrawFunction` updates (#99)
+
+    **Compatibility**
+
+    - Requires `@canvas-tile-engine/core` >= 0.4.0 (peer dependency raised)
+
+### Patch Changes
+
+- 2068dac: Publish internal `@canvas-tile-engine/core` dependency as a caret range (`^x.y.z`) instead of an exact pin, so core patch/minor updates flow to consumers without requiring a re-release of dependent packages.
+- Updated dependencies [2068dac]
+    - @canvas-tile-engine/core@0.4.0
+
 All notable changes to `@canvas-tile-engine/react` will be documented in this file.
 
 ## [0.3.0] - 2026-01-08
