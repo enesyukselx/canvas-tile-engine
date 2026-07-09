@@ -47,15 +47,15 @@
         "format:check": "oxfmt --check"
     },
     "peerDependencies": {
-        "@canvas-tile-engine/core": ">=0.3.0",
+        "@canvas-tile-engine/core": ">=0.4.0",
         "@canvas-tile-engine/renderer-skia": ">=0.1.0",
         "@shopify/react-native-skia": ">=2.0.0-next.0",
         "react": ">=18.0.0",
         "react-native": ">=0.78.0"
     },
     "dependencies": {
-        "@canvas-tile-engine/core": "workspace:*",
-        "@canvas-tile-engine/renderer-skia": "workspace:*"
+        "@canvas-tile-engine/core": "workspace:^",
+        "@canvas-tile-engine/renderer-skia": "workspace:^"
     },
     "devDependencies": {
         "@types/react": "^19.0.0",

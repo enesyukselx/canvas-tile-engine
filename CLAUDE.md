@@ -207,6 +207,15 @@ const png = await renderToBuffer({
 });
 ```
 
+## Releases (Changesets)
+
+Publishing is managed with Changesets (`.changeset/config.json`; private packages — docs and all examples — are excluded from versioning).
+
+- Any PR that changes a published package's behavior or public artifact must include a changeset: run `pnpm changeset`, pick the affected packages and bump type, describe the change (this text becomes the CHANGELOG entry).
+- On push to `master`, `.github/workflows/release.yml` (changesets/action) collects pending changesets into a "Version Packages" PR. Merging that PR bumps versions, updates CHANGELOGs, publishes to npm with `pnpm release`, and pushes git tags.
+- Internal deps between published packages use `workspace:^` (published as `^x.y.z`). Do not use `workspace:*` — it publishes as an exact pin.
+- Manual release (fallback): `pnpm changeset:version` then `pnpm release` (requires npm auth).
+
 ## Repository Conventions
 
 - Use package scripts and root `turbo run` delegation. Do not add root scripts that manually chain package logic.
