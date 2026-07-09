@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0
+
+### Minor Changes
+
+- d37d3e6: Catch-up release: everything merged since 0.3.0.
+
+  **Features**
+
+  - Spritesheet & animation support: `ImageItem.sprite` (`SpriteRect`), `SpriteSheet` frame calculator (margin/spacing, `frame`/`frameByIndex`/`framesInRow`), and `SpriteAnimator` rAF loop that only re-renders on frame change (#107)
+  - Zoom anchor modes for `eventHandlers.zoom` ("pointer" / "center") (#104)
+  - Engine and renderer interfaces (`IRenderer`, `IDrawAPI`, `IImageLoader`) are now generic over mount/image types, enabling non-DOM renderers (server, React Native Skia)
+
+  **Fixes**
+
+  - Keep camera fixed during pinch zoom in "center" anchor mode (#105)
+  - Fire `onZoom` for programmatic zoom changes; notify `onCoordsChange` when `setBounds` moves the camera; guard pinch zoom against near-zero start distance; validate `scale` against `minScale`/`maxScale`; complete animations instantly when duration is 0 (#100)
+
+  **Breaking notes** (0.x minor)
+
+  - The unused optional `renderer` property was removed from the config type — remove it from your config object if you passed it
+  - `Config.get()` now returns a frozen snapshot — mutate config via the engine API instead of mutating the returned object (#100)
+
 All notable changes to `@canvas-tile-engine/core` will be documented in this file.
 
 ## [0.3.0] - 2026-01-08
@@ -53,17 +75,17 @@ All notable changes to `@canvas-tile-engine/core` will be documented in this fil
 - **Camera System** - Pan, zoom, drag with smooth animations
 - **Coordinate System** - Grid-based world coordinates with automatic transformations
 - **Layer-based Rendering**
-    - `drawRect` - Rectangles with rotation and border-radius
-    - `drawCircle` - Circles sized in world units
-    - `drawImage` - Images with rotation support
-    - `drawLine` - Line segments
-    - `drawPath` - Polylines
-    - `drawText` - Text at world positions
-    - `drawGridLines` - Grid overlay
+  - `drawRect` - Rectangles with rotation and border-radius
+  - `drawCircle` - Circles sized in world units
+  - `drawImage` - Images with rotation support
+  - `drawLine` - Line segments
+  - `drawPath` - Polylines
+  - `drawText` - Text at world positions
+  - `drawGridLines` - Grid overlay
 - **Performance Optimizations**
-    - Spatial indexing with R-Tree (rbush) for 10k+ items
-    - Viewport culling - skip off-screen work
-    - Static cache (`drawStaticRect`, `drawStaticImage`, `drawStaticCircle`)
+  - Spatial indexing with R-Tree (rbush) for 10k+ items
+  - Viewport culling - skip off-screen work
+  - Static cache (`drawStaticRect`, `drawStaticImage`, `drawStaticCircle`)
 - **Event Handling** - click, hover, drag, zoom, resize
 - **Animation Controller** - `goCoords()` with smooth transitions
 - **Bounds System** - Restrict camera movement
