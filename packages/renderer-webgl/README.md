@@ -71,9 +71,9 @@ export function Map() {
 
 `RendererWebGL` creates two stacked canvases inside the wrapper:
 
-| Surface | Draws |
-| --- | --- |
-| WebGL canvas | Rects, circles, images, lines, paths, grid lines, and shape strokes. |
+| Surface           | Draws                                                                        |
+| ----------------- | ---------------------------------------------------------------------------- |
+| WebGL canvas      | Rects, circles, images, lines, paths, grid lines, and shape strokes.         |
 | 2D overlay canvas | Text, coordinate overlay, debug HUD, `addDrawFunction`, and `engine.onDraw`. |
 
 Geometry is batched by layer. Filled rects, rounded rects, and circles use shader-based rendering; lines and paths are expanded into triangles; images are uploaded as cached GPU textures.

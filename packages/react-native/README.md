@@ -50,10 +50,7 @@ export function NativeMap() {
             onClick={(coords) => console.log("Tapped:", coords.snapped)}
         >
             <CanvasTileEngine.GridLines cellSize={1} strokeStyle="#1e293b" layer={0} />
-            <CanvasTileEngine.Circle
-                items={{ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }}
-                layer={1}
-            />
+            <CanvasTileEngine.Circle items={{ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }} layer={1} />
         </CanvasTileEngine>
     );
 }
@@ -116,14 +113,14 @@ function UnitLayer({ engine }: { engine: EngineHandle }) {
 
 ## Web vs Native
 
-| Concern | React web | React Native |
-| --- | --- | --- |
-| Renderer | `RendererCanvas` or `RendererWebGL` | `RendererSkia` |
-| Mount | `<div><canvas /></div>` | Skia `<Canvas>` inside a `<View>` |
-| Styling | `className` / `CSSProperties` | `ViewStyle` |
-| Images | `HTMLImageElement` | `SkImage` |
-| Custom draw context | `CanvasRenderingContext2D` or overlay context | `SkCanvas` |
-| Input | DOM mouse/touch/wheel behind the same callbacks | Native touch input behind the same callbacks |
+| Concern             | React web                                       | React Native                                 |
+| ------------------- | ----------------------------------------------- | -------------------------------------------- |
+| Renderer            | `RendererCanvas` or `RendererWebGL`             | `RendererSkia`                               |
+| Mount               | `<div><canvas /></div>`                         | Skia `<Canvas>` inside a `<View>`            |
+| Styling             | `className` / `CSSProperties`                   | `ViewStyle`                                  |
+| Images              | `HTMLImageElement`                              | `SkImage`                                    |
+| Custom draw context | `CanvasRenderingContext2D` or overlay context   | `SkCanvas`                                   |
+| Input               | DOM mouse/touch/wheel behind the same callbacks | Native touch input behind the same callbacks |
 
 Everything else - hook handle, draw components, layers, culling, camera math, coordinate callbacks, and sprite helpers - is shared.
 
