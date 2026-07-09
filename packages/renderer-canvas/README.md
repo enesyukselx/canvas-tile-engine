@@ -4,37 +4,62 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@canvas-tile-engine/renderer-canvas)](https://bundlephobia.com/package/@canvas-tile-engine/renderer-canvas)
 [![license](https://img.shields.io/npm/l/@canvas-tile-engine/renderer-canvas)](../../LICENSE)
 
-Canvas2D renderer for [Canvas Tile Engine](https://github.com/ArdaGnsrn/canvas-tile-engine). This package provides the default rendering implementation using the HTML Canvas 2D API.
+The default HTML Canvas2D renderer for Canvas Tile Engine. It is the simplest browser renderer to start with and supports the full public draw API: shapes, images, spritesheet frames, text, lines, paths, grid lines, static caches, custom draw functions, event handling, resize handling, coordinate overlays, and debug HUDs.
 
 ## Install
 
 ```bash
-npm install @canvas-tile-engine/renderer-canvas
+npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-canvas
 ```
 
-## Usage
+With React:
 
-### With Core (Vanilla JS/TS)
+```bash
+npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engine/renderer-canvas
+```
+
+## Quick Start
+
+```html
+<div id="map">
+    <canvas></canvas>
+</div>
+```
 
 ```ts
 import { CanvasTileEngine } from "@canvas-tile-engine/core";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
-const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), { x: 0, y: 0 });
+const engine = new CanvasTileEngine(
+    document.getElementById("map") as HTMLDivElement,
+    {
+        scale: 48,
+        size: { width: 800, height: 500 },
+        backgroundColor: "#0f172a",
+        eventHandlers: { drag: true, zoom: true, hover: true, click: true },
+    },
+    new RendererCanvas(),
+    { x: 0, y: 0 },
+);
+
+engine.drawGridLines(1, 1, "#1e293b", 0);
+engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#22c55e" } }, 1);
+engine.render();
 ```
 
-### With React
+## With React
 
 ```tsx
 import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
-function App() {
+export function Map() {
     const engine = useCanvasTileEngine();
 
     return (
         <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
-            {/* children */}
+            <CanvasTileEngine.GridLines cellSize={1} layer={0} />
+            <CanvasTileEngine.Rect items={tiles} layer={1} />
         </CanvasTileEngine>
     );
 }
@@ -42,52 +67,36 @@ function App() {
 
 ## Features
 
-- Full support for all drawing primitives (rect, circle, image, text, path, line)
-- Static caching for large datasets (offscreen canvas)
-- Layer-based rendering with configurable draw order
-- Coordinate overlay and debug HUD
-- High DPI (retina) display support
+- Complete draw primitive support: rect, circle, image, text, line, path, grid, and custom draw functions.
+- Static caches with offscreen canvas for large non-changing rect, circle, and image layers.
+- Layer-based rendering with deterministic draw order.
+- DOM mouse, touch, wheel, right-click, hover, drag, zoom, and resize handling.
+- High-DPI canvas sizing.
+- Coordinate overlay and debug HUD support.
+- Image loading through `engine.images.load(src)` / React's `engine.loadImage(src)`.
 
 ## Custom Drawing
 
-When using `addDrawFunction` or `onDraw`, cast the context to `CanvasRenderingContext2D`:
+`addDrawFunction` registers custom drawing in the layer stack and receives the Canvas2D context.
 
 ```ts
 engine.addDrawFunction((ctx, coords, config) => {
     const context = ctx as CanvasRenderingContext2D;
 
-    context.fillStyle = "red";
-    context.fillRect(0, 0, 100, 100);
+    context.fillStyle = "#f97316";
+    context.fillRect(12, 12, 80, 24);
 }, 2);
-
-engine.onDraw = (ctx, info) => {
-    const context = ctx as CanvasRenderingContext2D;
-
-    context.strokeStyle = "blue";
-    context.strokeRect(0, 0, info.width, info.height);
-};
 ```
 
-## Architecture
+## When To Use It
 
-This renderer implements the `IRenderer` interface from `@canvas-tile-engine/core`:
-
-```
-@canvas-tile-engine/core
-        │
-        ▼
-   IRenderer ◄─── Interface
-        │
-        ▼
-┌─────────────────┐
-│ RendererCanvas  │ ◄─── This package
-│   (Canvas2D)    │
-└─────────────────┘
-```
+Use `RendererCanvas` as the default choice for web apps, documentation examples, tooling, editors, and medium-sized scenes. If you are drawing very large dynamic geometry layers, try [`@canvas-tile-engine/renderer-webgl`](../renderer-webgl). If you need image output on Node.js, use [`@canvas-tile-engine/renderer-server`](../renderer-server).
 
 ## Documentation
 
-Full documentation: [canvastileengine.dev](https://canvastileengine.dev)
+- Core engine: [`@canvas-tile-engine/core`](../core)
+- React bindings: [`@canvas-tile-engine/react`](../react)
+- Full docs: [canvastileengine.dev](https://canvastileengine.dev)
 
 ## License
 

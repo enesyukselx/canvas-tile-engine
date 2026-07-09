@@ -4,54 +4,119 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@canvas-tile-engine/renderer-webgl)](https://bundlephobia.com/package/@canvas-tile-engine/renderer-webgl)
 [![license](https://img.shields.io/npm/l/@canvas-tile-engine/renderer-webgl)](../../LICENSE)
 
-GPU-accelerated WebGL renderer for [Canvas Tile Engine](https://github.com/enesyukselx/canvas-tile-engine). It implements the same `IRenderer` contract as `@canvas-tile-engine/renderer-canvas`, so it is a drop-in replacement: swap the renderer instance and everything else (config, draw API, events) stays the same.
+GPU-accelerated WebGL renderer for Canvas Tile Engine. It implements the same renderer contract as `@canvas-tile-engine/renderer-canvas`, so most apps switch by changing only the renderer instance.
+
+Use it when your scene has many dynamic primitives and you want batched GPU drawing while keeping the same core engine, config, event callbacks, layers, and draw helpers.
 
 ## Install
 
 ```bash
-npm install @canvas-tile-engine/renderer-webgl
+npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-webgl
 ```
 
-## Usage
+With React:
 
-### With Core (Vanilla JS/TS)
+```bash
+npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engine/renderer-webgl
+```
+
+## Quick Start
+
+```html
+<div id="map">
+    <canvas></canvas>
+</div>
+```
 
 ```ts
-import { CanvasTileEngine } from "@canvas-tile-engine/core";
+import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 
+const wrapper = document.getElementById("map") as HTMLDivElement;
+
+const config: CanvasTileEngineConfig = {
+    scale: 48,
+    size: { width: 800, height: 500 },
+    backgroundColor: "#0f172a",
+    eventHandlers: { drag: true, zoom: true, hover: true, click: true },
+};
+
 const engine = new CanvasTileEngine(wrapper, config, new RendererWebGL(), { x: 0, y: 0 });
+
+engine.drawGridLines(1, 1, "#1e293b", 0);
+engine.drawRect({ x: 0, y: 0, size: 1, radius: 4, style: { fillStyle: "#22c55e" } }, 1);
+engine.drawCircle({ x: 2, y: 1, size: 0.8, style: { fillStyle: "#38bdf8" } }, 1);
+engine.render();
 ```
 
-### With React
+## With React
 
 ```tsx
 import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
 import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 
-function App() {
+export function Map() {
     const engine = useCanvasTileEngine();
 
-    return <CanvasTileEngine engine={engine} config={config} renderer={new RendererWebGL()} />;
+    return (
+        <CanvasTileEngine engine={engine} config={config} renderer={new RendererWebGL()}>
+            <CanvasTileEngine.GridLines cellSize={1} layer={0} />
+            <CanvasTileEngine.Rect items={tiles} layer={1} />
+        </CanvasTileEngine>
+    );
 }
 ```
 
-## How it works
+## How It Works
 
-The renderer paints onto **two stacked canvases** inside the wrapper:
+`RendererWebGL` creates two stacked canvases inside the wrapper:
 
-1. **WebGL canvas (bottom)** — all geometry primitives (`drawRect`, `drawCircle`, `drawImage`, `drawLine`, `drawPath`, `drawGridLines`) are rendered on the GPU. Each layer flushes as a single batched draw call, so painting thousands of tiles costs only a handful of GL calls.
-    - Filled shapes use a signed-distance rounded-box shader, which anti-aliases edges and renders sharp rects, rounded rects and circles from one program.
-    - Lines, grid lines, paths and shape strokes are expanded into triangle strips with a configurable pixel width.
-    - Images are uploaded as textures (cached per image) and drawn as textured quads.
-2. **2D overlay canvas (top, transparent)** — text (`drawText`), the coordinate overlay, the debug HUD and user-supplied draw functions (`addDrawFunction`, `engine.onDraw`) are painted with the Canvas2D API. This keeps the public draw API byte-for-byte compatible with the Canvas2D renderer.
+| Surface | Draws |
+| --- | --- |
+| WebGL canvas | Rects, circles, images, lines, paths, grid lines, and shape strokes. |
+| 2D overlay canvas | Text, coordinate overlay, debug HUD, `addDrawFunction`, and `engine.onDraw`. |
 
-### Differences from the Canvas2D renderer
+Geometry is batched by layer. Filled rects, rounded rects, and circles use shader-based rendering; lines and paths are expanded into triangles; images are uploaded as cached GPU textures.
 
-- **Layer ordering across surfaces.** Because text and user draw functions live on the upper 2D canvas, they always composite **above** every WebGL primitive, regardless of their layer index. Ordering _within_ each surface is preserved.
-- **Static caches.** `drawStaticRect`, `drawStaticCircle` and `drawStaticImage` delegate to their dynamic counterparts — with WebGL a full layer already renders in a single batched draw call, so the offscreen pre-render cache is unnecessary.
-- **Texture caching.** Image sources are uploaded to the GPU once and cached. Dimension changes (a resized canvas, a swapped `img.src` with different size) are detected and re-uploaded automatically, but mutating a source's pixels at the same size requires calling `renderer.invalidateTexture(source)` — the Canvas2D renderer always paints the source's current pixels.
-- **Requires WebGL.** The renderer prefers WebGL 2 and falls back to WebGL 1. If neither is available, `init()` throws; use `RendererCanvas` as a fallback.
+## Differences From Canvas2D
+
+- Text and user custom draw functions live on the upper 2D overlay, so they composite above every WebGL primitive even if their layer number is lower. Ordering within each surface is preserved.
+- `drawStaticRect`, `drawStaticCircle`, and `drawStaticImage` delegate to dynamic drawing. A WebGL layer is already batched, so the Canvas2D offscreen static cache is usually unnecessary.
+- Image sources are uploaded to the GPU and cached. Dimension changes are detected automatically, but if you mutate pixels at the same size, call `renderer.invalidateTexture(source)`.
+- The renderer prefers WebGL 2 and falls back to WebGL 1. If neither is available, `init()` throws.
+
+## Canvas Fallback
+
+```ts
+import { CanvasTileEngine } from "@canvas-tile-engine/core";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
+
+let engine;
+
+try {
+    engine = new CanvasTileEngine(wrapper, config, new RendererWebGL(), center);
+} catch {
+    engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), center);
+}
+```
+
+## Texture Invalidation
+
+```ts
+const renderer = new RendererWebGL();
+const engine = new CanvasTileEngine(wrapper, config, renderer);
+
+// Later, after mutating an image/canvas source without changing dimensions:
+renderer.invalidateTexture(source);
+engine.render();
+```
+
+## Documentation
+
+- Canvas2D renderer: [`@canvas-tile-engine/renderer-canvas`](../renderer-canvas)
+- Core engine: [`@canvas-tile-engine/core`](../core)
+- Full docs: [canvastileengine.dev](https://canvastileengine.dev)
 
 ## License
 

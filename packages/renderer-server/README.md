@@ -3,29 +3,21 @@
 [![npm version](https://img.shields.io/npm/v/@canvas-tile-engine/renderer-server)](https://www.npmjs.com/package/@canvas-tile-engine/renderer-server)
 [![license](https://img.shields.io/npm/l/@canvas-tile-engine/renderer-server)](../../LICENSE)
 
-Headless **server-side (Node.js) renderer** for [Canvas Tile Engine](https://github.com/enesyukselx/canvas-tile-engine). It draws maps to an image `Buffer` (PNG / JPEG / WebP) with **no browser and no DOM**, using [`@napi-rs/canvas`](https://github.com/Brooooooklyn/canvas) for the underlying Canvas2D surface.
+Headless Node.js renderer for Canvas Tile Engine. It draws a map into an image `Buffer` with no browser and no DOM, using [`@napi-rs/canvas`](https://github.com/Brooooooklyn/canvas) under the hood.
 
-There is no interaction, no animation loop, and no event handling — a single `render()` produces one frame you can encode. It reuses the exact same Canvas2D drawing pipeline as `@canvas-tile-engine/renderer-canvas` (culling, spatial index, origin, rotation, static caching), so server output matches the browser.
-
-## Use cases
-
-- Open Graph / social share images
-- Email and PDF map thumbnails
-- CDN tile pre-rendering
-- SEO / SSR previews
-- Visual snapshot tests (deterministic PNG output)
+Use it for Open Graph images, email/PDF thumbnails, CDN tile pre-rendering, SEO previews, and deterministic visual snapshot tests. A single `render()` produces one frame that can be encoded as PNG, JPEG, or WebP.
 
 ## Install
 
 ```bash
-npm install @canvas-tile-engine/renderer-server @canvas-tile-engine/core
+npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 ```
 
-`@napi-rs/canvas` ships prebuilt native binaries for common platforms, so no compiler toolchain is required.
+`@napi-rs/canvas` ships prebuilt native binaries for common platforms, so most installs do not need a compiler toolchain.
 
-## Quick start (one-shot helper)
+## Quick Start
 
-The `renderToBuffer` helper wires up the engine and renderer, runs your draw callback, renders one frame, and encodes the result:
+`renderToBuffer` creates the engine and renderer, runs your draw callback, renders one frame, encodes it, and destroys the engine.
 
 ```ts
 import { renderToBuffer } from "@canvas-tile-engine/renderer-server";
@@ -38,7 +30,7 @@ const png = await renderToBuffer({
         backgroundColor: "#0b1021",
     },
     center: { x: 2, y: 1 },
-    pixelRatio: 2, // @2x / retina output
+    pixelRatio: 2,
     draw: (engine) => {
         engine.drawGridLines(1, 1, "#1e2a45", 0);
         engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 6, style: { fillStyle: "#4ade80" } }, 1);
@@ -49,7 +41,7 @@ const png = await renderToBuffer({
 await writeFile("map.png", png);
 ```
 
-The `draw` callback may be `async` — useful when you need to load images first:
+The `draw` callback can be async, which is useful for image loading:
 
 ```ts
 const png = await renderToBuffer({
@@ -61,9 +53,9 @@ const png = await renderToBuffer({
 });
 ```
 
-## Low-level usage (engine + renderer)
+## Low-Level Usage
 
-For full control, construct the engine yourself and pull the buffer off the renderer:
+Use `RendererServer` directly when you need to keep the engine around, resize manually, or choose when to encode.
 
 ```ts
 import { CanvasTileEngine } from "@canvas-tile-engine/core";
@@ -72,83 +64,68 @@ import { RendererServer, SERVER_MOUNT } from "@canvas-tile-engine/renderer-serve
 const renderer = new RendererServer({ pixelRatio: 1 });
 const engine = new CanvasTileEngine(SERVER_MOUNT, config, renderer, { x: 0, y: 0 });
 
+engine.drawGridLines(1, 1, "#334155", 0);
 engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#0ff" } }, 1);
 engine.render();
 
-const png = renderer.toBuffer("png"); // sync
-const jpeg = await renderer.encode("jpeg", 80); // async, non-blocking
+const png = renderer.toBuffer("png");
+const jpeg = await renderer.encode("jpeg", 80);
 
 engine.destroy();
 ```
 
-`SERVER_MOUNT` is a shared, opaque mount marker — headless mode never touches the DOM, and the renderer creates its own backing canvas.
+`SERVER_MOUNT` is an opaque mount marker. The server renderer ignores the DOM and creates its own in-memory canvas.
+
+## Output API
+
+| Method | Returns | Notes |
+| --- | --- | --- |
+| `renderer.toBuffer(format?, quality?)` | `Buffer` | Synchronous encode. |
+| `renderer.encode(format?, quality?)` | `Promise<Buffer>` | Async encode; better for servers. |
+| `renderer.getCanvas()` | `Canvas` | Underlying `@napi-rs/canvas` canvas. |
+| `renderer.getContext()` | `SKRSContext2D` | Underlying 2D context. |
+
+`format` is `"png"`, `"jpeg"`, or `"webp"` and defaults to `"png"`. `quality` is `0-100` for JPEG/WebP and is ignored for PNG.
 
 ## Fonts
 
-System fonts are **not guaranteed** in headless environments (containers, CI, serverless). Register the fonts your maps rely on before rendering, then reference the family via `style.fontFamily` on text items:
+System fonts are not guaranteed in CI, containers, or serverless runtimes. Register the fonts your map needs before rendering text:
 
 ```ts
 import { registerFont } from "@canvas-tile-engine/renderer-server";
 
 registerFont("./fonts/Inter.ttf", "Inter");
 
-// later
 engine.drawText({ x: 0, y: 0, text: "Hello", style: { fontFamily: "Inter" } }, 2);
 ```
 
-`GlobalFonts` from `@napi-rs/canvas` is also re-exported for advanced control.
+`GlobalFonts` from `@napi-rs/canvas` is re-exported for advanced font management.
 
-## Output API
+## Behavior Notes
 
-| Method                                 | Returns           | Notes                                 |
-| -------------------------------------- | ----------------- | ------------------------------------- |
-| `renderer.toBuffer(format?, quality?)` | `Buffer`          | Synchronous encode                    |
-| `renderer.encode(format?, quality?)`   | `Promise<Buffer>` | Async, avoids blocking the event loop |
-| `renderer.getCanvas()`                 | `Canvas`          | Underlying `@napi-rs/canvas` canvas   |
-| `renderer.getContext()`                | `SKRSContext2D`   | Underlying 2D context                 |
+- No DOM events, interaction callbacks, or animation loop run on the server.
+- `pixelRatio` belongs to the renderer. The logical viewport size stays as configured; the physical output resolution is scaled.
+- Browser debug FPS HUD is not rendered. Coordinate overlay (`config.coordinates`) is supported.
+- Static caches work through an injected offscreen canvas factory, mirroring the Canvas2D renderer.
+- `onDraw` and `addDrawFunction` receive the native `SKRSContext2D` context.
 
-`format` is `"png" | "jpeg" | "webp"` (default `"png"`). `quality` is `0–100` for `jpeg`/`webp` (ignored for `png`).
-
-## Custom drawing
-
-In `addDrawFunction` / `onDraw`, the context is the `@napi-rs/canvas` `SKRSContext2D`:
+## Custom Drawing
 
 ```ts
 import type { SKRSContext2D } from "@canvas-tile-engine/renderer-server";
 
-engine.addDrawFunction((ctx, coords, config) => {
+engine.addDrawFunction((ctx) => {
     const context = ctx as SKRSContext2D;
-    context.fillStyle = "red";
-    context.fillRect(0, 0, 100, 100);
+    context.fillStyle = "#f97316";
+    context.fillRect(12, 12, 80, 24);
 }, 2);
-```
-
-## Notes & limitations
-
-- **DPR / `pixelRatio`** is owned by the renderer (there is no `window` on the server). The logical world/viewport size stays as configured; only the exported image's physical resolution is scaled.
-- **No debug HUD**: the FPS/debug overlay is browser-only and is not rendered here. The coordinate overlay (`config.coordinates`) is supported.
-- **Static caching works** on the server via an injected offscreen-canvas factory, mirroring the browser renderer.
-
-## Architecture
-
-Implements the generic `IRenderer<TMount, TImage>` interface from `@canvas-tile-engine/core`, parameterized as `IRenderer<ServerMount, Image>`:
-
-```
-@canvas-tile-engine/core
-        │
-        ▼
-   IRenderer ◄─── Interface (generic over mount/image)
-        │
-        ▼
-┌──────────────────┐
-│  RendererServer  │ ◄─── This package
-│ (@napi-rs/canvas)│
-└──────────────────┘
 ```
 
 ## Documentation
 
-Full documentation: [canvastileengine.dev](https://canvastileengine.dev)
+- Core engine: [`@canvas-tile-engine/core`](../core)
+- Browser Canvas2D renderer: [`@canvas-tile-engine/renderer-canvas`](../renderer-canvas)
+- Full docs: [canvastileengine.dev](https://canvastileengine.dev)
 
 ## License
 
