@@ -174,6 +174,7 @@ type ImageItem = {
     };
     rotate?: number;
     img: HTMLImageElement;
+    sprite?: SpriteRect;
 };
 ```
 
@@ -184,6 +185,22 @@ type ImageItem = {
 | `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                    |
 | `rotate` | `number`           | `0`                                | Rotation in degrees (clockwise) |
 | `img`    | `HTMLImageElement` | **Required**                       | Loaded image object             |
+| `sprite` | `SpriteRect`       | -                                  | Spritesheet source rectangle    |
+
+---
+
+### `SpriteRect`
+
+A source rectangle inside a spritesheet image, in sheet pixels. See [Spritesheet & Animation](../js/spritesheet.md).
+
+```typescript
+type SpriteRect = {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+};
+```
 
 ---
 

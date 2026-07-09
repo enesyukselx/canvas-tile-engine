@@ -1,6 +1,7 @@
 export { Rect, type RectProps } from "./Rect";
 export { Circle, type CircleProps } from "./Circle";
 export { Image, type ImageProps } from "./Image";
+export { Sprite, type SpriteProps } from "./Sprite";
 export { GridLines, type GridLinesProps } from "./GridLines";
 export { Line, type LineProps } from "./Line";
 export { Text, type TextProps } from "./Text";

@@ -34,10 +34,28 @@ export type TextAlign = "center" | "end" | "left" | "right" | "start";
 export type TextBaseline = "alphabetic" | "bottom" | "hanging" | "ideographic" | "middle" | "top";
 
 /**
+ * A source rectangle inside a spritesheet image, in sheet pixels.
+ * Used to draw a sub-region (frame) of a larger image.
+ */
+export type SpriteRect = {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+};
+
+/**
  * An image to draw. `TImage` is the platform-specific image handle and defaults
  * to `HTMLImageElement` (DOM); other renderers parameterize it (e.g. `SkImage`).
  */
-export type ImageItem<TImage = HTMLImageElement> = Omit<DrawObject, "style"> & { img: TImage };
+export type ImageItem<TImage = HTMLImageElement> = Omit<DrawObject, "style"> & {
+    img: TImage;
+    /**
+     * Source rectangle in sheet pixels. When set, only this sub-region of
+     * `img` is drawn (spritesheet frame); when omitted the whole image is drawn.
+     */
+    sprite?: SpriteRect;
+};
 export type Text = Omit<DrawObject, "radius" | "size"> & {
     text: string;
     /** Font size in world units (scales with zoom). Default: 1 */

@@ -329,8 +329,14 @@ export class SkiaDraw {
 
         const pxSize = size * cellSize;
 
-        // preserve aspect
-        const aspect = imgW / imgH;
+        // Spritesheet source rect; defaults to the whole image
+        const srcX = item.sprite?.x ?? 0;
+        const srcY = item.sprite?.y ?? 0;
+        const srcW = item.sprite?.w ?? imgW;
+        const srcH = item.sprite?.h ?? imgH;
+
+        // preserve aspect (of the sprite frame when one is set)
+        const aspect = srcW / srcH;
         let drawW = pxSize;
         let drawH = pxSize;
         if (aspect > 1) drawH = pxSize / aspect;
@@ -345,7 +351,7 @@ export class SkiaDraw {
         const cy = offsetY + drawH / 2;
         const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
 
-        const src = Skia.XYWHRect(0, 0, imgW, imgH);
+        const src = Skia.XYWHRect(srcX, srcY, srcW, srcH);
         const dest = Skia.XYWHRect(offsetX, offsetY, drawW, drawH);
         canvas.drawImageRect(img, src, dest, this.imagePaint);
 

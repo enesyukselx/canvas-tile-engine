@@ -13,3 +13,7 @@ export { SpatialIndex } from "./modules/SpatialIndex";
 export { GestureProcessor } from "./modules/GestureProcessor";
 export type { NormalizedPointer, NormalizedPinch, ProcessedCoords, CanvasBounds } from "./modules/GestureProcessor";
 export { AnimationController } from "./modules/AnimationController";
+export { SpriteSheet } from "./modules/SpriteSheet";
+export type { SpriteSheetOptions } from "./modules/SpriteSheet";
+export { SpriteAnimator } from "./modules/SpriteAnimator";
+export type { SpriteAnimation } from "./modules/SpriteAnimator";

@@ -203,6 +203,37 @@ importers:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
 
+  examples/react/spritesheet:
+    dependencies:
+      '@canvas-tile-engine/react':
+        specifier: workspace:*
+        version: link:../../../packages/react
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-canvas
+      react:
+        specifier: ^18.3.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.0
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.27)
+      '@vitejs/plugin-react':
+        specifier: ^4.5.2
+        version: 4.7.0(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4))
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.1
+        version: 7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
+
   examples/renderer-server/game-map:
     dependencies:
       '@canvas-tile-engine/core':
@@ -242,6 +273,22 @@ importers:
       tailwindcss:
         specifier: ^4.3.2
         version: 4.3.2
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.1
+        version: 7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
+
+  examples/vanilla-js-examples/spritesheet:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-canvas
     devDependencies:
       typescript:
         specifier: ~5.9.3

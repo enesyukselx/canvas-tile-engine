@@ -294,6 +294,7 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 | `size`   | `number`           | `1`          | Size in grid units (maintains aspect ratio).                       |
 | `rotate` | `number`           | `0`          | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 | `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                  |
+| `sprite` | `SpriteRect`       | -            | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
 
 ```typescript
 // Single image
