@@ -15,10 +15,17 @@ The `App.tsx` is intentionally almost identical to the web version — same `use
 
 ## Run
 
+Metro doesn't fully support pnpm's default isolated `node_modules`, so before installing, add a hoisted linker setting **at the repo root**:
+
 ```bash
 # from the repo root
+echo "node-linker=hoisted" >> .npmrc
 pnpm install
+```
 
+> This is not committed by default — it's opt-in, scoped to your local checkout, so the rest of the monorepo (and published packages) keeps pnpm's stricter isolated linking. Only add it if you're going to run this example.
+
+```bash
 cd examples/react-native/responsive-game-map
 
 # Native (creates a dev build):
@@ -29,7 +36,7 @@ pnpm ios             # or: pnpm android
 pnpm web
 ```
 
-> pnpm + Metro: `metro.config.js` is already set up to watch the workspace root and resolve the hoisted dependencies. If Metro fails to resolve a workspace package, run `pnpm install` again from the repo root.
+> pnpm + Metro: `metro.config.js` is already set up to watch the workspace root and resolve the hoisted dependencies. If Metro fails to resolve a workspace package, make sure `node-linker=hoisted` is set in the root `.npmrc` and run `pnpm install` again from the repo root.
 
 ## Gestures
 

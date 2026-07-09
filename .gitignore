@@ -34,6 +34,7 @@ lerna-debug.log*
 
 # pnpm
 .pnpm-store/
+/.npmrc
 
 # Editor
 .vscode/*
