@@ -4,85 +4,136 @@ sidebar_position: 1
 
 # Getting Started
 
-`Canvas Tile Engine` is a lightweight library for building interactive 2D grid-based maps and visualizations. It handles camera controls, coordinate transformations, rendering, and user interactions - so you can focus on your content.
+Canvas Tile Engine is a renderer-agnostic TypeScript engine for zoomable 2D grid surfaces: maps, game boards, editors, minimaps, pixel tools, and dense spatial dashboards.
 
-**Features:**
+The core package owns camera state, coordinate transforms, gestures, layers, culling, sprite helpers, and the draw API. Renderer packages decide where the frame is drawn: HTML Canvas2D, WebGL, React Native Skia, or a headless Node.js image buffer.
 
--   Pan, zoom, and smooth camera animations
--   Grid-based coordinate system with automatic transformations
--   Event handling (click, hover, drag, zoom)
--   Layer-based rendering with drawing helpers
--   Modular renderer architecture (Canvas2D, WebGL, etc.)
+## Package Map
 
-## Installation
+| Package | Use it for |
+| :-- | :-- |
+| `@canvas-tile-engine/core` | Framework-agnostic engine, camera, events, drawing, sprites, and renderer contracts. |
+| `@canvas-tile-engine/react` | React web component, hook, and declarative draw components. |
+| `@canvas-tile-engine/react-native` | React Native component and hook backed by Skia. |
+| `@canvas-tile-engine/renderer-canvas` | HTML Canvas2D renderer. Best default for browser apps. |
+| `@canvas-tile-engine/renderer-webgl` | WebGL renderer for batched GPU drawing of dynamic geometry and images. |
+| `@canvas-tile-engine/renderer-skia` | React Native Skia renderer used by the native package. |
+| `@canvas-tile-engine/renderer-server` | Node.js renderer for PNG, JPEG, and WebP buffers without a browser. |
+
+## Install
+
+Vanilla web with Canvas2D:
 
 ```bash
 npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-canvas
 ```
 
-## Architecture
+React web:
 
-Canvas Tile Engine uses a modular architecture that separates core logic from rendering:
+```bash
+npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engine/renderer-canvas
+```
 
--   **@canvas-tile-engine/core** - Framework-agnostic engine handling camera, coordinates, and events
--   **@canvas-tile-engine/renderer-canvas** - Canvas2D renderer implementation
+React Native:
 
-The renderer is injected into the engine, allowing different rendering backends:
+```bash
+npx expo install @shopify/react-native-skia
+npm install @canvas-tile-engine/core @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia
+```
 
-```ts
-import { CanvasTileEngine } from "@canvas-tile-engine/core";
-import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+Server rendering:
 
-// Inject the Canvas2D renderer
-const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas());
+```bash
+npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 ```
 
 ## Quick Start
 
-HTML wrapper (must contain a `<canvas>`):
+HTML wrapper:
 
 ```html
-<div id="wrapper">
+<div id="map">
     <canvas></canvas>
 </div>
 ```
 
-Initialize, draw, and render:
+Engine setup:
 
 ```ts
 import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
-const wrapper = document.getElementById("wrapper") as HTMLDivElement;
+const wrapper = document.getElementById("map") as HTMLDivElement;
 
 const config: CanvasTileEngineConfig = {
-    scale: 50,
-    size: { width: 500, height: 500, minWidth: 200, minHeight: 200 },
-    backgroundColor: "#337426",
-    eventHandlers: { drag: true, zoom: true, hover: true, click: true },
-    coordinates: { enabled: true, shownScaleRange: { min: 30, max: 80 } },
+    scale: 48,
+    size: { width: 800, height: 500 },
+    backgroundColor: "#0f172a",
+    eventHandlers: { drag: true, zoom: "pointer", hover: true, click: true },
+    coordinates: { enabled: true, shownScaleRange: { min: 16, max: 96 } },
 };
 
 const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), { x: 0, y: 0 });
 
-// Draw a yellow tile
-engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#f9c74f" } });
+engine.drawGridLines(1, 1, "#1e293b", 0);
+engine.drawRect({ x: 0, y: 0, size: 1, radius: 4, style: { fillStyle: "#22c55e" } }, 1);
+engine.drawText(
+    {
+        x: 0,
+        y: -1,
+        text: "Spawn",
+        size: 0.35,
+        style: { fillStyle: "#e2e8f0", fontFamily: "sans-serif", textAlign: "center" },
+    },
+    2,
+);
 
-// Handle click events
 engine.onClick = (coords) => {
     console.log("Clicked tile:", coords.snapped);
 };
 
-// Render the frame
 engine.render();
 ```
 
-That's it! You now have a draggable, zoomable grid map with click detection.
+## React Quick Start
 
-## What's happening?
+```tsx
+import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
--   **Config** sets up canvas size, zoom level (`scale`), and enables interactions
--   **Renderer** handles all platform-specific drawing (Canvas2D in this case)
--   **Engine** manages the camera, coordinates, and events - delegating rendering to the injected renderer
--   **Drawing** uses world coordinates - the engine handles screen transformations
--   **Events** provide both raw and grid-snapped coordinates
+const tiles = [
+    { x: 0, y: 0, size: 1, style: { fillStyle: "#22c55e" } },
+    { x: 1, y: 0, size: 1, style: { fillStyle: "#38bdf8" } },
+];
+
+export function Map() {
+    const engine = useCanvasTileEngine();
+
+    return (
+        <CanvasTileEngine
+            engine={engine}
+            renderer={new RendererCanvas()}
+            config={{
+                scale: 48,
+                size: { width: 800, height: 500 },
+                eventHandlers: { drag: true, zoom: true, click: true },
+            }}
+            center={{ x: 0, y: 0 }}
+            onClick={(coords) => console.log(coords.snapped)}
+        >
+            <CanvasTileEngine.GridLines cellSize={1} strokeStyle="#1e293b" layer={0} />
+            <CanvasTileEngine.Rect items={tiles} layer={1} />
+        </CanvasTileEngine>
+    );
+}
+```
+
+## Next Steps
+
+- Install the package for your platform: [Installation](./installation.md).
+- Choose a renderer: [Renderers](./renderers.md).
+- Learn the config object: [Configuration](./config.md).
+- Use the imperative web API: [JavaScript](../js/installation.md).
+- Use declarative React components: [React](../react/installation.md).
+- Build native maps: [React Native](../react-native/installation.md).
+- Generate image buffers: [Server Rendering](../server/rendering.md).

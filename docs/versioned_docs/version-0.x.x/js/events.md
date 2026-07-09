@@ -4,508 +4,298 @@ sidebar_position: 3
 
 # Interactions & Events
 
-The engine provides a robust event system that handles user interactions like clicking, hovering, dragging, and zooming. It automatically translates screen coordinates (pixels) into world coordinates (grid units).
+The core engine normalizes mouse, touch, wheel, and resize input into world-space callbacks. Events are disabled by default, so enable only the interaction paths your UI needs.
 
-## Enabling Events
-
-By default, all interactions are disabled for performance. You must enable them in your configuration:
-
-```typescript
+```ts
 const config = {
-    // ...
+    scale: 48,
+    size: { width: 800, height: 500 },
     eventHandlers: {
-        click: true, // Enable click events
-        rightClick: true, // Enable right click events
-        hover: true, // Enable hover events
-        drag: true, // Enable panning
-        zoom: true, // Enable zooming
-        resize: true, // Enable auto-resize
+        click: true,
+        rightClick: true,
+        hover: true,
+        drag: true,
+        zoom: "pointer",
+        resize: true,
     },
 };
 ```
 
-## Event Callbacks
+`zoom: true` is shorthand for `"pointer"`. Use `zoom: "center"` when wheel and pinch gestures should zoom around the viewport center instead of the cursor or pinch midpoint.
+
+## Event Handlers
+
+Assign callbacks directly on the engine instance.
 
 ### `onClick`
 
-Triggered when the user clicks on the canvas.
+Triggered when a click or tap completes without a drag.
 
-```typescript
-engine.onClick = (world, canvas, client) => {
-    console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
-    console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+```ts
+engine.onClick = (coords, mouse, client) => {
+    console.log("Clicked cell:", coords.snapped);
+    console.log("Exact world position:", coords.raw);
+    console.log("Canvas pixel:", mouse.raw);
+    console.log("Viewport pixel:", client.raw);
 };
 ```
 
 ### `onRightClick`
 
-Triggered when the user right clicks on the canvas.
+Triggered by DOM context menu/right-click input when `eventHandlers.rightClick` is enabled. The renderer prevents the browser context menu before forwarding the callback.
 
-```typescript
-engine.onRightClick = (world, canvas, client) => {
-    console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
-    console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+```ts
+engine.onRightClick = (coords, mouse, client) => {
+    openContextMenu({
+        tile: coords.snapped,
+        screen: client.raw,
+    });
 };
 ```
 
 ### `onHover`
 
-Triggered when the mouse moves over the canvas. Useful for tooltips or highlighting cells.
+Triggered when the pointer moves over the canvas while not dragging, if `eventHandlers.hover` is enabled.
 
-```typescript
-engine.onHover = (world, canvas, client) => {
-    // Highlight the cell under the cursor
-    engine.drawRect(
+```ts
+let hoverHandle: DrawHandle | undefined;
+
+engine.onHover = (coords) => {
+    if (hoverHandle) engine.removeDrawHandle(hoverHandle);
+
+    hoverHandle = engine.drawRect(
         {
-            x: world.snapped.x,
-            y: world.snapped.y,
-            style: { fillStyle: "rgba(255, 255, 0, 0.3)" },
+            x: coords.snapped.x,
+            y: coords.snapped.y,
+            size: 1,
+            style: { fillStyle: "rgba(56, 189, 248, 0.25)" },
         },
-        3
+        10,
     );
+
+    engine.render();
 };
 ```
 
-### `onMouseDown`
+For high-frequency hover work, prefer replacing one previous `DrawHandle` or clearing a dedicated layer over accumulating draw calls.
 
-Triggered when the user presses the mouse button on the canvas. This is useful for starting drawing operations, selecting cells, or implementing custom drag behaviors.
+### `onMouseDown` And `onMouseUp`
 
-```typescript
-let isDrawing = false;
+Useful for painting, selection, drag handles, and other tool modes.
 
-engine.onMouseDown = (world, canvas, client) => {
-    isDrawing = true;
-    console.log("Mouse button pressed");
+```ts
+let selecting = false;
+let selectionStart = { x: 0, y: 0 };
+
+engine.onMouseDown = (coords) => {
+    selecting = true;
+    selectionStart = coords.snapped;
+};
+
+engine.onMouseUp = (coords) => {
+    if (!selecting) return;
+    selecting = false;
+    selectRect(selectionStart, coords.snapped);
 };
 ```
-
-### `onMouseUp`
-
-Triggered when the user releases the mouse button. Useful for completing drawing operations or drag actions.
-
-```typescript
-engine.onMouseUp = (world, canvas, client) => {
-    isDrawing = false;
-    console.log("Mouse button released");
-};
-```
-
-:::tip Drawing Example
-Combine `onMouseDown`, `onMouseUp`, and `onHover` to create a painting tool:
-
-```typescript
-let isDrawing = false;
-const paintedCells = new Set();
-
-engine.onMouseDown = (world, canvas, client) => {
-    isDrawing = true;
-    paintedCells.clear();
-};
-
-engine.onHover = (world, canvas, client) => {
-    if (isDrawing) {
-        const key = `${world.snapped.x},${world.snapped.y}`;
-        if (!paintedCells.has(key)) {
-            paintedCells.add(key);
-            engine.drawRect(
-                {
-                    x: world.snapped.x,
-                    y: world.snapped.y,
-                    size: 1,
-                    style: { fillStyle: "blue" },
-                },
-                1
-            );
-            engine.render();
-        }
-    }
-};
-
-engine.onMouseUp = (world, canvas, client) => {
-    isDrawing = false;
-    console.log("Painted cells:", Array.from(paintedCells));
-};
-```
-
-:::
-
-:::info Working with Drag
-When `eventHandlers.drag` is enabled, both drag and custom mouse interactions (like painting) will try to work simultaneously. To implement mode-based interactions (e.g., paint mode vs pan mode), use `setEventHandlers()` to toggle drag on/off:
-
-**Keyboard-based Mode Switching:**
-
-```typescript
-let isPaintMode = false;
-let isDrawing = false;
-const paintedCells = new Set();
-
-// Toggle paint mode with Shift key
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Shift" && !isPaintMode) {
-        isPaintMode = true;
-        engine.setEventHandlers({ drag: false, hover: true }); // Disable drag, enable hover
-        engine.canvas.style.cursor = "crosshair";
-    }
-});
-
-document.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") {
-        isPaintMode = false;
-        engine.setEventHandlers({ drag: true, hover: false }); // Re-enable drag
-        engine.canvas.style.cursor = "default";
-    }
-});
-
-engine.onMouseDown = () => {
-    if (isPaintMode) {
-        isDrawing = true;
-        paintedCells.clear();
-    }
-};
-
-engine.onHover = (world) => {
-    if (isPaintMode && isDrawing) {
-        const key = `${world.snapped.x},${world.snapped.y}`;
-        if (!paintedCells.has(key)) {
-            paintedCells.add(key);
-            engine.drawRect(
-                {
-                    x: world.snapped.x,
-                    y: world.snapped.y,
-                    size: 1,
-                    style: { fillStyle: "blue" },
-                },
-                1
-            );
-            engine.render();
-        }
-    }
-};
-
-engine.onMouseUp = () => {
-    isDrawing = false;
-};
-
-engine.onMouseLeave = () => {
-    isDrawing = false; // Stop painting when mouse leaves canvas
-};
-```
-
-**Button-based Mode Switching:**
-
-```typescript
-const paintModeBtn = document.getElementById("paint-mode");
-const panModeBtn = document.getElementById("pan-mode");
-
-paintModeBtn.addEventListener("click", () => {
-    engine.setEventHandlers({ drag: false, hover: true });
-    // Enable painting logic
-});
-
-panModeBtn.addEventListener("click", () => {
-    engine.setEventHandlers({ drag: true, hover: false });
-    // Disable painting logic
-});
-```
-
-:::
-
-:::tip Best Practices
-
--   **Disable drag when painting**: Use `setEventHandlers({ drag: false })` to prevent camera movement during drawing operations
--   **Use keyboard shortcuts**: Shift, Space, or Alt keys for quick mode switching (like Photoshop/Figma)
--   **Update cursor**: Change the cursor style to indicate the current mode (`crosshair` for paint, `grab` for pan)
--   **Clean up on mouse leave**: Always stop drawing operations in `onMouseLeave` to prevent stuck states
-    :::
 
 ### `onMouseLeave`
 
-Triggered when the mouse leaves the canvas area. Useful for cleaning up hover states, hiding tooltips, or stopping drawing operations.
+Triggered when the pointer leaves the canvas. Use it to clear transient UI state.
 
-```typescript
-engine.onMouseLeave = (world, canvas, client) => {
-    console.log("Mouse left the map");
-    // Clear highlights or tooltips
-    isDrawing = false; // Stop drawing if in progress
+```ts
+engine.onMouseLeave = () => {
+    selecting = false;
+    if (hoverHandle) {
+        engine.removeDrawHandle(hoverHandle);
+        hoverHandle = undefined;
+        engine.render();
+    }
 };
 ```
 
+## Camera Callbacks
+
 ### `onCoordsChange`
 
-Triggered whenever the camera moves (pan or zoom). Useful for syncing UI elements like a mini-map or coordinate display.
+Fires after camera movement: drag, wheel/pinch zoom, `updateCoords`, `goCoords`, `setBounds` clamping, or resize-centered updates.
 
-```typescript
+```ts
 engine.onCoordsChange = (center) => {
-    console.log("New Camera Center:", center);
+    updateMiniMap(center);
+    updateCoordinateReadout(center);
+};
+```
+
+### `onZoom`
+
+Fires when the scale changes through wheel, pinch, `setScale`, `zoomIn`, or `zoomOut`.
+
+```ts
+engine.onZoom = (scale) => {
+    zoomLabel.textContent = `${Math.round(scale)} px / cell`;
 };
 ```
 
 ### `onResize`
 
-Triggered when the canvas is resized (either manually via `resize()` or automatically in responsive mode).
+Fires after manual resize or observed wrapper resize.
 
-```typescript
+```ts
 engine.onResize = () => {
-    console.log("Canvas resized to:", engine.getSize());
+    console.log("New size:", engine.getSize());
 };
-```
-
-:::tip Responsive Mode
-In responsive mode, this callback is triggered whenever the wrapper element size changes.
-:::
-
-### `onZoom`
-
-Triggered when the zoom level changes (via mouse wheel or pinch gesture). Receives the new scale value.
-
-```typescript
-engine.onZoom = (scale) => {
-    console.log("Zoom level changed:", scale);
-    // Update UI elements based on zoom level
-    updateZoomIndicator(scale);
-};
-```
-
-:::tip Use Cases
-
--   **Zoom indicator**: Display current zoom percentage in the UI
--   **Level of detail**: Show/hide elements based on zoom level
--   **Minimap sync**: Update viewport representation in a minimap
-    :::
-
-## Coordinate Data Structure
-
-The `onClick` and `onHover` callbacks receive three coordinate objects to provide position data in different contexts:
-
-| Argument      | Property  | Description                                                 | Example               |
-| :------------ | :-------- | :---------------------------------------------------------- | :-------------------- |
-| **1. World**  | `raw`     | Exact floating-point world coordinates.                     | `{ x: 5.5, y: 10.2 }` |
-|               | `snapped` | Integer grid cell coordinates.                              | `{ x: 5, y: 10 }`     |
-| **2. Canvas** | `raw`     | Pixel coordinates relative to the canvas element.           | `{ x: 400, y: 300 }`  |
-|               | `snapped` | Pixel coordinates of the cell's bottom-right corner.        | `{ x: 380, y: 280 }`  |
-| **3. Client** | `raw`     | Pixel coordinates relative to the browser viewport.         | `{ x: 420, y: 320 }`  |
-|               | `snapped` | Screen pixel coordinates of the cell's bottom-right corner. | `{ x: 400, y: 300 }`  |
-
-:::info
-**Snapped Coordinates:**
-
--   **World**: Snaps to the integer grid coordinates (e.g., `5.9` becomes `5`).
--   **Canvas/Client**: Snaps to the bottom-right pixel of that grid cell on the screen.
-    :::
-
-## Camera Controls
-
-While events handle user input, you can also control the camera programmatically to focus on specific areas or adjust the view.
-
-### `updateCoords`
-
-Instantly jumps the camera to a new center position without animation.
-
-| Parameter   | Type       | Description                                |
-| :---------- | :--------- | :----------------------------------------- |
-| `newCenter` | `{ x, y }` | The new center coordinates in world space. |
-
-```typescript
-// Jump immediately to (10, 10)
-engine.updateCoords({ x: 10, y: 10 });
-```
-
-### `goCoords`
-
-Smoothly animates the camera center to target coordinates over a specified duration.
-
-| Parameter    | Type     | Default      | Description                                                      |
-| :----------- | :------- | :----------- | :--------------------------------------------------------------- |
-| `x`          | `number` | **Required** | Target world X coordinate.                                       |
-| `y`          | `number` | **Required** | Target world Y coordinate.                                       |
-| `durationMs` | `number` | `500`        | Animation duration in milliseconds. Set to `0` for instant move. |
-
-```typescript
-// Pan to (10, 10) over 1 second
-engine.goCoords(10, 10, 1000);
-
-// Instant move (same as updateCoords)
-engine.goCoords(5, 5, 0);
-```
-
-### `resize`
-
-Manually updates the canvas size (e.g., when the container resizes or user selects a resolution). The engine attempts to keep the current center point in focus during the resize.
-
-| Parameter    | Type     | Default      | Description                                                     |
-| :----------- | :------- | :----------- | :-------------------------------------------------------------- |
-| `width`      | `number` | **Required** | New canvas width in pixels.                                     |
-| `height`     | `number` | **Required** | New canvas height in pixels.                                    |
-| `durationMs` | `number` | `500`        | Animation duration in milliseconds. Use `0` for instant resize. |
-
-```typescript
-// Resize to 800x600 with a smooth transition
-engine.resize(800, 600, 500);
 ```
 
 :::warning Responsive Mode
-This method is disabled when `responsive` mode is enabled. In responsive mode, canvas size is automatically controlled by the wrapper element.
+`engine.resize()` and `eventHandlers.resize` are ignored when `config.responsive` is enabled. Responsive mode is controlled by the wrapper element.
 :::
 
-### `setEventHandlers`
+## Coordinate Payload
 
-Dynamically updates event handlers at runtime. This is essential for implementing mode-based interactions (e.g., switching between pan mode, paint mode, select mode).
+Pointer callbacks receive three coordinate objects.
 
-| Parameter  | Type                     | Description                                                                 |
-| :--------- | :----------------------- | :-------------------------------------------------------------------------- |
-| `handlers` | `Partial<EventHandlers>` | Event handler flags to update (`click`, `hover`, `drag`, `zoom`, `resize`). |
+| Argument | `raw` | `snapped` |
+| :-- | :-- | :-- |
+| `coords` | Exact world coordinate under the pointer. | Floored world grid cell. |
+| `mouse` | Canvas-relative pixel coordinate. | Canvas pixel coordinate for the center of the snapped cell. |
+| `client` | Browser viewport pixel coordinate. | Viewport pixel coordinate for the center of the snapped cell. |
 
-```typescript
-// Disable drag for painting mode
-engine.setEventHandlers({ drag: false, hover: true });
+```ts
+engine.onClick = (coords, mouse, client) => {
+    // World tile for game/map logic
+    const tile = coords.snapped;
 
-// Re-enable drag for pan mode
-engine.setEventHandlers({ drag: true, hover: false });
+    // Canvas-local pixel position for custom drawing
+    const local = mouse.raw;
 
-// Disable all interactions temporarily
-engine.setEventHandlers({
-    click: false,
-    hover: false,
-    drag: false,
-    zoom: false,
-});
+    // Viewport pixel position for DOM popovers/tooltips
+    const screen = client.raw;
+};
 ```
 
-**Common Use Cases:**
+## Runtime Event Modes
 
-```typescript
-// Paint mode toggle
+Use `setEventHandlers()` to change interaction behavior without recreating the engine.
+
+```ts
 function enablePaintMode() {
     engine.setEventHandlers({ drag: false, hover: true });
-    canvas.style.cursor = "crosshair";
+    engine.canvas.style.cursor = "crosshair";
 }
 
 function enablePanMode() {
     engine.setEventHandlers({ drag: true, hover: false });
-    canvas.style.cursor = "grab";
+    engine.canvas.style.cursor = "grab";
 }
 
-// Presentation mode (view only)
-function enableViewMode() {
+function enableReadOnlyMode() {
     engine.setEventHandlers({
         click: false,
+        rightClick: false,
         hover: false,
         drag: false,
         zoom: false,
     });
 }
+```
 
-// Full interactivity
-function enableEditMode() {
-    engine.setEventHandlers({
-        click: true,
-        hover: true,
-        drag: true,
-        zoom: true,
+### Painting Tool Example
+
+```ts
+let painting = false;
+const painted = new Set<string>();
+let paintHandle: DrawHandle | undefined;
+
+function redrawPaintLayer() {
+    if (paintHandle) engine.removeDrawHandle(paintHandle);
+
+    const rects = Array.from(painted).map((key) => {
+        const [x, y] = key.split(",").map(Number);
+        return { x, y, size: 1, style: { fillStyle: "#38bdf8" } };
     });
+
+    paintHandle = engine.drawRect(rects, 2);
+    engine.render();
 }
+
+engine.onMouseDown = (coords) => {
+    painting = true;
+    painted.add(`${coords.snapped.x},${coords.snapped.y}`);
+    redrawPaintLayer();
+};
+
+engine.onHover = (coords) => {
+    if (!painting) return;
+
+    const key = `${coords.snapped.x},${coords.snapped.y}`;
+    if (painted.has(key)) return;
+
+    painted.add(key);
+    redrawPaintLayer();
+};
+
+engine.onMouseUp = () => {
+    painting = false;
+};
+
+engine.onMouseLeave = () => {
+    painting = false;
+};
 ```
 
-:::tip Integration with Keyboard Shortcuts
-Combine `setEventHandlers()` with keyboard events for professional-grade interaction patterns:
-
-```typescript
-let currentMode = "pan";
-
-document.addEventListener("keydown", (e) => {
-    // Shift = Paint mode
-    if (e.key === "Shift" && currentMode === "pan") {
-        currentMode = "paint";
-        engine.setEventHandlers({ drag: false, hover: true });
-        canvas.style.cursor = "crosshair";
-    }
-
-    // Space = Temporarily enable pan (even in other modes)
-    if (e.code === "Space") {
-        engine.setEventHandlers({ drag: true, hover: false });
-        canvas.style.cursor = "grab";
-    }
-});
-
-document.addEventListener("keyup", (e) => {
-    // Release Shift = Back to pan mode
-    if (e.key === "Shift" && currentMode === "paint") {
-        currentMode = "pan";
-        engine.setEventHandlers({ drag: true, hover: false });
-        canvas.style.cursor = "default";
-    }
-
-    // Release Space = Back to previous mode
-    if (e.code === "Space") {
-        if (currentMode === "paint") {
-            engine.setEventHandlers({ drag: false, hover: true });
-            canvas.style.cursor = "crosshair";
-        } else {
-            engine.setEventHandlers({ drag: true, hover: false });
-            canvas.style.cursor = "default";
-        }
-    }
-});
-```
-
+:::tip Drag And Paint
+If `eventHandlers.drag` stays enabled while painting, pointer movement will pan the camera and paint at the same time. Disable drag in paint mode with `engine.setEventHandlers({ drag: false, hover: true })`.
 :::
 
-### `setBounds`
+### Keyboard Mode Switching
 
-Set or update map boundaries to restrict camera movement to a specific area. This prevents users from panning beyond defined limits.
+```ts
+let mode: "pan" | "paint" = "pan";
 
-| Parameter | Type     | Description                                          |
-| :-------- | :------- | :--------------------------------------------------- |
-| `bounds`  | `object` | Boundary limits with `minX`, `maxX`, `minY`, `maxY`. |
+window.addEventListener("keydown", (event) => {
+    if (event.key === "Shift" && mode !== "paint") {
+        mode = "paint";
+        engine.setEventHandlers({ drag: false, hover: true });
+        engine.canvas.style.cursor = "crosshair";
+    }
 
-```typescript
-// Restrict map to -100 to 100 on both axes
-engine.setBounds({ minX: -100, maxX: 100, minY: -100, maxY: 100 });
-
-// Remove all boundaries
-engine.setBounds({
-    minX: -Infinity,
-    maxX: Infinity,
-    minY: -Infinity,
-    maxY: Infinity,
+    if (event.code === "Space") {
+        engine.setEventHandlers({ drag: true, hover: false });
+        engine.canvas.style.cursor = "grab";
+    }
 });
 
-// Only limit horizontal scrolling
-engine.setBounds({
-    minX: 0,
-    maxX: 500,
-    minY: -Infinity,
-    maxY: Infinity,
-});
-
-// Limit to positive quadrant only
-engine.setBounds({
-    minX: 0,
-    maxX: 1000,
-    minY: 0,
-    maxY: 1000,
+window.addEventListener("keyup", (event) => {
+    if (event.key === "Shift" && mode === "paint") {
+        mode = "pan";
+        engine.setEventHandlers({ drag: true, hover: false });
+        engine.canvas.style.cursor = "default";
+    }
 });
 ```
 
-**Use Cases:**
+## Camera API Used With Events
 
--   **Game maps**: Keep players within playable area
--   **Data visualization**: Prevent scrolling beyond data boundaries
--   **Floor plans**: Restrict view to building dimensions
--   **Interactive maps**: Define explorable regions
+Events often drive camera or viewport updates.
 
-:::info Initial Configuration
-Boundaries can also be set in the initial configuration:
-
-```typescript
-const engine = new CanvasTileEngine(wrapper, {
-    scale: 50,
-    size: { width: 800, height: 600 },
-    bounds: {
-        minX: -100,
-        maxX: 100,
-        minY: -100,
-        maxY: 100,
-    },
-});
+```ts
+engine.updateCoords({ x: 10, y: 10 });
+engine.goCoords(0, 0, 500);
+engine.setScale(64);
+engine.zoomIn();
+engine.zoomOut();
+engine.resize(1024, 768, 300);
+engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
 ```
+
+`resize(width, height, durationMs?, onComplete?)` is disabled when `config.responsive` is enabled.
+
+## Best Practices
+
+- Enable only the events you need.
+- Use a dedicated layer or retained `DrawHandle` for transient hover/selection visuals.
+- Disable `drag` while implementing paint or marquee-selection tools.
+- Use `client.raw` for DOM popovers and `coords.snapped` for grid logic.
+- Clear temporary state in `onMouseLeave`.
+- Use `onCoordsChange`, `onZoom`, and `onResize` to synchronize minimaps and UI readouts.

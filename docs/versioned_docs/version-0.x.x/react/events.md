@@ -4,82 +4,79 @@ sidebar_position: 3
 
 # Interactions & Events
 
-The React package provides event handling through props on the `CanvasTileEngine` component. Events automatically translate screen coordinates into world coordinates.
-
-## Enabling Events
-
-Enable events in the configuration:
+React events are passed as props to `<CanvasTileEngine>`. The interaction flags still live in `config.eventHandlers`.
 
 ```tsx
 const config = {
-    // ...
+    scale: 48,
+    size: { width: 800, height: 500 },
     eventHandlers: {
-        click: true, // Enable click events
-        rightClick: true // Enable right click evenets
-        hover: true, // Enable hover events
-        drag: true, // Enable panning
-        zoom: true, // Enable zooming
-        resize: true, // Enable auto-resize
+        click: true,
+        rightClick: true,
+        hover: true,
+        drag: true,
+        zoom: "pointer",
+        resize: true,
     },
 };
 ```
 
-## Event Props
+`zoom: true` is shorthand for `"pointer"`. Use `"center"` for center-anchored wheel and pinch zoom.
+
+## Pointer Props
 
 ### `onClick`
-
-Triggered when the user clicks on the canvas.
 
 ```tsx
 <CanvasTileEngine
     engine={engine}
+    renderer={new RendererCanvas()}
     config={config}
-    onClick={(world, canvas, client) => {
-        console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
-        console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+    onClick={(coords, mouse, client) => {
+        console.log("Clicked cell:", coords.snapped);
+        console.log("Exact world position:", coords.raw);
     }}
->
-    {/* children */}
-</CanvasTileEngine>
+/>
 ```
 
 ### `onRightClick`
 
-Triggered when the user right clicks on the canvas.
-
 ```tsx
 <CanvasTileEngine
     engine={engine}
+    renderer={new RendererCanvas()}
     config={config}
-    onRightClick={(world, canvas, client) => {
-        console.log("Clicked Cell:", world.snapped); // { x: 5, y: 10 }
-        console.log("Exact World Pos:", world.raw); // { x: 5.23, y: 10.87 }
+    onRightClick={(coords, mouse, client) => {
+        setContextMenu({ tile: coords.snapped, screen: client.raw });
     }}
->
-    {/* children */}
-</CanvasTileEngine>
+/>
 ```
 
 ### `onHover`
 
-Triggered when the mouse moves over the canvas.
-
 ```tsx
 function MapWithHover() {
     const engine = useCanvasTileEngine();
-    const [hoverCell, setHoverCell] = useState<Coords | null>(null);
+    const [hovered, setHovered] = useState<Coords | null>(null);
 
     const hoverRect = useMemo(
-        () => (hoverCell ? { x: hoverCell.x, y: hoverCell.y, style: { fillStyle: "rgba(255,255,0,0.3)" } } : null),
-        [hoverCell]
+        () =>
+            hovered && {
+                x: hovered.x,
+                y: hovered.y,
+                size: 1,
+                style: { fillStyle: "rgba(56,189,248,0.25)" },
+            },
+        [hovered],
     );
 
     return (
         <CanvasTileEngine
             engine={engine}
-            config={config}
-            onHover={(world) => setHoverCell(world.snapped)}
-            onMouseLeave={() => setHoverCell(null)}
+            renderer={new RendererCanvas()}
+            config={{ ...config, eventHandlers: { ...config.eventHandlers, hover: true } }}
+            onHover={(coords) => setHovered(coords.snapped)}
+            onMouseLeave={() => setHovered(null)}
         >
             <CanvasTileEngine.GridLines cellSize={1} />
             {hoverRect && <CanvasTileEngine.Rect items={hoverRect} layer={3} />}
@@ -88,225 +85,215 @@ function MapWithHover() {
 }
 ```
 
-### `onMouseDown` & `onMouseUp`
-
-Triggered when mouse buttons are pressed/released. Useful for drawing tools.
+### `onMouseDown`, `onMouseUp`, And `onMouseLeave`
 
 ```tsx
-function PaintingApp() {
+function SelectionMap() {
     const engine = useCanvasTileEngine();
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [paintedCells, setPaintedCells] = useState<Set<string>>(new Set());
-
-    const paintRects = useMemo(
-        () =>
-            Array.from(paintedCells).map((key) => {
-                const [x, y] = key.split(",").map(Number);
-                return { x, y, size: 1, style: { fillStyle: "blue" } };
-            }),
-        [paintedCells]
-    );
+    const [start, setStart] = useState<Coords | null>(null);
+    const [end, setEnd] = useState<Coords | null>(null);
 
     return (
         <CanvasTileEngine
             engine={engine}
+            renderer={new RendererCanvas()}
             config={config}
-            onMouseDown={() => setIsDrawing(true)}
-            onMouseUp={() => setIsDrawing(false)}
-            onMouseLeave={() => setIsDrawing(false)}
-            onHover={(world) => {
-                if (isDrawing) {
-                    const key = `${world.snapped.x},${world.snapped.y}`;
-                    setPaintedCells((prev) => new Set(prev).add(key));
-                }
+            onMouseDown={(coords) => {
+                setStart(coords.snapped);
+                setEnd(coords.snapped);
             }}
+            onHover={(coords) => {
+                if (start) setEnd(coords.snapped);
+            }}
+            onMouseUp={(coords) => {
+                setEnd(coords.snapped);
+                commitSelection(start, coords.snapped);
+                setStart(null);
+            }}
+            onMouseLeave={() => setStart(null)}
         >
             <CanvasTileEngine.GridLines cellSize={1} />
-            <CanvasTileEngine.Rect items={paintRects} layer={1} />
         </CanvasTileEngine>
     );
 }
 ```
 
-### `onMouseLeave`
+## Callback Payload
 
-Triggered when the mouse leaves the canvas area.
+Pointer props share the same callback shape.
+
+| Argument | `raw` | `snapped` |
+| :-- | :-- | :-- |
+| `coords` | Exact world coordinate under the pointer. | Floored world grid cell. |
+| `mouse` | Canvas-relative pixel coordinate. | Canvas pixel coordinate for the center of the snapped cell. |
+| `client` | Browser viewport pixel coordinate. | Viewport pixel coordinate for the center of the snapped cell. |
+
+Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
+
+## Camera Props
 
 ```tsx
 <CanvasTileEngine
     engine={engine}
+    renderer={new RendererCanvas()}
     config={config}
-    onMouseLeave={(world, canvas, client) => {
-        setHoverCell(null);
-        setIsDrawing(false);
-    }}
->
-    {/* children */}
-</CanvasTileEngine>
+    onCoordsChange={setCenter}
+    onZoom={setScale}
+    onResize={() => console.log(engine.getSize())}
+/>
 ```
 
-### `onCoordsChange`
+| Prop | Description |
+| :-- | :-- |
+| `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes. |
+| `onZoom` | Fires after wheel, pinch, `setScale`, `zoomIn`, or `zoomOut` changes the scale. |
+| `onResize` | Fires after manual or observed resize. |
 
-Triggered whenever the camera moves (pan or zoom).
+## Painting Example
+
+For high-frequency interactions, use functional state updates or refs. Keep the rendered item array memoized.
 
 ```tsx
-function MapWithMinimap() {
+function PaintingApp() {
     const engine = useCanvasTileEngine();
-    const [center, setCenter] = useState({ x: 0, y: 0 });
+    const [painting, setPainting] = useState(false);
+    const [painted, setPainted] = useState<Set<string>>(() => new Set());
+
+    const paintRects = useMemo(
+        () =>
+            Array.from(painted).map((key) => {
+                const [x, y] = key.split(",").map(Number);
+                return { x, y, size: 1, style: { fillStyle: "#38bdf8" } };
+            }),
+        [painted],
+    );
+
+    const addCell = (coords: Coords) => {
+        const key = `${coords.x},${coords.y}`;
+        setPainted((prev) => {
+            if (prev.has(key)) return prev;
+            const next = new Set(prev);
+            next.add(key);
+            return next;
+        });
+    };
 
     return (
-        <>
-            <CanvasTileEngine engine={engine} config={config} onCoordsChange={setCenter}>
-                {/* Main map content */}
-            </CanvasTileEngine>
-
-            <MiniMap center={center} />
-        </>
+        <CanvasTileEngine
+            engine={engine}
+            renderer={new RendererCanvas()}
+            config={{
+                ...config,
+                eventHandlers: { ...config.eventHandlers, drag: false, hover: true },
+            }}
+            onMouseDown={(coords) => {
+                setPainting(true);
+                addCell(coords.snapped);
+            }}
+            onHover={(coords) => {
+                if (painting) addCell(coords.snapped);
+            }}
+            onMouseUp={() => setPainting(false)}
+            onMouseLeave={() => setPainting(false)}
+        >
+            <CanvasTileEngine.GridLines cellSize={1} />
+            <CanvasTileEngine.Rect items={paintRects} layer={2} />
+        </CanvasTileEngine>
     );
 }
 ```
 
-### `onResize`
+## Runtime Event Modes
 
-Triggered when the canvas is resized (either manually via `resize()` or automatically in responsive mode).
-
-```tsx
-<CanvasTileEngine
-    engine={engine}
-    config={config}
-    onResize={() => {
-        console.log("Canvas resized to:", engine.getSize());
-    }}
->
-    {/* children */}
-</CanvasTileEngine>
-```
-
-:::tip Responsive Mode
-In responsive mode, this callback is triggered whenever the wrapper element size changes.
-:::
-
-### `onZoom`
-
-Triggered when the zoom level changes (via mouse wheel or pinch gesture). Receives the new scale value.
+Use `engine.setEventHandlers()` for tool modes without remounting the component.
 
 ```tsx
-<CanvasTileEngine
-    engine={engine}
-    config={config}
-    onZoom={(scale) => {
-        console.log("Zoom level changed:", scale);
-        setCurrentZoom(scale);
-    }}
->
-    {/* children */}
-</CanvasTileEngine>
-```
-
-:::tip Use Cases
-
--   **Zoom indicator**: Display current zoom percentage in the UI
--   **Level of detail**: Conditionally render components based on zoom level
--   **Minimap sync**: Update viewport representation in a minimap
-    :::
-
-## Coordinate Data Structure
-
-The `onClick` and `onHover` callbacks receive three coordinate objects:
-
-| Argument      | Property  | Description                                          | Example               |
-| :------------ | :-------- | :--------------------------------------------------- | :-------------------- |
-| **1. World**  | `raw`     | Exact floating-point world coordinates.              | `{ x: 5.5, y: 10.2 }` |
-|               | `snapped` | Integer grid cell coordinates.                       | `{ x: 5, y: 10 }`     |
-| **2. Canvas** | `raw`     | Pixel coordinates relative to the canvas element.    | `{ x: 400, y: 300 }`  |
-|               | `snapped` | Pixel coordinates of the cell's bottom-right corner. | `{ x: 380, y: 280 }`  |
-| **3. Client** | `raw`     | Pixel coordinates relative to the browser viewport.  | `{ x: 420, y: 320 }`  |
-|               | `snapped` | Screen pixel coordinates of the cell's corner.       | `{ x: 400, y: 300 }`  |
-
-## Dynamic Event Handlers
-
-Use `setEventHandlers` to toggle event handlers at runtime:
-
-```tsx
-function ModeBasedInteraction() {
+function ModeControls() {
     const engine = useCanvasTileEngine();
-    const [mode, setMode] = useState<"pan" | "paint">("pan");
+    const [mode, setMode] = useState<"pan" | "paint" | "readonly">("pan");
 
-    const enablePaintMode = () => {
+    const enablePaint = () => {
         setMode("paint");
         engine.setEventHandlers({ drag: false, hover: true });
     };
 
-    const enablePanMode = () => {
+    const enablePan = () => {
         setMode("pan");
         engine.setEventHandlers({ drag: true, hover: false });
     };
 
+    const enableReadonly = () => {
+        setMode("readonly");
+        engine.setEventHandlers({ click: false, rightClick: false, hover: false, drag: false, zoom: false });
+    };
+
     return (
-        <div>
-            <div>
-                <button onClick={enablePanMode}>Pan Mode</button>
-                <button onClick={enablePaintMode}>Paint Mode</button>
-            </div>
+        <>
+            <button onClick={enablePan}>Pan</button>
+            <button onClick={enablePaint}>Paint</button>
+            <button onClick={enableReadonly}>Read only</button>
 
             <CanvasTileEngine
                 engine={engine}
+                renderer={new RendererCanvas()}
                 config={config}
-                onHover={(world) => {
-                    if (mode === "paint") {
-                        // Handle painting
-                    }
+                onHover={(coords) => {
+                    if (mode === "paint") console.log(coords.snapped);
                 }}
-            >
-                {/* children */}
-            </CanvasTileEngine>
-        </div>
+            />
+        </>
     );
 }
 ```
 
 ## Keyboard Shortcuts
 
-Combine with keyboard events for professional interactions:
-
 ```tsx
-function AdvancedInteraction() {
-    const engine = useCanvasTileEngine();
+useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+        if (event.key === "Shift") {
+            engine.setEventHandlers({ drag: false, hover: true });
+        }
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Shift") {
-                engine.setEventHandlers({ drag: false, hover: true });
-            }
-        };
+        if (event.code === "Space") {
+            engine.setEventHandlers({ drag: true, hover: false });
+        }
+    };
 
-        const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.key === "Shift") {
-                engine.setEventHandlers({ drag: true, hover: false });
-            }
-        };
+    const up = (event: KeyboardEvent) => {
+        if (event.key === "Shift") {
+            engine.setEventHandlers({ drag: true, hover: false });
+        }
+    };
 
-        document.addEventListener("keydown", handleKeyDown);
-        document.addEventListener("keyup", handleKeyUp);
-
-        return () => {
-            document.removeEventListener("keydown", handleKeyDown);
-            document.removeEventListener("keyup", handleKeyUp);
-        };
-    }, [engine]);
-
-    return (
-        <CanvasTileEngine engine={engine} config={config}>
-            {/* children */}
-        </CanvasTileEngine>
-    );
-}
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+        window.removeEventListener("keydown", down);
+        window.removeEventListener("keyup", up);
+    };
+}, [engine]);
 ```
 
-:::tip Best Practices
+## Camera API Used With Events
 
--   **Use state for UI-driven interactions**: React state keeps your UI in sync
--   **Use refs for high-frequency updates**: For painting operations with many updates per second
--   **Memoize computed values**: Use `useMemo` for derived data like painted cells
--   **Clean up on mouse leave**: Always handle `onMouseLeave` to prevent stuck states
-    :::
+The hook handle exposes the same camera controls as the core engine.
+
+```tsx
+engine.updateCoords({ x: 10, y: 10 });
+engine.goCoords(0, 0, 500);
+engine.setScale(64);
+engine.zoomIn();
+engine.zoomOut();
+engine.resize(1024, 768, 300);
+engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
+```
+
+## Best Practices
+
+- Keep `config`, `center`, and `renderer` lifecycle rules in mind: they are read on mount. Use `engine.setEventHandlers()` for runtime event changes.
+- Use React state for UI-visible state and refs for very hot transient state.
+- Memoize draw item arrays with `useMemo`.
+- Disable `drag` while painting or selecting.
+- Use `client.raw` for DOM overlays and `coords.snapped` for grid logic.
+- Clear active tool state in `onMouseLeave`.

@@ -43,7 +43,8 @@ const config: Config = {
                     sidebarPath: "./sidebars.ts",
                     // Please change this to your repo.
                     // Remove this to remove the "edit this page" links.
-                    editUrl: "https://github.com/enesyukselx/canvas-tile-engine/tree/master/docs/",
+                    editUrl:
+                        "https://github.com/enesyukselx/canvas-tile-engine/tree/master/docs/",
                 },
                 /*blog: {
                     showReadingTime: true,
@@ -86,16 +87,17 @@ const config: Config = {
                     label: "Home",
                     position: "left",
                 },
-                {
-                    to: "https://www.canvastileengine.com/playground",
-                    label: "Playground",
-                    position: "left",
-                },
+
                 {
                     type: "docSidebar",
                     sidebarId: "tutorialSidebar",
                     position: "left",
                     label: "Documentation",
+                },
+                {
+                    href: "https://www.canvastileengine.com/api-docs",
+                    label: "API Reference",
+                    position: "left",
                 },
                 {
                     href: "https://github.com/enesyukselx/canvas-tile-engine",

@@ -11,7 +11,7 @@
     },
     "scripts": {
         "build": "turbo run build --filter=./packages/*",
-        "build:docs": "turbo run build --filter=docs",
+        "build:docs": "pnpm --dir docs build",
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "turbo run dev --filter=./packages/* --filter=!@canvas-tile-engine/renderer-server",
         "dev:example": "node run-example.js",

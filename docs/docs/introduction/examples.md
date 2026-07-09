@@ -1,31 +1,48 @@
 ---
-sidebar_position: 5
+sidebar_position: 7
 ---
 
 # Examples
 
-You can access the source code for all example projects [here](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples).
+Example projects live in the repository under [`examples`](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples).
 
-### Javascript
+## Vanilla JavaScript
 
-#### Game Map Example
+| Example | Command |
+| :-- | :-- |
+| Game map | `pnpm --filter vanilla-js-game-map dev` |
+| Spritesheet | `pnpm --filter vanilla-js-spritesheet dev` |
 
--   [Github](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples/vanilla-js-examples/game-map)
--   [Demo](https://js-game-map.netlify.app/)
+## React
 
-### React
+| Example | Command |
+| :-- | :-- |
+| Game map | `pnpm --filter react-game-map dev` |
+| Responsive game map | `pnpm --filter react-responsive-game-map dev` |
+| Pixel paint | `pnpm --filter react-pixel-paint dev` |
+| Spritesheet | `pnpm --filter react-spritesheet dev` |
 
-#### Game Map Example
+## React Native
 
--   [Github](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples/react/game-map)
--   [Demo](https://react-game-map.netlify.app/)
+| Example | Command |
+| :-- | :-- |
+| Responsive game map | See `examples/react-native/responsive-game-map` and run it with your React Native or Expo workflow. |
 
-#### Responsive Game Map Example
+## Server Rendering
 
--   [Github](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples/react/responsive-game-map)
--   [Demo](https://react-responsive-game-map.netlify.app/)
+| Example | Command |
+| :-- | :-- |
+| Game map image generation | `pnpm --filter renderer-server-game-map start` |
 
-#### Pixel Paint Example
+## Workspace Setup
 
--   [Github](https://github.com/enesyukselx/canvas-tile-engine/tree/master/examples/react/pixel-paint)
--   [Demo](https://react-pixel-paint.netlify.app)
+```bash
+pnpm install
+pnpm build
+```
+
+When changing package source locally, keep package watch mode running in another terminal:
+
+```bash
+pnpm dev:lib
+```

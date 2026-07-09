@@ -4,303 +4,198 @@ sidebar_position: 5
 
 # Types Reference
 
-All types are exported from both packages and can be imported directly:
+Core types are exported from `@canvas-tile-engine/core` and re-exported by the React packages where useful.
 
-```typescript
-// From core package (vanilla JS)
-import { Rect, Circle, Text, Path, ImageItem, Coords } from "@canvas-tile-engine/core";
-
-// From React package
-import { Rect, Circle, Text, Path, ImageItem, Coords } from "@canvas-tile-engine/react";
+```ts
+import type { Rect, Circle, Text, Line, Path, ImageItem, Coords } from "@canvas-tile-engine/core";
+import type { EngineHandle } from "@canvas-tile-engine/react";
 ```
 
-## Drawing Types
-
-### `Rect`
-
-Rectangle/square shape definition. Supports rotation and border radius.
-
-```typescript
-type Rect = {
-    x: number;
-    y: number;
-    size?: number;
-    origin?: {
-        mode?: "cell" | "self";
-        x?: number; // 0 to 1
-        y?: number; // 0 to 1
-    };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
-    rotate?: number;
-    radius?: number | number[];
-};
-```
-
-| Property | Type                 | Default                            | Description                     |
-| :------- | :------------------- | :--------------------------------- | :------------------------------ |
-| `x`, `y` | `number`             | **Required**                       | World coordinates               |
-| `size`   | `number`             | `1`                                | Size in grid units              |
-| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                    |
-| `style`  | `object`             | `{}`                               | Fill and stroke styling         |
-| `rotate` | `number`             | `0`                                | Rotation in degrees (clockwise) |
-| `radius` | `number \| number[]` | -                                  | Border radius in pixels         |
-
----
-
-### `Circle`
-
-Circle shape definition. Does not support rotation or border radius.
-
-```typescript
-type Circle = {
-    x: number;
-    y: number;
-    size?: number;
-    origin?: {
-        mode?: "cell" | "self";
-        x?: number;
-        y?: number;
-    };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
-};
-```
-
-| Property | Type     | Default                            | Description             |
-| :------- | :------- | :--------------------------------- | :---------------------- |
-| `x`, `y` | `number` | **Required**                       | World coordinates       |
-| `size`   | `number` | `1`                                | Diameter in grid units  |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point            |
-| `style`  | `object` | `{}`                               | Fill and stroke styling |
-
----
-
-### `Text`
-
-Text element with position, content, and font styling. Extends the DrawObject pattern.
-
-```typescript
-type Text = {
-    x: number;
-    y: number;
-    text: string;
-    size?: number;
-    origin?: {
-        mode?: "cell" | "self";
-        x?: number;
-        y?: number;
-    };
-    style?: {
-        fillStyle?: string;
-        fontFamily?: string;
-        textAlign?: CanvasTextAlign;
-        textBaseline?: CanvasTextBaseline;
-    };
-    rotate?: number;
-};
-```
-
-| Property | Type     | Default                            | Description                                 |
-| :------- | :------- | :--------------------------------- | :------------------------------------------ |
-| `x`, `y` | `number` | **Required**                       | World coordinates                           |
-| `text`   | `string` | **Required**                       | Text content to render                      |
-| `size`   | `number` | `1`                                | Font size in world units (scales with zoom) |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                                |
-| `style`  | `object` | `{}`                               | Font styling options                        |
-| `rotate` | `number` | `0`                                | Rotation in degrees (clockwise)             |
-
-**Style Options:**
-
-| Property       | Type                 | Default        | Description          |
-| :------------- | :------------------- | :------------- | :------------------- |
-| `fillStyle`    | `string`             | -              | Text color           |
-| `fontFamily`   | `string`             | `"sans-serif"` | Font family          |
-| `textAlign`    | `CanvasTextAlign`    | `"left"`       | Horizontal alignment |
-| `textBaseline` | `CanvasTextBaseline` | `"top"`        | Vertical baseline    |
-
----
-
-### `Line`
-
-Line between two points. Style is passed separately to the draw method.
-
-```typescript
-type Line = {
-    from: Coords;
-    to: Coords;
-};
-```
-
-| Property | Type     | Description    |
-| :------- | :------- | :------------- |
-| `from`   | `Coords` | Starting point |
-| `to`     | `Coords` | Ending point   |
-
----
-
-### `Path`
-
-Array of coordinates forming a continuous path.
-
-```typescript
-type Path = Coords[];
-```
-
-**Example:**
-
-```typescript
-const path: Path = [
-    { x: 0, y: 0 },
-    { x: 5, y: 0 },
-    { x: 5, y: 5 },
-    { x: 0, y: 5 },
-];
-```
-
----
-
-### `ImageItem`
-
-Image element with position, size, and rotation.
-
-```typescript
-type ImageItem = {
-    x: number;
-    y: number;
-    size?: number;
-    origin?: {
-        mode?: "cell" | "self";
-        x?: number;
-        y?: number;
-    };
-    rotate?: number;
-    img: HTMLImageElement;
-    sprite?: SpriteRect;
-};
-```
-
-| Property | Type               | Default                            | Description                     |
-| :------- | :----------------- | :--------------------------------- | :------------------------------ |
-| `x`, `y` | `number`           | **Required**                       | World coordinates               |
-| `size`   | `number`           | `1`                                | Size in grid units              |
-| `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point                    |
-| `rotate` | `number`           | `0`                                | Rotation in degrees (clockwise) |
-| `img`    | `HTMLImageElement` | **Required**                       | Loaded image object             |
-| `sprite` | `SpriteRect`       | -                                  | Spritesheet source rectangle    |
-
----
-
-### `SpriteRect`
-
-A source rectangle inside a spritesheet image, in sheet pixels. See [Spritesheet & Animation](../js/spritesheet.md).
-
-```typescript
-type SpriteRect = {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-};
-```
-
----
-
-## Utility Types
+## Draw Objects
 
 ### `Coords`
 
-Basic 2D coordinate object used throughout the engine.
-
-```typescript
+```ts
 type Coords = {
     x: number;
     y: number;
 };
 ```
 
----
+### `Rect`
 
-### `DrawObject`
-
-Base type that `Rect` extends. You can use this for generic drawing operations.
-
-```typescript
-type DrawObject = {
+```ts
+type Rect = {
     x: number;
     y: number;
     size?: number;
-    origin?: {
-        mode?: "cell" | "self";
-        x?: number;
-        y?: number;
-    };
+    origin?: { mode?: "cell" | "self"; x?: number; y?: number };
     style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
     rotate?: number;
     radius?: number | number[];
 };
 ```
 
----
+`size` is in world units. `radius` and `style.lineWidth` are in pixels. `rotate` is degrees, clockwise.
+
+### `Circle`
+
+```ts
+type Circle = {
+    x: number;
+    y: number;
+    size?: number;
+    origin?: { mode?: "cell" | "self"; x?: number; y?: number };
+    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+};
+```
+
+### `Text`
+
+```ts
+type Text = {
+    x: number;
+    y: number;
+    text: string;
+    size?: number;
+    origin?: { mode?: "cell" | "self"; x?: number; y?: number };
+    style?: {
+        fillStyle?: string;
+        fontFamily?: string;
+        textAlign?: "center" | "end" | "left" | "right" | "start";
+        textBaseline?: "alphabetic" | "bottom" | "hanging" | "ideographic" | "middle" | "top";
+    };
+    rotate?: number;
+};
+```
+
+`size` is a world-unit text size. Renderers currently draw the actual font at `size * scale * 0.3`, matching the existing Canvas2D behavior.
+
+### `Line` And `Path`
+
+```ts
+type Line = {
+    from: Coords;
+    to: Coords;
+};
+
+type Path = Coords[];
+```
+
+`Path` represents a polyline. Pass `Path[]` to draw multiple polylines in one call.
+
+### `ImageItem<TImage>`
+
+```ts
+type SpriteRect = {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+};
+
+type ImageItem<TImage = HTMLImageElement> = {
+    x: number;
+    y: number;
+    size?: number;
+    origin?: { mode?: "cell" | "self"; x?: number; y?: number };
+    rotate?: number;
+    radius?: number | number[];
+    img: TImage;
+    sprite?: SpriteRect;
+};
+```
+
+`TImage` depends on the renderer:
+
+| Renderer | Image type |
+| :-- | :-- |
+| Canvas2D / WebGL | `HTMLImageElement` |
+| Skia / React Native | `SkImage` |
+| Server | `@napi-rs/canvas` `Image` |
+
+`sprite` crops a sub-rectangle from a spritesheet image before drawing.
+
+## Sprite Helpers
+
+```ts
+type SpriteSheetOptions = {
+    frameWidth: number;
+    frameHeight: number;
+    columns?: number;
+    margin?: number;
+    spacing?: number;
+};
+
+type SpriteAnimation = {
+    frames: SpriteRect[];
+    fps: number;
+    loop?: boolean;
+};
+```
+
+Use `SpriteSheet` for frame math and `SpriteAnimator` for imperative animation. React and React Native also provide `<CanvasTileEngine.Sprite>`.
 
 ## Callback Types
 
-### `MouseEventCallback`
+Pointer callbacks share one shape:
 
-Callback for mouse events.
-
-```typescript
+```ts
 type MouseEventCallback = (
     coords: { raw: Coords; snapped: Coords },
     mouse: { raw: Coords; snapped: Coords },
-    client: { raw: Coords; snapped: Coords }
+    client: { raw: Coords; snapped: Coords },
 ) => void;
+```
 
+Aliases:
+
+```ts
 type onClickCallback = MouseEventCallback;
 type onRightClickCallback = MouseEventCallback;
 type onHoverCallback = MouseEventCallback;
 type onMouseDownCallback = MouseEventCallback;
 type onMouseUpCallback = MouseEventCallback;
 type onMouseLeaveCallback = MouseEventCallback;
+type onZoomCallback = (scale: number) => void;
 ```
 
-| Parameter | Description                                             |
-| :-------- | :------------------------------------------------------ |
-| `coords`  | World coordinates (raw = exact, snapped = grid-aligned) |
-| `mouse`   | Mouse position relative to canvas                       |
-| `client`  | Mouse position relative to viewport                     |
+`coords.raw` is the exact world coordinate. `coords.snapped` is floored to the grid cell.
 
 ### `onDrawCallback`
 
-Callback for custom drawing after all layers are rendered.
-
-```typescript
-type onDrawCallback = (ctx: unknown, info: { scale: number; width: number; height: number; coords: Coords }) => void;
+```ts
+type onDrawCallback = (
+    ctx: unknown,
+    info: { scale: number; width: number; height: number; coords: Coords },
+) => void;
 ```
 
-| Parameter     | Description                                             |
-| :------------ | :------------------------------------------------------ |
-| `ctx`         | Rendering context (type depends on renderer being used) |
-| `info.scale`  | Current zoom scale                                      |
-| `info.width`  | Canvas width in pixels                                  |
-| `info.height` | Canvas height in pixels                                 |
-| `info.coords` | Top-left world coordinate of the viewport               |
+`ctx` is renderer-specific:
 
-**Example usage with Canvas2D renderer:**
+- `CanvasRenderingContext2D` for `RendererCanvas`.
+- The WebGL renderer's 2D overlay context for `RendererWebGL`.
+- `SkCanvas` for `RendererSkia`.
+- `SKRSContext2D` for `RendererServer`.
 
-```typescript
-import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+`info.coords` is the top-left world coordinate of the viewport.
 
-const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas());
+## Engine Handles
 
-engine.onDraw = (ctx) => {
-    // Cast to the appropriate context type for your renderer
-    const context = ctx as CanvasRenderingContext2D;
+React packages expose safe handles from `useCanvasTileEngine()`. Methods no-op or return defaults before mount, and `engine.isReady` tells you when the core instance is attached.
 
-    context.fillStyle = "red";
-    context.fillRect(info.width / 2 - 5, info.height / 2 - 5, 10, 10);
-};
+Common methods:
+
+```ts
+engine.render();
+engine.getCenterCoords();
+engine.getVisibleBounds();
+engine.updateCoords({ x: 0, y: 0 });
+engine.goCoords(10, 10, 500);
+engine.setScale(64);
+engine.zoomIn();
+engine.zoomOut();
+engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
+engine.setEventHandlers({ drag: false, hover: true });
+engine.loadImage("/sprite.png");
 ```
-
-:::tip
-The `ctx` parameter is typed as `unknown` to support different renderer backends.
-When using `RendererCanvas`, cast it to `CanvasRenderingContext2D`.
-:::

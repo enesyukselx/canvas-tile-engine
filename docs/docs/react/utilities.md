@@ -49,6 +49,7 @@ const config = {
 
 ```tsx
 import { CanvasTileEngine, useCanvasTileEngine, gridToSize } from "@canvas-tile-engine/react";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const config = {
     ...gridToSize({ columns: 8, rows: 8, cellSize: 60 }),
@@ -61,7 +62,7 @@ function GameBoard() {
     const engine = useCanvasTileEngine();
 
     return (
-        <CanvasTileEngine engine={engine} config={config} center={{ x: 4, y: 4 }}>
+        <CanvasTileEngine engine={engine} renderer={new RendererCanvas()} config={config} center={{ x: 4, y: 4 }}>
             <CanvasTileEngine.GridLines cellSize={1} />
         </CanvasTileEngine>
     );

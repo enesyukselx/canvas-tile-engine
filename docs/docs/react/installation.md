@@ -4,147 +4,147 @@ sidebar_position: 1
 
 # Installation
 
-This page covers how to use `@canvas-tile-engine/react` inside React applications.
+`@canvas-tile-engine/react` provides a React component, a stable engine hook, and declarative draw components.
 
 ## Install
 
+Canvas2D:
+
 ```bash
-npm install @canvas-tile-engine/react @canvas-tile-engine/renderer-canvas
+npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engine/renderer-canvas
+```
+
+WebGL:
+
+```bash
+npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engine/renderer-webgl
 ```
 
 ## Basic Setup
-
-The React package provides a declarative API using compound components. Here's a minimal example:
 
 ```tsx
 import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
-function App() {
+const tiles = [
+    { x: 0, y: 0, size: 1, style: { fillStyle: "#22c55e" } },
+    { x: 1, y: 0, size: 1, style: { fillStyle: "#38bdf8" } },
+];
+
+export function App() {
     const engine = useCanvasTileEngine();
 
-    const config = {
-        scale: 50,
-        size: { width: 800, height: 600 },
-        eventHandlers: {
-            drag: true,
-            zoom: true,
-        },
-    };
-
     return (
-        <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
-            <CanvasTileEngine.GridLines cellSize={1} strokeStyle="rgba(0,0,0,0.2)" />
-            <CanvasTileEngine.Rect items={{ x: 5, y: 5, size: 1, style: { fillStyle: "#0077be" } }} layer={1} />
+        <CanvasTileEngine
+            engine={engine}
+            renderer={new RendererCanvas()}
+            config={{
+                scale: 48,
+                size: { width: 800, height: 500 },
+                backgroundColor: "#0f172a",
+                eventHandlers: { drag: true, zoom: true, click: true },
+            }}
+            center={{ x: 0, y: 0 }}
+            onClick={(coords) => console.log(coords.snapped)}
+        >
+            <CanvasTileEngine.GridLines cellSize={1} strokeStyle="#1e293b" layer={0} />
+            <CanvasTileEngine.Rect items={tiles} layer={1} />
         </CanvasTileEngine>
     );
 }
 ```
 
-## The `useCanvasTileEngine` Hook
+## Renderer Choice
 
-The `useCanvasTileEngine` hook creates an engine handle that manages the lifecycle of the canvas engine.
+Switch to WebGL by changing the renderer:
+
+```tsx
+import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
+
+<CanvasTileEngine engine={engine} config={config} renderer={new RendererWebGL()} />;
+```
+
+`config`, `center`, and `renderer` are read when the component mounts. Later prop changes are intentionally ignored. Use runtime APIs for live updates:
+
+```tsx
+engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
+engine.setEventHandlers({ drag: false, hover: true });
+engine.updateCoords({ x: 10, y: 10 });
+engine.goCoords(0, 0, 500);
+engine.setScale(64);
+```
+
+Remount with a new `key` when you need to apply a new full config or renderer.
+
+## `useCanvasTileEngine`
 
 ```tsx
 const engine = useCanvasTileEngine();
 ```
 
-### Engine Handle Properties
+The hook returns a stable handle. Methods are safe before mount: they no-op or return defaults. Use `engine.isReady` when you need the real core instance or image loader.
 
-| Property   | Type                       | Description                                  |
-| :--------- | :------------------------- | :------------------------------------------- |
-| `isReady`  | `boolean`                  | Whether the engine is initialized and ready. |
-| `instance` | `CanvasTileEngine \| null` | The underlying core engine instance.         |
+| Property | Description |
+| :-- | :-- |
+| `isReady` | `true` after the core engine has mounted. |
+| `instance` | The underlying core `CanvasTileEngine` instance, or `null`. |
+| `images` | Renderer image loader, available after mount. |
 
-### Engine Handle Methods
-
-Once `engine.isReady` is `true`, you can access all core engine methods:
-
-```tsx
-useEffect(() => {
-    if (engine.isReady) {
-        // Access core engine methods
-        engine.goCoords(10, 10, 500);
-        engine.render();
-    }
-}, [engine.isReady]);
-```
-
-## Declarative vs Imperative API
-
-### Declarative (Recommended)
-
-Use compound components as children of `CanvasTileEngine`:
+Common methods:
 
 ```tsx
-<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
-    <CanvasTileEngine.GridLines cellSize={1} />
-    <CanvasTileEngine.Rect items={rectangles} layer={1} />
-    <CanvasTileEngine.Circle items={circles} layer={2} />
-</CanvasTileEngine>
-```
-
-### Imperative
-
-For dynamic scenarios, use the engine handle directly:
-
-```tsx
-useEffect(() => {
-    if (engine.isReady) {
-        engine.drawGridLines(1);
-        engine.drawRect(rectangles, 1);
-        engine.render();
-    }
-}, [engine.isReady, rectangles]);
+engine.render();
+engine.getCenterCoords();
+engine.getVisibleBounds();
+engine.goCoords(10, 10, 500);
+engine.resize(1024, 768, 300);
+engine.zoomIn();
+engine.zoomOut();
+engine.loadImage("/sprite.png");
+engine.clearLayer(2);
+engine.clearAll();
 ```
 
 ## Component Props
 
-| Prop             | Type                     | Default          | Description                        |
-| :--------------- | :----------------------- | :--------------- | :--------------------------------- |
-| `engine`         | `EngineHandle`           | **Required**     | Engine handle from the hook.       |
-| `config`         | `CanvasTileEngineConfig` | **Required**     | Engine configuration.              |
-| `renderer`       | `IRenderer`              | **Required**     | Renderer instance (e.g., `new RendererCanvas()`). |
-| `center`         | `{ x, y }`               | `{ x: 0, y: 0 }` | Initial center coordinates.        |
-| `className`      | `string`                 | -                | CSS class for the wrapper div.     |
-| `style`          | `CSSProperties`          | -                | Inline styles for the wrapper div. |
-| `children`       | `ReactNode`              | -                | Draw components.                   |
-| `onCoordsChange` | `(coords) => void`       | -                | Camera position change callback.   |
-| `onClick`        | `onClickCallback`        | -                | Click event callback.              |
-| `onHover`        | `onHoverCallback`        | -                | Hover event callback.              |
-| `onMouseDown`    | `() => void`             | -                | Mouse down callback.               |
-| `onMouseUp`      | `() => void`             | -                | Mouse up callback.                 |
-| `onMouseLeave`   | `() => void`             | -                | Mouse leave callback.              |
-| `onDraw`         | `onDrawCallback`         | -                | Post-draw callback.                |
-| `onResize`       | `() => void`             | -                | Resize callback.                   |
+| Prop | Type | Description |
+| :-- | :-- | :-- |
+| `engine` | `EngineHandle` | Required handle from `useCanvasTileEngine()`. |
+| `renderer` | `IRenderer` | Required renderer instance. |
+| `config` | `CanvasTileEngineConfig` | Required initial config. |
+| `center` | `{ x, y }` | Optional initial center. Defaults to `{ x: 0, y: 0 }`. |
+| `className` | `string` | Wrapper div class. |
+| `style` | `React.CSSProperties` | Wrapper div style. |
+| `children` | `ReactNode` | Draw components. |
+| `onCoordsChange` | `(coords) => void` | Camera center callback. |
+| `onClick` / `onRightClick` / `onHover` | Pointer callbacks | Receive world, canvas, and client coordinate objects. |
+| `onMouseDown` / `onMouseUp` / `onMouseLeave` | Pointer callbacks | Useful for drawing tools and mode state. |
+| `onDraw` | `onDrawCallback` | Runs after engine layers. Context depends on renderer. |
+| `onResize` | `() => void` | Resize callback. |
+| `onZoom` | `(scale) => void` | Zoom callback. |
 
-## Configuration
+## Declarative And Imperative Drawing
 
-The `config` prop accepts the same configuration as the core engine:
+Declarative:
 
 ```tsx
-const config = {
-    scale: 50, // Pixels per grid unit
-    minScale: 10, // Minimum zoom
-    maxScale: 200, // Maximum zoom
-    backgroundColor: "#f0f0f0", // Canvas background
-    size: {
-        width: 800,
-        height: 600,
-    },
-    eventHandlers: {
-        click: true,
-        hover: true,
-        drag: true,
-        zoom: true,
-        resize: true,
-    },
-    bounds: {
-        // Optional camera bounds
-        minX: -100,
-        maxX: 100,
-        minY: -100,
-        maxY: 100,
-    },
-};
+<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
+    <CanvasTileEngine.GridLines cellSize={1} />
+    <CanvasTileEngine.Rect items={rects} layer={1} />
+    <CanvasTileEngine.Circle items={markers} layer={2} />
+</CanvasTileEngine>
 ```
+
+Imperative:
+
+```tsx
+useEffect(() => {
+    if (!engine.isReady) return;
+
+    engine.drawGridLines(1, 1, "#334155", 0);
+    engine.drawRect(rects, 1);
+    engine.render();
+}, [engine, engine.isReady, rects]);
+```
+
+For declarative draw components, keep large `items` arrays stable with `useMemo` or state. A new array identity re-registers the draw callback and can rebuild spatial indexes.

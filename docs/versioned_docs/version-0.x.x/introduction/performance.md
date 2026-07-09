@@ -1,93 +1,81 @@
 ---
-sidebar_position: 4
+sidebar_position: 6
 ---
 
 # Performance
 
-The engine is optimized to handle **large datasets** without lag. This page explains the internal optimizations that make this possible.
+Canvas Tile Engine is designed for large grid scenes, but the best strategy depends on whether your content is dynamic, static, visible all at once, or spread across a large world.
 
 ## Automatic Optimizations
 
-These optimizations happen automatically—you don't need to configure anything.
-
 ### Viewport Culling
 
-Only items within the visible viewport (plus a small buffer) are drawn. Items outside the view are skipped entirely.
+Draw methods skip items outside the visible viewport plus a small buffer. This applies to rectangles, circles, text, images, lines, and paths.
 
-```
-┌─────────────────────────────────────┐
-│           World (1M items)          │
-│                                     │
-│    ┌───────────────┐                │
-│    │   Viewport    │ ← Only these   │
-│    │  (500 items)  │   are rendered │
-│    └───────────────┘                │
-│                                     │
-└─────────────────────────────────────┘
+### Spatial Indexing
+
+For arrays larger than 500 items, dynamic rect, circle, text, and image layers build an RBush spatial index. Viewport queries then avoid scanning the whole list each frame.
+
+```ts
+engine.drawRect(largeArrayOfTiles, 1);
 ```
 
-### Spatial Indexing (R-Tree)
+Use one draw call with an array instead of thousands of draw calls.
 
-For large datasets (500+ items), the engine uses [RBush](https://github.com/mourner/rbush), an extremely fast R-Tree spatial index.
+### Renderer Batching
 
-**Without R-Tree:** To find visible items, every single item must be checked → O(n)
+- Canvas2D reduces repeated style changes while iterating visible items.
+- WebGL batches geometry into GPU draw calls.
+- Skia caches parsed colors and fonts and records frames as pictures.
 
-**With R-Tree:** Only items in the viewport region are queried → O(log n)
+## Static Drawing
 
-The R-Tree is built automatically when you call `drawRect`, `drawCircle`, or `drawImage` with an array of items.
+Static helpers are best for large non-changing layers.
 
-### Style Batching
-
-When multiple items share the same style, the engine batches them to reduce canvas state changes:
-
-```typescript
-// These are batched internally (single fillStyle set)
-engine.drawRect(
-    [
-        { x: 0, y: 0, style: { fillStyle: "#ff0000" } },
-        { x: 1, y: 0, style: { fillStyle: "#ff0000" } },
-        { x: 2, y: 0, style: { fillStyle: "#ff0000" } },
-    ],
-    1
-);
+```ts
+engine.drawStaticRect(items, "terrain", 0);
+engine.drawStaticCircle(markers, "markers", 1);
+engine.drawStaticImage(images, "decorations", 1);
 ```
 
-## Manual Optimizations
+Renderer behavior differs:
 
-For specific use cases, you can enable additional optimizations.
+| Renderer | Static helper behavior |
+| :-- | :-- |
+| Canvas2D | Pre-renders to an offscreen canvas and blits visible portions. |
+| WebGL | Delegates to dynamic batched drawing; no offscreen cache is kept. |
+| Skia | Records a reusable `SkPicture`. |
+| Server | Uses an offscreen `@napi-rs/canvas` cache. |
 
-### Static Caching
+Clear caches when underlying static data changes:
 
-For scenarios where **all items are visible at once**, use static caching to pre-render content to an offscreen canvas.
-
-```typescript
-// Pre-render items once
-engine.drawStaticRect(items, "cache-key", 1);
+```ts
+engine.clearStaticCache("terrain");
+engine.clearStaticCache();
 ```
 
-See [Drawing & Layers → Static Caching](/docs/js/drawing_and_layers#static-caching-pre-rendered-content) for details.
+## React Stability
 
-## Performance Tips
+React draw components compare `items` by reference. Keep large arrays stable with `useMemo`, `useState`, or external state.
 
-### Do
+```tsx
+const terrainItems = useMemo(() => buildTerrain(terrain), [terrain]);
 
--   **Use arrays** for batch rendering instead of calling `drawRect` in a loop
--   **Use static caching** when all items need to be visible with dragging enabled
--   **Reuse style objects** when possible to help style batching
-
-```typescript
-// Good - single call with array
-engine.drawRect(items, 1);
+<CanvasTileEngine.StaticRect items={terrainItems} cacheKey="terrain" layer={0} />;
 ```
 
-### Avoid
+Avoid inline arrays for large layers:
 
--   **Calling draw methods in a loop** - use arrays instead
--   **Creating new style objects per item** when they're identical
-
-```typescript
-// Bad - 1000 separate calls
-for (const item of items) {
-    engine.drawRect(item, 1);
-}
+```tsx
+// Avoid for large data: new array identity on every render.
+<CanvasTileEngine.Rect items={data.map(toRect)} layer={1} />;
 ```
+
+## Practical Rules
+
+- Batch items: `drawRect(items)` is better than calling `drawRect(item)` in a loop.
+- Use dynamic draw calls for frequently changing layers.
+- Use static draw calls for large, non-changing terrain or minimap layers.
+- Keep sprite animation frame lists stable.
+- In WebGL, call `renderer.invalidateTexture(source)` after mutating an image/canvas source without changing its dimensions.
+- Prefer server `renderer.encode()` over `toBuffer()` in request handlers to avoid blocking.
