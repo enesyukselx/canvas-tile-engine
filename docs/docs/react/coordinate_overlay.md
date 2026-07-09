@@ -25,7 +25,7 @@ const config = {
 | Property          | Type           | Default     | Description                                                                                                                         |
 | :---------------- | :------------- | :---------- | :---------------------------------------------------------------------------------------------------------------------------------- |
 | `enabled`         | `boolean`      | `false`     | Toggles the overlay visibility.                                                                                                     |
-| `shownScaleRange` | `{ min, max }` | `undefined` | Defines the zoom levels (scale) at which the overlay is visible. If the current scale is outside this range, the overlay is hidden. |
+| `shownScaleRange` | `{ min, max }` | `{ min: 0, max: Infinity }` | Defines the zoom levels (scale) at which the overlay is visible. If the current scale is outside this range, the overlay is hidden. |
 
 ### Scale Range Example
 

@@ -1,189 +1,171 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 ---
 
 # Configuration
 
-The `CanvasTileEngineConfig` object controls the initial state and behavior of the engine.
+`CanvasTileEngineConfig` defines the initial engine state. It is normalized by the core `Config` module, so omitted optional values get safe defaults.
+
+```ts
+import type { CanvasTileEngineConfig } from "@canvas-tile-engine/core";
+
+const config: CanvasTileEngineConfig = {
+    scale: 48,
+    minScale: 12,
+    maxScale: 128,
+    size: { width: 800, height: 500 },
+    backgroundColor: "#0f172a",
+    eventHandlers: { drag: true, zoom: "pointer", click: true },
+};
+```
 
 ## Core Settings
 
-These are the fundamental settings required to initialize the engine.
+| Property | Type | Default | Description |
+| :-- | :-- | :-- | :-- |
+| `scale` | `number` | Required | Initial pixels per world unit. |
+| `size` | `{ width, height, ... }` | Required | Initial logical viewport size in pixels. |
+| `minScale` | `number` | `scale * 0.5` | Minimum zoom scale. |
+| `maxScale` | `number` | `scale * 2` | Maximum zoom scale. |
+| `backgroundColor` | `string` | `"#ffffff"` | Frame background color. |
+| `gridAligned` | `boolean` | `false` | Snaps the initial center to `.5` cell centers when the viewport has an even tile count, useful for pixel-perfect grid alignment. |
+| `responsive` | `"preserve-scale" \| "preserve-viewport" \| false` | `false` | Enables container-driven resizing in browser renderers. |
 
-| Property          | Type                                              | Default       | Description                                                                      |
-| :---------------- | :------------------------------------------------ | :------------ | :------------------------------------------------------------------------------- |
-| `scale`           | `number`                                          | **Required**  | The initial zoom level (pixels per grid unit).                                   |
-| `size`            | `object`                                          | **Required**  | The dimensions of the canvas. See [Size Options](#size-options).                 |
-| `responsive`      | `"preserve-scale"` \| `"preserve-viewport"` \| `false` | `false`       | Enable responsive mode. See [Responsive Mode](#responsive-mode).                 |
-| `backgroundColor` | `string`                                          | `"#ffffff"`   | The background color of the canvas.                                              |
-| `minScale`        | `number`                                          | `scale * 0.5` | Minimum allowed zoom level.                                                      |
-| `maxScale`        | `number`                                          | `scale * 2`   | Maximum allowed zoom level.                                                      |
-| `gridAligned`     | `boolean`                                         | `false`       | Snap initial center to cell centers (x.5, y.5) for pixel-perfect grid alignment. |
+### Size
 
-### Size Options
+| Property | Type | Default | Description |
+| :-- | :-- | :-- | :-- |
+| `width` | `number` | Required | Logical width in pixels. |
+| `height` | `number` | Required | Logical height in pixels. |
+| `minWidth` | `number` | `100` | Minimum width for resize watchers. |
+| `minHeight` | `number` | `100` | Minimum height for resize watchers. |
+| `maxWidth` | `number` | `Infinity` | Maximum width for resize watchers. |
+| `maxHeight` | `number` | `Infinity` | Maximum height for resize watchers. |
 
-Define the canvas dimensions and constraints.
+## Responsive Mode
 
-| Property    | Type     | Default      | Description                           |
-| :---------- | :------- | :----------- | :------------------------------------ |
-| `width`     | `number` | **Required** | Initial width in pixels.              |
-| `height`    | `number` | **Required** | Initial height in pixels.             |
-| `minWidth`  | `number` | `100`        | Minimum width allowed during resize.  |
-| `minHeight` | `number` | `100`        | Minimum height allowed during resize. |
-| `maxWidth`  | `number` | `Infinity`   | Maximum width allowed during resize.  |
-| `maxHeight` | `number` | `Infinity`   | Maximum height allowed during resize. |
+Responsive mode is handled by the browser renderers. It is ignored by the server renderer, and React Native uses layout measurement instead.
 
-### Responsive Mode
+| Mode | Behavior |
+| :-- | :-- |
+| `"preserve-scale"` | Keeps `scale` fixed. The visible world area changes as the wrapper size changes. |
+| `"preserve-viewport"` | Keeps the configured tile count visible. The scale changes when the wrapper width changes. |
+| `false` | The engine uses the configured `size` until you call `resize()` or enable `eventHandlers.resize`. |
 
-Enable responsive mode to automatically resize the canvas when its container changes size. Two modes are available:
-
-| Mode                  | Description                                                            |
-| :-------------------- | :--------------------------------------------------------------------- |
-| `"preserve-scale"`    | Scale stays constant, visible tile count changes as container resizes. |
-| `"preserve-viewport"` | Visible tile count stays constant, scale adjusts based on width.       |
-
-#### preserve-scale
-
-The scale remains fixed while the visible tile count changes based on the container size. The wrapper size is fully controlled by your CSS.
-
-```typescript
-const config = {
-    size: { width: 800, height: 600 },
+```ts
+const responsiveConfig: CanvasTileEngineConfig = {
     scale: 50,
+    size: { width: 800, height: 600 },
     responsive: "preserve-scale",
 };
 ```
 
-#### preserve-viewport
-
-The visible tile count remains fixed while the scale adjusts based on container width. The engine automatically:
-
-- Sets wrapper `width: 100%`
-- Calculates height based on the tile ratio from `size.width` / `size.height`
-- Derives `minWidth` / `maxWidth` from `minScale` / `maxScale`:
-  - `minWidth = minScale × (size.width / scale)`
-  - `maxWidth = maxScale × (size.width / scale)`
-- Derives `minHeight` / `maxHeight` similarly based on the tile ratio
-
-This ensures the scale always stays within `minScale` and `maxScale` bounds.
-
-```typescript
-const config = {
-    size: { width: 800, height: 600 }, // 16×12 tiles at scale 50
-    scale: 50,
-    minScale: 25,  // → minWidth: 400px, minHeight: 300px
-    maxScale: 100, // → maxWidth: 1600px, maxHeight: 1200px
-    responsive: "preserve-viewport",
-};
-```
-
-:::info Automatic Size Limits
-In `preserve-viewport` mode, `size.minWidth`, `size.maxWidth`, `size.minHeight`, and `size.maxHeight` are ignored. The size limits are automatically calculated from `minScale` and `maxScale` to maintain the configured tile count.
-:::
-
-:::warning Limitations
-When responsive mode is enabled:
-- `resize()` method is disabled (canvas size is controlled by the wrapper element)
-- `eventHandlers.resize` is ignored (resizing is handled automatically)
+:::warning
+When `responsive` is enabled, `engine.resize()` and `eventHandlers.resize` are ignored because the wrapper element controls the size.
 :::
 
 ## Interactions
 
-Control how the user interacts with the map via `eventHandlers`.
+All interaction flags default to `false`.
 
-| Handler      | Default | Description                                         |
-| :----------- | :------ | :-------------------------------------------------- |
-| `click`      | `false` | Enable click events on grid cells.                  |
-| `rightClick` | `false` | Enable right click events on grid cells.            |
-| `hover`      | `false` | Enable hover events and tracking.                   |
-| `drag`       | `false` | Enable panning by dragging the map.                 |
-| `zoom`       | `false` | Enable zooming with the mouse wheel.                |
-| `resize`     | `false` | Automatically resize canvas when container changes. |
+| Handler | Type | Description |
+| :-- | :-- | :-- |
+| `click` | `boolean` | Enables tap/click callbacks. |
+| `rightClick` | `boolean` | Enables right-click callbacks on DOM renderers. |
+| `hover` | `boolean` | Enables hover/move callbacks. |
+| `drag` | `boolean` | Enables panning by pointer drag or touch drag. |
+| `zoom` | `boolean \| "pointer" \| "center"` | Enables wheel/pinch zoom. `true` is `"pointer"`. `"center"` zooms around the viewport center. |
+| `resize` | `boolean` | Enables wrapper resize observation when `responsive` is `false`. |
 
-```typescript
-// Example usage
+```ts
 eventHandlers: {
-  drag: true,
-  zoom: true,
-  click: true
+    drag: true,
+    zoom: "center",
+    click: true,
+    rightClick: true,
 }
 ```
 
-## Map Boundaries
+You can update interaction flags at runtime:
 
-Restrict camera movement to a specific area of the world. This is useful for preventing users from scrolling beyond your map limits.
+```ts
+engine.setEventHandlers({ drag: false, hover: true });
+```
 
-| Property | Type     | Default     | Description                                |
-| :------- | :------- | :---------- | :----------------------------------------- |
-| `minX`   | `number` | `-Infinity` | Minimum X coordinate the camera can reach. |
-| `maxX`   | `number` | `Infinity`  | Maximum X coordinate the camera can reach. |
-| `minY`   | `number` | `-Infinity` | Minimum Y coordinate the camera can reach. |
-| `maxY`   | `number` | `Infinity`  | Maximum Y coordinate the camera can reach. |
+## Bounds
 
-```typescript
-// Example: Restrict map to a 200x200 grid centered at origin
-bounds: {
-  minX: -100,
-  maxX: 100,
-  minY: -100,
-  maxY: 100
-}
+Bounds restrict camera movement.
 
-// Example: Only restrict horizontal movement
-bounds: {
-  minX: 0,
-  maxX: 500,
-  minY: -Infinity,
-  maxY: Infinity
+```ts
+const config: CanvasTileEngineConfig = {
+    scale: 48,
+    size: { width: 800, height: 500 },
+    bounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 },
+};
+```
+
+Use infinities for unbounded axes:
+
+```ts
+engine.setBounds({ minX: 0, maxX: 500, minY: -Infinity, maxY: Infinity });
+```
+
+## Coordinate Overlay
+
+```ts
+coordinates: {
+    enabled: true,
+    shownScaleRange: { min: 16, max: 96 },
 }
 ```
 
-:::tip Runtime Updates
-You can change boundaries at runtime using `engine.setBounds()`. See [Camera Controls](/docs/js/events#setbounds) for details.
-:::
+| Property | Type | Default | Description |
+| :-- | :-- | :-- | :-- |
+| `enabled` | `boolean` | `false` | Draws coordinate labels around the viewport. |
+| `shownScaleRange` | `{ min: number; max: number }` | `{ min: 0, max: Infinity }` | Only shows labels while the current scale is inside the range. |
 
-## Visual Customization
+## Cursor
 
-### Coordinate Overlay
+Browser renderers use the cursor values while idle and dragging.
 
-Display X/Y axes numbers on the edges of the screen.
+```ts
+cursor: {
+    default: "default",
+    move: "grabbing",
+}
+```
 
-| Property          | Type           | Default | Description                                           |
-| :---------------- | :------------- | :------ | :---------------------------------------------------- |
-| `enabled`         | `boolean`      | `false` | Show the coordinate numbers.                          |
-| `shownScaleRange` | `{ min, max }` | `All`   | Only show coordinates when zoom is within this range. |
+## Debug
 
-### Cursors
+```ts
+debug: {
+    enabled: true,
+    hud: {
+        enabled: true,
+        topLeftCoordinates: true,
+        coordinates: true,
+        scale: true,
+        tilesInView: true,
+        fps: true,
+    },
+}
+```
 
-Customize the mouse cursor for different states.
+| Property | Default | Description |
+| :-- | :-- | :-- |
+| `debug.enabled` | `false` | Master switch for debug overlays. |
+| `debug.hud.enabled` | `false` | Shows the HUD panel. |
+| `debug.hud.topLeftCoordinates` | `false` | Shows top-left world coordinates. |
+| `debug.hud.coordinates` | `false` | Shows center coordinates. |
+| `debug.hud.scale` | `false` | Shows current scale. |
+| `debug.hud.tilesInView` | `false` | Shows visible tile counts. |
+| `debug.hud.fps` | `false` | Shows FPS, continuously updated. |
+| `debug.eventHandlers.*` | `true` | Debug logging switches for click, hover, drag, zoom, and resize. |
 
-| State     | Default     | Description                              |
-| :-------- | :---------- | :--------------------------------------- |
-| `default` | `"default"` | The standard cursor.                     |
-| `move`    | `"move"`    | The cursor shown while dragging the map. |
+## Full Type
 
-## Debugging
-
-Built-in tools to help you develop. Enable via the `debug` object.
-
-| Feature                  | Default | Description                                            |
-| :----------------------- | :------ | :----------------------------------------------------- |
-| `enabled`                | `false` | Master switch for all debug features.                  |
-| `hud.enabled`            | `false` | Show HUD panel.                                        |
-| `hud.topLeftCoordinates` | `false` | Display top-left world coords.                         |
-| `hud.coordinates`        | `false` | Display center coords.                                 |
-| `hud.scale`              | `false` | Display current scale.                                 |
-| `hud.tilesInView`        | `false` | Display visible tile counts.                           |
-| `hud.fps`                | `false` | Display current FPS (continuously updated).            |
-| `eventHandlers.*`        | `true`  | Debug-time overrides for click/hover/drag/zoom/resize. |
-
-## Full TypeScript Type
-
-For reference, here is the complete type definition:
-
-```typescript
+```ts
 export type CanvasTileEngineConfig = {
-    renderer?: "canvas";
     scale: number;
     maxScale?: number;
     minScale?: number;
@@ -203,8 +185,14 @@ export type CanvasTileEngineConfig = {
         rightClick?: boolean;
         hover?: boolean;
         drag?: boolean;
-        zoom?: boolean;
+        zoom?: boolean | "pointer" | "center";
         resize?: boolean;
+    };
+    bounds?: {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
     };
     coordinates?: {
         enabled?: boolean;
@@ -216,17 +204,13 @@ export type CanvasTileEngineConfig = {
     };
     debug?: {
         enabled?: boolean;
-        grid?: {
-            enabled?: boolean;
-            color?: string;
-            lineWidth?: number;
-        };
         hud?: {
             enabled?: boolean;
             topLeftCoordinates?: boolean;
             coordinates?: boolean;
             scale?: boolean;
             tilesInView?: boolean;
+            fps?: boolean;
         };
         eventHandlers?: {
             click?: boolean;

@@ -98,6 +98,11 @@ const config: Config = {
                     label: "Documentation",
                 },
                 {
+                    href: "https://www.canvastileengine.com/api-docs",
+                    label: "API Reference",
+                    position: "left",
+                },
+                {
                     href: "https://github.com/enesyukselx/canvas-tile-engine",
                     label: "GitHub",
                     position: "right",

@@ -271,6 +271,7 @@ Draw images scaled to world units.
 | `x`, `y` | `number`           | World coordinates.                                                 |
 | `size`   | `number`           | Size in grid units (maintains aspect ratio).                       |
 | `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
+| `sprite` | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
 
 ```tsx
 function MapWithImages() {

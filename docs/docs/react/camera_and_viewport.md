@@ -19,6 +19,7 @@ Set the initial camera position with the `center` prop:
 ```tsx
 <CanvasTileEngine
     engine={engine}
+    renderer={new RendererCanvas()}
     config={config}
     center={{ x: 10, y: 10 }} // Start centered at (10, 10)
 >
@@ -57,7 +58,7 @@ function MapWithNavigation() {
             <button onClick={goToBase}>Go to Base</button>
             <button onClick={goToMarker}>Go to Marker</button>
 
-            <CanvasTileEngine engine={engine} config={config}>
+            <CanvasTileEngine engine={engine} renderer={new RendererCanvas()} config={config}>
                 {/* children */}
             </CanvasTileEngine>
         </div>
@@ -130,7 +131,7 @@ function MapWithCoordinateDisplay() {
                 Position: ({center.x.toFixed(1)}, {center.y.toFixed(1)})
             </div>
 
-            <CanvasTileEngine engine={engine} config={config} onCoordsChange={setCenter}>
+            <CanvasTileEngine engine={engine} renderer={new RendererCanvas()} config={config} onCoordsChange={setCenter}>
                 {/* children */}
             </CanvasTileEngine>
         </div>
@@ -215,7 +216,7 @@ function MapWithZoomControls() {
                 <button onClick={() => engine.zoomOut()}>-</button>
             </div>
 
-            <CanvasTileEngine engine={engine} config={config}>
+            <CanvasTileEngine engine={engine} renderer={new RendererCanvas()} config={config}>
                 {/* children */}
             </CanvasTileEngine>
         </div>
@@ -270,6 +271,7 @@ const logSize = () => {
 ```tsx
 <CanvasTileEngine
     engine={engine}
+    renderer={new RendererCanvas()}
     config={config}
     onResize={() => {
         const size = engine.getSize();
