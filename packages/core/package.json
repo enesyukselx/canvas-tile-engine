@@ -1,6 +1,6 @@
 {
     "name": "@canvas-tile-engine/core",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with Canvas",
     "author": "Enes Yüksel",
     "license": "MIT",
