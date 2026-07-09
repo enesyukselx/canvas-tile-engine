@@ -1,0 +1,38 @@
+name: Release
+
+on:
+    push:
+        branches:
+            - master
+    workflow_dispatch:
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    release:
+        name: Version PR / Publish
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.23.0
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: "pnpm"
+            - run: pnpm install --frozen-lockfile
+            - name: Create Version PR or publish to npm
+              uses: changesets/action@v1
+              with:
+                  version: pnpm changeset:version
+                  publish: pnpm release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -50,10 +50,10 @@
     "peerDependencies": {
         "react": ">=18.0.0",
         "react-dom": ">=18.0.0",
-        "@canvas-tile-engine/core": ">=0.3.0"
+        "@canvas-tile-engine/core": ">=0.4.0"
     },
     "dependencies": {
-        "@canvas-tile-engine/core": "workspace:*"
+        "@canvas-tile-engine/core": "workspace:^"
     },
     "devDependencies": {
         "@types/react": "^18.3.0",
