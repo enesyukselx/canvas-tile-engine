@@ -40,10 +40,13 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
 
 ## Mental model (read before writing any code)
 
-1. **World units, not pixels.** Item `x`, `y`, `size` are in world (tile)
-   units. `config.scale` is pixels per world unit; zooming changes it between
-   `minScale` and `maxScale`. Text `size` is also in world units and scales
-   with zoom.
+1. **World units, not pixels - and integers are CELL CENTERS.** Item `x`,
+   `y`, `size` are in world (tile) units. `config.scale` is pixels per world
+   unit; zooming changes it between `minScale` and `maxScale`. Text `size` is
+   also in world units. Crucially, an item at integer `k` is centered on its
+   cell: cell `k` spans world `[k - 0.5, k + 0.5]`, grid lines fall on
+   half-integers, and a board of cells `0..N-1` is centered at `(N-1)/2`
+   (NOT `N/2` - that is half a cell off).
 2. **Retained draw model.** `engine.drawRect(...)` does NOT paint immediately.
    It registers a persistent draw callback on a layer and returns a
    `DrawHandle`. The callback re-runs on every frame. Call `engine.render()`
@@ -146,6 +149,12 @@ const png = await renderToBuffer({
   canvas.
 - **Zoom limits**: `minScale` defaults to `scale * 0.5` and `maxScale` to
   `scale * 2`. If the user wants deep zooming, set them explicitly.
+- **Fixed boards MUST set the center**: a board of cells `0..N-1` is centered
+  at `(N-1)/2`, not `N/2` and not the default `(0, 0)`. Use the `center`
+  returned by `gridToSize` (core >= 0.5): `const { center, ...board } =
+  gridToSize({...})` and pass `center` to the constructor / `center` prop.
+  On older versions compute it manually: `{ x: (columns-1)/2, y: (rows-1)/2 }`.
+  Without this the board renders mostly off-screen or half a cell off.
 - **React props are mount-only**: `config`, `renderer`, and `center` are read
   once. Changing them later is ignored - use runtime APIs
   (`engine.setBounds`, `engine.updateCoords`, ...) or remount with a `key`.

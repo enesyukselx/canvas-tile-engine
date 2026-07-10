@@ -1,6 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_VALUES } from "../../src/constants";
-import { computePan, computeZoom, screenToWorld, worldToScreen } from "../../src/utils/viewport";
+import { computePan, computeZoom, screenToWorld, snapCenterToGrid, worldToScreen } from "../../src/utils/viewport";
+
+describe("snapCenterToGrid", () => {
+    it("snaps to the nearest half-integer for even tile counts", () => {
+        expect(snapCenterToGrid(9.2, 20)).toBe(9.5);
+        expect(snapCenterToGrid(9.8, 20)).toBe(9.5);
+        expect(snapCenterToGrid(10.4, 20)).toBe(10.5);
+    });
+
+    it("snaps integer ties down for even tile counts", () => {
+        // N/2 for a 0-based even board lands on the true center (N-1)/2.
+        expect(snapCenterToGrid(10, 20)).toBe(9.5);
+        expect(snapCenterToGrid(0, 20)).toBe(-0.5);
+    });
+
+    it("keeps aligned half-integer values for even tile counts", () => {
+        expect(snapCenterToGrid(9.5, 20)).toBe(9.5);
+        expect(snapCenterToGrid(-0.5, 20)).toBe(-0.5);
+    });
+
+    it("snaps to the nearest integer for odd tile counts", () => {
+        expect(snapCenterToGrid(9.4, 19)).toBe(9);
+        expect(snapCenterToGrid(9.6, 19)).toBe(10);
+        expect(snapCenterToGrid(9, 19)).toBe(9);
+    });
+
+    it("snaps half-integer ties down for odd tile counts", () => {
+        expect(snapCenterToGrid(9.5, 19)).toBe(9);
+    });
+
+    it("returns the value unchanged for non-integer tile counts", () => {
+        expect(snapCenterToGrid(10.3, 42.857)).toBe(10.3);
+    });
+});
 
 describe("computePan", () => {
     it("pans inverse to mouse movement scaled by zoom", () => {

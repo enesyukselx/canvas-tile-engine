@@ -28,7 +28,7 @@ const config: CanvasTileEngineConfig = {
 | `minScale` | `number` | `scale * 0.5` | Minimum zoom scale. |
 | `maxScale` | `number` | `scale * 2` | Maximum zoom scale. |
 | `backgroundColor` | `string` | `"#ffffff"` | Frame background color. |
-| `gridAligned` | `boolean` | `false` | Snaps the initial center to `.5` cell centers when the viewport has an even tile count, useful for pixel-perfect grid alignment. |
+| `gridAligned` | `boolean` | `false` | Snaps the initial center to the nearest grid-aligned value for pixel-perfect alignment: half-integers (x.5) for even tile counts, integers for odd. Integers are cell centers (cell `k` spans `[k-0.5, k+0.5]`); integer ties snap down so a center given as `N/2` lands on a 0-based board's true center `(N-1)/2`. |
 | `responsive` | `"preserve-scale" \| "preserve-viewport" \| false` | `false` | Enables container-driven resizing in browser renderers. |
 
 ### Size

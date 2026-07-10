@@ -8,15 +8,18 @@ import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 const HOVER_LAYER = 1;
 const DRAW_LAYER = 2;
 
+// Board of cells 0..N-1; gridToSize also returns its exact center.
+const { center: boardCenter, ...board } = gridToSize({
+    columns: 10,
+    rows: 6,
+    cellSize: 100,
+});
+
 function App() {
     //
     const engine = useCanvasTileEngine();
     const config: CanvasTileEngineConfig = {
-        ...gridToSize({
-            columns: 10,
-            rows: 6,
-            cellSize: 100,
-        }),
+        ...board,
         minScale: 10,
         maxScale: 100,
         responsive: "preserve-viewport",
@@ -59,6 +62,7 @@ function App() {
                     engine={engine}
                     renderer={new RendererCanvas()}
                     config={config}
+                    center={boardCenter}
                     onHover={(coords) => {
                         if (!isDrawing) {
                             engine.clearLayer(HOVER_LAYER);

@@ -36,6 +36,21 @@ Ascending draw order: layer 0 paints first (bottom), higher layers paint on
 top. Defaults: `drawGridLines` 0, most primitives 1, `drawText` 2. Multiple
 draw calls can share a layer (drawn in registration order).
 
+## Coordinate convention: integers are cell centers
+
+An item at integer coordinate `k` is centered on its cell. Concretely:
+
+- Cell `k` spans world `[k - 0.5, k + 0.5]`; cell boundaries (and grid lines)
+  fall on half-integers (`-0.5`, `0.5`, `1.5`, ...).
+- A board of cells `0..N-1` spans world `[-0.5, N - 0.5]` and is centered at
+  `(N - 1) / 2` on each axis - e.g. `(9.5, 9.5)` for 20x20, `(3.5, 3.5)` for
+  8x8. Using `N/2` puts everything half a cell off (background strips on the
+  right/bottom edges, clicks landing on cell boundaries).
+- `gridToSize` returns this center for you; pass it to the engine
+  constructor (vanilla/server) or the `center` prop (React/RN).
+- Clicks/hover report the cell as `coords.snapped` (floored), consistent
+  with this convention - no adjustment needed.
+
 ## Shared item fields (`DrawObject`)
 
 ```ts

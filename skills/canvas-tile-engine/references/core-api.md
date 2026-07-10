@@ -37,9 +37,12 @@ type CanvasTileEngineConfig = {
     minScale?: number;                 // default scale * 0.5
     maxScale?: number;                 // default scale * 2
     backgroundColor?: string;          // default "#ffffff", any CSS color
-    gridAligned?: boolean;             // default false. Snaps initial center to
-                                       // .5 cell centers when the viewport has an
-                                       // even tile count (pixel-perfect grids).
+    gridAligned?: boolean;             // default false. Snaps the initial center to
+                                       // the nearest grid-aligned value: half-integers
+                                       // for even tile counts, integers for odd
+                                       // (pixel-perfect grids). Integer ties snap
+                                       // down, so N/2 lands on a 0-based board's
+                                       // true center (N-1)/2.
     responsive?: "preserve-scale" | "preserve-viewport" | false; // default false
     eventHandlers?: {                  // ALL default false
         click?: boolean;
@@ -195,18 +198,28 @@ engine.render();
 
 ### `gridToSize` - think in cells instead of pixels
 
+Returns `{ size, scale, center }` where `center = ((columns-1)/2, (rows-1)/2)`
+is the exact center of a board of cells `0..N-1` (integers are cell centers -
+see [drawing.md](drawing.md)). ALWAYS pass this center to the engine;
+without it the board renders mostly off-screen.
+
 ```ts
 import { gridToSize } from "@canvas-tile-engine/core";
 
+const { center, ...board } = gridToSize({ columns: 8, rows: 8, cellSize: 60 });
+// board => size {480,480}, scale 60; center => { x: 3.5, y: 3.5 }
+
 const engine = new CanvasTileEngine(wrapper, {
-    ...gridToSize({ columns: 8, rows: 8, cellSize: 60 }), // => size {480,480}, scale 60
+    ...board,
     gridAligned: true,
     eventHandlers: { click: true, hover: true, drag: false, zoom: false },
-}, new RendererCanvas());
+}, new RendererCanvas(), center);
 ```
 
 Perfect for fixed boards (chess, match-3, minesweeper): a known number of
-cells fully visible, often with `drag`/`zoom` disabled.
+cells fully visible, often with `drag`/`zoom` disabled. On core versions
+before 0.5 `gridToSize` has no `center` field - compute
+`{ x: (columns-1)/2, y: (rows-1)/2 }` manually.
 
 ## Exported types and classes (import from `@canvas-tile-engine/core`)
 
