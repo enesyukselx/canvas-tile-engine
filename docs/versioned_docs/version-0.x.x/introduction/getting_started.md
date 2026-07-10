@@ -47,6 +47,29 @@ Server rendering:
 npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 ```
 
+## AI Agent Skill
+
+Canvas Tile Engine ships an [Agent Skill](https://github.com/enesyukselx/canvas-tile-engine/tree/master/skills) that teaches AI coding agents (Claude Code, Cursor, Codex, and compatible tools) the full engine API, so they can build tile maps, game boards, minimaps, and pixel editors with these packages on the first try.
+
+Install with the skills CLI (works across agents):
+
+```bash
+npx skills add enesyukselx/canvas-tile-engine
+```
+
+Or as a Claude Code plugin:
+
+```
+/plugin marketplace add enesyukselx/canvas-tile-engine
+/plugin install canvas-tile-engine@canvas-tile-engine
+```
+
+Manual copy into a project:
+
+```bash
+npx degit enesyukselx/canvas-tile-engine/skills/canvas-tile-engine .claude/skills/canvas-tile-engine
+```
+
 ## Quick Start
 
 HTML wrapper:

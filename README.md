@@ -15,6 +15,25 @@ Canvas Tile Engine gives you the hard parts of a tile surface out of the box: ca
 
 Start with Canvas2D. Swap to WebGL when you want batched GPU primitives. Reuse the same React component model in React Native with Skia. Render PNG/JPEG/WebP snapshots on the server with no browser.
 
+## AI Agent Skill
+
+This repository ships an [Agent Skill](./skills) that teaches AI coding agents (Claude Code, Cursor, Codex, and compatible tools) the full Canvas Tile Engine API, so they can build tile maps, game boards, minimaps, and pixel editors with these packages on the first try.
+
+Install with the skills CLI (works across agents):
+
+```bash
+npx skills add enesyukselx/canvas-tile-engine
+```
+
+Or as a Claude Code plugin:
+
+```
+/plugin marketplace add enesyukselx/canvas-tile-engine
+/plugin install canvas-tile-engine@canvas-tile-engine
+```
+
+See [skills/](./skills) for details and manual installation.
+
 ## Why It Exists
 
 - Grid-first API for maps, strategy games, pixel tools, editors, dashboards, and spatial UIs.
@@ -75,25 +94,6 @@ Server-side image rendering:
 ```bash
 npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 ```
-
-## AI Agent Skill
-
-This repository ships an [Agent Skill](./skills) that teaches AI coding agents (Claude Code, Cursor, Codex, and compatible tools) the full Canvas Tile Engine API, so they can build tile maps, game boards, minimaps, and pixel editors with these packages on the first try.
-
-Install with the skills CLI (works across agents):
-
-```bash
-npx skills add enesyukselx/canvas-tile-engine
-```
-
-Or as a Claude Code plugin:
-
-```
-/plugin marketplace add enesyukselx/canvas-tile-engine
-/plugin install canvas-tile-engine@canvas-tile-engine
-```
-
-See [skills/](./skills) for details and manual installation.
 
 ## Quick Start
 
