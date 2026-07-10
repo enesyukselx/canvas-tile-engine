@@ -1,24 +1,263 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Link from "@docusaurus/Link";
-import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import Layout from "@theme/Layout";
 import HomepageFeatures from "@site/src/components/HomepageFeatures";
 
 import styles from "./index.module.css";
 
+const GITHUB_URL = "https://github.com/enesyukselx/canvas-tile-engine";
+
+const packages = [
+    { label: "Core", to: "/docs/introduction/getting_started", tone: "amber" },
+    { label: "Canvas2D", to: "/docs/js/installation", tone: "sky" },
+    { label: "WebGL", to: "/docs/introduction/renderers", tone: "violet" },
+    { label: "React", to: "/docs/react/installation", tone: "rose" },
+    { label: "React Native", to: "/docs/react-native/installation", tone: "indigo" },
+    { label: "Server", to: "/docs/server/rendering", tone: "fuchsia" },
+];
+
+const TILE = 44;
+const PALETTE = ["#f59e0b", "#0ea5e9", "#8b5cf6", "#10b981", "#f43f5e", "#6366f1"];
+const MAX_CELLS = 90;
+const DRIFT_X = 5;
+const DRIFT_Y = 3;
+
+type Cell = {
+    col: number;
+    row: number;
+    color: string;
+    born: number;
+    ttl: number;
+};
+
+function tilePath(ctx: CanvasRenderingContext2D, x: number, y: number) {
+    const inset = 3;
+    ctx.beginPath();
+    ctx.roundRect(x + inset, y + inset, TILE - inset * 2, TILE - inset * 2, 5);
+}
+
+function HeroCanvas() {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let raf = 0;
+        let lastSpawn = 0;
+        let lastPainted = "";
+        let paletteIndex = 0;
+        const cells: Cell[] = [];
+        const pointer = { x: -1, y: -1, active: false };
+
+        const offsets = (now: number) =>
+            reducedMotion
+                ? { ox: 0, oy: 0 }
+                : {
+                      ox: (now / 1000) * DRIFT_X,
+                      oy: (now / 1000) * DRIFT_Y,
+                  };
+
+        const resize = () => {
+            const rect = canvas.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+        };
+
+        const spawn = (now: number, ttl: number) => {
+            const { ox, oy } = offsets(now);
+            const col = Math.floor(ox / TILE) + Math.floor(Math.random() * (Math.ceil(width / TILE) + 1));
+            const row = Math.floor(oy / TILE) + Math.floor(Math.random() * (Math.ceil(height / TILE) + 1));
+
+            cells.push({
+                col,
+                row,
+                color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+                born: now,
+                ttl,
+            });
+        };
+
+        const draw = (now: number) => {
+            const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+            const { ox, oy } = offsets(now);
+
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.07)" : "rgba(9, 9, 11, 0.08)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+
+            for (let x = -(ox % TILE); x <= width; x += TILE) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+            }
+
+            for (let y = -(oy % TILE); y <= height; y += TILE) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+            }
+
+            ctx.stroke();
+
+            const baseAlpha = isDark ? 0.32 : 0.22;
+            for (let i = cells.length - 1; i >= 0; i--) {
+                const cell = cells[i];
+                const age = now - cell.born;
+
+                if (age > cell.ttl) {
+                    cells.splice(i, 1);
+                    continue;
+                }
+
+                const t = age / cell.ttl;
+                const envelope = !Number.isFinite(cell.ttl) ? 1 : t < 0.2 ? t / 0.2 : t > 0.6 ? (1 - t) / 0.4 : 1;
+                const x = cell.col * TILE - ox;
+                const y = cell.row * TILE - oy;
+
+                if (x < -TILE || x > width || y < -TILE || y > height) continue;
+
+                ctx.globalAlpha = envelope * baseAlpha;
+                ctx.fillStyle = cell.color;
+                tilePath(ctx, x, y);
+                ctx.fill();
+            }
+
+            ctx.globalAlpha = 1;
+
+            if (pointer.active) {
+                const col = Math.floor((pointer.x + ox) / TILE);
+                const row = Math.floor((pointer.y + oy) / TILE);
+                const x = col * TILE - ox;
+                const y = row * TILE - oy;
+
+                ctx.globalAlpha = isDark ? 0.45 : 0.35;
+                ctx.fillStyle = "#f59e0b";
+                tilePath(ctx, x, y);
+                ctx.fill();
+                ctx.globalAlpha = 0.9;
+                ctx.strokeStyle = "#f59e0b";
+                ctx.lineWidth = 1.5;
+                tilePath(ctx, x, y);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        };
+
+        const frame = (now: number) => {
+            if (cells.length < MAX_CELLS && now - lastSpawn > 260) {
+                lastSpawn = now;
+                spawn(now, 2600 + Math.random() * 3400);
+            }
+
+            draw(now);
+            raf = requestAnimationFrame(frame);
+        };
+
+        const onPointerMove = (event: PointerEvent) => {
+            const rect = canvas.getBoundingClientRect();
+            pointer.x = event.clientX - rect.left;
+            pointer.y = event.clientY - rect.top;
+            pointer.active = pointer.x >= 0 && pointer.y >= 0 && pointer.x <= rect.width && pointer.y <= rect.height;
+
+            if (!pointer.active) return;
+
+            const now = performance.now();
+            const { ox, oy } = offsets(now);
+            const col = Math.floor((pointer.x + ox) / TILE);
+            const row = Math.floor((pointer.y + oy) / TILE);
+            const key = `${col}:${row}`;
+
+            if (key !== lastPainted) {
+                lastPainted = key;
+                cells.push({
+                    col,
+                    row,
+                    color: PALETTE[paletteIndex++ % PALETTE.length],
+                    born: now,
+                    ttl: 1400,
+                });
+            }
+        };
+
+        resize();
+
+        const resizeObserver = new ResizeObserver(() => {
+            resize();
+            if (reducedMotion) draw(performance.now());
+        });
+        resizeObserver.observe(canvas);
+
+        const themeObserver = new MutationObserver(() => draw(performance.now()));
+        themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["data-theme"],
+        });
+
+        if (reducedMotion) {
+            const now = performance.now();
+            for (let i = 0; i < 14; i++) spawn(now, Infinity);
+            draw(now);
+        } else {
+            window.addEventListener("pointermove", onPointerMove, { passive: true });
+            raf = requestAnimationFrame(frame);
+        }
+
+        return () => {
+            cancelAnimationFrame(raf);
+            window.removeEventListener("pointermove", onPointerMove);
+            resizeObserver.disconnect();
+            themeObserver.disconnect();
+        };
+    }, []);
+
+    return <canvas ref={canvasRef} aria-hidden className={styles.heroCanvas} />;
+}
+
+function TileWord({ children }: { children: string }) {
+    return (
+        <span className={styles.tileWord}>
+            <span className={styles.tileWordFrame} aria-hidden />
+            <span className={styles.tileCornerTopLeft} aria-hidden />
+            <span className={styles.tileCornerTopRight} aria-hidden />
+            <span className={styles.tileCornerBottomLeft} aria-hidden />
+            <span className={styles.tileCornerBottomRight} aria-hidden />
+            <span className={styles.tileWordText}>{children}</span>
+        </span>
+    );
+}
+
 function HomepageHeader() {
-    const { siteConfig } = useDocusaurusContext();
     return (
         <header className={styles.heroBanner}>
-            <div className={styles.heroBackground}>
-                <div className={styles.heroGrid} />
-            </div>
+            <HeroCanvas />
             <div className={styles.heroContent}>
-                <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
-                <p className={styles.heroSubtitle}>{siteConfig.tagline}</p>
+                <p className={styles.eyebrow}>Documentation</p>
+                <h1 className={styles.heroTitle}>
+                    Canvas
+                    <TileWord>Tile</TileWord>
+                    Engine Docs
+                </h1>
+                <p className={styles.heroSubtitle}>
+                    Build zoomable 2D maps, game boards, editors, minimaps, and dense grid UIs with a renderer-agnostic
+                    TypeScript engine. These docs cover the camera, drawing API, events, renderers, React bindings, and
+                    server snapshots.
+                </p>
                 <div className={styles.buttons}>
                     <Link className={styles.primaryButton} to="/docs/introduction/getting_started">
-                        Get Started
+                        Start reading
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path
                                 d="M6 12L10 8L6 4"
@@ -29,7 +268,10 @@ function HomepageHeader() {
                             />
                         </svg>
                     </Link>
-                    <Link className={styles.secondaryButton} to="https://github.com/enesyukselx/canvas-tile-engine">
+                    <Link className={styles.secondaryButton} to="https://www.canvastileengine.com/playground">
+                        Playground
+                    </Link>
+                    <Link className={styles.secondaryButton} to={GITHUB_URL}>
                         <svg
                             width="16"
                             height="16"
@@ -46,17 +288,28 @@ function HomepageHeader() {
                         GitHub
                     </Link>
                 </div>
+                <div className={styles.packageBlock}>
+                    <p className={styles.packageLabel}>Packages</p>
+                    <ul className={styles.packageList}>
+                        {packages.map((pkg) => (
+                            <li key={pkg.label}>
+                                <Link className={`${styles.packageChip} ${styles[pkg.tone]}`} to={pkg.to}>
+                                    {pkg.label}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             </div>
         </header>
     );
 }
 
 export default function Home(): ReactNode {
-    const { siteConfig } = useDocusaurusContext();
     return (
         <Layout
-            title={`${siteConfig.title} Documentation`}
-            description="A powerful and flexible tile engine for creating 2D games and applications using HTML5 Canvas."
+            title="Canvas Tile Engine Documentation"
+            description="Renderer-agnostic TypeScript tile engine documentation for zoomable maps, game boards, editors, minimaps, and grid UIs."
         >
             <HomepageHeader />
             <main>

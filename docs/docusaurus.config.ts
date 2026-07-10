@@ -6,7 +6,7 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
     title: "Canvas Tile Engine",
-    tagline: "High-performance HTML5 Canvas tile engine for JS & React",
+    tagline: "Renderer-agnostic 2D tile engine for maps, editors, games, and grid UIs",
     favicon: "img/favicon.ico",
 
     // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -93,6 +93,11 @@ const config: Config = {
                     sidebarId: "tutorialSidebar",
                     position: "left",
                     label: "Documentation",
+                },
+                {
+                    href: "https://www.canvastileengine.com/playground",
+                    label: "Playground",
+                    position: "left",
                 },
                 {
                     href: "https://www.canvastileengine.com/api-docs",
