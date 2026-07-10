@@ -80,4 +80,58 @@ describe("CanvasTileEngine", () => {
             expect(coords.y).toBeGreaterThan(500);
         });
     });
+
+    describe("gridAligned initial center snapping", () => {
+        // Integers are cell centers (cell k spans [k-0.5, k+0.5]), so an even
+        // tile count needs a half-integer center and an odd tile count needs
+        // an integer center for pixel-perfect alignment.
+        function centerFor(config: CanvasTileEngineConfig, center: Coords): Coords {
+            const e = new CanvasTileEngine<Mount>({}, config, createMockRenderer(), center);
+            return e.getCenterCoords();
+        }
+
+        const even = { scale: 15, size: { width: 300, height: 300 }, gridAligned: true }; // 20x20 tiles
+        const odd = { scale: 20, size: { width: 380, height: 380 }, gridAligned: true }; // 19x19 tiles
+
+        it("snaps an integer center down to the board center for even tile counts", () => {
+            // A 0-based 20-cell board's true center is 9.5; a center computed
+            // as N/2 = 10 must land there, not drift to 10.5.
+            expect(centerFor(even, { x: 10, y: 10 })).toEqual({ x: 9.5, y: 9.5 });
+        });
+
+        it("keeps an already-aligned half-integer center for even tile counts", () => {
+            expect(centerFor(even, { x: 9.5, y: 9.5 })).toEqual({ x: 9.5, y: 9.5 });
+        });
+
+        it("snaps to the nearest half-integer for even tile counts", () => {
+            expect(centerFor(even, { x: 9.2, y: 9.8 })).toEqual({ x: 9.5, y: 9.5 });
+            expect(centerFor(even, { x: 10.4, y: 10.6 })).toEqual({ x: 10.5, y: 10.5 });
+        });
+
+        it("snaps to the nearest integer for odd tile counts", () => {
+            expect(centerFor(odd, { x: 9.4, y: 9.6 })).toEqual({ x: 9, y: 10 });
+        });
+
+        it("keeps an already-aligned integer center for odd tile counts", () => {
+            expect(centerFor(odd, { x: 9, y: 9 })).toEqual({ x: 9, y: 9 });
+        });
+
+        it("does not snap when the tile count is not an integer", () => {
+            const fractional = { scale: 7, size: { width: 300, height: 300 }, gridAligned: true };
+            expect(centerFor(fractional, { x: 10.3, y: 10.3 })).toEqual({ x: 10.3, y: 10.3 });
+        });
+
+        it("does not snap when gridAligned is false", () => {
+            const off = { ...even, gridAligned: false };
+            expect(centerFor(off, { x: 10.3, y: 10.3 })).toEqual({ x: 10.3, y: 10.3 });
+        });
+
+        it("centers a gridToSize board exactly when its center is used", () => {
+            // The fixed-board pattern: gridToSize + center => cells 0..N-1
+            // exactly fill the viewport, i.e. visible world is [-0.5, N-0.5].
+            const e = new CanvasTileEngine<Mount>({}, even, createMockRenderer(), { x: 9.5, y: 9.5 });
+            expect(e.getVisibleBounds()).toEqual({ minX: -1, maxX: 20, minY: -1, maxY: 20 });
+            expect(e.getCenterCoords()).toEqual({ x: 9.5, y: 9.5 });
+        });
+    });
 });

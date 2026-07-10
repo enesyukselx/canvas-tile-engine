@@ -119,6 +119,11 @@ import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 import { gridToSize, type Rect } from "@canvas-tile-engine/core";
 
+// Board center: cells 0..N-1 are centered at (N-1)/2 (integers are cell
+// centers). gridToSize returns it; it MUST be passed or the board renders
+// mostly off-screen.
+const { center: boardCenter, ...board } = gridToSize({ columns: 32, rows: 32, cellSize: 16 });
+
 export function PixelPainter() {
     const engine = useCanvasTileEngine();
     const [pixels, setPixels] = useState<Map<string, string>>(new Map());
@@ -141,8 +146,9 @@ export function PixelPainter() {
         <CanvasTileEngine
             engine={engine}
             renderer={new RendererCanvas()}
+            center={boardCenter}
             config={{
-                ...gridToSize({ columns: 32, rows: 32, cellSize: 16 }),
+                ...board,
                 gridAligned: true,
                 backgroundColor: "#ffffff",
                 eventHandlers: { click: true, hover: true, drag: false, zoom: false },
@@ -170,12 +176,16 @@ Chess/match-3 style: exact cell count, no camera movement.
 import { CanvasTileEngine, gridToSize } from "@canvas-tile-engine/core";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
+// center is REQUIRED: cells 0..7 are centered at (3.5, 3.5), not (4, 4)
+// and not the default (0, 0) - integers are cell centers.
+const { center, ...board } = gridToSize({ columns: 8, rows: 8, cellSize: 60 }); // 480x480, scale 60
+
 const engine = new CanvasTileEngine(wrapper, {
-    ...gridToSize({ columns: 8, rows: 8, cellSize: 60 }),   // 480x480, scale 60
+    ...board,
     gridAligned: true,
     backgroundColor: "#2d2d2d",
     eventHandlers: { click: true, hover: true, drag: false, zoom: false },
-}, new RendererCanvas());
+}, new RendererCanvas(), center);
 
 // Checkerboard
 const squares = [];
@@ -186,8 +196,10 @@ engine.drawRect(squares, 0);
 engine.render();
 ```
 
-With `gridAligned` and even tile counts, the board's cells map exactly to
-integer world coordinates 0..7.
+With the `gridToSize` center, cells 0..7 exactly fill the canvas: cell (0,0)
+touches the top-left corner and cell (7,7) the bottom-right. `gridAligned`
+then guards against slightly-off centers by snapping to the nearest aligned
+value.
 
 ## 5. Responsive fullscreen map
 

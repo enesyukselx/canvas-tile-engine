@@ -4,6 +4,7 @@ import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
 import { validateCoords, validateScale } from "./utils/validateConfig";
+import { snapCenterToGrid } from "./utils/viewport";
 import {
     Coords,
     CanvasTileEngineConfig,
@@ -282,8 +283,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
         const tilesX = config.size.width / config.scale;
         const tilesY = config.size.height / config.scale;
-        const alignedXCenter = config.gridAligned && tilesX % 2 === 0 ? Math.floor(center.x) + 0.5 : center.x;
-        const alignedYCenter = config.gridAligned && tilesY % 2 === 0 ? Math.floor(center.y) + 0.5 : center.y;
+        const alignedXCenter = config.gridAligned ? snapCenterToGrid(center.x, tilesX) : center.x;
+        const alignedYCenter = config.gridAligned ? snapCenterToGrid(center.y, tilesY) : center.y;
 
         const initialTopLeft: Coords = {
             x: alignedXCenter - config.size.width / (2 * config.scale),

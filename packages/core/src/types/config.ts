@@ -3,7 +3,13 @@ export type CanvasTileEngineConfig = {
     maxScale?: number;
     minScale?: number;
     backgroundColor?: string;
-    /** When true, center coordinates are snapped to cell centers (x.5, y.5) for pixel-perfect grid alignment */
+    /**
+     * When true, the initial center snaps to the nearest grid-aligned value
+     * for pixel-perfect alignment: half-integers (x.5) for even tile counts,
+     * integers for odd. Integers are cell centers (cell k spans
+     * [k-0.5, k+0.5]); exact ties snap down so a center computed as N/2 for
+     * a 0-based N-cell board lands on the true board center (N-1)/2.
+     */
     gridAligned?: boolean;
     size: {
         width: number;
