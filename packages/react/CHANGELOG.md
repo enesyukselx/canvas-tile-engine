@@ -1,28 +1,35 @@
 # Changelog
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [35f9532]
+  - @canvas-tile-engine/core@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
 
 - 2068dac: Catch-up release: everything merged since 0.3.0.
 
-    **Features**
+  **Features**
 
-    - Declarative `<CanvasTileEngine.Sprite>` compound component for spritesheet animation (frames/fps/loop/playing/onComplete); re-exports `SpriteSheet`, `SpriteAnimator` and sprite types from core (#107)
+  - Declarative `<CanvasTileEngine.Sprite>` compound component for spritesheet animation (frames/fps/loop/playing/onComplete); re-exports `SpriteSheet`, `SpriteAnimator` and sprite types from core (#107)
 
-    **Fixes**
+  **Fixes**
 
-    - Repaint canvas on draw component unmount and on `DrawFunction` updates (#99)
+  - Repaint canvas on draw component unmount and on `DrawFunction` updates (#99)
 
-    **Compatibility**
+  **Compatibility**
 
-    - Requires `@canvas-tile-engine/core` >= 0.4.0 (peer dependency raised)
+  - Requires `@canvas-tile-engine/core` >= 0.4.0 (peer dependency raised)
 
 ### Patch Changes
 
 - 2068dac: Publish internal `@canvas-tile-engine/core` dependency as a caret range (`^x.y.z`) instead of an exact pin, so core patch/minor updates flow to consumers without requiring a re-release of dependent packages.
 - Updated dependencies [2068dac]
-    - @canvas-tile-engine/core@0.4.0
+  - @canvas-tile-engine/core@0.4.0
 
 All notable changes to `@canvas-tile-engine/react` will be documented in this file.
 
@@ -83,18 +90,18 @@ All notable changes to `@canvas-tile-engine/react` will be documented in this fi
 
 - **CanvasTileEngine Component** - Declarative wrapper for core engine
 - **Compound Components**
-    - `<CanvasTileEngine.Rect>` - Draw rectangles
-    - `<CanvasTileEngine.Circle>` - Draw circles
-    - `<CanvasTileEngine.Image>` - Draw images
-    - `<CanvasTileEngine.GridLines>` - Draw grid overlay
-    - `<CanvasTileEngine.Line>` - Draw line segments
-    - `<CanvasTileEngine.Text>` - Draw text
-    - `<CanvasTileEngine.Path>` - Draw polylines
-    - `<CanvasTileEngine.StaticRect>` - Pre-rendered rectangles
-    - `<CanvasTileEngine.StaticCircle>` - Pre-rendered circles
-    - `<CanvasTileEngine.StaticImage>` - Pre-rendered images
-    - `<CanvasTileEngine.DrawFunction>` - Custom canvas drawing
+  - `<CanvasTileEngine.Rect>` - Draw rectangles
+  - `<CanvasTileEngine.Circle>` - Draw circles
+  - `<CanvasTileEngine.Image>` - Draw images
+  - `<CanvasTileEngine.GridLines>` - Draw grid overlay
+  - `<CanvasTileEngine.Line>` - Draw line segments
+  - `<CanvasTileEngine.Text>` - Draw text
+  - `<CanvasTileEngine.Path>` - Draw polylines
+  - `<CanvasTileEngine.StaticRect>` - Pre-rendered rectangles
+  - `<CanvasTileEngine.StaticCircle>` - Pre-rendered circles
+  - `<CanvasTileEngine.StaticImage>` - Pre-rendered images
+  - `<CanvasTileEngine.DrawFunction>` - Custom canvas drawing
 - **Hooks**
-    - `useCanvasTileEngine()` - Engine handle with imperative API
+  - `useCanvasTileEngine()` - Engine handle with imperative API
 - **Full TypeScript Support** - Complete type definitions
 - **Automatic Render Batching** - Multiple draw calls → single render

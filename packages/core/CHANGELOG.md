@@ -1,26 +1,32 @@
 # Changelog
 
+## 0.5.0
+
+### Minor Changes
+
+- 35f9532: Fix fixed-board centering: `gridToSize` now also returns the board `center` (`(columns-1)/2, (rows-1)/2`) to pass to the engine, and `gridAligned` snaps the initial center to the nearest aligned value instead of always flooring - half-integers for even tile counts (integer ties snap down, so a center computed as `N/2` lands on the true board center `(N-1)/2`), and integers for odd tile counts (previously not snapped at all). Non-integer tile counts are left untouched. This makes a `gridToSize` board of cells `0..N-1` exactly fill the viewport.
+
 ## 0.4.0
 
 ### Minor Changes
 
 - 2068dac: Catch-up release: everything merged since 0.3.0.
 
-    **Features**
+  **Features**
 
-    - Spritesheet & animation support: `ImageItem.sprite` (`SpriteRect`), `SpriteSheet` frame calculator (margin/spacing, `frame`/`frameByIndex`/`framesInRow`), and `SpriteAnimator` rAF loop that only re-renders on frame change (#107)
-    - Zoom anchor modes for `eventHandlers.zoom` ("pointer" / "center") (#104)
-    - Engine and renderer interfaces (`IRenderer`, `IDrawAPI`, `IImageLoader`) are now generic over mount/image types, enabling non-DOM renderers (server, React Native Skia)
+  - Spritesheet & animation support: `ImageItem.sprite` (`SpriteRect`), `SpriteSheet` frame calculator (margin/spacing, `frame`/`frameByIndex`/`framesInRow`), and `SpriteAnimator` rAF loop that only re-renders on frame change (#107)
+  - Zoom anchor modes for `eventHandlers.zoom` ("pointer" / "center") (#104)
+  - Engine and renderer interfaces (`IRenderer`, `IDrawAPI`, `IImageLoader`) are now generic over mount/image types, enabling non-DOM renderers (server, React Native Skia)
 
-    **Fixes**
+  **Fixes**
 
-    - Keep camera fixed during pinch zoom in "center" anchor mode (#105)
-    - Fire `onZoom` for programmatic zoom changes; notify `onCoordsChange` when `setBounds` moves the camera; guard pinch zoom against near-zero start distance; validate `scale` against `minScale`/`maxScale`; complete animations instantly when duration is 0 (#100)
+  - Keep camera fixed during pinch zoom in "center" anchor mode (#105)
+  - Fire `onZoom` for programmatic zoom changes; notify `onCoordsChange` when `setBounds` moves the camera; guard pinch zoom against near-zero start distance; validate `scale` against `minScale`/`maxScale`; complete animations instantly when duration is 0 (#100)
 
-    **Breaking notes** (0.x minor)
+  **Breaking notes** (0.x minor)
 
-    - The unused optional `renderer` property was removed from the config type — remove it from your config object if you passed it
-    - `Config.get()` now returns a frozen snapshot — mutate config via the engine API instead of mutating the returned object (#100)
+  - The unused optional `renderer` property was removed from the config type — remove it from your config object if you passed it
+  - `Config.get()` now returns a frozen snapshot — mutate config via the engine API instead of mutating the returned object (#100)
 
 All notable changes to `@canvas-tile-engine/core` will be documented in this file.
 
@@ -75,17 +81,17 @@ All notable changes to `@canvas-tile-engine/core` will be documented in this fil
 - **Camera System** - Pan, zoom, drag with smooth animations
 - **Coordinate System** - Grid-based world coordinates with automatic transformations
 - **Layer-based Rendering**
-    - `drawRect` - Rectangles with rotation and border-radius
-    - `drawCircle` - Circles sized in world units
-    - `drawImage` - Images with rotation support
-    - `drawLine` - Line segments
-    - `drawPath` - Polylines
-    - `drawText` - Text at world positions
-    - `drawGridLines` - Grid overlay
+  - `drawRect` - Rectangles with rotation and border-radius
+  - `drawCircle` - Circles sized in world units
+  - `drawImage` - Images with rotation support
+  - `drawLine` - Line segments
+  - `drawPath` - Polylines
+  - `drawText` - Text at world positions
+  - `drawGridLines` - Grid overlay
 - **Performance Optimizations**
-    - Spatial indexing with R-Tree (rbush) for 10k+ items
-    - Viewport culling - skip off-screen work
-    - Static cache (`drawStaticRect`, `drawStaticImage`, `drawStaticCircle`)
+  - Spatial indexing with R-Tree (rbush) for 10k+ items
+  - Viewport culling - skip off-screen work
+  - Static cache (`drawStaticRect`, `drawStaticImage`, `drawStaticCircle`)
 - **Event Handling** - click, hover, drag, zoom, resize
 - **Animation Controller** - `goCoords()` with smooth transitions
 - **Bounds System** - Restrict camera movement
