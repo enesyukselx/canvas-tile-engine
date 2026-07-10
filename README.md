@@ -246,6 +246,25 @@ For package watch mode during local development, run `pnpm dev:lib` in a separat
 - React Native API: [`packages/react-native`](./packages/react-native)
 - Server renderer: [`packages/renderer-server`](./packages/renderer-server)
 
+## AI Agent Skill
+
+This repository ships an [Agent Skill](./plugins/canvas-tile-engine) that teaches AI coding agents (Claude Code and compatible tools) the full Canvas Tile Engine API, so they can build tile maps, game boards, minimaps, and pixel editors with these packages on the first try.
+
+Install in Claude Code:
+
+```
+/plugin marketplace add enesyukselx/canvas-tile-engine
+/plugin install canvas-tile-engine@canvas-tile-engine
+```
+
+Manual install (any skills-compatible agent):
+
+```bash
+npx degit enesyukselx/canvas-tile-engine/plugins/canvas-tile-engine/skills/canvas-tile-engine .claude/skills/canvas-tile-engine
+```
+
+See [plugins/canvas-tile-engine](./plugins/canvas-tile-engine) for details.
+
 ## Development
 
 ```bash
