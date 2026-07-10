@@ -26,14 +26,14 @@ Start with Canvas2D. Swap to WebGL when you want batched GPU primitives. Reuse t
 
 ## Packages
 
-| Package | Use it for |
-| --- | --- |
-| [`@canvas-tile-engine/core`](./packages/core) | Framework-agnostic engine, camera, events, coordinates, layers, draw API, sprites, and spatial indexing. |
-| [`@canvas-tile-engine/react`](./packages/react) | Declarative React bindings with compound draw components and a reusable engine hook. |
-| [`@canvas-tile-engine/react-native`](./packages/react-native) | React Native bindings with the same component API, mounted through Skia gestures and layout. |
-| [`@canvas-tile-engine/renderer-canvas`](./packages/renderer-canvas) | Default HTML Canvas2D renderer with full primitive support, static caches, debug HUD, and high-DPI output. |
-| [`@canvas-tile-engine/renderer-webgl`](./packages/renderer-webgl) | Drop-in WebGL renderer for batched GPU drawing of geometry, images, paths, lines, and grids. |
-| [`@canvas-tile-engine/renderer-skia`](./packages/renderer-skia) | React Native Skia renderer used by the native package. |
+| Package                                                             | Use it for                                                                                                    |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [`@canvas-tile-engine/core`](./packages/core)                       | Framework-agnostic engine, camera, events, coordinates, layers, draw API, sprites, and spatial indexing.      |
+| [`@canvas-tile-engine/react`](./packages/react)                     | Declarative React bindings with compound draw components and a reusable engine hook.                          |
+| [`@canvas-tile-engine/react-native`](./packages/react-native)       | React Native bindings with the same component API, mounted through Skia gestures and layout.                  |
+| [`@canvas-tile-engine/renderer-canvas`](./packages/renderer-canvas) | Default HTML Canvas2D renderer with full primitive support, static caches, debug HUD, and high-DPI output.    |
+| [`@canvas-tile-engine/renderer-webgl`](./packages/renderer-webgl)   | Drop-in WebGL renderer for batched GPU drawing of geometry, images, paths, lines, and grids.                  |
+| [`@canvas-tile-engine/renderer-skia`](./packages/renderer-skia)     | React Native Skia renderer used by the native package.                                                        |
 | [`@canvas-tile-engine/renderer-server`](./packages/renderer-server) | Headless Node.js renderer for deterministic PNG/JPEG/WebP buffers, OG images, thumbnails, and snapshot tests. |
 
 ## Install
