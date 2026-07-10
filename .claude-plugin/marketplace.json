@@ -1,0 +1,23 @@
+{
+    "name": "canvas-tile-engine",
+    "owner": {
+        "name": "Enes Yüksel",
+        "email": "enesyuksel9903@gmail.com"
+    },
+    "description": "Agent skills for building apps with the Canvas Tile Engine packages",
+    "plugins": [
+        {
+            "name": "canvas-tile-engine",
+            "source": "./plugins/canvas-tile-engine",
+            "description": "Teaches AI agents the @canvas-tile-engine/* API: zoomable 2D tile maps, game boards, minimaps, pixel editors, spritesheet animation, and server-side map rendering in vanilla JS, React, and React Native.",
+            "author": {
+                "name": "Enes Yüksel"
+            },
+            "homepage": "https://canvastileengine.dev",
+            "repository": "https://github.com/enesyukselx/canvas-tile-engine",
+            "license": "MIT",
+            "keywords": ["canvas", "tile", "map", "grid", "game", "react", "react-native", "webgl", "skia", "skill"],
+            "category": "development"
+        }
+    ]
+}
