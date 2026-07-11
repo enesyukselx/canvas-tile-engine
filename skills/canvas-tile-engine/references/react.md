@@ -74,8 +74,14 @@ useEffect(() => {
     if (!engine.isReady) return;
     engine.drawGridLines(1);
     engine.render();
-}, [engine.isReady]);   // isReady flips true exactly once after mount
+}, [engine.isReady]);   // flips true after mount
 ```
+
+If the component can remount with a `key` (renderer/config swap), depend on
+`engine.instance` instead of `engine.isReady`: during a remount `isReady`
+goes true -> false -> true within one effect flush, so effects keyed on it
+never re-fire, while `instance` changes identity with every new engine.
+Dropped draw calls (engine not mounted yet) log a `console.warn` in dev.
 
 Handle members beyond the core engine API (see
 [core-api.md](core-api.md) for the shared methods):
@@ -171,7 +177,11 @@ const items = useMemo(() => (img ? [{ x: 0, y: 0, size: 2, img }] : []), [img]);
   `useMemo`/state.
 - Expecting `config`/`center`/`renderer` prop changes to apply: they will not;
   remount with `key` or use runtime APIs.
-- Imperative drawing without gating on `engine.isReady`: silently no-ops.
+- Imperative drawing without gating on `engine.isReady`: drops the call
+  (warns in dev, silent in prod).
+- Effects keyed on `[engine.isReady]` around a `key` remount: the value
+  collapses back to `true` in the same flush, so the effect never re-fires.
+  Use `[engine.instance]` for remount-safe imperative setup.
 - Creating one handle for two `<CanvasTileEngine>` mounts: each canvas needs
   its own `useCanvasTileEngine()`.
 - Forgetting `eventHandlers` in config: canvas renders but nothing responds.
