@@ -68,6 +68,14 @@ export interface ICamera {
     setScale(newScale: number): void;
 
     /**
+     * Replace the scale limits, clamping the current scale into the new range.
+     * Used by responsive modes to keep limits meaningful as the viewport resizes.
+     * @param minScale New minimum scale.
+     * @param maxScale New maximum scale.
+     */
+    setScaleLimits(minScale: number, maxScale: number): void;
+
+    /**
      * Get the visible world coordinate bounds of the viewport.
      * @param canvasWidth Canvas width in pixels.
      * @param canvasHeight Canvas height in pixels.
@@ -92,8 +100,8 @@ export class Camera implements ICamera {
     private _x: number;
     private _y: number;
     private _scale: number;
-    readonly minScale: number;
-    readonly maxScale: number;
+    private _minScale: number;
+    private _maxScale: number;
     private bounds?: {
         minX: number;
         maxX: number;
@@ -106,8 +114,8 @@ export class Camera implements ICamera {
         this._x = initialTopLeft.x + DEFAULT_VALUES.CELL_CENTER_OFFSET; // Center of the pixel
         this._y = initialTopLeft.y + DEFAULT_VALUES.CELL_CENTER_OFFSET; // Center of the pixel
         this._scale = scale;
-        this.minScale = minScale;
-        this.maxScale = maxScale;
+        this._minScale = minScale;
+        this._maxScale = maxScale;
         this.viewport = viewport;
     }
 
@@ -172,13 +180,36 @@ export class Camera implements ICamera {
         return this._scale;
     }
 
+    get minScale(): number {
+        return this._minScale;
+    }
+
+    get maxScale(): number {
+        return this._maxScale;
+    }
+
     /**
      * Set the camera scale directly, clamped to min/max bounds.
      * @param newScale The desired scale value.
      */
     setScale(newScale: number) {
-        this._scale = Math.min(this.maxScale, Math.max(this.minScale, newScale));
+        this._scale = Math.min(this._maxScale, Math.max(this._minScale, newScale));
         this.clampToBounds();
+    }
+
+    /**
+     * Replace the scale limits, clamping the current scale into the new range.
+     * @param minScale New minimum scale.
+     * @param maxScale New maximum scale.
+     */
+    setScaleLimits(minScale: number, maxScale: number) {
+        this._minScale = minScale;
+        this._maxScale = maxScale;
+        const clamped = Math.min(this._maxScale, Math.max(this._minScale, this._scale));
+        if (clamped !== this._scale) {
+            this._scale = clamped;
+            this.clampToBounds();
+        }
     }
 
     pan(deltaScreenX: number, deltaScreenY: number) {

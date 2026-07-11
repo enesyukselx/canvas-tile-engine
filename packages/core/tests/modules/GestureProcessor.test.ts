@@ -38,6 +38,7 @@ describe("GestureProcessor", () => {
             setCenter: vi.fn(),
             adjustForResize: vi.fn(),
             setScale: vi.fn(),
+            setScaleLimits: vi.fn(),
             getVisibleBounds: vi.fn(() => ({ minX: 0, maxX: 100, minY: 0, maxY: 100 })),
         };
 
