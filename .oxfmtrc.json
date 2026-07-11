@@ -4,5 +4,5 @@
   "tabWidth": 4,
   "semi": true,
   "sortPackageJson": false,
-  "ignorePatterns": []
+  "ignorePatterns": ["**/CHANGELOG.md"]
 }
