@@ -147,4 +147,8 @@ useEffect(() => {
 }, [engine, engine.isReady, rects]);
 ```
 
+:::note
+If you remount the component with a `key` (for example to swap `renderer` or `config`), depend on `engine.instance` instead of `engine.isReady`. During a remount `isReady` returns to `true` within the same effect flush, so effects keyed on it do not re-run, while `engine.instance` changes identity with every new engine. Draw calls made while no engine is mounted are dropped and log a dev-only console warning.
+:::
+
 For declarative draw components, keep large `items` arrays stable with `useMemo` or state. A new array identity re-registers the draw callback and can rebuild spatial indexes.
