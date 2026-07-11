@@ -11,7 +11,9 @@ export class ResponsiveWatcher {
     private currentDpr: number;
 
     private initialVisibleTiles: { x: number; y: number };
-    private widthLimits: { min: number; max: number };
+
+    /** Scale limits relative to the base scale (preserve-viewport mode) */
+    private scaleLimitRatios: { min: number; max: number };
 
     public onResize?: () => void;
 
@@ -32,9 +34,11 @@ export class ResponsiveWatcher {
             y: cfg.size.height / cfg.scale,
         };
 
-        this.widthLimits = {
-            min: cfg.minScale * this.initialVisibleTiles.x,
-            max: cfg.maxScale * this.initialVisibleTiles.x,
+        // Configured scale limits expressed as zoom factors of the base scale,
+        // so they keep their meaning when preserve-viewport rescales the base
+        this.scaleLimitRatios = {
+            min: cfg.minScale / cfg.scale,
+            max: cfg.maxScale / cfg.scale,
         };
     }
 
@@ -48,12 +52,9 @@ export class ResponsiveWatcher {
         this.currentDpr = this.viewport.dpr;
 
         if (responsiveMode === "preserve-viewport") {
-            const aspectRatio = this.initialVisibleTiles.y / this.initialVisibleTiles.x;
+            // Width follows the container; scale limits adapt in applySize,
+            // so no CSS min/max width is needed to protect them
             this.wrapper.style.width = "100%";
-            this.wrapper.style.minWidth = `${this.widthLimits.min}px`;
-            this.wrapper.style.maxWidth = `${this.widthLimits.max}px`;
-            this.wrapper.style.minHeight = `${this.widthLimits.min * aspectRatio}px`;
-            this.wrapper.style.maxHeight = `${this.widthLimits.max * aspectRatio}px`;
         } else {
             const cfg = this.config.get();
             this.wrapper.style.width = "100%";
@@ -118,16 +119,61 @@ export class ResponsiveWatcher {
 
             const currentCenter = this.camera.getCenter(prev.width, prev.height);
 
+            // Update viewport before mutating the camera so bounds clamping
+            // uses the new dimensions
+            this.viewport.setSize(width, height);
+
+            // Rescale the zoom limits with the base scale so the configured
+            // range keeps acting as zoom factors and the camera never lands
+            // outside gesture-reachable limits
+            this.camera.setScaleLimits(newScale * this.scaleLimitRatios.min, newScale * this.scaleLimitRatios.max);
             this.camera.setScale(newScale);
+
             this.camera.setCenter(currentCenter, width, height);
         } else {
+            this.viewport.setSize(width, height);
+
             const diffW = width - prev.width;
             const diffH = height - prev.height;
             this.camera.adjustForResize(diffW, diffH);
+
+            this.adaptMinScaleToBounds(width, height);
         }
 
-        this.viewport.setSize(width, height);
         this.applyCanvasSize(width, height, dpr);
+    }
+
+    /**
+     * preserve-scale: rescale the minimum zoom limit with the scale at which
+     * the bounded area fits the viewport, so intents like "minScale shows the
+     * whole board" survive container resizes. No-op without finite bounds.
+     */
+    private adaptMinScaleToBounds(width: number, height: number) {
+        const cfg = this.config.get();
+        const boundsWidth = cfg.bounds.maxX - cfg.bounds.minX;
+        const boundsHeight = cfg.bounds.maxY - cfg.bounds.minY;
+
+        const fitScale = (w: number, h: number) => {
+            let fit = Infinity;
+            if (Number.isFinite(boundsWidth)) {
+                fit = Math.min(fit, w / boundsWidth);
+            }
+            if (Number.isFinite(boundsHeight)) {
+                fit = Math.min(fit, h / boundsHeight);
+            }
+            return fit;
+        };
+
+        const initialFit = fitScale(cfg.size.width, cfg.size.height);
+        if (!Number.isFinite(initialFit)) {
+            return;
+        }
+
+        let minScale = cfg.minScale * (fitScale(width, height) / initialFit);
+        // Never tighten past the zoom-in limit or the current scale — the
+        // camera must always stay inside its own limits
+        minScale = Math.min(minScale, cfg.maxScale, this.camera.scale);
+        this.camera.setScaleLimits(minScale, cfg.maxScale);
     }
 
     private applyCanvasSize(width: number, height: number, dpr: number) {
