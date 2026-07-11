@@ -64,6 +64,13 @@ const responsiveConfig: CanvasTileEngineConfig = {
 When `responsive` is enabled, `engine.resize()` and `eventHandlers.resize` are ignored because the wrapper element controls the size.
 :::
 
+### Scale limits in responsive mode
+
+`minScale` and `maxScale` describe the zoom range at the configured `size`. Responsive modes adapt them as the container resizes so the camera never gets stuck outside the reachable zoom range:
+
+- `"preserve-viewport"` scales both limits with the base scale. They act as zoom factors: a config with `scale: 10, minScale: 10, maxScale: 40` always means "no zooming out past the base view, up to 4x zoom in", no matter how wide the container is.
+- `"preserve-scale"` keeps the limits as configured, unless finite `bounds` are set. With bounds, the minimum limit follows the scale at which the bounded area fits the viewport, so an intent like "minScale shows the whole board" stays valid at every container width. The limit is never raised above the current scale.
+
 ## Interactions
 
 All interaction flags default to `false`.
