@@ -93,6 +93,19 @@ are ignored (the wrapper element controls size - style the wrapper with CSS).
 The server renderer ignores `responsive`; React Native measures its `View`
 via `onLayout` instead.
 
+Scale limits adapt to the container in responsive modes: `"preserve-viewport"`
+scales `minScale`/`maxScale` with the base scale (they act as zoom factors of
+the configured `scale`), and `"preserve-scale"` lowers the minimum limit to the
+scale at which finite `bounds` fit the viewport (never raising it above the
+current scale). The camera therefore never lands outside the gesture-reachable
+zoom range after a resize.
+
+When a `"preserve-viewport"` resize changes the scale, `onZoom` fires with the
+new value (like wheel/pinch and programmatic zooms), so scale-threshold logic
+keeps working. The initial responsive sizing runs during engine construction
+before callbacks attach - read the starting value with `engine.getScale()`
+after mount.
+
 ### Zoom anchor
 
 `zoom: "pointer"` (or `true`) zooms toward the cursor / pinch midpoint.

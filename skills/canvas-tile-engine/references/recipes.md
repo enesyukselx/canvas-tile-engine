@@ -215,6 +215,11 @@ const engine = new CanvasTileEngine(wrapper, {
 
 Do not call `engine.resize()` in responsive mode - CSS on the wrapper is the
 size authority. In React pass `style={{ width: "100%", height: "100vh" }}`.
+Scale limits adapt on resize (preserve-viewport: zoom factors of the base
+scale; preserve-scale: the minimum follows the bounds fit scale), and
+preserve-viewport resizes fire `onZoom` - read the initial scale with
+`engine.getScale()` after mount, since the first sizing runs before
+callbacks attach.
 
 ## 6. Animated units from a spritesheet (vanilla)
 

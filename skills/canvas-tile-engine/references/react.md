@@ -77,6 +77,20 @@ useEffect(() => {
 }, [engine.isReady]);   // isReady flips true exactly once after mount
 ```
 
+With `responsive: "preserve-viewport"`, track scale via `onZoom` PLUS an
+initial read - the first responsive sizing runs inside the engine
+constructor, before callbacks attach, so `onZoom` cannot deliver it:
+
+```tsx
+const [scale, setScale] = useState(config.scale);
+useEffect(() => {
+    if (map.isReady) setScale(map.getScale()); // real mount-time scale
+}, [map, map.isReady]);
+// ...
+<CanvasTileEngine onZoom={setScale} ... />  // all later changes (gesture,
+                                            // programmatic, responsive resize)
+```
+
 Handle members beyond the core engine API (see
 [core-api.md](core-api.md) for the shared methods):
 
