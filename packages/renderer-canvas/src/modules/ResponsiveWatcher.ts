@@ -15,8 +15,8 @@ export class ResponsiveWatcher {
     /** Initial visible tiles (used for preserve-viewport mode) */
     private initialVisibleTiles: { x: number; y: number };
 
-    /** Scale limits relative to the base scale (preserve-viewport mode) */
-    private scaleLimitRatios: { min: number; max: number };
+    /** Minimum scale limit relative to the base scale (preserve-viewport mode) */
+    private minScaleRatio: number;
 
     /** Callback fired after responsive resize */
     public onResize?: () => void;
@@ -41,12 +41,10 @@ export class ResponsiveWatcher {
             y: cfg.size.height / cfg.scale,
         };
 
-        // Configured scale limits expressed as zoom factors of the base scale,
-        // so they keep their meaning when preserve-viewport rescales the base
-        this.scaleLimitRatios = {
-            min: cfg.minScale / cfg.scale,
-            max: cfg.maxScale / cfg.scale,
-        };
+        // The zoom-out limit is a view intent ("don't zoom out past the base
+        // view"), so it is kept as a factor of the base scale. The zoom-in
+        // limit is a px-per-tile quality cap and stays absolute.
+        this.minScaleRatio = cfg.minScale / cfg.scale;
     }
 
     start() {
@@ -142,10 +140,13 @@ export class ResponsiveWatcher {
             // uses the new dimensions
             this.viewport.setSize(width, height);
 
-            // Rescale the zoom limits with the base scale so the configured
-            // range keeps acting as zoom factors and the camera never lands
-            // outside gesture-reachable limits
-            this.camera.setScaleLimits(newScale * this.scaleLimitRatios.min, newScale * this.scaleLimitRatios.max);
+            // Rescale the zoom-out limit with the base scale so it keeps its
+            // meaning at every container width; keep the zoom-in limit at its
+            // configured px value, only lifting it when the base scale itself
+            // exceeds it, so the camera never lands outside gesture-reachable
+            // limits
+            const maxScale = Math.max(this.config.get().maxScale, newScale);
+            this.camera.setScaleLimits(newScale * this.minScaleRatio, maxScale);
             this.camera.setScale(newScale);
 
             // Restore center after scale change (must use new dimensions)

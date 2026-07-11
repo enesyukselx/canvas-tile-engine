@@ -105,7 +105,7 @@ describe("ResponsiveWatcher scale limits", () => {
     });
 
     describe("preserve-viewport", () => {
-        it("rescales limits with the base scale in a narrow container", () => {
+        it("rescales the min limit with the base scale in a narrow container", () => {
             // 100x80 visible tiles; minScale equals the base scale (gridToSize-style board)
             const { watcher, state } = createWatcher({
                 responsive: "preserve-viewport",
@@ -118,12 +118,13 @@ describe("ResponsiveWatcher scale limits", () => {
 
             // Base scale follows the container instead of being clamped to minScale
             expect(state.scale).toBe(6);
-            // Limits keep their configured zoom-factor meaning (1x..4x of base)
+            // The zoom-out limit keeps its zoom-factor meaning (1x of base)...
             expect(state.minScale).toBe(6);
-            expect(state.maxScale).toBe(24);
+            // ...while the zoom-in limit stays at its configured px value
+            expect(state.maxScale).toBe(40);
         });
 
-        it("rescales limits upward in a wide container", () => {
+        it("rescales the min limit upward in a wide container, max stays absolute", () => {
             const { watcher, state } = createWatcher({
                 responsive: "preserve-viewport",
                 wrapperWidth: 1200,
@@ -135,6 +136,23 @@ describe("ResponsiveWatcher scale limits", () => {
 
             expect(state.scale).toBe(12);
             expect(state.minScale).toBe(12);
+            expect(state.maxScale).toBe(40);
+        });
+
+        it("lifts the max limit to the base scale when the container exceeds it", () => {
+            // 4800px wide: base scale 48 is beyond the configured maxScale 40
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 4800,
+                wrapperHeight: 3840,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            // The camera must be able to hold the base scale
+            expect(state.scale).toBe(48);
+            expect(state.minScale).toBe(48 * (10 / 10));
             expect(state.maxScale).toBe(48);
         });
 
@@ -153,7 +171,7 @@ describe("ResponsiveWatcher scale limits", () => {
 
             expect(state.scale).toBe(6);
             expect(state.minScale).toBe(6);
-            expect(state.maxScale).toBe(24);
+            expect(state.maxScale).toBe(40);
         });
 
         it("notifies onScaleChange when a resize changes the scale", () => {
