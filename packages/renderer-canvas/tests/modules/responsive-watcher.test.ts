@@ -156,6 +156,26 @@ describe("ResponsiveWatcher scale limits", () => {
             expect(state.maxScale).toBe(24);
         });
 
+        it("notifies onScaleChange when a resize changes the scale", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 1000,
+                wrapperHeight: 800,
+                minScale: 10,
+                maxScale: 40,
+            });
+            const scales: number[] = [];
+            watcher.onScaleChange = (scale) => scales.push(scale);
+            watcher.start();
+
+            // Initial size matches the config, so the scale did not change
+            expect(scales).toEqual([]);
+
+            FakeResizeObserver.instance!.trigger(600, 480);
+            expect(scales).toEqual([6]);
+            expect(state.scale).toBe(6);
+        });
+
         it("does not force CSS min/max width on the wrapper", () => {
             const { watcher, wrapper } = createWatcher({
                 responsive: "preserve-viewport",
@@ -221,6 +241,24 @@ describe("ResponsiveWatcher scale limits", () => {
             // never strand the current scale outside the allowed range
             expect(state.scale).toBe(10);
             expect(state.minScale).toBe(10);
+        });
+
+        it("does not notify onScaleChange when the scale stays fixed", () => {
+            const { watcher } = createWatcher({
+                responsive: "preserve-scale",
+                wrapperWidth: 1000,
+                wrapperHeight: 800,
+                minScale: 10,
+                maxScale: 40,
+                bounds: { minX: 0, maxX: 100, minY: 0, maxY: 80 },
+            });
+            const scales: number[] = [];
+            watcher.onScaleChange = (scale) => scales.push(scale);
+            watcher.start();
+
+            FakeResizeObserver.instance!.trigger(600, 800);
+
+            expect(scales).toEqual([]);
         });
 
         it("adapts the min limit again on resize events", () => {

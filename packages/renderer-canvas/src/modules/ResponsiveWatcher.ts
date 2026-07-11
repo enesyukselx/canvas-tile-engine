@@ -21,6 +21,9 @@ export class ResponsiveWatcher {
     /** Callback fired after responsive resize */
     public onResize?: () => void;
 
+    /** Callback fired when a responsive resize changes the camera scale (preserve-viewport) */
+    public onScaleChange?: (scale: number) => void;
+
     constructor(
         private wrapper: HTMLDivElement,
         private canvas: HTMLCanvasElement,
@@ -119,6 +122,7 @@ export class ResponsiveWatcher {
     private applySize(width: number, height: number, mode: "preserve-scale" | "preserve-viewport") {
         const dpr = this.viewport.dpr;
         const prev = this.viewport.getSize();
+        const prevScale = this.camera.scale;
 
         if (mode === "preserve-viewport") {
             // Calculate new scale to maintain the same visible tile count
@@ -164,6 +168,10 @@ export class ResponsiveWatcher {
         // Update canvas CSS size (logical pixels)
         this.canvas.style.width = `${width}px`;
         this.canvas.style.height = `${height}px`;
+
+        if (this.camera.scale !== prevScale) {
+            this.onScaleChange?.(this.camera.scale);
+        }
     }
 
     /**
