@@ -369,7 +369,10 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
-                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? droppedDraw("drawGridLines");
+                return (
+                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ??
+                    droppedDraw("drawGridLines")
+                );
             },
 
             clearLayer(layer) {

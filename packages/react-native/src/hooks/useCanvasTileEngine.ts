@@ -204,7 +204,10 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? droppedDraw("drawStaticImage");
             },
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
-                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? droppedDraw("drawGridLines");
+                return (
+                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ??
+                    droppedDraw("drawGridLines")
+                );
             },
 
             clearLayer(layer) {
