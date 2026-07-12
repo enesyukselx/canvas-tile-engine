@@ -117,7 +117,61 @@ describe("text rendering", () => {
         render(canvas);
 
         const textOp = ops.find((o) => o.op === "text");
-        expect(textOp?.fontSize).toBe(1 * 11.5 * 0.3);
+        expect(textOp?.fontSize).toBe(1 * 11.5);
+    });
+
+    // Font sizing contract shared by all renderers: px = fontPx ?? size * scale.
+    // Mirrors the fixture values in the canvas, webgl, and server suites.
+    it("renders size in world units (px = size * scale)", () => {
+        const { draw, render } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "default", style: { fillStyle: "#000" } },
+                { x: 2, y: 1, text: "sized", size: 2, style: { fillStyle: "#000" } },
+            ],
+            2
+        );
+        render(canvas);
+
+        const sizes = ops.filter((o) => o.op === "text").map((o) => o.fontSize);
+        expect(sizes).toEqual([10, 20]);
+    });
+
+    it("uses fontPx as a zoom-independent pixel size that wins over size", () => {
+        for (const scale of [10, 50]) {
+            const { draw, render } = setup(scale);
+            const { canvas, ops } = makeCanvas();
+            draw.drawText(
+                [
+                    { x: 1, y: 1, text: "fixed", fontPx: 14, style: { fillStyle: "#000" } },
+                    { x: 2, y: 1, text: "both", size: 2, fontPx: 14, style: { fillStyle: "#000" } },
+                ],
+                2
+            );
+            render(canvas);
+
+            const sizes = ops.filter((o) => o.op === "text").map((o) => o.fontSize);
+            expect(sizes).toEqual([14, 14]);
+        }
+    });
+
+    it("culls with the fontPx world-space extent (fontPx / scale)", () => {
+        const { draw, render } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        // Viewport spans 10 world units (+1 tile buffer). x=20 with size 1 is
+        // out of reach, but a 140px label spans 14 world units and pokes in.
+        draw.drawText(
+            [
+                { x: 20, y: 1, text: "culled", style: { fillStyle: "#000" } },
+                { x: 20, y: 1, text: "visible", fontPx: 140, style: { fillStyle: "#000" } },
+            ],
+            2
+        );
+        render(canvas);
+
+        const texts = ops.filter((o) => o.op === "text").map((o) => o.text);
+        expect(texts).toEqual(["visible"]);
     });
 
     it("caches one font per family regardless of size", () => {

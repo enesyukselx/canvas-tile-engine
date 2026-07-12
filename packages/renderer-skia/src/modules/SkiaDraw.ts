@@ -240,10 +240,13 @@ export class SkiaDraw {
                 const size = item.size ?? 1;
                 const style = item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size, topLeft, config)) continue;
+                // fontPx is zoom-independent; its world-space extent shrinks as scale grows
+                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
-                // Scale-aware font size (world units), matching the Canvas2D renderer.
-                const pxSize = size * this.camera.scale * 0.3;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+
+                // Font sizing matches the Canvas2D renderer: fontPx wins, else size * scale.
+                const pxSize = item.fontPx ?? size * this.camera.scale;
                 const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize);
                 this.fillPaint.setColor(this.color(style?.fillStyle ?? "#000000"));
 
