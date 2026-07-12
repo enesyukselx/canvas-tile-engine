@@ -242,3 +242,46 @@ describe("stroke width handling", () => {
         expect(strokes[1].strokeWidth).toBe(1);
     });
 });
+
+// Non-square rect contract shared by all renderers; mirrors the fixture
+// values in the canvas, webgl, and server suites.
+describe("non-square rects", () => {
+    it("draws width/height boxes with per-axis origin anchoring", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, width: 4, height: 2, style: { fillStyle: "#f00" } },
+                { x: 2, y: 2, size: 1, style: { fillStyle: "#0f0" } },
+                { x: 1, y: 1, width: 2, height: 1, origin: { mode: "self", x: 0, y: 0 }, style: { fillStyle: "#00f" } },
+            ],
+            1
+        );
+        render(canvas);
+
+        const rects = ops.filter((o) => o.op === "rect").map((o) => o.rect);
+        expect(rects).toEqual([
+            { x: 5, y: 15, width: 40, height: 20 },
+            { x: 20, y: 20, width: 10, height: 10 },
+            { x: 15, y: 15, width: 20, height: 10 },
+        ]);
+    });
+
+    it("culls with the max(width, height) extent", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                { x: 20, y: 0, width: 30, height: 1, style: { fillStyle: "#f00" } },
+                { x: 20, y: 0, size: 1, style: { fillStyle: "#0f0" } },
+            ],
+            1
+        );
+        render(canvas);
+
+        const rects = ops.filter((o) => o.op === "rect");
+        expect(rects).toHaveLength(1);
+    });
+});

@@ -115,8 +115,9 @@ export class SkiaDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
+                const extent = Math.max(item.width ?? size, item.height ?? size) / 2;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, extent, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 this.paintRect(canvas, item, pos, this.camera.scale);
@@ -129,16 +130,17 @@ export class SkiaDraw {
         const size = item.size ?? 1;
         const origin = this.resolveOrigin(item.origin);
         const style = item.style;
-        const pxSize = size * cellSize;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, cellSize);
-        const cx = drawX + pxSize / 2;
-        const cy = drawY + pxSize / 2;
+        const pxW = (item.width ?? size) * cellSize;
+        const pxH = (item.height ?? size) * cellSize;
+        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, cellSize);
+        const cx = drawX + pxW / 2;
+        const cy = drawY + pxH / 2;
         const rotation = item.rotate ?? 0;
         const radius = this.resolveRadius(item.radius);
 
         const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
 
-        const rect = Skia.XYWHRect(drawX, drawY, pxSize, pxSize);
+        const rect = Skia.XYWHRect(drawX, drawY, pxW, pxH);
         const rounded = this.hasRadius(radius);
         if (style?.fillStyle) {
             this.fillPaint.setColor(this.color(style.fillStyle));
@@ -185,7 +187,7 @@ export class SkiaDraw {
         const style = item.style;
         const pxSize = size * cellSize;
         const radius = pxSize / 2;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, cellSize);
+        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, cellSize);
         const cx = drawX + radius;
         const cy = drawY + radius;
 
@@ -342,7 +344,7 @@ export class SkiaDraw {
         if (aspect > 1) drawH = pxSize / aspect;
         else drawW = pxSize * aspect;
 
-        const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, cellSize);
+        const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, cellSize);
         const offsetX = baseX + (pxSize - drawW) / 2;
         const offsetY = baseY + (pxSize - drawH) / 2;
         const rotation = item.rotate ?? 0;
@@ -599,21 +601,22 @@ export class SkiaDraw {
 
     private computeOriginOffset(
         pos: Coords,
-        pxSize: number,
+        pxW: number,
+        pxH: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
         cellSize: number
     ) {
         if (origin.mode === "cell") {
             const cell = cellSize;
             return {
-                x: pos.x - cell / 2 + origin.x * cell - pxSize / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxSize / 2,
+                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
+                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
             };
         }
 
         return {
-            x: pos.x - origin.x * pxSize,
-            y: pos.y - origin.y * pxSize,
+            x: pos.x - origin.x * pxW,
+            y: pos.y - origin.y * pxH,
         };
     }
 
