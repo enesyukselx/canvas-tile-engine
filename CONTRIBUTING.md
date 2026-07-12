@@ -246,7 +246,9 @@ PRs that only touch docs, examples, CI, or internal tooling do not need a change
 
 3. **Add a changeset** if the PR changes a published package (`pnpm changeset`)
 
-4. **Push to your fork** and open a Pull Request
+4. **Update docs and the AI skill** if the change affects usage or the public API: `docs/` (both `docs/docs/` and the current `docs/versioned_docs/` copy when it applies to the released version) and `skills/canvas-tile-engine/` (SKILL.md + references)
+
+5. **Push to your fork** and open a Pull Request
 
 ### PR Checklist
 
@@ -254,7 +256,8 @@ PRs that only touch docs, examples, CI, or internal tooling do not need a change
 - [ ] All tests pass
 - [ ] New code is covered by tests
 - [ ] Changeset added (if a published package changed)
-- [ ] Documentation is updated (if applicable)
+- [ ] `docs/` updated (if usage or the public API changed)
+- [ ] AI skill (`skills/canvas-tile-engine/`) updated (if usage or the public API changed)
 - [ ] Commit messages follow conventional commits
 - [ ] PR description clearly explains the changes
 

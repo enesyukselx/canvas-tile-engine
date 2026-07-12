@@ -207,6 +207,14 @@ const png = await renderToBuffer({
 });
 ```
 
+## Keeping Changesets, Docs, and Skills in Sync
+
+For every edit, feature, or fix, check whether these need updating alongside the code:
+
+- `.changeset/` - required whenever a published package changes (behavior or public artifact). Run `pnpm changeset` and commit the generated file. Docs-, example-, or tooling-only changes do not need one.
+- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one; when the change applies to the current release, update both and keep them identical.
+- `skills/canvas-tile-engine/` - update `SKILL.md` and its reference files when the change affects usage or the public API, so the AI agent skill stays accurate.
+
 ## Releases (Changesets)
 
 Publishing is managed with Changesets (`.changeset/config.json`; private packages — docs and all examples — are excluded from versioning).
