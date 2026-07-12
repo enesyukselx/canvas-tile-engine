@@ -55,6 +55,11 @@ export type ImageItem<TImage = HTMLImageElement> = Omit<DrawObject, "style"> & {
      * `img` is drawn (spritesheet frame); when omitted the whole image is drawn.
      */
     sprite?: SpriteRect;
+    /**
+     * Opacity from 0 (transparent) to 1 (opaque). Default: 1.
+     * Useful for ghost/preview placements in editor-style apps.
+     */
+    opacity?: number;
 };
 export type Text = Omit<DrawObject, "radius" | "size"> & {
     text: string;

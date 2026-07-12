@@ -141,12 +141,14 @@ composites ABOVE all GPU primitives regardless of layer (see
     img: TImage;          // HTMLImageElement (web) / SkImage (RN) / napi Image (server)
     sprite?: { x: number; y: number; w: number; h: number };
                           // optional source rect in image pixels (spritesheet frame)
+    opacity?: number;     // 0..1, default 1 - ghost/preview placements
 }
 ```
 
 ```ts
 const img = await engine.images.load("/assets/unit.png");
 engine.drawImage({ x: 5, y: 3, size: 2, img, rotate: 90 }, 1);
+engine.drawImage({ x: 7, y: 3, size: 2, img, opacity: 0.5 }, 2); // ghost preview
 ```
 
 Aspect ratio derives from the image (or the `sprite` frame). Spritesheets and

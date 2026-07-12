@@ -356,7 +356,12 @@ export class SkiaDraw {
 
         const src = Skia.XYWHRect(srcX, srcY, srcW, srcH);
         const dest = Skia.XYWHRect(offsetX, offsetY, drawW, drawH);
+        // Skia snapshots paint state at draw time, so mutating the shared paint
+        // per item is safe (same pattern as fill/stroke paints).
+        const opacity = item.opacity ?? 1;
+        if (opacity !== 1) this.imagePaint.setAlphaf(opacity);
         canvas.drawImageRect(img, src, dest, this.imagePaint);
+        if (opacity !== 1) this.imagePaint.setAlphaf(1);
 
         if (count !== -1) canvas.restoreToCount(count);
     }

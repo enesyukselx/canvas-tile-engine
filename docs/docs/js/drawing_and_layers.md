@@ -305,6 +305,7 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 | `rotate` | `number`           | `0`          | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 | `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                  |
 | `sprite` | `SpriteRect`       | -            | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
+| `opacity` | `number`          | `1`          | Opacity from 0 (transparent) to 1 (opaque). Ideal for ghost/preview placements. |
 
 ```typescript
 // Single image
@@ -314,6 +315,9 @@ engine.drawImage({ x: 2, y: 3, size: 1.5, img }, 2);
 // Rotated image (90 degrees clockwise)
 const arrow = await engine.images.load("/assets/arrow.png");
 engine.drawImage({ x: 5, y: 3, size: 1, img: arrow, rotate: 90 }, 2);
+
+// Ghost preview: semi-transparent placement indicator
+engine.drawImage({ x: 7, y: 3, size: 1.5, img, opacity: 0.5 }, 3);
 
 // Multiple images
 engine.drawImage([

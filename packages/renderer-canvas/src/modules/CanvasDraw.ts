@@ -355,12 +355,15 @@ export class CanvasDraw {
         dy: number,
         dw: number,
         dh: number,
+        opacity: number = 1,
     ) {
+        if (opacity !== 1) ctx.globalAlpha = opacity;
         if (sprite) {
             ctx.drawImage(img, sprite.x, sprite.y, sprite.w, sprite.h, dx, dy, dw, dh);
         } else {
             ctx.drawImage(img, dx, dy, dw, dh);
         }
+        if (opacity !== 1) ctx.globalAlpha = 1;
     }
 
     drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
@@ -410,16 +413,18 @@ export class CanvasDraw {
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
 
+                const opacity = item.opacity ?? 1;
+
                 if (rotationDeg !== 0) {
                     const centerX = offsetX + drawW / 2;
                     const centerY = offsetY + drawH / 2;
                     ctx.save();
                     ctx.translate(centerX, centerY);
                     ctx.rotate(rotation);
-                    this.blitImage(ctx, item.img, item.sprite, -drawW / 2, -drawH / 2, drawW, drawH);
+                    this.blitImage(ctx, item.img, item.sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
                     ctx.restore();
                 } else {
-                    this.blitImage(ctx, item.img, item.sprite, offsetX, offsetY, drawW, drawH);
+                    this.blitImage(ctx, item.img, item.sprite, offsetX, offsetY, drawW, drawH, opacity);
                 }
             }
         });
@@ -801,6 +806,7 @@ export class CanvasDraw {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
             const img = (item as { img: HTMLImageElement }).img;
             const sprite = (item as { sprite?: SpriteRect }).sprite;
+            const opacity = (item as { opacity?: number }).opacity ?? 1;
             const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
             const srcW = sprite?.w ?? img.width;
@@ -822,10 +828,10 @@ export class CanvasDraw {
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(rotation);
-                this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH);
+                this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
                 ctx.restore();
             } else {
-                this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH);
+                this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH, opacity);
             }
         });
 

@@ -285,6 +285,7 @@ Draw images scaled to world units.
 | `size`   | `number`           | Size in grid units (maintains aspect ratio).                       |
 | `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 | `sprite` | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
+| `opacity` | `number`          | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements. |
 
 ```tsx
 function MapWithImages() {

@@ -191,6 +191,42 @@ describe("text rendering", () => {
     });
 });
 
+describe("image opacity", () => {
+    const fakeImage = { width: () => 10, height: () => 10 } as unknown as import("@shopify/react-native-skia").SkImage;
+
+    // Image opacity contract shared by all renderers: alpha = opacity ?? 1.
+    // Mirrors the fixture values in the canvas, webgl, and server suites.
+    it("applies item opacity via paint alpha and restores it", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawImage(
+            [
+                { x: 1, y: 1, img: fakeImage, opacity: 0.5 },
+                { x: 3, y: 3, img: fakeImage },
+                { x: 5, y: 5, img: fakeImage, sprite: { x: 0, y: 0, w: 5, h: 5 }, opacity: 0.25 },
+            ],
+            1
+        );
+        render(canvas);
+
+        const alphas = ops.filter((o) => o.op === "image").map((o) => o.alpha);
+        expect(alphas).toEqual([0.5, 1, 0.25]);
+    });
+
+    it("records opacity into static pictures", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawStaticImage([{ x: 1, y: 1, img: fakeImage, opacity: 0.5 }], "cache-img-opacity", 1);
+        render(canvas);
+
+        const picture = ops.find((o) => o.op === "picture")?.picture as MockPicture;
+        const alphas = picture.ops.filter((o) => o.op === "image").map((o) => (o as Op).alpha);
+        expect(alphas).toEqual([0.5]);
+    });
+});
+
 describe("static picture cache", () => {
     const items = [
         { x: 1, y: 1, size: 1, style: { fillStyle: "#f00" } },
