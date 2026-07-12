@@ -62,11 +62,6 @@ export class Config {
                 shownScaleRange: config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity },
             },
 
-            cursor: {
-                default: config.cursor?.default ?? "default",
-                move: config.cursor?.move ?? "move",
-            },
-
             debug: {
                 enabled: config.debug?.enabled ?? false,
                 hud: {
@@ -95,7 +90,6 @@ export class Config {
                 ...base.coordinates,
                 shownScaleRange: Object.freeze(base.coordinates.shownScaleRange),
             }),
-            cursor: Object.freeze(base.cursor),
             debug: Object.freeze({
                 enabled: base.debug.enabled,
                 hud: Object.freeze(base.debug.hud),
