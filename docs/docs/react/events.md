@@ -289,6 +289,41 @@ engine.resize(1024, 768, 300);
 engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
 ```
 
+## Hit Testing
+
+`engine.instance.hitTest` / `hitTestFirst` answer "which item is under this
+point?" for rect, circle, and image items - including items drawn by the
+declarative components, which register through the same engine. Pass
+`coords.raw` from any event prop; origin anchoring, image aspect fit, and
+rotation are handled internally.
+
+```tsx
+function StationMap() {
+    const engine = useCanvasTileEngine();
+    const [selected, setSelected] = useState<number | null>(null);
+
+    return (
+        <CanvasTileEngine
+            engine={engine}
+            renderer={new RendererCanvas()}
+            config={config}
+            onClick={(coords) => {
+                const hit = engine.instance?.hitTestFirst(coords.raw);
+                // hit.index maps back into the items array you rendered
+                setSelected(hit ? hit.index : null);
+            }}
+        >
+            <CanvasTileEngine.Circle items={stationDots} layer={2} />
+        </CanvasTileEngine>
+    );
+}
+```
+
+Results are `{ item, kind, layer, handle, index }`, ordered by visual
+priority (higher layer, then later registration, then later item). Line,
+Path, and Text are not hit-testable, and - like rendering - position
+mutations require re-registration to be reflected.
+
 ## Best Practices
 
 - Keep `config`, `center`, and `renderer` lifecycle rules in mind: they are read on mount. Use `engine.setEventHandlers()` for runtime event changes.

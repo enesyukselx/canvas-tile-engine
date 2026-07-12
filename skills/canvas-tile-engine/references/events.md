@@ -78,6 +78,22 @@ function enableReadOnlyMode() {
 CRITICAL for paint/marquee tools: disable `drag` while the tool is active,
 otherwise pointer movement pans the camera AND paints simultaneously.
 
+## Pattern: item click / hover via hitTest
+
+For "which item did the user click/hover?" use the built-in hit testing -
+do NOT build coordinate lookup maps or hand-roll box math (the 0.5 cell
+offset is easy to get wrong):
+
+```ts
+engine.onClick = (coords) => {
+    const hit = engine.hitTestFirst(coords.raw); // raw, not snapped
+    if (hit) select(stations[hit.index]);        // index -> your data array
+};
+```
+
+Full semantics: [core-api.md](core-api.md) hit testing section (kinds
+covered, ordering, staleness rule).
+
 ## Pattern: hover highlight
 
 Replace one retained handle instead of accumulating draw calls:

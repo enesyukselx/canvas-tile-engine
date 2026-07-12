@@ -166,6 +166,29 @@ and semantics: [drawing.md](drawing.md).
 | `clearAll(): void` | Remove all callbacks on all layers. |
 | `clearStaticCache(cacheKey?: string): void` | Drop one or all pre-rendered static caches (forces rebuild next frame). |
 
+### Hit testing
+
+| Signature | Notes |
+| :-- | :-- |
+| `hitTest(point: Coords, opts?: { layer?: number }): HitResult[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
+| `hitTestFirst(point: Coords, opts?): HitResult \| undefined` | Topmost item only. |
+
+`HitResult` = `{ item, kind: "rect"|"circle"|"image", layer, handle, index }`;
+`index` is the item's position in the array passed to the draw call - use it
+to map back to app data. Pass `coords.raw` from event callbacks; origin
+anchoring, image aspect fit, and rotation are handled internally. Covers
+`drawStatic*` variants too; Line/Path/Text are NOT hit-testable. Position
+mutations require re-registration to be reflected (same rule as rendering).
+500+ item draw calls are queried via a spatial index - hover-frequency use is
+fine at scale.
+
+```ts
+engine.onClick = (coords) => {
+    const hit = engine.hitTestFirst(coords.raw);
+    if (hit) openPanel(stations[hit.index]);
+};
+```
+
 ### Event callbacks (assign as properties)
 
 ```ts
