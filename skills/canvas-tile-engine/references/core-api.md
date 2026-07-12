@@ -172,7 +172,8 @@ and semantics: [drawing.md](drawing.md).
 `HitResult` = `{ item, kind: "rect"|"circle"|"image", layer, handle, index }`;
 `index` is the item's position in the array passed to the draw call - use it
 to map back to app data. Pass `coords.raw` from event callbacks; origin
-anchoring, image aspect fit, and rotation are handled internally. Covers
+anchoring, non-square Rect `width`/`height`, image aspect fit, and rotation
+are handled internally - the hit box is always the drawn box. Covers
 `drawStatic*` variants too; Line/Path/Text are NOT hit-testable. Position
 mutations require re-registration to be reflected (same rule as rendering).
 500+ item draw calls are queried via a spatial index - hover-frequency use is

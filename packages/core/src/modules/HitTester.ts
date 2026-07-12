@@ -66,8 +66,9 @@ export class HitTester {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
         for (const item of list) {
-            const size = item.size ?? 1;
-            if (size > maxSize) maxSize = size;
+            const rect = item as Rect;
+            const extent = Math.max(item.size ?? 1, rect.width ?? 0, rect.height ?? 0);
+            if (extent > maxSize) maxSize = extent;
         }
         this.entries.set(handle.id, { handle, kind, layer, items: list, seq: this.nextSeq++, maxSize });
     }
@@ -147,15 +148,20 @@ export class HitTester {
     /** World-space box the item is drawn into, mirroring the renderers' math. */
     private boxFor(item: HitItem, kind: HitKind): { left: number; top: number; w: number; h: number } {
         const size = item.size ?? 1;
+        // Only rects support per-axis dimensions; circle stays size (diameter)
+        // and image keeps its aspect-fit size box below.
+        const rect = item as Rect;
+        const w = kind === "rect" ? (rect.width ?? size) : size;
+        const h = kind === "rect" ? (rect.height ?? size) : size;
         const mode = item.origin?.mode === "self" ? "self" : "cell";
         const ox = item.origin?.x ?? 0.5;
         const oy = item.origin?.y ?? 0.5;
 
         // World-unit mirror of the renderers' computeOriginOffset (px = world * scale)
-        const left = mode === "cell" ? item.x - 0.5 + ox - size / 2 : item.x - ox * size;
-        const top = mode === "cell" ? item.y - 0.5 + oy - size / 2 : item.y - oy * size;
+        const left = mode === "cell" ? item.x - 0.5 + ox - w / 2 : item.x - ox * w;
+        const top = mode === "cell" ? item.y - 0.5 + oy - h / 2 : item.y - oy * h;
 
-        if (kind !== "image") return { left, top, w: size, h: size };
+        if (kind !== "image") return { left, top, w, h };
 
         // Images are aspect-fit inside the size box (mirror of the draw path)
         const image = item as ImageItem<unknown>;
@@ -163,12 +169,12 @@ export class HitTester {
         if (!dims) return { left, top, w: size, h: size };
 
         const aspect = dims.w / dims.h;
-        let w = size;
-        let h = size;
-        if (aspect > 1) h = size / aspect;
-        else w = size * aspect;
+        let fitW = size;
+        let fitH = size;
+        if (aspect > 1) fitH = size / aspect;
+        else fitW = size * aspect;
 
-        return { left: left + (size - w) / 2, top: top + (size - h) / 2, w, h };
+        return { left: left + (size - fitW) / 2, top: top + (size - fitH) / 2, w: fitW, h: fitH };
     }
 
     /** Source dimensions: the sprite frame when set, else the image itself. */

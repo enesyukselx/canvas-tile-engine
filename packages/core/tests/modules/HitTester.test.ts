@@ -164,3 +164,46 @@ describe("HitTester large datasets (spatial index path)", () => {
         expect(hit!.index).toBe(200);
     });
 });
+
+describe("HitTester non-square rects", () => {
+    it("uses width/height boxes with cell-center origin", () => {
+        const ht = new HitTester();
+        // cell origin: box spans [0,4] x [1,3]
+        ht.register(handle(1), "rect", { x: 2, y: 2, width: 4, height: 2 }, 1);
+
+        expect(ht.hitTestFirst({ x: 0.1, y: 1.1 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 3.9, y: 2.9 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 0.1, y: 0.9 })).toBeUndefined(); // above the box
+        expect(ht.hitTestFirst({ x: 4.1, y: 2 })).toBeUndefined(); // right of the box
+    });
+
+    it("anchors per axis with self-mode origin", () => {
+        const ht = new HitTester();
+        // self {0,0}: box spans [1,3] x [1,2]
+        ht.register(handle(1), "rect", { x: 1, y: 1, width: 2, height: 1, origin: { mode: "self", x: 0, y: 0 } }, 1);
+
+        expect(ht.hitTestFirst({ x: 2.9, y: 1.9 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 2.9, y: 2.1 })).toBeUndefined(); // below the 1-high box
+    });
+
+    it("inverse-rotates against the non-square box", () => {
+        const ht = new HitTester();
+        // 2x1 box at origin, rotated 90 degrees: now effectively 1x2
+        ht.register(handle(1), "rect", { x: 0, y: 0, width: 2, height: 1, rotate: 90 }, 1);
+
+        expect(ht.hitTestFirst({ x: 0, y: 0.9 })).toBeDefined(); // tall now
+        expect(ht.hitTestFirst({ x: 0.9, y: 0 })).toBeUndefined(); // no longer wide
+    });
+
+    it("pads spatial-index queries with the max per-axis extent", () => {
+        const ht = new HitTester();
+        // 600 wide bars: item i anchored at x = i * 10, box spans [i*10 - 4, i*10 + 4]
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i * 10, y: 0, width: 8, height: 1 }));
+        ht.register(handle(1), "rect", items, 1);
+
+        const hit = ht.hitTestFirst({ x: 2003.9, y: 0 }); // far edge of item 200's box
+        expect(hit).toBeDefined();
+        expect(hit!.index).toBe(200);
+        expect(ht.hitTestFirst({ x: 2004.1, y: 0 })).toBeUndefined();
+    });
+});
