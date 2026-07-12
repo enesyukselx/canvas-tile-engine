@@ -201,7 +201,8 @@ Render text at world coordinates. Text size scales with zoom.
 | :------- | :------- | :--------------------------------- | :--------------------------------------- |
 | `x`, `y` | `number` | **Required**                       | World coordinates.                       |
 | `text`   | `string` | **Required**                       | The text content.                        |
-| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set. |
+| `fontPx` | `number` | -                                  | Fixed font size in pixels, independent of zoom. Takes precedence over `size`. |
 | `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
 | `style`  | `object` | -                                  | Font styling options.                    |
 | `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).   |
@@ -239,6 +240,18 @@ Render text at world coordinates. Text size scales with zoom.
     layer={3}
 />
 
+{/* Fixed-size label: always 14px on screen, regardless of zoom */}
+<CanvasTileEngine.Text
+    items={{
+        x: 5,
+        y: 3,
+        text: "Ankara",
+        fontPx: 14,
+        style: { fillStyle: "white" }
+    }}
+    layer={3}
+/>
+
 {/* Multiple texts (batch rendering) */}
 <CanvasTileEngine.Text
     items={[
@@ -250,8 +263,8 @@ Render text at world coordinates. Text size scales with zoom.
 />
 ```
 
-:::tip Scale-Aware Text
-The `size` property works like other draw components - it's in world units and scales with zoom. Use `size: 1` for text that fills approximately one tile height.
+:::tip Two sizing modes
+`size` works like other draw components - it's in world units, so `size: 1` text has a font em box of one tile and scales with zoom. Use `fontPx` instead for labels that must stay readable at any zoom level (map labels, names): the text keeps the same pixel size on screen no matter how far you zoom out.
 :::
 
 ### `<Image>`

@@ -43,7 +43,8 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
 1. **World units, not pixels - and integers are CELL CENTERS.** Item `x`,
    `y`, `size` are in world (tile) units. `config.scale` is pixels per world
    unit; zooming changes it between `minScale` and `maxScale`. Text `size` is
-   also in world units. Crucially, an item at integer `k` is centered on its
+   also in world units (or use `fontPx` for a zoom-independent pixel size).
+   Crucially, an item at integer `k` is centered on its
    cell: cell `k` spans world `[k - 0.5, k + 0.5]`, grid lines fall on
    half-integers, and a board of cells `0..N-1` is centered at `(N-1)/2`
    (NOT `N/2` - that is half a cell off).
