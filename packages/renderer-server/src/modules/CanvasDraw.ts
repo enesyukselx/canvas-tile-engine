@@ -114,6 +114,8 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
+                const w = item.width ?? size;
+                const h = item.height ?? size;
                 const origin = {
                     mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
@@ -122,11 +124,12 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const style = item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+                const pxW = w * this.camera.scale;
+                const pxH = h * this.camera.scale;
+                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
 
                 // Only update style when changed (reduces state changes)
                 if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
@@ -144,25 +147,25 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const radius = item.radius;
 
                 if (rotationDeg !== 0) {
-                    const centerX = drawX + pxSize / 2;
-                    const centerY = drawY + pxSize / 2;
+                    const centerX = drawX + pxW / 2;
+                    const centerY = drawY + pxH / 2;
                     ctx.save();
                     ctx.translate(centerX, centerY);
                     ctx.rotate(rotation);
                     ctx.beginPath();
                     if (radius && ctx.roundRect) {
-                        ctx.roundRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize, radius);
+                        ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
                     } else {
-                        ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                        ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
                     }
                     this.fillStrokePath(ctx, style);
                     ctx.restore();
                 } else {
                     ctx.beginPath();
                     if (radius && ctx.roundRect) {
-                        ctx.roundRect(drawX, drawY, pxSize, pxSize, radius);
+                        ctx.roundRect(drawX, drawY, pxW, pxH, radius);
                     } else {
-                        ctx.rect(drawX, drawY, pxSize, pxSize);
+                        ctx.rect(drawX, drawY, pxW, pxH);
                     }
                     this.fillStrokePath(ctx, style);
                 }
@@ -236,7 +239,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
                 const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
 
                 // Only update style when changed
                 if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
@@ -410,7 +413,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 else drawW = pxSize * aspect;
 
                 // origin SELF/CELL
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
 
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
@@ -491,21 +494,22 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
     private computeOriginOffset(
         pos: Coords,
-        pxSize: number,
+        pxW: number,
+        pxH: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
         camera: ICamera,
     ) {
         if (origin.mode === "cell") {
             const cell = camera.scale;
             return {
-                x: pos.x - cell / 2 + origin.x * cell - pxSize / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxSize / 2,
+                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
+                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
             };
         }
 
         return {
-            x: pos.x - origin.x * pxSize,
-            y: pos.y - origin.y * pxSize,
+            x: pos.x - origin.x * pxW,
+            y: pos.y - origin.y * pxH,
         };
     }
 
@@ -518,13 +522,15 @@ export class CanvasDraw implements IDrawAPI<Image> {
             x: number;
             y: number;
             size?: number;
+            width?: number;
+            height?: number;
             radius?: number | number[];
             origin?: { mode?: "cell" | "self"; x?: number; y?: number };
         },
     >(
         items: T[],
         cacheKey: string,
-        renderFn: (ctx: SKRSContext2D, item: T, x: number, y: number, pxSize: number) => void,
+        renderFn: (ctx: SKRSContext2D, item: T, x: number, y: number, pxW: number, pxH: number) => void,
     ): StaticCache | null {
         if (items.length === 0) {
             return null;
@@ -538,10 +544,12 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
         for (const item of items) {
             const size = item.size ?? 1;
-            if (item.x - size / 2 < minX) minX = item.x - size / 2;
-            if (item.x + size / 2 > maxX) maxX = item.x + size / 2;
-            if (item.y - size / 2 < minY) minY = item.y - size / 2;
-            if (item.y + size / 2 > maxY) maxY = item.y + size / 2;
+            const w = item.width ?? size;
+            const h = item.height ?? size;
+            if (item.x - w / 2 < minX) minX = item.x - w / 2;
+            if (item.x + w / 2 > maxX) maxX = item.x + w / 2;
+            if (item.y - h / 2 < minY) minY = item.y - h / 2;
+            if (item.y + h / 2 > maxY) maxY = item.y + h / 2;
         }
 
         // Add padding
@@ -591,7 +599,8 @@ export class CanvasDraw implements IDrawAPI<Image> {
             // Render all items using the provided render function
             for (const item of items) {
                 const size = item.size ?? 1;
-                const pxSize = size * renderScale;
+                const pxW = (item.width ?? size) * renderScale;
+                const pxH = (item.height ?? size) * renderScale;
                 const origin = {
                     mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
@@ -602,9 +611,9 @@ export class CanvasDraw implements IDrawAPI<Image> {
                     x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
                     y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
                 };
-                const { x, y } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+                const { x, y } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
 
-                renderFn(offCtx, item, x, y, pxSize);
+                renderFn(offCtx, item, x, y, pxW, pxH);
             }
 
             cache = {
@@ -710,7 +719,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
+        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxW, pxH) => {
             const style = item.style;
             const rotationDeg = item.rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
@@ -726,25 +735,25 @@ export class CanvasDraw implements IDrawAPI<Image> {
             }
 
             if (rotationDeg !== 0) {
-                const centerX = x + pxSize / 2;
-                const centerY = y + pxSize / 2;
+                const centerX = x + pxW / 2;
+                const centerY = y + pxH / 2;
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(rotation);
                 ctx.beginPath();
                 if (radius && ctx.roundRect) {
-                    ctx.roundRect(-pxSize / 2, -pxSize / 2, pxSize, pxSize, radius);
+                    ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
                 } else {
-                    ctx.rect(-pxSize / 2, -pxSize / 2, pxSize, pxSize);
+                    ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
                 }
                 this.fillStrokePath(ctx, style);
                 ctx.restore();
             } else {
                 ctx.beginPath();
                 if (radius && ctx.roundRect) {
-                    ctx.roundRect(x, y, pxSize, pxSize, radius);
+                    ctx.roundRect(x, y, pxW, pxH, radius);
                 } else {
-                    ctx.rect(x, y, pxSize, pxSize);
+                    ctx.rect(x, y, pxW, pxH);
                 }
                 this.fillStrokePath(ctx, style);
             }
@@ -765,7 +774,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
      * @param layer Layer order
      */
     drawStaticImage(items: Array<ImageItem<Image>>, cacheKey: string, layer: number = 1): DrawHandle {
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
+        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
             const img = item.img;
             const sprite = item.sprite;
             const opacity = item.opacity ?? 1;
@@ -815,7 +824,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize) => {
+        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
             const style = item.style;
             const radius = pxSize / 2;
 

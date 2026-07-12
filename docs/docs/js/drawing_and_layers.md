@@ -49,6 +49,8 @@ drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 | `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                            |
 | `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                    |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                   |
+| `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.         |
+| `height` | `number`             | `size`                             | Height in world units (only for `drawRect`).                                                                                    |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                |
 | `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
 
@@ -66,6 +68,18 @@ engine.drawRect(
         y: 5,
         size: 1,
         style: { fillStyle: "#0077be" },
+    },
+    1
+);
+
+// Draw a 4x2 zone floor (anchored on its center cell)
+engine.drawRect(
+    {
+        x: 5,
+        y: 8,
+        width: 4,
+        height: 2,
+        style: { fillStyle: "rgba(34, 197, 94, 0.3)", strokeStyle: "#166534" },
     },
     1
 );
