@@ -241,10 +241,12 @@ export class WebGLDraw {
                 const size = item.size ?? 1;
                 const style = item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size, topLeft, config)) continue;
+                // fontPx is zoom-independent; its world-space extent shrinks as scale grows
+                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
-                // Scale-aware font size (world units)
-                const pxSize = size * this.camera.scale * 0.3;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+
+                const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
                 ctx.font = `${pxSize}px ${family}`;
 
