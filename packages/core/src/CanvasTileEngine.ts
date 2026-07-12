@@ -3,6 +3,8 @@ import { Config } from "./modules/Config";
 import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
+import { HitTester, HitResult, HitTestOptions } from "./modules/HitTester";
+import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateScale } from "./utils/validateConfig";
 import { snapCenterToGrid } from "./utils/viewport";
 import {
@@ -37,6 +39,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     private coordinateTransformer: CoordinateTransformer;
     private renderer: IRenderer<TMount, TImage>;
     private animationController: AnimationController;
+    private hitTester = new HitTester();
 
     public canvasWrapper: TMount;
     /**
@@ -333,6 +336,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     destroy() {
         this.animationController.cancelAll();
         this.renderer.destroy();
+        this.hitTester.clear();
     }
 
     /** Render a frame using the active renderer. */
@@ -527,7 +531,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param layer Layer order (lower draws first).
      */
     drawRect(items: Rect | Array<Rect>, layer: number = 1): DrawHandle {
-        return this.renderer.getDrawAPI().drawRect(items, layer);
+        const handle = this.renderer.getDrawAPI().drawRect(items, layer);
+        this.hitTester.register(handle, "rect", items, layer);
+        return handle;
     }
 
     /**
@@ -540,7 +546,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param layer Layer order (lower draws first).
      */
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
+        this.hitTester.register(handle, "rect", items, layer);
+        return handle;
     }
 
     /**
@@ -552,7 +560,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param layer Layer order (lower draws first).
      */
     drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
+        this.hitTester.register(handle, "circle", items, layer);
+        return handle;
     }
 
     /**
@@ -565,7 +575,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param layer Layer order (lower draws first).
      */
     drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
+        this.hitTester.register(handle, "image", items, layer);
+        return handle;
     }
 
     /**
@@ -596,7 +608,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param layer Layer order.
      */
     drawCircle(items: Circle | Array<Circle>, layer: number = 1): DrawHandle {
-        return this.renderer.getDrawAPI().drawCircle(items, layer);
+        const handle = this.renderer.getDrawAPI().drawCircle(items, layer);
+        this.hitTester.register(handle, "circle", items, layer);
+        return handle;
     }
 
     /**
@@ -645,7 +659,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param layer Layer order.
      */
     drawImage(items: Array<ImageItem<TImage>> | ImageItem<TImage>, layer: number = 1): DrawHandle {
-        return this.renderer.getDrawAPI().drawImage(items, layer);
+        const handle = this.renderer.getDrawAPI().drawImage(items, layer);
+        this.hitTester.register(handle, "image", items, layer);
+        return handle;
     }
 
     /**
@@ -685,6 +701,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     removeDrawHandle(handle: DrawHandle) {
         this.renderer.getDrawAPI().removeDrawHandle(handle);
+        this.hitTester.remove(handle);
     }
 
     /**
@@ -700,6 +717,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     clearLayer(layer: number) {
         this.renderer.getDrawAPI().clearLayer(layer);
+        this.hitTester.clearLayer(layer);
     }
 
     /**
@@ -713,6 +731,54 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     clearAll() {
         this.renderer.getDrawAPI().clearAll();
+        this.hitTester.clear();
+    }
+
+    // ─── Hit testing ───────────
+
+    /**
+     * All rect/circle/image items under a world point, highest visual
+     * priority first (higher layer, then later registration, then later
+     * item within a draw call). Pass the `coords.raw` value from event
+     * callbacks - origin anchoring, image aspect fit, and rotation are
+     * handled internally.
+     *
+     * Line, Path, and Text items are not hit-testable. Like rendering,
+     * results reflect item positions as of the draw call: mutating an
+     * item's position requires re-registration (style mutation is fine).
+     * @param point World coordinates (e.g. `coords.raw` from onClick/onHover).
+     * @param opts Optional filter, e.g. `{ layer: 2 }`.
+     * @example
+     * ```ts
+     * engine.onClick = (coords) => {
+     *     const hit = engine.hitTestFirst(coords.raw);
+     *     if (hit) openPanel(stations[hit.index]);
+     * };
+     * ```
+     */
+    hitTest(point: Coords, opts?: HitTestOptions): HitResult<TImage>[] {
+        return this.hitTester.hitTest(this.rawToItemSpace(point), opts) as HitResult<TImage>[];
+    }
+
+    /**
+     * The topmost item under a world point, or `undefined`.
+     * See {@link hitTest} for semantics.
+     */
+    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<TImage> | undefined {
+        return this.hitTester.hitTestFirst(this.rawToItemSpace(point), opts) as HitResult<TImage> | undefined;
+    }
+
+    /**
+     * Event payloads report `coords.raw` in corner space (the cell of item
+     * `k` spans `[k, k+1]` there, which is why `snapped` floors it), while
+     * item coordinates are cell centers. Shift by the cell-center offset so
+     * hit geometry can work in item space.
+     */
+    private rawToItemSpace(point: Coords): Coords {
+        return {
+            x: point.x - DEFAULT_VALUES.CELL_CENTER_OFFSET,
+            y: point.y - DEFAULT_VALUES.CELL_CENTER_OFFSET,
+        };
     }
 
     // ─── Internal ───────────────────────────────

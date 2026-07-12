@@ -134,4 +134,76 @@ describe("CanvasTileEngine", () => {
             expect(e.getCenterCoords()).toEqual({ x: 9.5, y: 9.5 });
         });
     });
+
+    describe("hit testing through the engine draw API", () => {
+        function createEngineWithDrawAPI() {
+            let seq = 0;
+            const drawAPI = {
+                drawRect: (_items: unknown, layer: number = 1) => ({ id: Symbol(`rect-${seq++}`), layer }),
+                drawCircle: (_items: unknown, layer: number = 1) => ({ id: Symbol(`circle-${seq++}`), layer }),
+                drawImage: (_items: unknown, layer: number = 1) => ({ id: Symbol(`image-${seq++}`), layer }),
+                drawStaticRect: (_items: unknown, _key: string, layer: number = 1) => ({
+                    id: Symbol(`static-${seq++}`),
+                    layer,
+                }),
+                removeDrawHandle: vi.fn(),
+                clearLayer: vi.fn(),
+                clearAll: vi.fn(),
+            };
+            const renderer = createMockRenderer();
+            (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
+            return new CanvasTileEngine<Mount>({}, baseConfig, renderer);
+        }
+
+        // Event payloads report coords.raw in corner space: the cell of item k
+        // spans [k, k+1] there (which is why snapped floors it). The engine
+        // converts to item space internally, so these tests query in raw space -
+        // the same values an onClick/onHover callback would receive.
+        it("registers drawn items and finds them via hitTestFirst with raw coords", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1);
+
+            // Raw center of cell (2,2) is (2.5, 2.5)
+            const hit = e.hitTestFirst({ x: 2.5, y: 2.5 });
+            expect(hit).toBeDefined();
+            expect(hit!.kind).toBe("rect");
+            expect(hit!.layer).toBe(1);
+        });
+
+        it("applies the raw-to-item half-cell offset at the API boundary", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1);
+
+            // In raw space the item's cell spans [2, 3] on each axis
+            expect(e.hitTestFirst({ x: 2.05, y: 2.05 })).toBeDefined();
+            expect(e.hitTestFirst({ x: 2.95, y: 2.95 })).toBeDefined();
+            // (1.95, 1.95) belongs to cell (1,1) - a hit here would mean the
+            // offset was not applied
+            expect(e.hitTestFirst({ x: 1.95, y: 1.95 })).toBeUndefined();
+        });
+
+        it("stops reporting items after removeDrawHandle and clearLayer", () => {
+            const e = createEngineWithDrawAPI();
+            const h = e.drawCircle({ x: 0, y: 0, size: 1 }, 2);
+            e.drawRect({ x: 0, y: 0, size: 1 }, 3);
+
+            expect(e.hitTest({ x: 0.5, y: 0.5 })).toHaveLength(2);
+
+            e.removeDrawHandle(h);
+            expect(e.hitTest({ x: 0.5, y: 0.5 })).toHaveLength(1);
+
+            e.clearLayer(3);
+            expect(e.hitTest({ x: 0.5, y: 0.5 })).toHaveLength(0);
+        });
+
+        it("includes static draw variants and clears everything on clearAll", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0);
+
+            expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeDefined();
+
+            e.clearAll();
+            expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeUndefined();
+        });
+    });
 });
