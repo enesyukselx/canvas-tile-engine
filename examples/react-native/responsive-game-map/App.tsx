@@ -66,7 +66,7 @@ export default function App() {
     const items = useMemo(
         () =>
             generateMapObjects(10000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2),
-        [],
+        []
     );
 
     // Coordinate-based Map for O(1) click lookups
@@ -94,7 +94,7 @@ export default function App() {
                     await asset.downloadAsync();
                     const uri = asset.localUri ?? asset.uri;
                     imageCache.set(mod, await map.loadImage(uri));
-                }),
+                })
             );
 
             const newImageItems: SkiaImageItem[] = [];
@@ -105,7 +105,12 @@ export default function App() {
                 const img = imageCache.get(item.image);
                 if (!img) continue;
 
-                newImageItems.push({ img, x: item.x, y: item.y, size: 1 });
+                newImageItems.push({
+                    img,
+                    x: item.x,
+                    y: item.y,
+                    size: 1,
+                });
 
                 if (item.type !== "terrain") {
                     newCircleItems.push({
@@ -135,7 +140,7 @@ export default function App() {
 
     const handleClick = (coords: { snapped: { x: number; y: number } }) => {
         const item = itemsByCoord.get(
-            `${coords.snapped.x},${coords.snapped.y}`,
+            `${coords.snapped.x},${coords.snapped.y}`
         );
         if (item) {
             setModalItem(item);
@@ -196,7 +201,7 @@ export default function App() {
                         paint.setColor(Skia.Color("red"));
                         canvas.drawRect(
                             Skia.XYWHRect(cx - 5, cy - 5, 10, 10),
-                            paint,
+                            paint
                         );
                     }}
                 </CanvasTileEngine.DrawFunction>

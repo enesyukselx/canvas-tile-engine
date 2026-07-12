@@ -357,7 +357,7 @@ export class WebGLDraw {
                     w: drawW,
                     h: drawH,
                     rotation,
-                    alpha: 1,
+                    alpha: item.opacity ?? 1,
                 };
 
                 if (sprite) {

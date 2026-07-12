@@ -112,3 +112,40 @@ describe("CanvasDraw lineWidth handling", () => {
         }
     });
 });
+
+// Minimal fake 2D context that records globalAlpha at every drawImage() call.
+function makeImageRecordingCtx() {
+    const blits: Array<{ alpha: number }> = [];
+    const ctx = {
+        globalAlpha: 1,
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        drawImage() {
+            blits.push({ alpha: ctx.globalAlpha });
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, blits };
+}
+
+const fakeImage = { width: 10, height: 10 } as HTMLImageElement;
+
+// Image opacity contract shared by all renderers: alpha = opacity ?? 1.
+// The same fixture values are asserted in the webgl, skia, and server suites.
+describe("CanvasDraw image opacity", () => {
+    it("applies item opacity while drawing and restores globalAlpha", () => {
+        const { draw, render } = setup();
+        const { ctx, blits } = makeImageRecordingCtx();
+
+        draw.drawImage([
+            { x: 1, y: 1, img: fakeImage, opacity: 0.5 },
+            { x: 3, y: 3, img: fakeImage },
+            { x: 5, y: 5, img: fakeImage, sprite: { x: 0, y: 0, w: 5, h: 5 }, opacity: 0.25 },
+        ]);
+        render(ctx);
+
+        expect(blits.map((b) => b.alpha)).toEqual([0.5, 1, 0.25]);
+        expect(ctx.globalAlpha).toBe(1);
+    });
+});
