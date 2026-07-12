@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useMemo } from "react";
+import { useRef, useState } from "react";
 import type {
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
@@ -253,18 +253,20 @@ export function useCanvasTileEngine(): EngineHandle {
     // Keep isReady in a ref so the handle getter can read it without recreating handle
     const isReadyRef = useRef(false);
 
-    const setInstance = useCallback((engine: CanvasTileEngineCore | null) => {
-        instanceRef.current = engine;
-        isReadyRef.current = engine !== null;
-        bumpInstanceVersion((v) => v + 1);
-    }, []);
-
-    // Create stable handle object using useMemo
-    // Note: isReady is NOT in deps - we read from isReadyRef to keep handle stable
-    const handle = useMemo<EngineHandle>(
-        () => ({
+    // The handle must keep a single identity for the component's entire
+    // lifetime, so it lives in a ref (isReady is read through isReadyRef so it
+    // never needs to change). useMemo is not enough: React treats it as a
+    // discardable cache — Fast Refresh recreates it, which remounts the engine
+    // and races the children's draw effects against the new instance.
+    const handleRef = useRef<EngineHandle | null>(null);
+    if (handleRef.current === null) {
+        handleRef.current = {
             _containerRef: containerRef,
-            _setInstance: setInstance,
+            _setInstance: (engine: CanvasTileEngineCore | null) => {
+                instanceRef.current = engine;
+                isReadyRef.current = engine !== null;
+                bumpInstanceVersion((v) => v + 1);
+            },
 
             get isReady() {
                 return isReadyRef.current;
@@ -403,9 +405,8 @@ export function useCanvasTileEngine(): EngineHandle {
                 }
                 return instanceRef.current.images.load(src, retry);
             },
-        }),
-        [setInstance],
-    );
+        };
+    }
 
-    return handle;
+    return handleRef.current;
 }

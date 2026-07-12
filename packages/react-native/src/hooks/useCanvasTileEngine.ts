@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type {
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
@@ -109,15 +109,19 @@ export function useCanvasTileEngine(): EngineHandle {
     const [, bumpInstanceVersion] = useState(0);
     const isReadyRef = useRef(false);
 
-    const setInstance = useCallback((engine: SkiaEngine | null) => {
-        instanceRef.current = engine;
-        isReadyRef.current = engine !== null;
-        bumpInstanceVersion((v) => v + 1);
-    }, []);
-
-    return useMemo<EngineHandle>(
-        () => ({
-            _setInstance: setInstance,
+    // The handle must keep a single identity for the component's entire
+    // lifetime, so it lives in a ref (isReady is read through isReadyRef so it
+    // never needs to change). useMemo is not enough: React treats it as a
+    // discardable cache — Fast Refresh recreates it, which remounts the engine
+    // and races the children's draw effects against the new instance.
+    const handleRef = useRef<EngineHandle | null>(null);
+    if (handleRef.current === null) {
+        handleRef.current = {
+            _setInstance: (engine: SkiaEngine | null) => {
+                instanceRef.current = engine;
+                isReadyRef.current = engine !== null;
+                bumpInstanceVersion((v) => v + 1);
+            },
 
             get isReady() {
                 return isReadyRef.current;
@@ -233,7 +237,7 @@ export function useCanvasTileEngine(): EngineHandle {
                 }
                 return instanceRef.current.images.load(src, retry);
             },
-        }),
-        [setInstance],
-    );
+        };
+    }
+    return handleRef.current;
 }
