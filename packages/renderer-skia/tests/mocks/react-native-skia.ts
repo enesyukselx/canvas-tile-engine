@@ -10,10 +10,12 @@ export interface MockPaint {
     style: number;
     color: unknown;
     strokeWidth: number;
+    alphaf: number;
     setAntiAlias(v: boolean): void;
     setStyle(v: number): void;
     setColor(c: unknown): void;
     setStrokeWidth(w: number): void;
+    setAlphaf(a: number): void;
 }
 
 const makePaint = (): MockPaint => {
@@ -21,6 +23,7 @@ const makePaint = (): MockPaint => {
         style: 0,
         color: undefined,
         strokeWidth: 1,
+        alphaf: 1,
         setAntiAlias() {},
         setStyle(v: number) {
             paint.style = v;
@@ -30,6 +33,9 @@ const makePaint = (): MockPaint => {
         },
         setStrokeWidth(w: number) {
             paint.strokeWidth = w;
+        },
+        setAlphaf(a: number) {
+            paint.alphaf = a;
         },
     };
     return paint;
@@ -86,8 +92,8 @@ export function makeRecordingCanvas() {
         drawPath() {
             ops.push({ op: "path" });
         },
-        drawImageRect(img: unknown, src: unknown, dest: unknown) {
-            ops.push({ op: "image", img, src, dest });
+        drawImageRect(img: unknown, src: unknown, dest: unknown, paint: MockPaint) {
+            ops.push({ op: "image", img, src, dest, alpha: paint.alphaf });
         },
         drawPicture(picture: MockPicture) {
             ops.push({ op: "picture", picture });
