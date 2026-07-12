@@ -242,15 +242,21 @@ export interface EngineHandle {
 export function useCanvasTileEngine(): EngineHandle {
     const instanceRef = useRef<CanvasTileEngineCore | null>(null);
     const containerRef = useRef<HTMLDivElement>(null!);
-    // _isReady state is only used to trigger re-renders, actual value is read from isReadyRef
-    const [, setIsReady] = useState(false);
+    // State is only used to trigger re-renders; actual values are read from refs.
+    // This must be a counter, not a boolean: during a key remount _setInstance
+    // runs twice (null, then the new engine) inside one flush, and a boolean
+    // would collapse back to its previous value — React then discards the
+    // re-render as a no-op WITHOUT running consumer effects, even ones whose
+    // deps (engine.instance) changed. A distinct value per call guarantees the
+    // post-remount render commits and those effects re-fire.
+    const [, bumpInstanceVersion] = useState(0);
     // Keep isReady in a ref so the handle getter can read it without recreating handle
     const isReadyRef = useRef(false);
 
     const setInstance = useCallback((engine: CanvasTileEngineCore | null) => {
         instanceRef.current = engine;
         isReadyRef.current = engine !== null;
-        setIsReady(engine !== null);
+        bumpInstanceVersion((v) => v + 1);
     }, []);
 
     // Create stable handle object using useMemo

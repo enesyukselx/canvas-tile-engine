@@ -102,13 +102,17 @@ export interface EngineHandle {
  */
 export function useCanvasTileEngine(): EngineHandle {
     const instanceRef = useRef<SkiaEngine | null>(null);
-    const [, setIsReady] = useState(false);
+    // Counter, not a boolean: a key remount calls _setInstance(null) then
+    // _setInstance(engine) in one flush; a boolean collapses back to its
+    // previous value and React discards the re-render without running
+    // consumer effects, even ones whose deps (engine.instance) changed.
+    const [, bumpInstanceVersion] = useState(0);
     const isReadyRef = useRef(false);
 
     const setInstance = useCallback((engine: SkiaEngine | null) => {
         instanceRef.current = engine;
         isReadyRef.current = engine !== null;
-        setIsReady(engine !== null);
+        bumpInstanceVersion((v) => v + 1);
     }, []);
 
     return useMemo<EngineHandle>(
