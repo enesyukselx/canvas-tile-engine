@@ -62,7 +62,7 @@ export default function App() {
     // Resolve the map object under the pointer with built-in hit testing.
     // imageItems is built 1:1 from items, so hit.index maps straight back.
     const itemAt = (raw: { x: number; y: number }): MapObject | null => {
-        const hit = map.instance?.hitTestFirst(raw, { layer: 0 });
+        const hit = map.hitTestFirst(raw, { layer: 0 });
         if (!hit) return null;
         const item = items[hit.index];
         return item.type !== "terrain" ? item : null;

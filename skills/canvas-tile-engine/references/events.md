@@ -91,6 +91,25 @@ engine.onClick = (coords) => {
 };
 ```
 
+React / React Native: the hook handle exposes the same methods (empty
+result before mount, no null checks needed), and items drawn by the
+declarative components are included automatically:
+
+```tsx
+const engine = useCanvasTileEngine();
+
+<CanvasTileEngine
+    engine={engine}
+    onClick={(coords) => {
+        const hit = engine.hitTestFirst(coords.raw);
+        if (hit) setSelected(hit.index); // index into the items array below
+    }}
+    /* ... */
+>
+    <CanvasTileEngine.Circle items={stationDots} layer={2} />
+</CanvasTileEngine>;
+```
+
 Full semantics: [core-api.md](core-api.md) hit testing section (kinds
 covered, ordering, staleness rule).
 

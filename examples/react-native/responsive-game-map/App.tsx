@@ -131,7 +131,7 @@ export default function App() {
 
     const handleClick = (coords: { raw: { x: number; y: number } }) => {
         // Built-in hit testing: images are drawn on layer 0
-        const hit = map.instance?.hitTestFirst(coords.raw, { layer: 0 });
+        const hit = map.hitTestFirst(coords.raw, { layer: 0 });
         const item = hit ? imageSourcesRef.current[hit.index] : undefined;
         if (item && item.type !== "terrain") {
             setModalItem(item);

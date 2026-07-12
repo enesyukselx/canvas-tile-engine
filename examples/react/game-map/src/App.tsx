@@ -106,7 +106,7 @@ export default function App() {
     // imageItems is built 1:1 from items, so hit.index maps straight back.
     const itemAt = useCallback(
         (raw: { x: number; y: number }): MapObject | null => {
-            const hit = mainMap.instance?.hitTestFirst(raw, { layer: 0 });
+            const hit = mainMap.hitTestFirst(raw, { layer: 0 });
             if (!hit) return null;
             const item = items[hit.index];
             return item.type !== "terrain" ? item : null;
