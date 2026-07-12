@@ -129,6 +129,12 @@ export default function App() {
         }
     };
 
+    // Cursor policy is app-owned: the engine never touches canvas.style.cursor.
+    const setCursor = (cursor: string) => {
+        const canvas = map.instance?.canvas;
+        if (canvas) canvas.style.cursor = cursor;
+    };
+
     return (
         <>
             {/* Main Map */}
@@ -140,11 +146,12 @@ export default function App() {
                     center={INITIAL_COORDS}
                     onHover={(coords) => {
                         if (scale < MINI_MAP_SCALE_THRESHOLD) {
-                            window.document.body.style.cursor = "move";
+                            setCursor("move");
                             return;
                         }
-                        window.document.body.style.cursor = itemAt(coords.raw) ? "pointer" : "move";
+                        setCursor(itemAt(coords.raw) ? "pointer" : "move");
                     }}
+                    onMouseLeave={() => setCursor("default")}
                     onClick={(coords) => {
                         if (scale < MINI_MAP_SCALE_THRESHOLD) {
                             map.setScale(50);
@@ -154,7 +161,6 @@ export default function App() {
                             });
                             setScale(50);
                         } else {
-                            window.document.body.style.cursor = "default";
                             handleClick(coords);
                         }
                     }}

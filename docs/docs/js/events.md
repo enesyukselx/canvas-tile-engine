@@ -155,11 +155,11 @@ engine.onResize = () => {
 
 Pointer callbacks receive three coordinate objects.
 
-| Argument | `raw` | `snapped` |
-| :-- | :-- | :-- |
-| `coords` | Exact world coordinate under the pointer. | Floored world grid cell. |
-| `mouse` | Canvas-relative pixel coordinate. | Canvas pixel coordinate for the center of the snapped cell. |
-| `client` | Browser viewport pixel coordinate. | Viewport pixel coordinate for the center of the snapped cell. |
+| Argument | `raw`                                     | `snapped`                                                     |
+| :------- | :---------------------------------------- | :------------------------------------------------------------ |
+| `coords` | Exact world coordinate under the pointer. | Floored world grid cell.                                      |
+| `mouse`  | Canvas-relative pixel coordinate.         | Canvas pixel coordinate for the center of the snapped cell.   |
+| `client` | Browser viewport pixel coordinate.        | Viewport pixel coordinate for the center of the snapped cell. |
 
 ```ts
 engine.onClick = (coords, mouse, client) => {
@@ -311,6 +311,42 @@ Semantics to know:
   unaffected).
 - Draw calls with 500+ items are queried through a spatial index, so
   hit testing large scenes on hover is cheap.
+
+## Managing the Cursor
+
+The engine never touches `canvas.style.cursor` - cursor styling is fully owned
+by your application, so pick the policy that fits your scenario. The typical
+map pattern:
+
+```ts
+const canvas = engine.canvas; // DOM renderers only
+
+canvas.style.cursor = "grab"; // idle
+
+engine.onMouseDown = () => {
+    canvas.style.cursor = "grabbing";
+};
+
+engine.onMouseUp = () => {
+    canvas.style.cursor = "grab";
+};
+
+engine.onMouseLeave = () => {
+    // Releasing the button outside the canvas never fires onMouseUp,
+    // so reset here too or the cursor sticks on "grabbing".
+    canvas.style.cursor = "grab";
+};
+
+// Optional: pointer feedback over interactive items.
+// onHover does not fire while dragging, so it never fights "grabbing".
+engine.onHover = (coords) => {
+    const key = `${coords.snapped.x},${coords.snapped.y}`;
+    canvas.style.cursor = itemsByCoord.has(key) ? "pointer" : "grab";
+};
+```
+
+Always pair the `onMouseDown` override with resets in **both** `onMouseUp` and
+`onMouseLeave`.
 
 ## Camera API Used With Events
 

@@ -133,17 +133,6 @@ coordinates: {
 | `enabled` | `boolean` | `false` | Draws coordinate labels around the viewport. |
 | `shownScaleRange` | `{ min: number; max: number }` | `{ min: 0, max: Infinity }` | Only shows labels while the current scale is inside the range. |
 
-## Cursor
-
-Browser renderers use the cursor values while idle and dragging.
-
-```ts
-cursor: {
-    default: "default",
-    move: "grabbing",
-}
-```
-
 ## Debug
 
 ```ts
@@ -206,10 +195,6 @@ export type CanvasTileEngineConfig = {
     coordinates?: {
         enabled?: boolean;
         shownScaleRange?: { min: number; max: number };
-    };
-    cursor?: {
-        default?: string;
-        move?: string;
     };
     debug?: {
         enabled?: boolean;

@@ -216,26 +216,6 @@ describe("Config", () => {
             expect(result.coordinates.shownScaleRange?.max).toBe(2);
         });
 
-        it("applies default cursor settings", () => {
-            const config = new Config(minimalConfig);
-            const result = config.get();
-            expect(result.cursor.default).toBe("default");
-            expect(result.cursor.move).toBe("move");
-        });
-
-        it("uses provided cursor settings", () => {
-            const config = new Config({
-                ...minimalConfig,
-                cursor: {
-                    default: "crosshair",
-                    move: "grab",
-                },
-            });
-            const result = config.get();
-            expect(result.cursor.default).toBe("crosshair");
-            expect(result.cursor.move).toBe("grab");
-        });
-
         it("applies default debug settings", () => {
             const config = new Config(minimalConfig);
             const result = config.get();

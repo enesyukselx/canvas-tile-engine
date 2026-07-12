@@ -103,7 +103,12 @@ engine.drawCircle({ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }, 1)
 
 ### Text
 
-`size` is font height in world units (scales with zoom). No `radius`.
+Two sizing modes, no `radius`:
+
+- `size` (default 1): font em-box height in world units; pixel height is
+  `size * scale`, so text scales with zoom like other primitives.
+- `fontPx`: fixed pixel size, independent of zoom - use for labels that must
+  stay readable at any zoom level. Takes precedence over `size` when both set.
 
 ```ts
 engine.drawText({
@@ -117,6 +122,9 @@ engine.drawText({
         textBaseline: "middle",            // "alphabetic"|"bottom"|"hanging"|"ideographic"|"middle"|"top"
     },
 }, 2);
+
+// Zoom-independent label: always 14px on screen
+engine.drawText({ x: 0, y: 0, text: "Ankara", fontPx: 14 }, 2);
 ```
 
 On the WebGL renderer text is painted on a 2D overlay canvas and always
@@ -133,12 +141,14 @@ composites ABOVE all GPU primitives regardless of layer (see
     img: TImage;          // HTMLImageElement (web) / SkImage (RN) / napi Image (server)
     sprite?: { x: number; y: number; w: number; h: number };
                           // optional source rect in image pixels (spritesheet frame)
+    opacity?: number;     // 0..1, default 1 - ghost/preview placements
 }
 ```
 
 ```ts
 const img = await engine.images.load("/assets/unit.png");
 engine.drawImage({ x: 5, y: 3, size: 2, img, rotate: 90 }, 1);
+engine.drawImage({ x: 7, y: 3, size: 2, img, opacity: 0.5 }, 2); // ghost preview
 ```
 
 Aspect ratio derives from the image (or the `sprite` frame). Spritesheets and

@@ -58,10 +58,6 @@ type CanvasTileEngineConfig = {
         enabled?: boolean;             // default false
         shownScaleRange?: { min: number; max: number }; // default {0, Infinity}
     };
-    cursor?: {                         // DOM renderers only
-        default?: string;              // idle CSS cursor, default "default"
-        move?: string;                 // dragging CSS cursor, default "move"
-    };
     debug?: {
         enabled?: boolean;             // master switch, default false
         hud?: {                        // on-canvas HUD panel

@@ -55,11 +55,25 @@ export type ImageItem<TImage = HTMLImageElement> = Omit<DrawObject, "style"> & {
      * `img` is drawn (spritesheet frame); when omitted the whole image is drawn.
      */
     sprite?: SpriteRect;
+    /**
+     * Opacity from 0 (transparent) to 1 (opaque). Default: 1.
+     * Useful for ghost/preview placements in editor-style apps.
+     */
+    opacity?: number;
 };
 export type Text = Omit<DrawObject, "radius" | "size"> & {
     text: string;
-    /** Font size in world units (scales with zoom). Default: 1 */
+    /**
+     * Font size in world units: the font's em box spans `size` world units, so
+     * rendered pixel height is `size * scale` and text scales with zoom.
+     * Ignored when {@link fontPx} is set. Default: 1
+     */
     size?: number;
+    /**
+     * Fixed font size in CSS pixels, independent of zoom. Use for labels that
+     * must stay readable at any zoom level. Takes precedence over {@link size}.
+     */
+    fontPx?: number;
     style?: {
         fillStyle?: string;
         /** Font family (default: "sans-serif") */
