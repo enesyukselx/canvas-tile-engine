@@ -97,10 +97,6 @@ const toPointer = (t: NativeTouchEvent): NormalizedPointer => ({
  * }
  * ```
  */
-// NOTE: Do not wrap this component in memo(). `engine.isReady` is read from a
-// ref, so the `isReady && children` gate below only re-evaluates because the
-// hook's setState re-renders the parent. With a stable engine handle, memo()
-// would skip that re-render and the declarative children would never mount.
 function CanvasTileEngineBase({
     engine,
     renderer,
@@ -121,6 +117,14 @@ function CanvasTileEngineBase({
 }: CanvasTileEngineProps) {
     const [picture, setPicture] = useState<SkPicture | null>(null);
     const [size, setSize] = useState({ width: 0, height: 0 });
+    // Children mount gate. This must be component-local state, not
+    // `engine.isReady`: the handle outlives this component, so during a
+    // key-driven remount `isReady` still reflects the previous engine and
+    // children would mount before this component creates its own engine on
+    // first layout — their draw effects would silently register nothing.
+    // Local state starts false on every mount, so children always mount
+    // after their own engine is attached.
+    const [ready, setReady] = useState(false);
 
     const instanceRef = useRef<CanvasTileEngineCore<SkiaMount, SkImage> | null>(null);
     const sizeRef = useRef({ width: 0, height: 0 });
@@ -226,6 +230,7 @@ function CanvasTileEngineBase({
                 instanceRef.current = instance;
                 rendererRef.current = renderer;
                 engine._setInstance(instance);
+                setReady(true);
                 instance.render();
             } else if (prev.width !== w || prev.height !== h) {
                 instanceRef.current.resize(w, h, 0);
@@ -391,8 +396,8 @@ function CanvasTileEngineBase({
                         </Canvas>
                     )}
             </View>
-            {/* Render children (draw components) only when engine is ready */}
-            {engine.isReady && children}
+            {/* Render children (draw components) only after this component's engine exists */}
+            {ready && children}
         </EngineContext.Provider>
     );
 }

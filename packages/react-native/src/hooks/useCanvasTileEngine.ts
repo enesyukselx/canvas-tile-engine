@@ -19,6 +19,22 @@ export type SkiaEngine = CanvasTileEngineCore<SkiaMount, SkImage>;
 const DUMMY_DRAW_HANDLE: DrawHandle = { layer: -1, id: Symbol("dummy") };
 
 /**
+ * Warn (dev only) and return the dummy handle when a draw method is called
+ * before the engine mounts. Without the warning these calls are silent
+ * no-ops, which makes remount/ordering bugs invisible.
+ */
+function droppedDraw(method: string): DrawHandle {
+    if (typeof process !== "undefined" && process.env.NODE_ENV !== "production") {
+        console.warn(
+            `Canvas Tile Engine: ${method}() was called before the engine mounted, so the call was dropped. ` +
+                `Gate imperative draw calls on engine.isReady and include engine.instance in your effect deps ` +
+                `so they re-run when the engine remounts.`,
+        );
+    }
+    return DUMMY_DRAW_HANDLE;
+}
+
+/**
  * Engine handle returned by {@link useCanvasTileEngine}. Mirrors the web hook but
  * is typed for the Skia backend (`SkImage` instead of `HTMLImageElement`). All
  * methods are safe to call before the engine mounts (they no-op / return
@@ -157,38 +173,41 @@ export function useCanvasTileEngine(): EngineHandle {
                     instanceRef.current?.addDrawFunction(
                         fn as (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
                         layer,
-                    ) ?? DUMMY_DRAW_HANDLE
+                    ) ?? droppedDraw("addDrawFunction")
                 );
             },
             drawRect(items, layer) {
-                return instanceRef.current?.drawRect(items, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawRect(items, layer) ?? droppedDraw("drawRect");
             },
             drawStaticRect(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? droppedDraw("drawStaticRect");
             },
             drawCircle(items, layer) {
-                return instanceRef.current?.drawCircle(items, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawCircle(items, layer) ?? droppedDraw("drawCircle");
             },
             drawStaticCircle(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? droppedDraw("drawStaticCircle");
             },
             drawLine(items, style, layer) {
-                return instanceRef.current?.drawLine(items, style, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawLine(items, style, layer) ?? droppedDraw("drawLine");
             },
             drawText(items, layer) {
-                return instanceRef.current?.drawText(items, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawText(items, layer) ?? droppedDraw("drawText");
             },
             drawPath(items, style, layer) {
-                return instanceRef.current?.drawPath(items, style, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawPath(items, style, layer) ?? droppedDraw("drawPath");
             },
             drawImage(items, layer) {
-                return instanceRef.current?.drawImage(items, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawImage(items, layer) ?? droppedDraw("drawImage");
             },
             drawStaticImage(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? DUMMY_DRAW_HANDLE;
+                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? droppedDraw("drawStaticImage");
             },
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
-                return instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ?? DUMMY_DRAW_HANDLE;
+                return (
+                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ??
+                    droppedDraw("drawGridLines")
+                );
             },
 
             clearLayer(layer) {

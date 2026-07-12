@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { CanvasTileEngine as CanvasTileEngineCore } from "@canvas-tile-engine/core";
 import { EngineContext, type EngineContextValue } from "../context/EngineContext";
 import type { CanvasTileEngineProps } from "../types";
@@ -52,10 +52,6 @@ import { DrawFunction } from "./draw/DrawFunction";
  * }
  * ```
  */
-// NOTE: Do not wrap this component in memo(). `engine.isReady` is read from a
-// ref, so the `isReady && children` gate below only re-evaluates because the
-// hook's setState re-renders the parent. With a stable engine handle, memo()
-// would skip that re-render and the declarative children would never mount.
 function CanvasTileEngineBase({
     engine,
     renderer,
@@ -75,6 +71,16 @@ function CanvasTileEngineBase({
     onResize,
     onZoom,
 }: CanvasTileEngineProps) {
+    // Children mount gate. This must be component-local state, not
+    // `engine.isReady`: the handle outlives this component, so during a
+    // key-driven remount `isReady` still reflects the previous engine and
+    // children would mount in the first render — their draw effects then run
+    // before this component's mount effect creates the new engine (child
+    // effects fire first) and silently register nothing. Local state starts
+    // false on every mount, so children always mount after their own engine
+    // is attached.
+    const [ready, setReady] = useState(false);
+
     // Stable callback refs
     const callbacksRef = useRef({
         onCoordsChange,
@@ -159,8 +165,9 @@ function CanvasTileEngineBase({
         instance.onResize = () => callbacksRef.current.onResize?.();
         instance.onZoom = (scale) => callbacksRef.current.onZoom?.(scale);
 
-        // Attach to handle
+        // Attach to handle, then open the children gate
         engine._setInstance(instance);
+        setReady(true);
 
         // Initial render
         instance.render();
@@ -184,8 +191,8 @@ function CanvasTileEngineBase({
             >
                 <canvas />
             </div>
-            {/* Render children only when engine is ready */}
-            {engine.isReady && children}
+            {/* Render children only after this component's engine exists */}
+            {ready && children}
         </EngineContext.Provider>
     );
 }

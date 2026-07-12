@@ -11,20 +11,23 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engi
 ## Component and hook
 
 ```tsx
-import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import {
+    CanvasTileEngine,
+    useCanvasTileEngine,
+} from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 function Map() {
-    const engine = useCanvasTileEngine();   // stable handle, safe before mount
+    const engine = useCanvasTileEngine(); // stable handle, safe before mount
 
     return (
         <CanvasTileEngine
-            engine={engine}                  // REQUIRED
-            renderer={new RendererCanvas()}  // REQUIRED, read once on mount
-            config={config}                  // REQUIRED, read once on mount
-            center={{ x: 0, y: 0 }}          // optional, read once on mount
-            className="map"                  // wrapper div class
-            style={{ borderRadius: 8 }}      // wrapper div styles
+            engine={engine} // REQUIRED
+            renderer={new RendererCanvas()} // REQUIRED, read once on mount
+            config={config} // REQUIRED, read once on mount
+            center={{ x: 0, y: 0 }} // optional, read once on mount
+            className="map" // wrapper div class
+            style={{ borderRadius: 8 }} // wrapper div styles
             onClick={(coords, mouse, client) => {}}
             onRightClick={(coords, mouse, client) => {}}
             onHover={(coords, mouse, client) => {}}
@@ -74,8 +77,14 @@ useEffect(() => {
     if (!engine.isReady) return;
     engine.drawGridLines(1);
     engine.render();
-}, [engine.isReady]);   // isReady flips true exactly once after mount
+}, [engine.isReady]); // flips true after mount
 ```
+
+If the component can remount with a `key` (renderer/config swap), depend on
+`engine.instance` instead of `engine.isReady`: during a remount `isReady`
+goes true -> false -> true within one effect flush, so effects keyed on it
+never re-fire, while `instance` changes identity with every new engine.
+Dropped draw calls (engine not mounted yet) log a `console.warn` in dev.
 
 With `responsive: "preserve-viewport"`, track scale via `onZoom` PLUS an
 initial read - the first responsive sizing runs inside the engine
@@ -94,11 +103,11 @@ useEffect(() => {
 Handle members beyond the core engine API (see
 [core-api.md](core-api.md) for the shared methods):
 
-| Member | Notes |
-| :-- | :-- |
-| `isReady: boolean` | False until the engine mounts. Valid `useEffect` dependency. |
-| `instance` | The raw `CanvasTileEngine` instance or `null`. Escape hatch. |
-| `images` | The image loader, `undefined` before mount. |
+| Member                   | Notes                                                        |
+| :----------------------- | :----------------------------------------------------------- |
+| `isReady: boolean`       | False until the engine mounts. Valid `useEffect` dependency. |
+| `instance`               | The raw `CanvasTileEngine` instance or `null`. Escape hatch. |
+| `images`                 | The image loader, `undefined` before mount.                  |
 | `loadImage(src, retry?)` | `Promise<HTMLImageElement>`; rejects if called before ready. |
 
 The same handle can drive multiple concerns (toolbar buttons calling
@@ -114,20 +123,20 @@ removes its handle on unmount, and batches repaints through a single
 array identity re-registers the callback and rebuilds the spatial index for
 500+ items. Keep items in `useMemo` or state, never inline literals.
 
-| Component | Props (defaults) |
-| :-- | :-- |
-| `<CanvasTileEngine.Rect>` | `items: Rect \| Rect[]`, `layer = 1` |
-| `<CanvasTileEngine.Circle>` | `items: Circle \| Circle[]`, `layer = 1` |
-| `<CanvasTileEngine.Image>` | `items: ImageItem \| ImageItem[]`, `layer = 1` |
-| `<CanvasTileEngine.Text>` | `items: Text \| Text[]`, `layer = 2` |
-| `<CanvasTileEngine.Line>` | `items: Line \| Line[]`, `style?: { strokeStyle?, lineWidth? }`, `layer = 1` |
-| `<CanvasTileEngine.Path>` | `items: Path \| Path[]`, `style?: { strokeStyle?, lineWidth? }`, `layer = 1` |
-| `<CanvasTileEngine.GridLines>` | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0` |
-| `<CanvasTileEngine.StaticRect>` | `items: Rect[]`, `cacheKey: string`, `layer = 1` |
-| `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1` |
-| `<CanvasTileEngine.StaticImage>` | `items: ImageItem[]`, `cacheKey: string`, `layer = 1` |
-| `<CanvasTileEngine.Sprite>` | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?` |
-| `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config) => void`, `layer = 1` |
+| Component                         | Props (defaults)                                                                                                                      |
+| :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`                                                                                                  |
+| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`                                                                                              |
+| `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`                                                                                        |
+| `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`                                                                                                  |
+| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: { strokeStyle?, lineWidth? }`, `layer = 1`                                                          |
+| `<CanvasTileEngine.Path>`         | `items: Path \| Path[]`, `style?: { strokeStyle?, lineWidth? }`, `layer = 1`                                                          |
+| `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
+| `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
+| `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |
+| `<CanvasTileEngine.StaticImage>`  | `items: ImageItem[]`, `cacheKey: string`, `layer = 1`                                                                                 |
+| `<CanvasTileEngine.Sprite>`       | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?` |
+| `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config) => void`, `layer = 1`                                                                               |
 
 Item shapes are identical to the core draw API: [drawing.md](drawing.md).
 Sprite semantics: [sprites.md](sprites.md).
@@ -137,7 +146,12 @@ Sprite semantics: [sprites.md](sprites.md).
     {(ctx, topLeft, config) => {
         const c = ctx as CanvasRenderingContext2D;
         c.fillStyle = "rgba(255,255,255,0.6)";
-        c.fillRect((0 - topLeft.x) * config.scale, (0 - topLeft.y) * config.scale, config.scale, config.scale);
+        c.fillRect(
+            (0 - topLeft.x) * config.scale,
+            (0 - topLeft.y) * config.scale,
+            config.scale,
+            config.scale,
+        );
     }}
 </CanvasTileEngine.DrawFunction>
 ```
@@ -151,13 +165,24 @@ swaps the drawn content automatically.
 const [tiles, setTiles] = useState<Rect[]>([]);
 
 const paint = (coords: ProcessedClick) =>
-    setTiles((prev) => [...prev, { x: coords.snapped.x, y: coords.snapped.y, size: 1,
-                                   style: { fillStyle: "#38bdf8" } }]);
+    setTiles((prev) => [
+        ...prev,
+        {
+            x: coords.snapped.x,
+            y: coords.snapped.y,
+            size: 1,
+            style: { fillStyle: "#38bdf8" },
+        },
+    ]);
 
-<CanvasTileEngine engine={engine} config={config} renderer={renderer}
-                  onClick={(coords) => paint(coords)}>
+<CanvasTileEngine
+    engine={engine}
+    config={config}
+    renderer={renderer}
+    onClick={(coords) => paint(coords)}
+>
     <CanvasTileEngine.Rect items={tiles} layer={1} />
-</CanvasTileEngine>
+</CanvasTileEngine>;
 ```
 
 For very hot updates (60fps animation over huge arrays), prefer the mutation
@@ -176,7 +201,7 @@ useEffect(() => {
 
 const items = useMemo(() => (img ? [{ x: 0, y: 0, size: 2, img }] : []), [img]);
 // ...
-<CanvasTileEngine.Image items={items} layer={1} />
+<CanvasTileEngine.Image items={items} layer={1} />;
 ```
 
 ## Pitfalls checklist
@@ -185,7 +210,11 @@ const items = useMemo(() => (img ? [{ x: 0, y: 0, size: 2, img }] : []), [img]);
   `useMemo`/state.
 - Expecting `config`/`center`/`renderer` prop changes to apply: they will not;
   remount with `key` or use runtime APIs.
-- Imperative drawing without gating on `engine.isReady`: silently no-ops.
+- Imperative drawing without gating on `engine.isReady`: drops the call
+  (warns in dev, silent in prod).
+- Effects keyed on `[engine.isReady]` around a `key` remount: the value
+  collapses back to `true` in the same flush, so the effect never re-fires.
+  Use `[engine.instance]` for remount-safe imperative setup.
 - Creating one handle for two `<CanvasTileEngine>` mounts: each canvas needs
   its own `useCanvasTileEngine()`.
 - Forgetting `eventHandlers` in config: canvas renders but nothing responds.
