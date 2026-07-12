@@ -609,9 +609,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      *     x: 0,
      *     y: 0,
      *     text: "Hello",
-     *     size: 1, // 1 tile height
+     *     size: 1, // 1 tile height, scales with zoom
      *     style: { fillStyle: "black", fontFamily: "Arial" }
      * });
+     *
+     * // Fixed-size label: always 14px on screen, regardless of zoom
+     * engine.drawText({ x: 0, y: 0, text: "Ankara", fontPx: 14 });
      *
      * // Multiple texts
      * engine.drawText([
