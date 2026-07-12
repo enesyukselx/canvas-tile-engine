@@ -31,10 +31,6 @@ export type CanvasTileEngineConfig = {
         enabled?: boolean;
         shownScaleRange?: { min: number; max: number };
     };
-    cursor?: {
-        default?: string;
-        move?: string;
-    };
     debug?: {
         enabled?: boolean;
         hud?: {

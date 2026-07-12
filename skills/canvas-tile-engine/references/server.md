@@ -112,7 +112,7 @@ font management.
 ## Behavior notes (differences from browser renderers)
 
 - No DOM events, no interaction callbacks, no animation loop, no FPS HUD.
-  `eventHandlers`, `cursor`, and `responsive` are ignored.
+  `eventHandlers` and `responsive` are ignored.
 - `config.coordinates` (coordinate overlay) IS supported.
 - Static draw helpers (`drawStatic*`) work via an offscreen `@napi-rs/canvas`
   cache.
