@@ -289,6 +289,39 @@ engine.resize(1024, 768, 300);
 engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
 ```
 
+## Managing the Cursor
+
+The engine never touches `canvas.style.cursor` - cursor styling is fully owned
+by your application, so pick the policy that fits your scenario. Access the
+canvas through `engine.instance.canvas` and reset in **both** `onMouseUp` and
+`onMouseLeave` (releasing the button outside the canvas never fires
+`onMouseUp`):
+
+```tsx
+const engine = useCanvasTileEngine();
+
+const setCursor = (cursor: string) => {
+    const canvas = engine.instance?.canvas;
+    if (canvas) canvas.style.cursor = cursor;
+};
+
+<CanvasTileEngine
+    engine={engine}
+    config={config}
+    renderer={new RendererCanvas()}
+    onMouseDown={() => setCursor("grabbing")}
+    onMouseUp={() => setCursor("grab")}
+    onMouseLeave={() => setCursor("grab")}
+    // onHover does not fire while dragging, so it never fights "grabbing"
+    onHover={(coords) => {
+        const key = `${coords.snapped.x},${coords.snapped.y}`;
+        setCursor(itemsByCoord.has(key) ? "pointer" : "grab");
+    }}
+>
+    {/* ... */}
+</CanvasTileEngine>;
+```
+
 ## Best Practices
 
 - Keep `config`, `center`, and `renderer` lifecycle rules in mind: they are read on mount. Use `engine.setEventHandlers()` for runtime event changes.

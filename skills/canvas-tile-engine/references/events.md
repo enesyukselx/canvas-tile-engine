@@ -78,6 +78,24 @@ function enableReadOnlyMode() {
 CRITICAL for paint/marquee tools: disable `drag` while the tool is active,
 otherwise pointer movement pans the camera AND paints simultaneously.
 
+## Pattern: cursor management
+
+The engine never sets `canvas.style.cursor` - the app owns cursor policy
+entirely (there is no cursor config). Reset in BOTH `onMouseUp` and
+`onMouseLeave`: releasing the button outside the canvas never fires
+`onMouseUp`, so without the leave reset the cursor sticks on "grabbing".
+
+```ts
+engine.canvas.style.cursor = "grab";                            // idle
+engine.onMouseDown = () => { engine.canvas.style.cursor = "grabbing"; };
+engine.onMouseUp = () => { engine.canvas.style.cursor = "grab"; };
+engine.onMouseLeave = () => { engine.canvas.style.cursor = "grab"; };
+// Optional item feedback; onHover never fires mid-drag, so no conflict:
+engine.onHover = (c) => {
+    engine.canvas.style.cursor = items.has(`${c.snapped.x},${c.snapped.y}`) ? "pointer" : "grab";
+};
+```
+
 ## Pattern: hover highlight
 
 Replace one retained handle instead of accumulating draw calls:
@@ -180,6 +198,6 @@ and translate them into camera calls (`goCoords`, `zoomIn`, ...) or
 - Clear tool state in `onMouseLeave` - pointers leave mid-gesture.
 - `onCoordsChange` + `onZoom` + `onResize` are the sync points for external
   UI (minimaps, readouts, URL params).
-- Platform notes: `rightClick` and `cursor` are DOM-only; React Native has
+- Platform notes: `rightClick` and cursor styling are DOM-only; React Native has
   taps, drags, and pinch but no hover or right-click (see
   [react-native.md](react-native.md)).
