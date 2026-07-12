@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 import type { DrawHandle, IDrawAPI, IImageLoader, IRenderer, Rect as RectType } from "@canvas-tile-engine/core";
@@ -99,6 +100,38 @@ describe("CanvasTileEngine remount with key", () => {
         // The children must register against the NEW engine, not get dropped
         // into the null-instance window between destroy and create.
         expect(b.drawRectCalls).toHaveLength(1);
+        expect(b.drawRectCalls[0]).toBe(TILES);
+    });
+
+    it("re-fires imperative effects keyed on engine.instance after a key remount", () => {
+        const a = createFakeRenderer();
+        const b = createFakeRenderer();
+
+        /**
+         * Imperative variant of the bug: the draw effect lives in the handle
+         * owner and depends on engine.instance. The remount's only state
+         * change is the hook's own _setInstance pair (null, then the new
+         * engine); if that collapses to a no-op re-render, React discards it
+         * without running this effect and the new canvas stays blank.
+         */
+        function ImperativeHarness({ renderer, engineKey }: { renderer: IRenderer; engineKey: string }) {
+            const engine = useCanvasTileEngine();
+            useEffect(() => {
+                if (!engine.instance) return;
+                engine.drawRect(TILES, 1);
+            }, [engine, engine.instance]);
+            return <CanvasTileEngine key={engineKey} engine={engine} config={CONFIG} renderer={renderer} />;
+        }
+
+        const { rerender } = render(<ImperativeHarness renderer={a.renderer} engineKey="a" />);
+        expect(a.drawRectCalls.length).toBeGreaterThanOrEqual(1);
+
+        rerender(<ImperativeHarness renderer={b.renderer} engineKey="b" />);
+
+        // The bug leaves the NEW engine with zero registrations: the remount's
+        // state updates collapse to a no-op, React discards the re-render, and
+        // the effect never re-fires.
+        expect(b.drawRectCalls.length).toBeGreaterThanOrEqual(1);
         expect(b.drawRectCalls[0]).toBe(TILES);
     });
 
