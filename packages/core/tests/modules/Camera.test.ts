@@ -48,6 +48,35 @@ describe("Camera", () => {
         });
     });
 
+    describe("setScaleLimits", () => {
+        it("replaces the limits used by later scale changes", () => {
+            const camera = new Camera({ x: 0, y: 0 }, 1, 0.5, 5);
+            camera.setScaleLimits(0.1, 20);
+            expect(camera.minScale).toBe(0.1);
+            expect(camera.maxScale).toBe(20);
+            camera.setScale(10);
+            expect(camera.scale).toBe(10);
+        });
+
+        it("keeps the current scale when it is inside the new range", () => {
+            const camera = new Camera({ x: 0, y: 0 }, 3, 1, 5);
+            camera.setScaleLimits(2, 10);
+            expect(camera.scale).toBe(3);
+        });
+
+        it("clamps the current scale up to a raised minimum", () => {
+            const camera = new Camera({ x: 0, y: 0 }, 1, 0.5, 5);
+            camera.setScaleLimits(2, 5);
+            expect(camera.scale).toBe(2);
+        });
+
+        it("clamps the current scale down to a lowered maximum", () => {
+            const camera = new Camera({ x: 0, y: 0 }, 4, 0.5, 5);
+            camera.setScaleLimits(0.5, 1.5);
+            expect(camera.scale).toBe(1.5);
+        });
+    });
+
     describe("pan", () => {
         it("pans inversely to screen deltas scaled by zoom", () => {
             const camera = new Camera({ x: 0, y: 0 }, 2);

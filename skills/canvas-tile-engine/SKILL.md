@@ -148,7 +148,12 @@ const png = await renderToBuffer({
 - **Events default off**: no `eventHandlers` config means a completely inert
   canvas.
 - **Zoom limits**: `minScale` defaults to `scale * 0.5` and `maxScale` to
-  `scale * 2`. If the user wants deep zooming, set them explicitly.
+  `scale * 2`. If the user wants deep zooming, set them explicitly. In
+  responsive modes the minimum adapts to the container: `preserve-viewport`
+  treats `minScale` as a zoom-out factor of the base scale, `preserve-scale`
+  lowers it so finite `bounds` stay fully viewable at any width. `maxScale`
+  stays absolute (px-per-tile quality cap; lifted only if the base scale
+  exceeds it).
 - **Fixed boards MUST set the center**: a board of cells `0..N-1` is centered
   at `(N-1)/2`, not `N/2` and not the default `(0, 0)`. Use the `center`
   returned by `gridToSize` (core >= 0.5): `const { center, ...board } =

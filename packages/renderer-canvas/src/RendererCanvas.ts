@@ -232,6 +232,11 @@ export class RendererCanvas implements IRenderer {
                     this.onResize();
                 }
             };
+            // preserve-viewport resizes change the camera scale; surface it
+            // through onZoom like every other engine-driven scale change
+            this.responsiveWatcher.onScaleChange = (scale) => {
+                this.onZoom?.(scale);
+            };
             this.responsiveWatcher.start();
         } else if (this.config.get().eventHandlers?.resize) {
             // Non-responsive mode with resize enabled - use ResizeWatcher

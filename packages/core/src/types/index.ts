@@ -153,6 +153,7 @@ export interface ICamera {
     zoom(screenX: number, screenY: number, deltaY: number, bounds: ViewportBounds): void;
     zoomByFactor(factor: number, centerX: number, centerY: number): void;
     setScale(scale: number): void;
+    setScaleLimits(minScale: number, maxScale: number): void;
     setCenter(center: Coords, viewportWidth: number, viewportHeight: number): void;
     getCenter(viewportWidth: number, viewportHeight: number): Coords;
     getVisibleBounds(viewportWidth: number, viewportHeight: number): Bounds;
