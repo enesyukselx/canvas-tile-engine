@@ -242,10 +242,13 @@ export class SkiaDraw {
                 const size = item.size ?? 1;
                 const style = item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size, topLeft, config)) continue;
+                // fontPx is zoom-independent; its world-space extent shrinks as scale grows
+                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
-                // Scale-aware font size (world units), matching the Canvas2D renderer.
-                const pxSize = size * this.camera.scale * 0.3;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+
+                // Font sizing matches the Canvas2D renderer: fontPx wins, else size * scale.
+                const pxSize = item.fontPx ?? size * this.camera.scale;
                 const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize);
                 this.fillPaint.setColor(this.color(style?.fillStyle ?? "#000000"));
 
@@ -355,7 +358,12 @@ export class SkiaDraw {
 
         const src = Skia.XYWHRect(srcX, srcY, srcW, srcH);
         const dest = Skia.XYWHRect(offsetX, offsetY, drawW, drawH);
+        // Skia snapshots paint state at draw time, so mutating the shared paint
+        // per item is safe (same pattern as fill/stroke paints).
+        const opacity = item.opacity ?? 1;
+        if (opacity !== 1) this.imagePaint.setAlphaf(opacity);
         canvas.drawImageRect(img, src, dest, this.imagePaint);
+        if (opacity !== 1) this.imagePaint.setAlphaf(1);
 
         if (count !== -1) canvas.restoreToCount(count);
     }

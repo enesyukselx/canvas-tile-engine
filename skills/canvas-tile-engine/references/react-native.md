@@ -64,7 +64,7 @@ export function NativeMap() {
 | `style` prop | React Native `ViewStyle`, not CSSProperties. No `className`. |
 | Images | `TImage` is Skia's `SkImage`. `engine.loadImage(uri)` resolves to `SkImage`. Remote URLs work. |
 | Touch input | Taps -> `onClick` (a touch that moves beyond a small slop or lasts too long becomes a drag, not a tap). One-finger drag pans; two-finger pinch zooms. |
-| Not available | `onRightClick` / `rightClick`, `hover`, mouse cursor config. Do not build hover-dependent UX. |
+| Not available | `onRightClick` / `rightClick`, `hover`, mouse cursor styling. Do not build hover-dependent UX. |
 | Custom drawing | `onDraw`, `<CanvasTileEngine.DrawFunction>`, and `addDrawFunction` receive a Skia `SkCanvas`, not a 2D context. |
 | Coordinate overlay & debug HUD | Supported via the same `config.coordinates` / `config.debug` options. |
 
