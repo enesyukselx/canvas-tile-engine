@@ -183,3 +183,16 @@ describe("SpatialIndex", () => {
         });
     });
 });
+
+describe("non-square bounding boxes", () => {
+    it("uses width/height for the bbox instead of size when present", () => {
+        const index = SpatialIndex.fromArray([{ x: 10, y: 10, size: 1, width: 8, height: 2 }]);
+
+        // Inside the 8-wide box but outside a size-1 box
+        expect(index.query(13, 10, 14, 10)).toHaveLength(1);
+        // Inside vertically only for the 2-high box
+        expect(index.query(10, 10.9, 10, 10.9)).toHaveLength(1);
+        // Outside the 2-high box
+        expect(index.query(10, 11.5, 10, 11.5)).toHaveLength(0);
+    });
+});

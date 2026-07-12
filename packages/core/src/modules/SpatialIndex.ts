@@ -12,6 +12,10 @@ export interface SpatialItem {
      * Optional world-space size (width/height). Defaults to 0 for point-like items.
      */
     size?: number;
+    /** Optional per-axis world width; overrides `size` on the x axis (non-square rects). */
+    width?: number;
+    /** Optional per-axis world height; overrides `size` on the y axis (non-square rects). */
+    height?: number;
 }
 
 interface RBushItem<T> {
@@ -35,13 +39,14 @@ export class SpatialIndex<T extends SpatialItem> {
     load(items: T[]): void {
         const rbushItems: RBushItem<T>[] = items.map((item) => {
             const size = typeof item.size === "number" ? item.size : 0;
-            const half = size / 2;
+            const halfW = (typeof item.width === "number" ? item.width : size) / 2;
+            const halfH = (typeof item.height === "number" ? item.height : size) / 2;
 
             return {
-                minX: item.x - half,
-                minY: item.y - half,
-                maxX: item.x + half,
-                maxY: item.y + half,
+                minX: item.x - halfW,
+                minY: item.y - halfH,
+                maxX: item.x + halfW,
+                maxY: item.y + halfH,
                 item,
             };
         });

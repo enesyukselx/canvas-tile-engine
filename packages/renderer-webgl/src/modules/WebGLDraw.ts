@@ -94,25 +94,28 @@ export class WebGLDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
+                const w = item.width ?? size;
+                const h = item.height ?? size;
                 const origin = this.resolveOrigin(item.origin);
                 const style = item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
-                const cx = drawX + pxSize / 2;
-                const cy = drawY + pxSize / 2;
+                const pxW = w * this.camera.scale;
+                const pxH = h * this.camera.scale;
+                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const cx = drawX + pxW / 2;
+                const cy = drawY + pxH / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
-                const radius = this.resolveRadius(item.radius, pxSize);
+                const radius = this.resolveRadius(item.radius, Math.min(pxW, pxH));
 
                 if (style?.fillStyle) {
                     shapes.push({
                         cx,
                         cy,
-                        halfW: pxSize / 2,
-                        halfH: pxSize / 2,
+                        halfW: pxW / 2,
+                        halfH: pxH / 2,
                         radius,
                         rotation,
                         color: this.colorParser.parse(style.fillStyle),
@@ -124,8 +127,8 @@ export class WebGLDraw {
                         lines,
                         cx,
                         cy,
-                        pxSize,
-                        pxSize,
+                        pxW,
+                        pxH,
                         rotation,
                         this.colorParser.parse(style.strokeStyle),
                         style.lineWidth ?? 1,
@@ -163,7 +166,7 @@ export class WebGLDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
                 const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
                 const cx = drawX + radius;
                 const cy = drawY + radius;
 
@@ -347,7 +350,7 @@ export class WebGLDraw {
                 if (aspect > 1) drawH = pxSize / aspect;
                 else drawW = pxSize * aspect;
 
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, origin, this.camera);
+                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
@@ -512,21 +515,22 @@ export class WebGLDraw {
 
     private computeOriginOffset(
         pos: Coords,
-        pxSize: number,
+        pxW: number,
+        pxH: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
         camera: ICamera,
     ) {
         if (origin.mode === "cell") {
             const cell = camera.scale;
             return {
-                x: pos.x - cell / 2 + origin.x * cell - pxSize / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxSize / 2,
+                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
+                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
             };
         }
 
         return {
-            x: pos.x - origin.x * pxSize,
-            y: pos.y - origin.y * pxSize,
+            x: pos.x - origin.x * pxW,
+            y: pos.y - origin.y * pxH,
         };
     }
 
