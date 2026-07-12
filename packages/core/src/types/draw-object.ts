@@ -16,7 +16,12 @@ export type DrawObject = {
     radius?: number | number[];
 };
 
-export type Rect = DrawObject;
+export type Rect = DrawObject & {
+    /** Width in world units. Defaults to `size`, so square rects are unchanged. */
+    width?: number;
+    /** Height in world units. Defaults to `size`. */
+    height?: number;
+};
 
 export type Circle = Omit<DrawObject, "rotate" | "radius">;
 
