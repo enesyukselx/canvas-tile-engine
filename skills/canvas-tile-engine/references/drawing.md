@@ -87,11 +87,29 @@ is stroked; both work together. Any CSS color string works (`"#22c55e"`,
 
 ### Rect
 
+Adds to the shared fields:
+
+```ts
+{
+    width?: number;   // world units, defaults to size - non-square rects
+    height?: number;  // world units, defaults to size
+}
+```
+
 ```ts
 engine.drawRect({ x: 2, y: 3, size: 1, rotate: 45, radius: 6,
                   style: { fillStyle: "#22c55e", strokeStyle: "#166534", lineWidth: 2 } }, 1);
 engine.drawRect(rectArray, 1);   // arrays are the fast path for many items
+
+// Non-square: one 4x2 zone floor instead of 8 one-cell rects
+engine.drawRect({ x: 5, y: 8, width: 4, height: 2,
+                  style: { fillStyle: "rgba(34,197,94,0.3)" } }, 1);
 ```
+
+Origin anchoring applies per axis (cell mode centers the box on the anchor
+cell; self mode anchors to the box itself). Rotation spins around the box
+center. `width`/`height` are Rect-only - Circle stays `size` (diameter) and
+Image keeps its aspect-fit `size` box.
 
 ### Circle
 
