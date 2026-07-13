@@ -74,7 +74,10 @@ function MapWithHover() {
         <CanvasTileEngine
             engine={engine}
             renderer={new RendererCanvas()}
-            config={{ ...config, eventHandlers: { ...config.eventHandlers, hover: true } }}
+            config={{
+                ...config,
+                eventHandlers: { ...config.eventHandlers, hover: true },
+            }}
             onHover={(coords) => setHovered(coords.snapped)}
             onMouseLeave={() => setHovered(null)}
         >
@@ -122,11 +125,11 @@ function SelectionMap() {
 
 Pointer props share the same callback shape.
 
-| Argument | `raw` | `snapped` |
-| :-- | :-- | :-- |
-| `coords` | Exact world coordinate under the pointer. | Floored world grid cell. |
-| `mouse` | Canvas-relative pixel coordinate. | Canvas pixel coordinate for the center of the snapped cell. |
-| `client` | Browser viewport pixel coordinate. | Viewport pixel coordinate for the center of the snapped cell. |
+| Argument | `raw`                                     | `snapped`                                                     |
+| :------- | :---------------------------------------- | :------------------------------------------------------------ |
+| `coords` | Exact world coordinate under the pointer. | Floored world grid cell.                                      |
+| `mouse`  | Canvas-relative pixel coordinate.         | Canvas pixel coordinate for the center of the snapped cell.   |
+| `client` | Browser viewport pixel coordinate.        | Viewport pixel coordinate for the center of the snapped cell. |
 
 Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
 
@@ -143,11 +146,11 @@ Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
 />
 ```
 
-| Prop | Description |
-| :-- | :-- |
+| Prop             | Description                                                                                 |
+| :--------------- | :------------------------------------------------------------------------------------------ |
 | `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes. |
-| `onZoom` | Fires after wheel, pinch, `setScale`, `zoomIn`, or `zoomOut` changes the scale. |
-| `onResize` | Fires after manual or observed resize. |
+| `onZoom`         | Fires after wheel, pinch, `setScale`, `zoomIn`, or `zoomOut` changes the scale.             |
+| `onResize`       | Fires after manual or observed resize.                                                      |
 
 ## Painting Example
 
@@ -184,7 +187,11 @@ function PaintingApp() {
             renderer={new RendererCanvas()}
             config={{
                 ...config,
-                eventHandlers: { ...config.eventHandlers, drag: false, hover: true },
+                eventHandlers: {
+                    ...config.eventHandlers,
+                    drag: false,
+                    hover: true,
+                },
             }}
             onMouseDown={(coords) => {
                 setPainting(true);
@@ -224,7 +231,13 @@ function ModeControls() {
 
     const enableReadonly = () => {
         setMode("readonly");
-        engine.setEventHandlers({ click: false, rightClick: false, hover: false, drag: false, zoom: false });
+        engine.setEventHandlers({
+            click: false,
+            rightClick: false,
+            hover: false,
+            drag: false,
+            zoom: false,
+        });
     };
 
     return (
@@ -287,6 +300,75 @@ engine.zoomIn();
 engine.zoomOut();
 engine.resize(1024, 768, 300);
 engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
+```
+
+## Hit Testing
+
+`engine.hitTest` / `engine.hitTestFirst` answer "which item is under this
+point?" for rect, circle, and image items - including items drawn by the
+declarative components, which register through the same engine. Pass
+`coords.raw` from any event prop; origin anchoring, image aspect fit, and
+rotation are handled internally. Before the engine mounts the methods
+return an empty result, so no null checks are needed.
+
+```tsx
+function StationMap() {
+    const engine = useCanvasTileEngine();
+    const [selected, setSelected] = useState<number | null>(null);
+
+    return (
+        <CanvasTileEngine
+            engine={engine}
+            renderer={new RendererCanvas()}
+            config={config}
+            onClick={(coords) => {
+                const hit = engine.hitTestFirst(coords.raw);
+                // hit.index maps back into the items array you rendered
+                setSelected(hit ? hit.index : null);
+            }}
+        >
+            <CanvasTileEngine.Circle items={stationDots} layer={2} />
+        </CanvasTileEngine>
+    );
+}
+```
+
+Results are `{ item, kind, layer, handle, index }`, ordered by visual
+priority (higher layer, then later registration, then later item). Line,
+Path, and Text are not hit-testable, and - like rendering - position
+mutations require re-registration to be reflected.
+
+## Managing the Cursor
+
+The engine never touches `canvas.style.cursor` - cursor styling is fully owned
+by your application, so pick the policy that fits your scenario. Access the
+canvas through `engine.instance.canvas` and reset in **both** `onMouseUp` and
+`onMouseLeave` (releasing the button outside the canvas never fires
+`onMouseUp`):
+
+```tsx
+const engine = useCanvasTileEngine();
+
+const setCursor = (cursor: string) => {
+    const canvas = engine.instance?.canvas;
+    if (canvas) canvas.style.cursor = cursor;
+};
+
+<CanvasTileEngine
+    engine={engine}
+    config={config}
+    renderer={new RendererCanvas()}
+    onMouseDown={() => setCursor("grabbing")}
+    onMouseUp={() => setCursor("grab")}
+    onMouseLeave={() => setCursor("grab")}
+    // onHover does not fire while dragging, so it never fights "grabbing"
+    onHover={(coords) => {
+        const key = `${coords.snapped.x},${coords.snapped.y}`;
+        setCursor(itemsByCoord.has(key) ? "pointer" : "grab");
+    }}
+>
+    {/* ... */}
+</CanvasTileEngine>;
 ```
 
 ## Best Practices

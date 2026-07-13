@@ -46,6 +46,8 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | `size`   | `number`             | `1`                                | Size in grid units.                                                                                                         |
 | `style`  | `object`             | `{}`                               | Styling options.                                                                                                            |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                               |
+| `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.         |
+| `height` | `number`             | `size`                             | Height in world units (only for `Rect`).                                                                                    |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `Rect`).                                                                                |
 | `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`). |
 
@@ -65,6 +67,12 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 
     {/* Rounded rectangle */}
     <CanvasTileEngine.Rect items={{ x: 10, y: 5, size: 1, radius: 8, style: { fillStyle: "#2ecc71" } }} layer={1} />
+
+    {/* Non-square rectangle: a 4x2 zone floor */}
+    <CanvasTileEngine.Rect
+        items={{ x: 5, y: 8, width: 4, height: 2, style: { fillStyle: "rgba(34, 197, 94, 0.3)" } }}
+        layer={1}
+    />
 
     {/* Different corner radii */}
     <CanvasTileEngine.Rect
@@ -201,7 +209,8 @@ Render text at world coordinates. Text size scales with zoom.
 | :------- | :------- | :--------------------------------- | :--------------------------------------- |
 | `x`, `y` | `number` | **Required**                       | World coordinates.                       |
 | `text`   | `string` | **Required**                       | The text content.                        |
-| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set. |
+| `fontPx` | `number` | -                                  | Fixed font size in pixels, independent of zoom. Takes precedence over `size`. |
 | `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
 | `style`  | `object` | -                                  | Font styling options.                    |
 | `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).   |
@@ -239,6 +248,18 @@ Render text at world coordinates. Text size scales with zoom.
     layer={3}
 />
 
+{/* Fixed-size label: always 14px on screen, regardless of zoom */}
+<CanvasTileEngine.Text
+    items={{
+        x: 5,
+        y: 3,
+        text: "Ankara",
+        fontPx: 14,
+        style: { fillStyle: "white" }
+    }}
+    layer={3}
+/>
+
 {/* Multiple texts (batch rendering) */}
 <CanvasTileEngine.Text
     items={[
@@ -250,8 +271,8 @@ Render text at world coordinates. Text size scales with zoom.
 />
 ```
 
-:::tip Scale-Aware Text
-The `size` property works like other draw components - it's in world units and scales with zoom. Use `size: 1` for text that fills approximately one tile height.
+:::tip Two sizing modes
+`size` works like other draw components - it's in world units, so `size: 1` text has a font em box of one tile and scales with zoom. Use `fontPx` instead for labels that must stay readable at any zoom level (map labels, names): the text keeps the same pixel size on screen no matter how far you zoom out.
 :::
 
 ### `<Image>`
@@ -272,6 +293,7 @@ Draw images scaled to world units.
 | `size`   | `number`           | Size in grid units (maintains aspect ratio).                       |
 | `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 | `sprite` | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
+| `opacity` | `number`          | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements. |
 
 ```tsx
 function MapWithImages() {
