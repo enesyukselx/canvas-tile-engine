@@ -338,6 +338,18 @@ priority (higher layer, then later registration, then later item). Line,
 Path, and Text are not hit-testable, and - like rendering - position
 mutations require re-registration to be reflected.
 
+The hit area is exactly the drawn geometry by default. For generous touch
+targets around small markers, expand it with `padding` (world units) or
+`paddingPx` (screen pixels, zoom-independent); they can be combined:
+
+```tsx
+onClick={(coords) => {
+    // Accept clicks up to 0.6 world units around each station dot
+    const hit = engine.hitTestFirst(coords.raw, { padding: 0.6 });
+    setSelected(hit ? hit.index : null);
+}}
+```
+
 ## Managing the Cursor
 
 The engine never touches `canvas.style.cursor` - cursor styling is fully owned
