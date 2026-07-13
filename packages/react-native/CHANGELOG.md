@@ -1,5 +1,21 @@
 # @canvas-tile-engine/react-native
 
+## 0.2.0
+
+### Minor Changes
+
+- ff94c7a: Expose `hitTest` / `hitTestFirst` on the `useCanvasTileEngine()` handle. Like the other handle methods they are safe before mount (empty array / `undefined`), so no null checks or `engine.instance` escape hatch needed. Results are typed with the platform image handle (`HTMLImageElement` / `SkImage`).
+
+### Patch Changes
+
+- Updated dependencies [ff94c7a]
+- Updated dependencies [153eacc]
+- Updated dependencies [fafe337]
+- Updated dependencies [38a5d18]
+- Updated dependencies [1be475c]
+  - @canvas-tile-engine/core@0.7.0
+  - @canvas-tile-engine/renderer-skia@0.2.0
+
 ## 0.1.3
 
 ### Patch Changes
