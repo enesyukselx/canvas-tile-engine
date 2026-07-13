@@ -49,6 +49,8 @@ drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 | `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                            |
 | `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                    |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                   |
+| `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.         |
+| `height` | `number`             | `size`                             | Height in world units (only for `drawRect`).                                                                                    |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                |
 | `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
 
@@ -66,6 +68,18 @@ engine.drawRect(
         y: 5,
         size: 1,
         style: { fillStyle: "#0077be" },
+    },
+    1
+);
+
+// Draw a 4x2 zone floor (anchored on its center cell)
+engine.drawRect(
+    {
+        x: 5,
+        y: 8,
+        width: 4,
+        height: 2,
+        style: { fillStyle: "rgba(34, 197, 94, 0.3)", strokeStyle: "#166534" },
     },
     1
 );
@@ -233,7 +247,8 @@ drawText(items: Text | Text[], layer?: number): DrawHandle
 | :------- | :------- | :--------------------------------- | :--------------------------------------- |
 | `x`, `y` | `number` | **Required**                       | World coordinates.                       |
 | `text`   | `string` | **Required**                       | The text content.                        |
-| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set. |
+| `fontPx` | `number` | -                                  | Fixed font size in pixels, independent of zoom. Takes precedence over `size`. |
 | `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
 | `style`  | `object` | -                                  | Font styling options.                    |
 | `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).   |
@@ -265,6 +280,15 @@ engine.drawText({
     style: { fillStyle: "yellow" }
 }, 3);
 
+// Fixed-size label: always 14px on screen, regardless of zoom
+engine.drawText({
+    x: 5,
+    y: 3,
+    text: "Ankara",
+    fontPx: 14,
+    style: { fillStyle: "white" }
+}, 3);
+
 // Multiple texts (batch rendering)
 engine.drawText([
     { x: 0, y: 0, text: "A", size: 2, style: { fillStyle: "red" } },
@@ -273,8 +297,8 @@ engine.drawText([
 ], 3);
 ```
 
-:::tip Scale-Aware Text
-The `size` property works like other draw methods - it's in world units and scales with zoom. Use `size: 1` for text that fills approximately one tile height.
+:::tip Two sizing modes
+`size` works like other draw methods - it's in world units, so `size: 1` text has a font em box of one tile and scales with zoom. Use `fontPx` instead for labels that must stay readable at any zoom level (map labels, names): the text keeps the same pixel size on screen no matter how far you zoom out.
 :::
 
 ### `drawImage`
@@ -295,6 +319,7 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 | `rotate` | `number`           | `0`          | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 | `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                  |
 | `sprite` | `SpriteRect`       | -            | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
+| `opacity` | `number`          | `1`          | Opacity from 0 (transparent) to 1 (opaque). Ideal for ghost/preview placements. |
 
 ```typescript
 // Single image
@@ -304,6 +329,9 @@ engine.drawImage({ x: 2, y: 3, size: 1.5, img }, 2);
 // Rotated image (90 degrees clockwise)
 const arrow = await engine.images.load("/assets/arrow.png");
 engine.drawImage({ x: 5, y: 3, size: 1, img: arrow, rotate: 90 }, 2);
+
+// Ghost preview: semi-transparent placement indicator
+engine.drawImage({ x: 7, y: 3, size: 1.5, img, opacity: 0.5 }, 3);
 
 // Multiple images
 engine.drawImage([

@@ -1,6 +1,6 @@
 {
     "name": "@canvas-tile-engine/renderer-skia",
-    "version": "0.1.2",
+    "version": "0.2.0",
     "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with React Native Skia",
     "author": "Enes Yüksel",
     "license": "MIT",

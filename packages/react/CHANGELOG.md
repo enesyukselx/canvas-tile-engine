@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0
+
+### Minor Changes
+
+- ff94c7a: Expose `hitTest` / `hitTestFirst` on the `useCanvasTileEngine()` handle. Like the other handle methods they are safe before mount (empty array / `undefined`), so no null checks or `engine.instance` escape hatch needed. Results are typed with the platform image handle (`HTMLImageElement` / `SkImage`).
+- 38a5d18: Remove the dead `config.cursor` option. It has not been applied by any renderer since the modular renderer architecture refactor - the engine never touches `canvas.style.cursor`, so the option silently did nothing while the docs claimed otherwise.
+
+  Cursor styling is fully owned by the application: set `engine.canvas.style.cursor` from the event callbacks (`onMouseDown`/`onMouseUp`/`onMouseLeave`/`onHover`). See the new "Managing the Cursor" section in the events docs for the recommended pattern - in particular, always reset the cursor in `onMouseLeave` too, because releasing the mouse button outside the canvas never fires `onMouseUp`.
+
+  Passing `cursor` in the config is now a type error; delete the field. Runtime behavior is unchanged (it was already ignored).
+
+### Patch Changes
+
+- Updated dependencies [ff94c7a]
+- Updated dependencies [153eacc]
+- Updated dependencies [fafe337]
+- Updated dependencies [38a5d18]
+- Updated dependencies [1be475c]
+  - @canvas-tile-engine/core@0.7.0
+
 ## 0.4.3
 
 ### Patch Changes

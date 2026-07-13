@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.7.0
+
+### Minor Changes
+
+- ff94c7a: Add `engine.hitTest(point)` and `engine.hitTestFirst(point)` - item-level hit testing for rect, circle, and image items (including the `drawStatic*` variants), answering "which item is under this pointer?" without hand-written lookup maps or manual 0.5-cell offset math.
+
+  - Pass `coords.raw` from event callbacks; origin anchoring, non-square Rect `width`/`height`, image aspect-fit, and rotation are handled internally - the hit box is always the drawn box.
+  - Results are `{ item, kind, layer, handle, index }`, ordered by visual priority: higher layer first, then later registration, then later item within a draw call. `index` maps back into the items array passed to the draw call.
+  - Optional `{ layer }` filter; draw calls with 500+ items are queried through a spatial index, so hover-frequency hit testing stays cheap at scale.
+  - Implemented entirely in core via a registry maintained by the draw delegations - no renderer changes, works identically on every platform.
+  - Limitations (v1): Line, Path, and Text items are not hit-testable; like rendering, item position mutations require re-registration to be reflected.
+
+- 153eacc: Add `ImageItem.opacity` (0..1, default 1) for per-item image transparency - ghost/preview placements in editor-style apps no longer need a custom draw function that duplicates the engine's aspect-fit math.
+
+  Applies in all four renderers, including the static image cache paths (`drawStaticImage`) and spritesheet frames. On the WebGL renderer, items with different opacities split the texture batch - keep same-opacity items grouped for best performance.
+
+- fafe337: Non-square rectangles: `Rect` gains `width` / `height` (world units, both default to `size`, so existing square rects are unchanged). One 4x2 zone floor no longer needs thousands of one-cell rects or a custom draw function.
+
+  - Origin anchoring works per axis (cell mode centers the box on the anchor cell, self mode anchors to the box itself); rotation spins around the box center; `radius` corner rounding works as before.
+  - Viewport culling uses the `max(width, height)` extent and spatial-index bounding boxes account for the per-axis dimensions, so wide/tall bars are not culled while still reaching into view.
+  - Static caches (`drawStaticRect`) compute their offscreen bounds from the per-axis dimensions.
+  - Applies identically in all four renderers. `width`/`height` are Rect-only: Circle keeps `size` as diameter, Image keeps its aspect-fit `size` box.
+
+- 38a5d18: Remove the dead `config.cursor` option. It has not been applied by any renderer since the modular renderer architecture refactor - the engine never touches `canvas.style.cursor`, so the option silently did nothing while the docs claimed otherwise.
+
+  Cursor styling is fully owned by the application: set `engine.canvas.style.cursor` from the event callbacks (`onMouseDown`/`onMouseUp`/`onMouseLeave`/`onHover`). See the new "Managing the Cursor" section in the events docs for the recommended pattern - in particular, always reset the cursor in `onMouseLeave` too, because releasing the mouse button outside the canvas never fires `onMouseUp`.
+
+  Passing `cursor` in the config is now a type error; delete the field. Runtime behavior is unchanged (it was already ignored).
+
+- 1be475c: Text sizing: `size` now means true world-unit height, and a new `fontPx` mode renders zoom-independent labels.
+
+  **Breaking:** text drawn with `size` renders ~3.3x larger than before. The previous implementation applied an undocumented `* 0.3` factor (`px = size * scale * 0.3`); pixel height is now exactly `size * scale`, matching the documented contract ("font size in world units"). To keep the old visual size, multiply existing `size` values by `0.3`.
+
+  **New:** `Text.fontPx` renders text at a fixed pixel size regardless of zoom, for labels that must stay readable at any zoom level (map labels, names). Takes precedence over `size` when both are set. Viewport culling accounts for the fixed-size label's world-space extent (`fontPx / scale`).
+
 ## 0.6.0
 
 ### Minor Changes
