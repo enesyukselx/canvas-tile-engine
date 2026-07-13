@@ -10,22 +10,28 @@ describe("AnimationController", () => {
     let onAnimationFrame: () => void;
     let controller: AnimationController;
     let setCenterMock: (center: Coords, canvasWidth: number, canvasHeight: number) => void;
+    let currentScale: number;
 
     beforeEach(() => {
         vi.useFakeTimers();
 
         setCenterMock = vi.fn();
+        currentScale = 1;
         mockCamera = {
             x: 0,
             y: 0,
-            scale: 1,
+            get scale() {
+                return currentScale;
+            },
             pan: vi.fn(),
             zoom: vi.fn(),
             zoomByFactor: vi.fn(),
             getCenter: vi.fn(() => ({ x: 50, y: 50 })),
             setCenter: setCenterMock,
             adjustForResize: vi.fn(),
-            setScale: vi.fn(),
+            setScale: vi.fn((newScale: number) => {
+                currentScale = Math.min(10, Math.max(0.1, newScale));
+            }),
             setScaleLimits: vi.fn(),
             getVisibleBounds: vi.fn(() => ({ minX: 0, maxX: 100, minY: 0, maxY: 100 })),
         };
@@ -101,6 +107,71 @@ describe("AnimationController", () => {
         });
     });
 
+    describe("animateZoomTo", () => {
+        it("applies the scale instantly when duration is 0", () => {
+            controller.animateZoomTo(2, 0);
+
+            expect(mockCamera.setScale).toHaveBeenCalledWith(2);
+            expect(onAnimationFrame).toHaveBeenCalled();
+        });
+
+        it("keeps the viewport center fixed", () => {
+            controller.animateZoomTo(2, 0);
+
+            expect(setCenterMock).toHaveBeenCalledWith({ x: 50, y: 50 }, 800, 600);
+        });
+
+        it("calls onComplete callback for instant zoom", () => {
+            const onComplete = vi.fn();
+            controller.animateZoomTo(2, 0, undefined, onComplete);
+
+            expect(onComplete).toHaveBeenCalled();
+        });
+
+        it("reports the previous scale to onZoomFrame", () => {
+            const onZoomFrame = vi.fn<(prevScale: number) => void>();
+            controller.animateZoomTo(4, 0, onZoomFrame);
+
+            expect(onZoomFrame).toHaveBeenCalledWith(1);
+        });
+
+        it("starts animation when duration > 0", () => {
+            controller.animateZoomTo(2, 500);
+
+            expect(controller.isAnimating()).toBe(true);
+        });
+
+        it("interpolates the scale between start and target during animation", () => {
+            controller.animateZoomTo(4, 500);
+
+            vi.advanceTimersByTime(250);
+
+            expect(mockCamera.scale).toBeGreaterThan(1);
+            expect(mockCamera.scale).toBeLessThan(4);
+        });
+
+        it("reaches the exact target scale after duration", () => {
+            const onComplete = vi.fn();
+            controller.animateZoomTo(4, 500, undefined, onComplete);
+
+            vi.advanceTimersByTime(600);
+
+            expect(mockCamera.scale).toBeCloseTo(4);
+            expect(onComplete).toHaveBeenCalled();
+            expect(controller.isAnimating()).toBe(false);
+        });
+
+        it("cancels previous zoom animation when new one starts", () => {
+            const cancelAnimationFrame = vi.fn();
+            vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+
+            controller.animateZoomTo(2, 500);
+            controller.animateZoomTo(3, 500);
+
+            expect(cancelAnimationFrame).toHaveBeenCalled();
+        });
+    });
+
     describe("animateResize", () => {
         it("resizes instantly when duration is 0", () => {
             const onApplySize = vi.fn();
@@ -168,6 +239,22 @@ describe("AnimationController", () => {
         });
     });
 
+    describe("cancelZoom", () => {
+        it("stops zoom animation", () => {
+            const cancelAnimationFrame = vi.fn();
+            vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+
+            controller.animateZoomTo(2, 500);
+            controller.cancelZoom();
+
+            expect(cancelAnimationFrame).toHaveBeenCalled();
+        });
+
+        it("does nothing when no animation is running", () => {
+            expect(() => controller.cancelZoom()).not.toThrow();
+        });
+    });
+
     describe("cancelResize", () => {
         it("stops resize animation", () => {
             const cancelAnimationFrame = vi.fn();
@@ -185,15 +272,16 @@ describe("AnimationController", () => {
     });
 
     describe("cancelAll", () => {
-        it("cancels both move and resize animations", () => {
+        it("cancels move, zoom and resize animations", () => {
             const cancelAnimationFrame = vi.fn();
             vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
 
             controller.animateMoveTo(100, 100, 500);
+            controller.animateZoomTo(2, 500);
             controller.animateResize(1024, 768, 500, vi.fn());
             controller.cancelAll();
 
-            expect(cancelAnimationFrame).toHaveBeenCalledTimes(2);
+            expect(cancelAnimationFrame).toHaveBeenCalledTimes(3);
         });
     });
 
@@ -204,6 +292,11 @@ describe("AnimationController", () => {
 
         it("returns true when move animation is running", () => {
             controller.animateMoveTo(100, 100, 500);
+            expect(controller.isAnimating()).toBe(true);
+        });
+
+        it("returns true when zoom animation is running", () => {
+            controller.animateZoomTo(2, 500);
             expect(controller.isAnimating()).toBe(true);
         });
 
@@ -243,6 +336,15 @@ describe("AnimationController", () => {
 
             expect(setCenterMock).toHaveBeenCalledWith({ x: 100, y: 100 }, 800, 600);
             expect(onAnimationFrame).toHaveBeenCalled();
+            expect(onComplete).toHaveBeenCalled();
+            expect(controller.isAnimating()).toBe(false);
+        });
+
+        it("completes animateZoomTo instantly instead of crashing", () => {
+            const onComplete = vi.fn();
+            controller.animateZoomTo(2, 500, undefined, onComplete);
+
+            expect(mockCamera.setScale).toHaveBeenCalledWith(2);
             expect(onComplete).toHaveBeenCalled();
             expect(controller.isAnimating()).toBe(false);
         });

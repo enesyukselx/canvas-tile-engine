@@ -396,6 +396,27 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
+     * Smoothly animate the canvas scale to a target value over the given duration.
+     * The zoom is anchored at the viewport center, matching zoomIn/zoomOut.
+     * @param targetScale The desired scale value, clamped to min/max bounds.
+     * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant change.
+     * @param onComplete Optional callback fired when animation completes.
+     * @throws {ConfigValidationError} If scale is not a positive finite number.
+     */
+    goScale(targetScale: number, durationMs: number = 500, onComplete?: () => void) {
+        validateScale(targetScale);
+        // Pre-clamp so the animation runs toward the effective value instead
+        // of saturating at the limit partway through the duration.
+        const clamped = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, targetScale));
+        this.animationController.animateZoomTo(
+            clamped,
+            durationMs,
+            (prevScale) => this.notifyZoomIfChanged(prevScale),
+            onComplete,
+        );
+    }
+
+    /**
      * Zoom in by a given factor, centered on the viewport.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom in more.
      */

@@ -13,11 +13,12 @@ function canAnimate(): boolean {
 }
 
 /**
- * Manages smooth animations for camera movements and canvas resizing.
+ * Manages smooth animations for camera movements, zooming, and canvas resizing.
  * Handles animation frame scheduling and cleanup.
  */
 export class AnimationController {
     private moveAnimationId?: number;
+    private zoomAnimationId?: number;
     private resizeAnimationId?: number;
 
     constructor(
@@ -78,6 +79,68 @@ export class AnimationController {
         };
 
         this.moveAnimationId = requestAnimationFrame(step);
+    }
+
+    /**
+     * Smoothly animate the camera scale to a target value, anchored at the
+     * viewport center (matching zoomIn/zoomOut).
+     * @param targetScale Target scale. Callers should pre-clamp it to the camera's limits so the animation ends exactly at the effective value.
+     * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant change.
+     * @param onZoomFrame Optional callback fired after each scale step with the scale before the step, for zoom-change notifications.
+     * @param onComplete Optional callback fired when animation completes.
+     */
+    animateZoomTo(
+        targetScale: number,
+        durationMs: number = DEFAULT_VALUES.ANIMATION_DURATION_MS,
+        onZoomFrame?: (prevScale: number) => void,
+        onComplete?: () => void,
+    ) {
+        // Cancel any existing zoom animation
+        this.cancelZoom();
+
+        // Re-center after setScale because the camera anchors scale changes at
+        // the top-left corner. Reading the center each frame (instead of
+        // pinning it once) lets a concurrent move animation keep working.
+        const applyScale = (scale: number) => {
+            const size = this.viewport.getSize();
+            const center = this.camera.getCenter(size.width, size.height);
+            const prevScale = this.camera.scale;
+            this.camera.setScale(scale);
+            this.camera.setCenter(center, size.width, size.height);
+            onZoomFrame?.(prevScale);
+            this.onAnimationFrame();
+        };
+
+        // Instant change if duration is 0/negative or frames can't be scheduled
+        if (durationMs <= 0 || !canAnimate()) {
+            applyScale(targetScale);
+            onComplete?.();
+            return;
+        }
+
+        const startScale = this.camera.scale;
+        const startTime = performance.now();
+
+        const step = (currentTime: number) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(1, elapsed / durationMs);
+
+            // Easing function (ease-in-out)
+            const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+            // Geometric interpolation: zoom speed is perceptually uniform
+            // (linear interpolation front-loads the zoom-in half).
+            applyScale(startScale * Math.pow(targetScale / startScale, eased));
+
+            if (progress < 1) {
+                this.zoomAnimationId = requestAnimationFrame(step);
+            } else {
+                this.zoomAnimationId = undefined;
+                onComplete?.();
+            }
+        };
+
+        this.zoomAnimationId = requestAnimationFrame(step);
     }
 
     /**
@@ -149,6 +212,16 @@ export class AnimationController {
     }
 
     /**
+     * Cancel the current zoom animation if running.
+     */
+    cancelZoom() {
+        if (this.zoomAnimationId !== undefined) {
+            cancelAnimationFrame(this.zoomAnimationId);
+            this.zoomAnimationId = undefined;
+        }
+    }
+
+    /**
      * Cancel the current resize animation if running.
      */
     cancelResize() {
@@ -163,6 +236,7 @@ export class AnimationController {
      */
     cancelAll() {
         this.cancelMove();
+        this.cancelZoom();
         this.cancelResize();
     }
 
@@ -170,6 +244,10 @@ export class AnimationController {
      * Check if any animation is currently running.
      */
     isAnimating(): boolean {
-        return this.moveAnimationId !== undefined || this.resizeAnimationId !== undefined;
+        return (
+            this.moveAnimationId !== undefined ||
+            this.zoomAnimationId !== undefined ||
+            this.resizeAnimationId !== undefined
+        );
     }
 }
