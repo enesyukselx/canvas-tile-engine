@@ -21,6 +21,18 @@ export type HitResult<TImage = unknown> = {
 export type HitTestOptions = {
     /** Only test items drawn on this layer. */
     layer?: number;
+    /**
+     * Expand every item's hit geometry outward by this many world units -
+     * generous touch targets around small markers without invisible helper
+     * items. Negative values are treated as 0.
+     */
+    padding?: number;
+    /**
+     * Extra hit padding in screen pixels, independent of zoom. The engine
+     * converts it with the current scale at query time and adds it to
+     * `padding`. Negative values are treated as 0.
+     */
+    paddingPx?: number;
 };
 
 type HitItem = Rect | Circle | ImageItem<unknown>;
@@ -56,6 +68,11 @@ const SPATIAL_INDEX_THRESHOLD = 500;
  * payloads report `coords.raw` in corner space - the cell of item `k` spans
  * `[k, k+1]` there - so the engine shifts by the cell-center offset before
  * calling in (see `CanvasTileEngine.rawToItemSpace`).
+ *
+ * Only `layer` and `padding` (world units) are read here; `paddingPx` is an
+ * engine-level convenience that `CanvasTileEngine` converts with the current
+ * scale and folds into `padding` before delegating (this module is
+ * scale-unaware, like the rest of its geometry).
  * @internal
  */
 export class HitTester {
@@ -90,6 +107,7 @@ export class HitTester {
     /** All items under `point` (world coords), highest visual priority first. */
     hitTest(point: Coords, opts?: HitTestOptions): HitResult[] {
         const results: Array<HitResult & { seq: number }> = [];
+        const padding = Math.max(0, opts?.padding ?? 0);
 
         for (const entry of this.entries.values()) {
             if (opts?.layer !== undefined && entry.layer !== opts.layer) continue;
@@ -99,10 +117,10 @@ export class HitTester {
                 // The index stores anchor-centered boxes; origin modes shift the
                 // drawn box by up to half a cell (or half the item size), so pad
                 // the query enough to never miss an edge candidate.
-                const pad = 0.5 + entry.maxSize;
+                const pad = 0.5 + entry.maxSize + padding;
                 const candidates = entry.index!.query(point.x - pad, point.y - pad, point.x + pad, point.y + pad);
                 for (const item of candidates) {
-                    if (!this.testItem(point, item, entry.kind)) continue;
+                    if (!this.testItem(point, item, entry.kind, padding)) continue;
                     results.push({
                         item,
                         kind: entry.kind,
@@ -115,7 +133,7 @@ export class HitTester {
             } else {
                 for (let i = 0; i < entry.items.length; i++) {
                     const item = entry.items[i];
-                    if (!this.testItem(point, item, entry.kind)) continue;
+                    if (!this.testItem(point, item, entry.kind, padding)) continue;
                     results.push({
                         item,
                         kind: entry.kind,
@@ -190,13 +208,13 @@ export class HitTester {
         return { w, h };
     }
 
-    private testItem(point: Coords, item: HitItem, kind: HitKind): boolean {
+    private testItem(point: Coords, item: HitItem, kind: HitKind, padding: number): boolean {
         const box = this.boxFor(item, kind);
 
         if (kind === "circle") {
             const cx = box.left + box.w / 2;
             const cy = box.top + box.h / 2;
-            const r = box.w / 2;
+            const r = box.w / 2 + padding;
             const dx = point.x - cx;
             const dy = point.y - cy;
             return dx * dx + dy * dy <= r * r;
@@ -219,6 +237,13 @@ export class HitTester {
             py = cy + dx * sin + dy * cos;
         }
 
-        return px >= box.left && px <= box.left + box.w && py >= box.top && py <= box.top + box.h;
+        // Padding expands the box in the item's own (rotated) frame, so the
+        // inverse-rotated point comparison above keeps working unchanged.
+        return (
+            px >= box.left - padding &&
+            px <= box.left + box.w + padding &&
+            py >= box.top - padding &&
+            py <= box.top + box.h + padding
+        );
     }
 }

@@ -207,3 +207,60 @@ describe("HitTester non-square rects", () => {
         expect(ht.hitTestFirst({ x: 2004.1, y: 0 })).toBeUndefined();
     });
 });
+
+describe("HitTester padding", () => {
+    it("expands circles by the padding radius", () => {
+        const ht = new HitTester();
+        // Station-dot scenario: drawn small, hit area kept generous
+        ht.register(handle(1), "circle", { x: 0, y: 0, size: 0.95 }, 1);
+
+        // 1.0 from the center, radius is 0.475
+        expect(ht.hitTestFirst({ x: 1, y: 0 })).toBeUndefined();
+        // padding 0.625 -> effective reach 1.1
+        expect(ht.hitTestFirst({ x: 1, y: 0 }, { padding: 0.625 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 1.15, y: 0 }, { padding: 0.625 })).toBeUndefined();
+    });
+
+    it("expands rect boxes on every side", () => {
+        const ht = new HitTester();
+        // size 1, cell-center origin: box spans [1.5, 2.5] x [2.5, 3.5]
+        ht.register(handle(1), "rect", { x: 2, y: 3, size: 1 }, 1);
+
+        expect(ht.hitTestFirst({ x: 2.7, y: 3 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 2.7, y: 3 }, { padding: 0.25 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 1.3, y: 2.3 }, { padding: 0.25 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 2.8, y: 3 }, { padding: 0.25 })).toBeUndefined();
+    });
+
+    it("expands rotated rects in their rotated frame", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", { x: 0, y: 0, size: 1, rotate: 45 }, 1);
+
+        // Beyond the rotated square's ~0.707 reach on the x axis...
+        expect(ht.hitTestFirst({ x: 0.9, y: 0 })).toBeUndefined();
+        // ...but inside once each side moves out by 0.2 (reach ~0.99)
+        expect(ht.hitTestFirst({ x: 0.9, y: 0 }, { padding: 0.2 })).toBeDefined();
+    });
+
+    it("treats negative padding as 0", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "circle", { x: 0, y: 0, size: 1 }, 1);
+
+        expect(ht.hitTestFirst({ x: 0.4, y: 0 }, { padding: -5 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 0.6, y: 0 }, { padding: -5 })).toBeUndefined();
+    });
+
+    it("also expands the spatial-index query on the 500+ item path", () => {
+        const ht = new HitTester();
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i, y: 0, size: 0.2 }));
+        ht.register(handle(1), "circle", items, 1);
+
+        // 4 units above item 10: without widening the query by the padding,
+        // the default pad (0.5 + maxSize) would not even surface it as a
+        // candidate, let alone hit it
+        expect(ht.hitTestFirst({ x: 10, y: 4 })).toBeUndefined();
+        const hit = ht.hitTestFirst({ x: 10, y: 4 }, { padding: 4 });
+        expect(hit).toBeDefined();
+        expect(hit!.index).toBe(10);
+    });
+});
