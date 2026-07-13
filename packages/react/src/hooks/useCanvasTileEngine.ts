@@ -5,6 +5,8 @@ import type {
     Coords,
     EventHandlers,
     DrawHandle,
+    HitResult,
+    HitTestOptions,
     ImageItem,
     Text,
     Circle,
@@ -190,6 +192,16 @@ export interface EngineHandle {
 
     /** Remove a previously registered draw callback */
     removeDrawHandle(handle: DrawHandle): void;
+
+    /**
+     * All rect/circle/image items under a world point, highest visual
+     * priority first. Pass `coords.raw` from event callbacks. Empty before
+     * mount.
+     */
+    hitTest(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement>[];
+
+    /** The topmost item under a world point, or undefined. */
+    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement> | undefined;
 
     /** Image loader instance (undefined until engine mounts) */
     readonly images: CanvasTileEngineCore["images"] | undefined;
@@ -393,6 +405,14 @@ export function useCanvasTileEngine(): EngineHandle {
 
             removeDrawHandle(handle) {
                 instanceRef.current?.removeDrawHandle(handle);
+            },
+
+            hitTest(point, opts) {
+                return instanceRef.current?.hitTest(point, opts) ?? [];
+            },
+
+            hitTestFirst(point, opts) {
+                return instanceRef.current?.hitTestFirst(point, opts);
             },
 
             loadImage(src: string, retry?: number) {

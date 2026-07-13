@@ -6,6 +6,8 @@ import type {
     Coords,
     DrawHandle,
     EventHandlers,
+    HitResult,
+    HitTestOptions,
     ImageItem,
     Line,
     Rect,
@@ -84,6 +86,15 @@ export interface EngineHandle {
     clearAll(): void;
     clearStaticCache(cacheKey?: string): void;
     removeDrawHandle(handle: DrawHandle): void;
+
+    /**
+     * All rect/circle/image items under a world point, highest visual
+     * priority first. Pass `coords.raw` from event callbacks. Empty before
+     * mount.
+     */
+    hitTest(point: Coords, opts?: HitTestOptions): HitResult<SkImage>[];
+    /** The topmost item under a world point, or undefined. */
+    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<SkImage> | undefined;
 
     readonly images: SkiaEngine["images"] | undefined;
     /** Decode and cache an image from a URI, resolving to a Skia `SkImage`. */
@@ -229,6 +240,14 @@ export function useCanvasTileEngine(): EngineHandle {
             },
             removeDrawHandle(handle) {
                 instanceRef.current?.removeDrawHandle(handle);
+            },
+
+            hitTest(point, opts) {
+                return instanceRef.current?.hitTest(point, opts) ?? [];
+            },
+
+            hitTestFirst(point, opts) {
+                return instanceRef.current?.hitTestFirst(point, opts);
             },
 
             loadImage(src, retry) {

@@ -155,11 +155,11 @@ engine.onResize = () => {
 
 Pointer callbacks receive three coordinate objects.
 
-| Argument | `raw` | `snapped` |
-| :-- | :-- | :-- |
-| `coords` | Exact world coordinate under the pointer. | Floored world grid cell. |
-| `mouse` | Canvas-relative pixel coordinate. | Canvas pixel coordinate for the center of the snapped cell. |
-| `client` | Browser viewport pixel coordinate. | Viewport pixel coordinate for the center of the snapped cell. |
+| Argument | `raw`                                     | `snapped`                                                     |
+| :------- | :---------------------------------------- | :------------------------------------------------------------ |
+| `coords` | Exact world coordinate under the pointer. | Floored world grid cell.                                      |
+| `mouse`  | Canvas-relative pixel coordinate.         | Canvas pixel coordinate for the center of the snapped cell.   |
+| `client` | Browser viewport pixel coordinate.        | Viewport pixel coordinate for the center of the snapped cell. |
 
 ```ts
 engine.onClick = (coords, mouse, client) => {
@@ -274,6 +274,43 @@ window.addEventListener("keyup", (event) => {
     }
 });
 ```
+
+## Hit Testing
+
+`hitTest` / `hitTestFirst` answer "which item is under this point?" for rect,
+circle, and image items - no more hand-written lookup maps or manual 0.5-cell
+offset math. Pass the `coords.raw` value from any event callback; origin
+anchoring, image aspect fit, and rotation are handled internally.
+
+```ts
+engine.onClick = (coords) => {
+    const hit = engine.hitTestFirst(coords.raw);
+    if (!hit) return;
+    // hit.index is the item's position in the array you passed to drawX -
+    // use it to reach your own richer data:
+    openStationPanel(stations[hit.index]);
+};
+
+// All overlapping items, highest visual priority first
+engine.onHover = (coords) => {
+    const hits = engine.hitTest(coords.raw, { layer: 2 }); // optional layer filter
+    highlight(hits.map((h) => h.item));
+};
+```
+
+Each result is `{ item, kind, layer, handle, index }`, ordered by visual
+priority: higher layer first, then later registration, then later item within
+a draw call - the item you see on top comes first.
+
+Semantics to know:
+
+- Works for `drawRect` / `drawCircle` / `drawImage` and their `drawStatic*`
+  variants. Line, Path, and Text items are not hit-testable.
+- Like rendering, results reflect item positions as of the draw call:
+  mutating an item's position requires re-registration (style mutation is
+  unaffected).
+- Draw calls with 500+ items are queried through a spatial index, so
+  hit testing large scenes on hover is cheap.
 
 ## Managing the Cursor
 

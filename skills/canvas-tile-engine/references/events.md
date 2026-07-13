@@ -21,11 +21,11 @@ eventHandlers: {
 `onClick`, `onRightClick`, `onHover`, `onMouseDown`, `onMouseUp`,
 `onMouseLeave` all receive `(coords, mouse, client)`:
 
-| Argument | Space | `raw` | `snapped` |
-| :-- | :-- | :-- | :-- |
-| `coords` | World | Exact world coordinate under the pointer. | Floored world grid cell (integer). |
-| `mouse` | Canvas px | Canvas-relative pixel position. | Pixel position of the snapped cell's center. |
-| `client` | Viewport px | Browser viewport pixel position. | Viewport pixel of the snapped cell's center. |
+| Argument | Space       | `raw`                                     | `snapped`                                    |
+| :------- | :---------- | :---------------------------------------- | :------------------------------------------- |
+| `coords` | World       | Exact world coordinate under the pointer. | Floored world grid cell (integer).           |
+| `mouse`  | Canvas px   | Canvas-relative pixel position.           | Pixel position of the snapped cell's center. |
+| `client` | Viewport px | Browser viewport pixel position.          | Viewport pixel of the snapped cell's center. |
 
 Usage rule of thumb: `coords.snapped` for game/grid logic, `mouse.raw` for
 custom canvas drawing, `client.raw` for positioning DOM popovers/tooltips.
@@ -64,19 +64,60 @@ engine.onResize = () => {};
 ```ts
 function enablePaintMode() {
     engine.setEventHandlers({ drag: false, hover: true });
-    engine.canvas.style.cursor = "crosshair";   // DOM renderers only
+    engine.canvas.style.cursor = "crosshair"; // DOM renderers only
 }
 function enablePanMode() {
     engine.setEventHandlers({ drag: true, hover: false });
     engine.canvas.style.cursor = "grab";
 }
 function enableReadOnlyMode() {
-    engine.setEventHandlers({ click: false, rightClick: false, hover: false, drag: false, zoom: false });
+    engine.setEventHandlers({
+        click: false,
+        rightClick: false,
+        hover: false,
+        drag: false,
+        zoom: false,
+    });
 }
 ```
 
 CRITICAL for paint/marquee tools: disable `drag` while the tool is active,
 otherwise pointer movement pans the camera AND paints simultaneously.
+
+## Pattern: item click / hover via hitTest
+
+For "which item did the user click/hover?" use the built-in hit testing -
+do NOT build coordinate lookup maps or hand-roll box math (the 0.5 cell
+offset is easy to get wrong):
+
+```ts
+engine.onClick = (coords) => {
+    const hit = engine.hitTestFirst(coords.raw); // raw, not snapped
+    if (hit) select(stations[hit.index]); // index -> your data array
+};
+```
+
+React / React Native: the hook handle exposes the same methods (empty
+result before mount, no null checks needed), and items drawn by the
+declarative components are included automatically:
+
+```tsx
+const engine = useCanvasTileEngine();
+
+<CanvasTileEngine
+    engine={engine}
+    onClick={(coords) => {
+        const hit = engine.hitTestFirst(coords.raw);
+        if (hit) setSelected(hit.index); // index into the items array below
+    }}
+    /* ... */
+>
+    <CanvasTileEngine.Circle items={stationDots} layer={2} />
+</CanvasTileEngine>;
+```
+
+Full semantics: [core-api.md](core-api.md) hit testing section (kinds
+covered, ordering, staleness rule).
 
 ## Pattern: cursor management
 
@@ -86,13 +127,21 @@ entirely (there is no cursor config). Reset in BOTH `onMouseUp` and
 `onMouseUp`, so without the leave reset the cursor sticks on "grabbing".
 
 ```ts
-engine.canvas.style.cursor = "grab";                            // idle
-engine.onMouseDown = () => { engine.canvas.style.cursor = "grabbing"; };
-engine.onMouseUp = () => { engine.canvas.style.cursor = "grab"; };
-engine.onMouseLeave = () => { engine.canvas.style.cursor = "grab"; };
+engine.canvas.style.cursor = "grab"; // idle
+engine.onMouseDown = () => {
+    engine.canvas.style.cursor = "grabbing";
+};
+engine.onMouseUp = () => {
+    engine.canvas.style.cursor = "grab";
+};
+engine.onMouseLeave = () => {
+    engine.canvas.style.cursor = "grab";
+};
 // Optional item feedback; onHover never fires mid-drag, so no conflict:
 engine.onHover = (c) => {
-    engine.canvas.style.cursor = items.has(`${c.snapped.x},${c.snapped.y}`) ? "pointer" : "grab";
+    engine.canvas.style.cursor = items.has(`${c.snapped.x},${c.snapped.y}`)
+        ? "pointer"
+        : "grab";
 };
 ```
 
@@ -106,10 +155,15 @@ let hoverHandle: DrawHandle | undefined;
 
 engine.onHover = (coords) => {
     if (hoverHandle) engine.removeDrawHandle(hoverHandle);
-    hoverHandle = engine.drawRect({
-        x: coords.snapped.x, y: coords.snapped.y, size: 1,
-        style: { fillStyle: "rgba(56, 189, 248, 0.25)" },
-    }, 10); // high layer -> on top
+    hoverHandle = engine.drawRect(
+        {
+            x: coords.snapped.x,
+            y: coords.snapped.y,
+            size: 1,
+            style: { fillStyle: "rgba(56, 189, 248, 0.25)" },
+        },
+        10,
+    ); // high layer -> on top
     engine.render();
 };
 
@@ -147,10 +201,17 @@ engine.onMouseDown = (coords) => {
 engine.onHover = (coords) => {
     if (!painting) return;
     const key = `${coords.snapped.x},${coords.snapped.y}`;
-    if (!painted.has(key)) { painted.add(key); redrawPaintLayer(); }
+    if (!painted.has(key)) {
+        painted.add(key);
+        redrawPaintLayer();
+    }
 };
-engine.onMouseUp = () => { painting = false; };
-engine.onMouseLeave = () => { painting = false; };
+engine.onMouseUp = () => {
+    painting = false;
+};
+engine.onMouseLeave = () => {
+    painting = false;
+};
 ```
 
 Requires `eventHandlers: { hover: true, drag: false, ... }` while painting.
@@ -161,7 +222,10 @@ Requires `eventHandlers: { hover: true, drag: false, ... }` while painting.
 let selecting = false;
 let start = { x: 0, y: 0 };
 
-engine.onMouseDown = (coords) => { selecting = true; start = coords.snapped; };
+engine.onMouseDown = (coords) => {
+    selecting = true;
+    start = coords.snapped;
+};
 engine.onMouseUp = (coords) => {
     if (!selecting) return;
     selecting = false;
@@ -177,11 +241,17 @@ engine.onMouseUp = (coords) => {
 
 ```ts
 window.addEventListener("keydown", (e) => {
-    if (e.key === "Shift") { engine.setEventHandlers({ drag: false, hover: true }); }
-    if (e.code === "Space") { engine.setEventHandlers({ drag: true, hover: false }); }
+    if (e.key === "Shift") {
+        engine.setEventHandlers({ drag: false, hover: true });
+    }
+    if (e.code === "Space") {
+        engine.setEventHandlers({ drag: true, hover: false });
+    }
 });
 window.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") { engine.setEventHandlers({ drag: true, hover: false }); }
+    if (e.key === "Shift") {
+        engine.setEventHandlers({ drag: true, hover: false });
+    }
 });
 ```
 

@@ -102,16 +102,17 @@ export default function App() {
     // Generate map objects (memoized)
     const items = useMemo(() => generateMapObjects(10000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2), []);
 
-    // Create coordinate-based Map for O(1) lookups
-    const itemsByCoord = useMemo(() => {
-        const map = new Map<string, MapObject>();
-        for (const item of items) {
-            if (item.type !== "terrain") {
-                map.set(`${item.x},${item.y}`, item);
-            }
-        }
-        return map;
-    }, [items]);
+    // Resolve the map object under the pointer with built-in hit testing.
+    // imageItems is built 1:1 from items, so hit.index maps straight back.
+    const itemAt = useCallback(
+        (raw: { x: number; y: number }): MapObject | null => {
+            const hit = mainMap.hitTestFirst(raw, { layer: 0 });
+            if (!hit) return null;
+            const item = items[hit.index];
+            return item.type !== "terrain" ? item : null;
+        },
+        [mainMap, items],
+    );
 
     // Load images and prepare draw data
     useEffect(() => {
@@ -205,7 +206,7 @@ export default function App() {
         _mouse: unknown,
         client: { raw: { x: number; y: number }; snapped: { x: number; y: number } },
     ) => {
-        const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
+        const item = itemAt(coords.raw);
 
         if (item) {
             const cfg = mainMap.getConfig();
@@ -222,7 +223,7 @@ export default function App() {
 
     // Handle click
     const handleClick = (coords: { raw: { x: number; y: number }; snapped: { x: number; y: number } }) => {
-        const item = itemsByCoord.get(`${coords.snapped.x},${coords.snapped.y}`);
+        const item = itemAt(coords.raw);
 
         if (item) {
             setModalItem(item);

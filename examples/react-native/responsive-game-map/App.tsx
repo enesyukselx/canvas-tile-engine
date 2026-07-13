@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Asset } from "expo-asset";
@@ -66,19 +66,12 @@ export default function App() {
     const items = useMemo(
         () =>
             generateMapObjects(10000, INITIAL_COORDS.x, INITIAL_COORDS.y, 1.2),
-        []
+        [],
     );
 
-    // Coordinate-based Map for O(1) click lookups
-    const itemsByCoord = useMemo(() => {
-        const lookup = new Map<string, MapObject>();
-        for (const item of items) {
-            if (item.type !== "terrain") {
-                lookup.set(`${item.x},${item.y}`, item);
-            }
-        }
-        return lookup;
-    }, [items]);
+    // Source objects in the same order as imageItems, so a hitTest result's
+    // index maps straight back to the map object it was drawn from.
+    const imageSourcesRef = useRef<MapObject[]>([]);
 
     // Load images (as SkImage) and prepare draw data
     useEffect(() => {
@@ -94,10 +87,11 @@ export default function App() {
                     await asset.downloadAsync();
                     const uri = asset.localUri ?? asset.uri;
                     imageCache.set(mod, await map.loadImage(uri));
-                })
+                }),
             );
 
             const newImageItems: SkiaImageItem[] = [];
+            const newImageSources: MapObject[] = [];
             const newCircleItems: Circle[] = [];
             const newRectItems: Rect[] = [];
 
@@ -105,12 +99,8 @@ export default function App() {
                 const img = imageCache.get(item.image);
                 if (!img) continue;
 
-                newImageItems.push({
-                    img,
-                    x: item.x,
-                    y: item.y,
-                    size: 1,
-                });
+                newImageItems.push({ img, x: item.x, y: item.y, size: 1 });
+                newImageSources.push(item);
 
                 if (item.type !== "terrain") {
                     newCircleItems.push({
@@ -130,6 +120,7 @@ export default function App() {
                 });
             }
 
+            imageSourcesRef.current = newImageSources;
             setImageItems(newImageItems);
             setCircleItems(newCircleItems);
             setRectItems(newRectItems);
@@ -138,11 +129,11 @@ export default function App() {
         void loadItems();
     }, [map, map.isReady, items]);
 
-    const handleClick = (coords: { snapped: { x: number; y: number } }) => {
-        const item = itemsByCoord.get(
-            `${coords.snapped.x},${coords.snapped.y}`
-        );
-        if (item) {
+    const handleClick = (coords: { raw: { x: number; y: number } }) => {
+        // Built-in hit testing: images are drawn on layer 0
+        const hit = map.hitTestFirst(coords.raw, { layer: 0 });
+        const item = hit ? imageSourcesRef.current[hit.index] : undefined;
+        if (item && item.type !== "terrain") {
             setModalItem(item);
             setModalVisible(true);
         }
@@ -201,7 +192,7 @@ export default function App() {
                         paint.setColor(Skia.Color("red"));
                         canvas.drawRect(
                             Skia.XYWHRect(cx - 5, cy - 5, 10, 10),
-                            paint
+                            paint,
                         );
                     }}
                 </CanvasTileEngine.DrawFunction>
