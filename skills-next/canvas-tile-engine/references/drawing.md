@@ -67,6 +67,8 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
     rotate?: number;          // degrees, positive = clockwise (Rect/Image only)
     radius?: number | number[]; // px corner radius (Rect only);
                               // array = [topLeft, topRight, bottomRight, bottomLeft]
+    data?: TData;             // arbitrary app data; never read by the engine,
+                              // returned as hit.item.data from hitTest
 }
 ```
 

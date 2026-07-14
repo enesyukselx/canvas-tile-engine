@@ -57,6 +57,7 @@ export interface EngineHandle {
     getSize(): { width: number; height: number };
     getScale(): number;
     setScale(newScale: number): void;
+    goScale(targetScale: number, durationMs?: number, onComplete?: () => void): void;
     zoomIn(factor?: number): void;
     zoomOut(factor?: number): void;
     getConfig(): Required<CanvasTileEngineConfig> | undefined;
@@ -92,9 +93,9 @@ export interface EngineHandle {
      * priority first. Pass `coords.raw` from event callbacks. Empty before
      * mount.
      */
-    hitTest(point: Coords, opts?: HitTestOptions): HitResult<SkImage>[];
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData>[];
     /** The topmost item under a world point, or undefined. */
-    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<SkImage> | undefined;
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData> | undefined;
 
     readonly images: SkiaEngine["images"] | undefined;
     /** Decode and cache an image from a URI, resolving to a Skia `SkImage`. */
@@ -167,6 +168,9 @@ export function useCanvasTileEngine(): EngineHandle {
             },
             setScale(newScale) {
                 instanceRef.current?.setScale(newScale);
+            },
+            goScale(targetScale, durationMs, onComplete) {
+                instanceRef.current?.goScale(targetScale, durationMs, onComplete);
             },
             zoomIn(factor) {
                 instanceRef.current?.zoomIn(factor);
@@ -242,12 +246,12 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.removeDrawHandle(handle);
             },
 
-            hitTest(point, opts) {
-                return instanceRef.current?.hitTest(point, opts) ?? [];
+            hitTest<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTest<TData>(point, opts) ?? [];
             },
 
-            hitTestFirst(point, opts) {
-                return instanceRef.current?.hitTestFirst(point, opts);
+            hitTestFirst<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTestFirst<TData>(point, opts);
             },
 
             loadImage(src, retry) {

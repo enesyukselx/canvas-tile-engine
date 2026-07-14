@@ -53,6 +53,7 @@ drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 | `height` | `number`             | `size`                             | Height in world units (only for `drawRect`).                                                                                    |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                |
 | `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
+| `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.        |
 
 **Style Options:**
 
@@ -320,6 +321,7 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 | `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                  |
 | `sprite` | `SpriteRect`       | -            | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
 | `opacity` | `number`          | `1`          | Opacity from 0 (transparent) to 1 (opaque). Ideal for ghost/preview placements. |
+| `data`   | `TData`            | -            | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`. |
 
 ```typescript
 // Single image

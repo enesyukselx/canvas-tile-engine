@@ -126,6 +126,9 @@ export interface EngineHandle {
     /** Set the canvas scale directly, clamped to min/max bounds. */
     setScale(newScale: number): void;
 
+    /** Animate the canvas scale to a target value, clamped to min/max bounds */
+    goScale(targetScale: number, durationMs?: number, onComplete?: () => void): void;
+
     /** Zoom in by a factor (default: 1.5) */
     zoomIn(factor?: number): void;
 
@@ -198,10 +201,10 @@ export interface EngineHandle {
      * priority first. Pass `coords.raw` from event callbacks. Empty before
      * mount.
      */
-    hitTest(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement>[];
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement, TData>[];
 
     /** The topmost item under a world point, or undefined. */
-    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement> | undefined;
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement, TData> | undefined;
 
     /** Image loader instance (undefined until engine mounts) */
     readonly images: CanvasTileEngineCore["images"] | undefined;
@@ -324,6 +327,10 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.setScale(newScale);
             },
 
+            goScale(targetScale: number, durationMs?: number, onComplete?: () => void) {
+                instanceRef.current?.goScale(targetScale, durationMs, onComplete);
+            },
+
             zoomIn(factor?: number) {
                 instanceRef.current?.zoomIn(factor);
             },
@@ -407,12 +414,12 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.removeDrawHandle(handle);
             },
 
-            hitTest(point, opts) {
-                return instanceRef.current?.hitTest(point, opts) ?? [];
+            hitTest<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTest<TData>(point, opts) ?? [];
             },
 
-            hitTestFirst(point, opts) {
-                return instanceRef.current?.hitTestFirst(point, opts);
+            hitTestFirst<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTestFirst<TData>(point, opts);
             },
 
             loadImage(src: string, retry?: number) {

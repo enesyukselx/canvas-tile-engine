@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* Same variable Inter as the landing site (optical sizing + full weight range) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
   --ifm-color-primary: #0a0a0a;
@@ -97,10 +98,14 @@
   --card-border: #27272a;
 }
 
+/* Landing parity: force the platform-default font smoothing. Infima's own
+   html rule sets -webkit-font-smoothing: antialiased, which renders text
+   visibly thinner (and the amber accent paler) on macOS; the landing site
+   never opts into it. */
 html {
   scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
 }
 
 body {
@@ -134,41 +139,164 @@ a:hover {
 
 .navbar {
   border-bottom: 1px solid var(--ifm-border-color);
-  padding: 0 1.5rem;
+  padding: 0;
   backdrop-filter: blur(12px);
 }
 
-.navbar__title {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 1rem;
-  font-weight: 700;
+/* Landing parity: navbar content sits in a centered max-w-screen-2xl
+   container (Tailwind --breakpoint-2xl: 96rem) with the horizontal
+   padding INSIDE the box, exactly like the landing's
+   `mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8` */
+.navbar__inner {
+  max-width: 96rem;
+  margin: 0 auto;
+  padding: 0 2rem;
 }
+
+@media screen and (max-width: 1024px) {
+  .navbar__inner {
+    padding: 0 1.5rem;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .navbar__inner {
+    padding: 0 1rem;
+  }
+}
+
+/* No external-link arrows anywhere: docs and landing read as one site */
+svg[class*='iconExternalLink'] {
+  display: none;
+}
+
+/* ── Brand wordmark (landing-site parity: "Canvas [Tile] Engine") ── */
+
+.ctym-brand {
+  /* Landing font-mono stack (system mono), NOT JetBrains Mono */
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5; /* landing text-base line-height; sets the tile frame height */
+  color: var(--ifm-font-color-base);
+  /* landing: gap-6 (24px) between the brand block and the nav; the first
+     link's own 12px padding brings text-to-text distance to 36px */
+  margin-right: 1.5rem;
+}
+
+.ctym-brand:hover {
+  color: var(--ifm-font-color-base);
+}
+
+.ctym-tile {
+  position: relative;
+  display: inline-block;
+  margin: 0 0.375rem;
+  padding: 0 0.375rem;
+  color: var(--accent-color);
+}
+
+.ctym-tile-frame {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 60%, transparent);
+  border-radius: 0.25rem; /* Tailwind v4 rounded-sm */
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  animation: ctym-tile-pulse 3.2s ease-in-out infinite;
+}
+
+.ctym-dot {
+  position: absolute;
+  width: 0.25rem;
+  height: 0.25rem;
+  border-radius: 1px;
+  background: var(--accent-color);
+}
+
+.ctym-dot--tl { top: -2px; left: -2px; }
+.ctym-dot--tr { top: -2px; right: -2px; }
+.ctym-dot--bl { bottom: -2px; left: -2px; }
+.ctym-dot--br { bottom: -2px; right: -2px; }
+
+.ctym-tile-text {
+  position: relative;
+}
+
+@keyframes ctym-tile-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ── Navbar links (landing parity: muted → foreground + muted bg on hover) ── */
 
 .navbar__link {
   border-radius: 0.375rem;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--ifm-font-color-secondary);
 }
 
-.navbar__link:hover,
+.navbar__link:hover {
+  background-color: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+}
+
 .navbar__link--active {
-  color: var(--accent-color);
+  color: var(--ifm-font-color-base);
 }
 
 .navbar__item.dropdown .navbar__link {
   color: var(--ifm-font-color-secondary);
 }
 
-.navbar__items--right .navbar__link[href*='github'] {
-  border: 1px solid var(--ifm-border-color);
-  background: color-mix(in srgb, var(--ifm-background-color) 70%, transparent);
-  color: var(--ifm-font-color-base);
-  padding: 0.42rem 0.7rem;
+/* landing: gap-1 (4px) between nav items on top of their 12px paddings */
+.navbar__item + .navbar__item {
+  margin-left: 0.25rem;
 }
 
-.navbar__items--right .navbar__link[href*='github']:hover {
-  border-color: color-mix(in srgb, var(--accent-color) 52%, var(--ifm-border-color));
-  color: var(--accent-color);
+/* ── Icon-only navbar links (GitHub / npm, landing parity) ── */
+
+.header-icon-link {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  padding: 0;
+  color: var(--ifm-font-color-secondary);
+}
+
+.header-icon-link:hover {
+  background-color: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+}
+
+/* Suppress the auto-appended external-link arrow on icon items */
+.header-icon-link svg {
+  display: none;
+}
+
+.header-icon-link::before {
+  content: "";
+  width: 1.25rem;
+  height: 1.25rem;
+  background-color: currentColor;
+  mask: var(--icon) no-repeat center / contain;
+  -webkit-mask: var(--icon) no-repeat center / contain;
+}
+
+.header-github-link {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4'/%3E%3Cpath d='M9 18c-4.51 2-5-2-7-2'/%3E%3C/svg%3E");
+}
+
+.header-npm-link {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7.5 4.27 9 5.15'/%3E%3Cpath d='M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z'/%3E%3Cpath d='M12 22V12'/%3E%3Cpath d='m3.3 7 8.7 5 8.7-5'/%3E%3C/svg%3E");
 }
 
 .menu {
@@ -451,6 +579,15 @@ tr:hover {
   padding-top: 1.5rem;
 }
 
+/* Landing parity (api-docs page: `mx-auto flex max-w-screen-2xl`):
+   the doc layout — sidebar included — sits in the same centered
+   container as the navbar instead of hugging the viewport edge */
+.main-wrapper {
+  width: 100%;
+  max-width: 96rem;
+  margin: 0 auto;
+}
+
 .navbar__items--right .clean-btn[class*='toggle'] {
   border-radius: 0.375rem;
   transition: background-color 0.15s ease;
@@ -520,6 +657,10 @@ tr:hover {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  .ctym-tile-frame {
+    animation: none;
   }
 
   a,

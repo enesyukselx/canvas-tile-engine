@@ -193,6 +193,7 @@ engine.getVisibleBounds();
 engine.updateCoords({ x: 0, y: 0 });
 engine.goCoords(10, 10, 500);
 engine.setScale(64);
+engine.goScale(64, 500);
 engine.zoomIn();
 engine.zoomOut();
 engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
