@@ -13,6 +13,8 @@ import {
     SpatialIndex,
     Text,
     VISIBILITY_BUFFER,
+    resolveLineWidthPx,
+    resolveRadiusPx,
 } from "@canvas-tile-engine/core";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
@@ -108,7 +110,7 @@ export class WebGLDraw {
                 const cx = drawX + pxW / 2;
                 const cy = drawY + pxH / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
-                const radius = this.resolveRadius(item.radius, Math.min(pxW, pxH));
+                const radius = this.resolveRadius(resolveRadiusPx(item.radius, this.camera.scale), Math.min(pxW, pxH));
 
                 if (style?.fillStyle) {
                     shapes.push({
@@ -131,7 +133,7 @@ export class WebGLDraw {
                         pxH,
                         rotation,
                         this.colorParser.parse(style.strokeStyle),
-                        style.lineWidth ?? 1,
+                        resolveLineWidthPx(style, this.camera.scale),
                     );
                 }
             }
@@ -189,7 +191,7 @@ export class WebGLDraw {
                         cy,
                         radius,
                         this.colorParser.parse(style.strokeStyle),
-                        style.lineWidth ?? 1,
+                        resolveLineWidthPx(style, this.camera.scale),
                     );
                 }
             }
@@ -208,7 +210,7 @@ export class WebGLDraw {
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
-            const lineWidth = style?.lineWidth ?? 1;
+            const lineWidth = resolveLineWidthPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
             for (const item of list) {
@@ -284,7 +286,7 @@ export class WebGLDraw {
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
-            const lineWidth = style?.lineWidth ?? 1;
+            const lineWidth = resolveLineWidthPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
             for (const points of list) {

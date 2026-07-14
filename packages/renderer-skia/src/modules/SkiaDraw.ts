@@ -13,6 +13,8 @@ import {
     SpatialIndex,
     Text,
     VISIBILITY_BUFFER,
+    resolveLineWidthPx,
+    resolveRadiusPx,
 } from "@canvas-tile-engine/core";
 import {
     matchFont,
@@ -136,7 +138,7 @@ export class SkiaDraw {
         const cx = drawX + pxW / 2;
         const cy = drawY + pxH / 2;
         const rotation = item.rotate ?? 0;
-        const radius = this.resolveRadius(item.radius);
+        const radius = this.resolveRadius(resolveRadiusPx(item.radius, cellSize));
 
         const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
 
@@ -149,7 +151,7 @@ export class SkiaDraw {
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
-            this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
+            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, cellSize));
             if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.strokePaint);
             else canvas.drawRect(rect, this.strokePaint);
         }
@@ -197,7 +199,7 @@ export class SkiaDraw {
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
-            this.strokePaint.setStrokeWidth(style.lineWidth ?? 1);
+            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, cellSize));
             canvas.drawCircle(cx, cy, radius, this.strokePaint);
         }
     }
@@ -211,7 +213,7 @@ export class SkiaDraw {
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
-            this.strokePaint.setStrokeWidth(style?.lineWidth ?? 1);
+            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, this.camera.scale));
 
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
@@ -272,7 +274,7 @@ export class SkiaDraw {
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
-            this.strokePaint.setStrokeWidth(style?.lineWidth ?? 1);
+            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, this.camera.scale));
 
             for (const points of list) {
                 if (points.length < 2) continue;
@@ -403,9 +405,11 @@ export class SkiaDraw {
     // with a single drawPicture under the camera transform. Replay cost is a
     // handful of calls regardless of item count — this is the Skia equivalent
     // of the Canvas2D renderer's offscreen cache. The picture is recorded at
-    // the camera scale active at record time, so px-denominated style values
-    // (lineWidth, radius) scale with zoom afterwards, matching how the Canvas2D
-    // raster cache scales.
+    // the camera scale active at record time and replayed under the camera
+    // transform, so world-unit style values (lineWidth, radius) scale with
+    // zoom exactly as intended. Pixel-denominated opt-ins (lineWidthPx) are
+    // baked in at the record scale and scale along on replay — use the
+    // dynamic draw methods when a zoom-independent px width must hold.
 
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
         return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>

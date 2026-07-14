@@ -14,6 +14,8 @@ import {
     SpriteRect,
     Text,
     VISIBILITY_BUFFER,
+    resolveLineWidthPx,
+    resolveRadiusPx,
 } from "@canvas-tile-engine/core";
 import { Layer } from "./Layer";
 import { applyLineWidth } from "../utils/canvas";
@@ -139,7 +141,7 @@ export class CanvasDraw {
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
 
-                const radius = item.radius;
+                const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
                 if (rotationDeg !== 0) {
                     const centerX = drawX + pxW / 2;
@@ -153,7 +155,7 @@ export class CanvasDraw {
                     } else {
                         ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
                     }
-                    this.fillStrokePath(ctx, style);
+                    this.fillStrokePath(ctx, style, this.camera.scale);
                     ctx.restore();
                 } else {
                     ctx.beginPath();
@@ -162,7 +164,7 @@ export class CanvasDraw {
                     } else {
                         ctx.rect(drawX, drawY, pxW, pxH);
                     }
-                    this.fillStrokePath(ctx, style);
+                    this.fillStrokePath(ctx, style, this.camera.scale);
                 }
             }
             ctx.restore();
@@ -180,7 +182,7 @@ export class CanvasDraw {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
-            const resetAlpha = style?.lineWidth ? applyLineWidth(ctx, style.lineWidth) : undefined;
+            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
 
             ctx.beginPath();
             for (const item of list) {
@@ -248,7 +250,7 @@ export class CanvasDraw {
 
                 ctx.beginPath();
                 ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
-                this.fillStrokePath(ctx, style);
+                this.fillStrokePath(ctx, style, this.camera.scale);
             }
             ctx.restore();
         });
@@ -316,7 +318,7 @@ export class CanvasDraw {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
-            const resetAlpha = style?.lineWidth ? applyLineWidth(ctx, style.lineWidth) : undefined;
+            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
 
             ctx.beginPath();
             for (const points of list) {
@@ -472,16 +474,19 @@ export class CanvasDraw {
 
     /**
      * Fill and/or stroke the current path based on the item's style.
-     * The lineWidth (default 1) is applied per stroke so the sub-pixel alpha
-     * fallback only affects the stroke, never the fill or neighboring items.
+     * Stroke width resolves through the world/px unit convention (world
+     * `lineWidth` scales with `scale`, `lineWidthPx` stays fixed); the width
+     * is applied per stroke so the sub-pixel alpha fallback only affects the
+     * stroke, never the fill or neighboring items.
      */
     private fillStrokePath(
         ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
+        style: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number } | undefined,
+        scale: number,
     ) {
         if (style?.fillStyle) ctx.fill();
         if (style?.strokeStyle) {
-            const resetAlpha = applyLineWidth(ctx, style.lineWidth ?? 1);
+            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, scale));
             ctx.stroke();
             resetAlpha();
         }
@@ -761,7 +766,9 @@ export class CanvasDraw {
             const style = item.style;
             const rotationDeg = item.rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
-            const radius = item.radius;
+            // Cache renders at the current camera scale, so world-unit radii
+            // resolve against it (the cache rebuilds when the scale changes).
+            const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
             if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                 ctx.fillStyle = style.fillStyle;
@@ -784,7 +791,7 @@ export class CanvasDraw {
                 } else {
                     ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
                 }
-                this.fillStrokePath(ctx, style);
+                this.fillStrokePath(ctx, style, this.camera.scale);
                 ctx.restore();
             } else {
                 ctx.beginPath();
@@ -793,7 +800,7 @@ export class CanvasDraw {
                 } else {
                     ctx.rect(x, y, pxW, pxH);
                 }
-                this.fillStrokePath(ctx, style);
+                this.fillStrokePath(ctx, style, this.camera.scale);
             }
         });
 
@@ -879,7 +886,7 @@ export class CanvasDraw {
 
             ctx.beginPath();
             ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
-            this.fillStrokePath(ctx, style);
+            this.fillStrokePath(ctx, style, this.camera.scale);
         });
 
         if (!cache) {
