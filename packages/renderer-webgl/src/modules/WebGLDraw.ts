@@ -13,6 +13,7 @@ import {
     SpatialIndex,
     Text,
     VISIBILITY_BUFFER,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
@@ -33,6 +34,12 @@ const CIRCLE_STROKE_SEGMENTS = 48;
  * @internal
  */
 export class WebGLDraw {
+
+    /** Transform helpers handed to custom draw callbacks. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     private colorParser = new ColorParser();
 
     constructor(
@@ -69,11 +76,16 @@ export class WebGLDraw {
     }
 
     addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (
+            ctx: CanvasRenderingContext2D,
+            coords: Coords,
+            config: Required<CanvasTileEngineConfig>,
+            transform: DrawTransform,
+        ) => void,
         layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            fn(ctx, topLeft, config);
+            fn(ctx, topLeft, config, this.drawTransform);
         });
     }
 

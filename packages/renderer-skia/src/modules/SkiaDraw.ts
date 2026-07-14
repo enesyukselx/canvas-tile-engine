@@ -13,6 +13,7 @@ import {
     SpatialIndex,
     Text,
     VISIBILITY_BUFFER,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import {
     matchFont,
@@ -43,6 +44,12 @@ const SPATIAL_INDEX_THRESHOLD = 500;
  * @internal
  */
 export class SkiaDraw {
+
+    /** Transform helpers handed to custom draw callbacks. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     // Reusable paints, mutated per draw call (draws are immediate within a frame).
     private fillPaint: SkPaint;
     private strokePaint: SkPaint;
@@ -93,11 +100,16 @@ export class SkiaDraw {
     }
 
     addDrawFunction(
-        fn: (canvas: SkCanvas, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (
+            canvas: SkCanvas,
+            coords: Coords,
+            config: Required<CanvasTileEngineConfig>,
+            transform: DrawTransform,
+        ) => void,
         layer: number = 1
     ): DrawHandle {
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            fn(canvas, topLeft, config);
+            fn(canvas, topLeft, config, this.drawTransform);
         });
     }
 

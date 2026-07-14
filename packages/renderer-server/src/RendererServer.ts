@@ -137,6 +137,8 @@ export class RendererServer implements IRenderer<ServerMount, Image> {
             width: config.size.width,
             height: config.size.height,
             coords: topLeft,
+            worldToScreen: (x: number, y: number) => this.transformer.worldToScreen(x, y),
+            screenToWorld: (x: number, y: number) => this.transformer.screenToWorld(x, y),
         });
 
         // Coordinate overlay

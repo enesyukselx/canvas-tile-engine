@@ -2,7 +2,16 @@ import { Coords } from ".";
 
 export type onDrawCallback = (
     ctx: unknown,
-    info: { scale: number; width: number; height: number; coords: Coords },
+    info: {
+        scale: number;
+        width: number;
+        height: number;
+        coords: Coords;
+        /** Item-space world coordinate → canvas pixel position (integers are cell centers). */
+        worldToScreen(x: number, y: number): Coords;
+        /** Canvas pixel position → raw (corner-space) world coordinate, like event `coords.raw`. */
+        screenToWorld(x: number, y: number): Coords;
+    },
 ) => void;
 
 type MouseEventCallback = (
