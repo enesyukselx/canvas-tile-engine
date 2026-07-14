@@ -136,6 +136,46 @@ describe("validateConfig", () => {
             );
         });
 
+        it("throws on NaN size limits", () => {
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: NaN } })).toThrow(
+                "size.minWidth must be a finite number, got NaN",
+            );
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, maxWidth: NaN } })).toThrow(
+                "size.maxWidth must be a number, got NaN",
+            );
+            expect(() =>
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: NaN } }),
+            ).toThrow("size.minHeight must be a finite number, got NaN");
+            expect(() =>
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, maxHeight: NaN } }),
+            ).toThrow("size.maxHeight must be a number, got NaN");
+        });
+
+        it("throws on non-number size limits", () => {
+            expect(() =>
+                validateConfig({
+                    ...validConfig,
+                    size: { width: 500, height: 500, minWidth: "100" as unknown as number },
+                }),
+            ).toThrow("size.minWidth must be a finite number, got 100");
+        });
+
+        it("throws on Infinity min limits but accepts Infinity max limits", () => {
+            expect(() =>
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: Infinity } }),
+            ).toThrow("size.minWidth must be a finite number, got Infinity");
+            expect(() =>
+                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: Infinity } }),
+            ).toThrow("size.minHeight must be a finite number, got Infinity");
+            // Infinity is the documented "no limit" value for max limits
+            expect(() =>
+                validateConfig({
+                    ...validConfig,
+                    size: { width: 500, height: 500, maxWidth: Infinity, maxHeight: Infinity },
+                }),
+            ).not.toThrow();
+        });
+
         it("accepts valid minWidth <= maxWidth", () => {
             expect(() =>
                 validateConfig({ ...validConfig, size: { width: 500, height: 500, minWidth: 200, maxWidth: 800 } }),
@@ -206,6 +246,27 @@ describe("validateConfig", () => {
                 validateConfig({ ...validConfig, bounds: { minX: 0, maxX: 100, minY: 100, maxY: 50 } }),
             ).toThrow("bounds.minY (100) must be less than bounds.maxY (50)");
         });
+
+        it("throws on NaN bounds", () => {
+            expect(() =>
+                validateConfig({ ...validConfig, bounds: { minX: NaN, maxX: 100, minY: 0, maxY: 100 } }),
+            ).toThrow("bounds.minX (NaN) must be less than bounds.maxX (100)");
+            expect(() =>
+                validateConfig({ ...validConfig, bounds: { minX: 0, maxX: 100, minY: 0, maxY: NaN } }),
+            ).toThrow("bounds.minY (0) must be less than bounds.maxY (NaN)");
+        });
+
+        it("throws on degenerate infinite bounds", () => {
+            expect(() =>
+                validateConfig({ ...validConfig, bounds: { minX: Infinity, maxX: 100, minY: 0, maxY: 100 } }),
+            ).toThrow("bounds.minX (Infinity) must be less than bounds.maxX (100)");
+            expect(() =>
+                validateConfig({
+                    ...validConfig,
+                    bounds: { minX: Infinity, maxX: Infinity, minY: 0, maxY: 100 },
+                }),
+            ).toThrow("bounds.minX (Infinity) must be less than bounds.maxX (Infinity)");
+        });
     });
 });
 
@@ -241,6 +302,21 @@ describe("validateBounds", () => {
     it("throws when minY >= maxY", () => {
         expect(() => validateBounds({ minX: 0, maxX: 100, minY: 100, maxY: 50 })).toThrow(
             "bounds.minY (100) must be less than bounds.maxY (50)",
+        );
+    });
+
+    it("throws on NaN bounds", () => {
+        expect(() => validateBounds({ minX: NaN, maxX: 100, minY: 0, maxY: 100 })).toThrow(
+            "bounds.minX (NaN) must be less than bounds.maxX (100)",
+        );
+        expect(() => validateBounds({ minX: 0, maxX: 100, minY: NaN, maxY: 100 })).toThrow(
+            "bounds.minY (NaN) must be less than bounds.maxY (100)",
+        );
+    });
+
+    it("throws on degenerate infinite bounds", () => {
+        expect(() => validateBounds({ minX: 0, maxX: -Infinity, minY: 0, maxY: 100 })).toThrow(
+            "bounds.minX (0) must be less than bounds.maxX (-Infinity)",
         );
     });
 });
