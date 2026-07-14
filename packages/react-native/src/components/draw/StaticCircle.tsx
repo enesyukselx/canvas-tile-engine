@@ -24,6 +24,7 @@ export interface StaticCircleProps {
 export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer = 1 }: StaticCircleProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
+    const prevItemsRef = useRef(items);
 
     useEffect(() => {
         if (items.length === 0) {
@@ -33,7 +34,12 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
         if (prevCacheKeyRef.current !== cacheKey) {
             engine.clearStaticCache(prevCacheKeyRef.current);
             prevCacheKeyRef.current = cacheKey;
+        } else if (prevItemsRef.current !== items) {
+            // Same key, new items: the Skia backend re-records only on a cache
+            // miss, so the stale picture must be dropped here.
+            engine.clearStaticCache(cacheKey);
         }
+        prevItemsRef.current = items;
 
         const handle = engine.drawStaticCircle(items, cacheKey, layer);
         requestRender();

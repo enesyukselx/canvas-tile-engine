@@ -141,6 +141,10 @@ array identity re-registers the callback and rebuilds the spatial index for
 Item shapes are identical to the core draw API: [drawing.md](drawing.md).
 Sprite semantics: [sprites.md](sprites.md).
 
+Static components clear their cache automatically when `items` gets a new
+array identity (or when `cacheKey` changes) — no manual `clearStaticCache`
+call is needed, unlike the core API.
+
 ```tsx
 <CanvasTileEngine.DrawFunction layer={5}>
     {(ctx, topLeft, config) => {
