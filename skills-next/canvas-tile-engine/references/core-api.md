@@ -166,23 +166,28 @@ and semantics: [drawing.md](drawing.md).
 
 | Signature | Notes |
 | :-- | :-- |
-| `hitTest(point: Coords, opts?: { layer?: number }): HitResult[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
-| `hitTestFirst(point: Coords, opts?): HitResult \| undefined` | Topmost item only. |
+| `hitTest<TData>(point: Coords, opts?: { layer?: number }): HitResult<TImage, TData>[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
+| `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Topmost item only. |
 
 `HitResult` = `{ item, kind: "rect"|"circle"|"image", layer, handle, index }`;
-`index` is the item's position in the array passed to the draw call - use it
-to map back to app data. Pass `coords.raw` from event callbacks; origin
-anchoring, non-square Rect `width`/`height`, image aspect fit, and rotation
-are handled internally - the hit box is always the drawn box. Covers
-`drawStatic*` variants too; Line/Path/Text are NOT hit-testable. Position
-mutations require re-registration to be reflected (same rule as rendering).
-500+ item draw calls are queried via a spatial index - hover-frequency use is
-fine at scale.
+`item` is the exact object passed to the draw call. Every drawable item
+accepts an optional `data?: TData` field the engine never reads - attach app
+data there and read it back as `hit.item.data`. The `TData` type parameter
+types that field (assertion only, no runtime check). Prefer `data` over
+`index` for identity: `index` is the position in the array at draw time and
+goes stale when a filtered/re-ordered array is re-drawn. Pass `coords.raw`
+from event callbacks; origin anchoring, non-square Rect `width`/`height`,
+image aspect fit, and rotation are handled internally - the hit box is always
+the drawn box. Covers `drawStatic*` variants too; Line/Path/Text are NOT
+hit-testable. Position mutations require re-registration to be reflected
+(same rule as rendering). 500+ item draw calls are queried via a spatial
+index - hover-frequency use is fine at scale.
 
 ```ts
+engine.drawRect(stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })), 2);
 engine.onClick = (coords) => {
-    const hit = engine.hitTestFirst(coords.raw);
-    if (hit) openPanel(stations[hit.index]);
+    const hit = engine.hitTestFirst<Station>(coords.raw);
+    if (hit?.item.data) openPanel(hit.item.data);
 };
 ```
 
