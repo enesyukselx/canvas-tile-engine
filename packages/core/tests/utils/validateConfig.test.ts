@@ -143,12 +143,12 @@ describe("validateConfig", () => {
             expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, maxWidth: NaN } })).toThrow(
                 "size.maxWidth must be a number, got NaN",
             );
-            expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: NaN } }),
-            ).toThrow("size.minHeight must be a finite number, got NaN");
-            expect(() =>
-                validateConfig({ ...validConfig, size: { width: 500, height: 500, maxHeight: NaN } }),
-            ).toThrow("size.maxHeight must be a number, got NaN");
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, minHeight: NaN } })).toThrow(
+                "size.minHeight must be a finite number, got NaN",
+            );
+            expect(() => validateConfig({ ...validConfig, size: { width: 500, height: 500, maxHeight: NaN } })).toThrow(
+                "size.maxHeight must be a number, got NaN",
+            );
         });
 
         it("throws on non-number size limits", () => {
