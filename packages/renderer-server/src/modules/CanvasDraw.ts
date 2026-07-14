@@ -178,11 +178,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
         });
     }
 
-    drawLine(
-        items: Array<Line> | Line,
-        style?: LineStyle,
-        layer: number = 1,
-    ): DrawHandle {
+    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
@@ -316,11 +312,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
         });
     }
 
-    drawPath(
-        items: Array<Path> | Path,
-        style?: LineStyle,
-        layer: number = 1,
-    ): DrawHandle {
+    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {

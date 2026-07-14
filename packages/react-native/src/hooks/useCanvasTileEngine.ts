@@ -74,11 +74,7 @@ export interface EngineHandle {
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
     drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
-    drawPath(
-        items: Coords[] | Coords[][],
-        style?: LineStyle,
-        layer?: number,
-    ): DrawHandle;
+    drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
     drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
     drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;

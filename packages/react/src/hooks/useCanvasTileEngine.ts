@@ -167,11 +167,7 @@ export interface EngineHandle {
     drawText(items: Text | Text[], layer?: number): DrawHandle;
 
     /** Draw paths/polylines */
-    drawPath(
-        items: Coords[] | Coords[][],
-        style?: LineStyle,
-        layer?: number,
-    ): DrawHandle;
+    drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
 
     /** Draw images */
     drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle;

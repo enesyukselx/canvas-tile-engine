@@ -50,10 +50,7 @@ export function resolveLineDashPx(style: LineDashStyle | undefined, scale: numbe
  * Border radius in screen pixels. `radius` is world units; single values and
  * per-corner arrays are both supported.
  */
-export function resolveRadiusPx(
-    radius: number | number[] | undefined,
-    scale: number,
-): number | number[] | undefined {
+export function resolveRadiusPx(radius: number | number[] | undefined, scale: number): number | number[] | undefined {
     if (radius === undefined) return undefined;
     return Array.isArray(radius) ? radius.map((v) => v * scale) : radius * scale;
 }

@@ -204,11 +204,7 @@ export class WebGLDraw {
         });
     }
 
-    drawLine(
-        items: Array<Line> | Line,
-        style?: LineStyle,
-        layer: number = 1,
-    ): DrawHandle {
+    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
@@ -282,11 +278,7 @@ export class WebGLDraw {
         });
     }
 
-    drawPath(
-        items: Array<Path> | Path,
-        style?: LineStyle,
-        layer: number = 1,
-    ): DrawHandle {
+    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
