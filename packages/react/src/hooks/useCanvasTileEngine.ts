@@ -12,6 +12,7 @@ import type {
     Circle,
     Line,
     Rect,
+    LineStyle,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -160,7 +161,7 @@ export interface EngineHandle {
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
 
     /** Draw lines */
-    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle;
+    drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
 
     /** Draw text */
     drawText(items: Text | Text[], layer?: number): DrawHandle;
@@ -168,7 +169,7 @@ export interface EngineHandle {
     /** Draw paths/polylines */
     drawPath(
         items: Coords[] | Coords[][],
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer?: number,
     ): DrawHandle;
 

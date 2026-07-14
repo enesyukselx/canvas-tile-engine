@@ -12,6 +12,7 @@ import type {
     Line,
     Rect,
     Text,
+    LineStyle,
 } from "@canvas-tile-engine/core";
 import type { SkiaMount, SkCanvas, SkImage } from "@canvas-tile-engine/renderer-skia";
 
@@ -71,11 +72,11 @@ export interface EngineHandle {
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
-    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle;
+    drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
     drawPath(
         items: Coords[] | Coords[][],
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer?: number,
     ): DrawHandle;
     drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
