@@ -5,9 +5,9 @@ import { SpatialIndex } from "./SpatialIndex";
 export type HitKind = "rect" | "circle" | "image";
 
 /** A single hit returned by `hitTest`, ordered by visual priority. */
-export type HitResult<TImage = unknown> = {
+export type HitResult<TImage = unknown, TData = unknown> = {
     /** The original item object passed to the draw call. */
-    item: Rect | Circle | ImageItem<TImage>;
+    item: Rect<TData> | Circle<TData> | ImageItem<TImage, TData>;
     /** Which primitive kind the item was drawn as. */
     kind: HitKind;
     /** Layer the item is drawn on. */
@@ -105,7 +105,7 @@ export class HitTester {
     }
 
     /** All items under `point` (world coords), highest visual priority first. */
-    hitTest(point: Coords, opts?: HitTestOptions): HitResult[] {
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<unknown, TData>[] {
         const results: Array<HitResult & { seq: number }> = [];
         const padding = Math.max(0, opts?.padding ?? 0);
 
@@ -149,12 +149,13 @@ export class HitTester {
         // Visual priority: higher layer first; within a layer, later
         // registration first; within a draw call, later item first.
         results.sort((a, b) => b.layer - a.layer || b.seq - a.seq || b.index - a.index);
-        return results.map(({ seq: _seq, ...hit }) => hit);
+        // TData is caller-asserted: the registry stores items as unknown-data.
+        return results.map(({ seq: _seq, ...hit }) => hit) as HitResult<unknown, TData>[];
     }
 
     /** The topmost item under `point`, or undefined. */
-    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult | undefined {
-        return this.hitTest(point, opts)[0];
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<unknown, TData> | undefined {
+        return this.hitTest<TData>(point, opts)[0];
     }
 
     private ensureIndex(entry: HitEntry): void {

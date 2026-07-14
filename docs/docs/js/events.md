@@ -283,12 +283,18 @@ offset math. Pass the `coords.raw` value from any event callback; origin
 anchoring, image aspect fit, and rotation are handled internally.
 
 ```ts
+type Station = { id: string; name: string };
+
+// Attach your own data to items when drawing:
+engine.drawRect(
+    stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })),
+    2,
+);
+
 engine.onClick = (coords) => {
-    const hit = engine.hitTestFirst(coords.raw);
-    if (!hit) return;
-    // hit.index is the item's position in the array you passed to drawX -
-    // use it to reach your own richer data:
-    openStationPanel(stations[hit.index]);
+    const hit = engine.hitTestFirst<Station>(coords.raw);
+    if (!hit?.item.data) return;
+    openStationPanel(hit.item.data); // typed as Station
 };
 
 // All overlapping items, highest visual priority first
@@ -306,6 +312,15 @@ Semantics to know:
 
 - Works for `drawRect` / `drawCircle` / `drawImage` and their `drawStatic*`
   variants. Line, Path, and Text items are not hit-testable.
+- Every drawable item accepts an optional `data` field. The engine never
+  reads it - it is carried through to `hit.item.data` so you can identify
+  what was hit. The `TData` type parameter on `hitTest<TData>` /
+  `hitTestFirst<TData>` types that field for you; it is an assertion, not a
+  runtime check.
+- `hit.item` is the exact object you passed to the draw call (same
+  reference), and `hit.index` is its position in that array at draw time.
+  Prefer `data` for identity - indexes go stale when you re-draw a filtered
+  or re-ordered array.
 - Like rendering, results reflect item positions as of the draw call:
   mutating an item's position requires re-registration (style mutation is
   unaffected).

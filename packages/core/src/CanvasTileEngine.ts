@@ -753,28 +753,35 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * `padding` (world units) and `paddingPx` (screen pixels, zoom
      * independent) expand every item's hit geometry outward - generous
      * touch targets around small markers without invisible helper items.
+     *
+     * `TData` types the `data` field of returned items — it is an assertion,
+     * not checked at runtime, so only pass it when every hit-testable item
+     * carries that data shape (or narrow per hit).
      * @param point World coordinates (e.g. `coords.raw` from onClick/onHover).
      * @param opts Optional filters, e.g. `{ layer: 2, padding: 0.5 }`.
      * @example
      * ```ts
      * engine.onClick = (coords) => {
      *     // Accept clicks up to 0.6 world units around each station dot
-     *     const hit = engine.hitTestFirst(coords.raw, { padding: 0.6 });
-     *     if (hit) openPanel(stations[hit.index]);
+     *     const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
+     *     if (hit?.item.data) openPanel(hit.item.data);
      * };
      * ```
      */
-    hitTest(point: Coords, opts?: HitTestOptions): HitResult<TImage>[] {
-        return this.hitTester.hitTest(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as HitResult<TImage>[];
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<TImage, TData>[] {
+        return this.hitTester.hitTest<TData>(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as HitResult<
+            TImage,
+            TData
+        >[];
     }
 
     /**
      * The topmost item under a world point, or `undefined`.
      * See {@link hitTest} for semantics.
      */
-    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<TImage> | undefined {
-        return this.hitTester.hitTestFirst(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as
-            | HitResult<TImage>
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<TImage, TData> | undefined {
+        return this.hitTester.hitTestFirst<TData>(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as
+            | HitResult<TImage, TData>
             | undefined;
     }
 

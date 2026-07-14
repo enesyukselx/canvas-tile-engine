@@ -198,10 +198,10 @@ export interface EngineHandle {
      * priority first. Pass `coords.raw` from event callbacks. Empty before
      * mount.
      */
-    hitTest(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement>[];
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement, TData>[];
 
     /** The topmost item under a world point, or undefined. */
-    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement> | undefined;
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement, TData> | undefined;
 
     /** Image loader instance (undefined until engine mounts) */
     readonly images: CanvasTileEngineCore["images"] | undefined;
@@ -407,12 +407,12 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.removeDrawHandle(handle);
             },
 
-            hitTest(point, opts) {
-                return instanceRef.current?.hitTest(point, opts) ?? [];
+            hitTest<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTest<TData>(point, opts) ?? [];
             },
 
-            hitTestFirst(point, opts) {
-                return instanceRef.current?.hitTestFirst(point, opts);
+            hitTestFirst<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTestFirst<TData>(point, opts);
             },
 
             loadImage(src: string, retry?: number) {

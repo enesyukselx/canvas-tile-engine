@@ -90,10 +90,15 @@ For "which item did the user click/hover?" use the built-in hit testing -
 do NOT build coordinate lookup maps or hand-roll box math (the 0.5 cell
 offset is easy to get wrong):
 
+Attach app data to items with the `data` field (never read by the engine)
+and read it back from the hit - do not rely on `hit.index`, which goes stale
+when a filtered/re-ordered array is re-drawn:
+
 ```ts
+engine.drawCircle(stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })), 2);
 engine.onClick = (coords) => {
-    const hit = engine.hitTestFirst(coords.raw); // raw, not snapped
-    if (hit) select(stations[hit.index]); // index -> your data array
+    const hit = engine.hitTestFirst<Station>(coords.raw); // raw, not snapped
+    if (hit?.item.data) select(hit.item.data); // typed as Station
 };
 ```
 
@@ -115,11 +120,12 @@ const engine = useCanvasTileEngine();
 <CanvasTileEngine
     engine={engine}
     onClick={(coords) => {
-        const hit = engine.hitTestFirst(coords.raw);
-        if (hit) setSelected(hit.index); // index into the items array below
+        const hit = engine.hitTestFirst<Station>(coords.raw);
+        setSelected(hit?.item.data ?? null); // data attached to items below
     }}
     /* ... */
 >
+    {/* stationDots items carry data: station */}
     <CanvasTileEngine.Circle items={stationDots} layer={2} />
 </CanvasTileEngine>;
 ```
