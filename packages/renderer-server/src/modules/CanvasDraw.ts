@@ -45,7 +45,6 @@ interface StaticCache {
  * @internal
  */
 export class CanvasDraw implements IDrawAPI<Image> {
-
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),

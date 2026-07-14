@@ -144,12 +144,7 @@ export interface EngineHandle {
 
     /** Register a custom draw function */
     addDrawFunction(
-        fn: (
-            ctx: unknown,
-            coords: Coords,
-            config: Required<CanvasTileEngineConfig>,
-            transform: DrawTransform,
-        ) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
     ): DrawHandle;
 

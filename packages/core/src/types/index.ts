@@ -105,12 +105,7 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
 
 export interface IDrawAPI<TImage = HTMLImageElement> {
     addDrawFunction(
-        fn: (
-            ctx: unknown,
-            coords: Coords,
-            config: Required<CanvasTileEngineConfig>,
-            transform: DrawTransform,
-        ) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
     ): DrawHandle;
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;

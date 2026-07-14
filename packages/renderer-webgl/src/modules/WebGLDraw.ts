@@ -34,7 +34,6 @@ const CIRCLE_STROKE_SEGMENTS = 48;
  * @internal
  */
 export class WebGLDraw {
-
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
