@@ -81,6 +81,41 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    describe("programmatic resize fires onResize once", () => {
+        // Every renderer's resizeWithAnimation completion invokes its own
+        // onResize (the engine setter mirrors the user callback into the
+        // renderer) and then the engine-supplied onComplete. The engine must
+        // not invoke the callback again from onComplete.
+        function createEngineWithResizingRenderer() {
+            const renderer = createMockRenderer();
+            (renderer.resizeWithAnimation as ReturnType<typeof vi.fn>).mockImplementation(
+                (_w: number, _h: number, _d: number, onComplete?: () => void) => {
+                    renderer.onResize?.();
+                    onComplete?.();
+                },
+            );
+            return new CanvasTileEngine<Mount>({}, baseConfig, renderer);
+        }
+
+        it("invokes the user onResize callback exactly once", () => {
+            const e = createEngineWithResizingRenderer();
+            const onResize = vi.fn();
+            e.onResize = onResize;
+
+            e.resize(400, 300, 0);
+            expect(onResize).toHaveBeenCalledTimes(1);
+        });
+
+        it("invokes onResize before the caller's onComplete", () => {
+            const e = createEngineWithResizingRenderer();
+            const order: string[] = [];
+            e.onResize = () => order.push("onResize");
+
+            e.resize(400, 300, 0, () => order.push("onComplete"));
+            expect(order).toEqual(["onResize", "onComplete"]);
+        });
+    });
+
     describe("gridAligned initial center snapping", () => {
         // Integers are cell centers (cell k spans [k-0.5, k+0.5]), so an even
         // tile count needs a half-integer center and an odd tile count needs
