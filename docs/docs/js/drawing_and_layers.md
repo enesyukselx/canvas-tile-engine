@@ -52,13 +52,14 @@ drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 | `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.         |
 | `height` | `number`             | `size`                             | Height in world units (only for `drawRect`).                                                                                    |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                |
-| `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
+| `radius` | `number \| number[]` | -                                  | Border radius in world units (scales with zoom). Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
 
 **Style Options:**
 
 -   `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
 -   `strokeStyle`: Border color
--   `lineWidth`: Border width in pixels
+-   `lineWidth`: Border width in world units; scales with zoom like the shape
+-   `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
 
 ```typescript
 // Draw a blue square on layer 1
@@ -102,7 +103,7 @@ engine.drawRect(
         x: 10,
         y: 5,
         size: 1,
-        radius: 8, // 8px radius for all corners
+        radius: 0.15, // world units: corners stay proportional at every zoom
         style: { fillStyle: "#2ecc71" },
     },
     1
@@ -114,7 +115,7 @@ engine.drawRect(
         x: 12,
         y: 5,
         size: 1,
-        radius: [10, 0, 10, 0], // Diagonal rounded corners
+        radius: [0.2, 0, 0.2, 0], // Diagonal rounded corners
         style: { fillStyle: "#9b59b6" },
     },
     1
@@ -149,7 +150,7 @@ engine.drawRect(
 Draw a straight line between two points. Supports single object or array of objects.
 
 ```typescript
-drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle
+drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle
 ```
 
 **Line Properties:**
@@ -161,13 +162,13 @@ drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: numbe
 
 ```typescript
 // Single line
-engine.drawLine({ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }, { strokeStyle: "#fb8500", lineWidth: 3 }, 1);
+engine.drawLine({ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }, { strokeStyle: "#fb8500", lineWidthPx: 3 }, 1);
 
 // Multiple lines
 engine.drawLine([
     { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
     { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
-], { strokeStyle: "red", lineWidth: 2 }, 1);
+], { strokeStyle: "red", lineWidthPx: 2 }, 1);
 ```
 
 ### `drawPath`
@@ -175,10 +176,27 @@ engine.drawLine([
 Draw a continuous line through multiple points. Supports a single path (array of points) or an array of paths.
 
 ```typescript
-drawPath(items: Path | Path[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle
+drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle
 ```
 
 **Path:** An array of `{ x, y }` coordinates.
+
+**`LineStyle`** (shared by `drawLine` and `drawPath`):
+
+| Property | Unit | Description |
+| :-- | :-- | :-- |
+| `strokeStyle` | - | Line color. |
+| `lineWidth` | world | Thickness scales with zoom (a road/river that belongs to the world). |
+| `lineWidthPx` | px | Zoom-independent thickness (cartographic lines); wins over `lineWidth`. |
+| `lineDash` | world | Dash pattern anchored to the world; dashes scale with zoom. |
+| `lineDashPx` | px | Zoom-independent dash pattern; wins over `lineDash`. |
+
+Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat). Along a `Path`, the pattern flows continuously around corners.
+
+```typescript
+// A ferry route: 3px dashed line at every zoom level
+engine.drawPath(ferryPoints, { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] }, 1);
+```
 
 ```typescript
 // Single path
@@ -188,7 +206,7 @@ engine.drawPath(
         { x: 5, y: 0 },
         { x: 5, y: 5 },
     ],
-    { strokeStyle: "#219ebc", lineWidth: 2 },
+    { strokeStyle: "#219ebc", lineWidthPx: 2 },
     1
 );
 
@@ -198,7 +216,7 @@ engine.drawPath(
         [{ x: 0, y: 0 }, { x: 5, y: 5 }],
         [{ x: 10, y: 0 }, { x: 15, y: 5 }],
     ],
-    { strokeStyle: "green", lineWidth: 1 },
+    { strokeStyle: "green", lineWidthPx: 1 },
     1
 );
 ```
@@ -419,7 +437,7 @@ const miniMapItems = items.map((item) => ({
     size: 0.9,
     style: { fillStyle: item.color },
     rotate: item.rotation, // Optional rotation in degrees
-    radius: 4, // Optional rounded corners
+    radius: 0.1, // Optional rounded corners
 }));
 
 // "minimap-items" is a unique cache key

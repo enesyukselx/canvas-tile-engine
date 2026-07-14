@@ -63,9 +63,14 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
         x?: number;               // 0..1, default 0.5
         y?: number;               // 0..1, default 0.5
     };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        lineWidth?: number;    // border width in WORLD units (scales with zoom)
+        lineWidthPx?: number;  // border width in screen px (zoom-independent); wins over lineWidth
+    };
     rotate?: number;          // degrees, positive = clockwise (Rect/Image only)
-    radius?: number | number[]; // px corner radius (Rect only);
+    radius?: number | number[]; // corner radius in WORLD units, scales with zoom (Rect only);
                               // array = [topLeft, topRight, bottomRight, bottomLeft]
 }
 ```
@@ -97,8 +102,8 @@ Adds to the shared fields:
 ```
 
 ```ts
-engine.drawRect({ x: 2, y: 3, size: 1, rotate: 45, radius: 6,
-                  style: { fillStyle: "#22c55e", strokeStyle: "#166534", lineWidth: 2 } }, 1);
+engine.drawRect({ x: 2, y: 3, size: 1, rotate: 45, radius: 0.12,
+                  style: { fillStyle: "#22c55e", strokeStyle: "#166534", lineWidth: 0.05 } }, 1);
 engine.drawRect(rectArray, 1);   // arrays are the fast path for many items
 
 // Non-square: one 4x2 zone floor instead of 8 one-cell rects
@@ -178,20 +183,27 @@ animation: [sprites.md](sprites.md).
 // Line: independent segments
 engine.drawLine(
     [{ from: { x: 0, y: 0 }, to: { x: 5, y: 5 } }],
-    { strokeStyle: "#f59e0b", lineWidth: 2 },
+    { strokeStyle: "#f59e0b", lineWidthPx: 2 },
     1,
 );
 
 // Path: polyline through points (Path = Coords[]; pass Path or Path[])
 engine.drawPath(
     [{ x: 0, y: 0 }, { x: 2, y: 1 }, { x: 4, y: 0 }],
-    { strokeStyle: "#a78bfa", lineWidth: 2 },
+    { strokeStyle: "#a78bfa", lineWidthPx: 2 },
     1,
 );
+
+// Dashed (e.g. ferry routes, planned segments): lineDash is world units,
+// lineDashPx is screen px and wins. Pattern flows around Path corners.
+engine.drawPath(route, { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] }, 1);
 ```
 
 Note the style object is a separate second argument for Line/Path (not per
-item).
+item). LineStyle = { strokeStyle?, lineWidth? (world), lineWidthPx?,
+lineDash? (world), lineDashPx? }. UNIT RULE (matches Text size/fontPx):
+plain numbers are world units and scale with zoom; *Px variants are screen
+pixels and take precedence. GridLines lineWidth stays px by design.
 
 ### Grid lines
 

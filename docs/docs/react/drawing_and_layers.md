@@ -49,13 +49,14 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.         |
 | `height` | `number`             | `size`                             | Height in world units (only for `Rect`).                                                                                    |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `Rect`).                                                                                |
-| `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`). |
+| `radius` | `number \| number[]` | -                                  | Border radius in world units (scales with zoom). Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`). |
 
 **Style Options:**
 
 -   `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
 -   `strokeStyle`: Border color
--   `lineWidth`: Border width in pixels
+-   `lineWidth`: Border width in world units; scales with zoom like the shape
+-   `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
 
 ```tsx
 <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
@@ -66,7 +67,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
     <CanvasTileEngine.Rect items={{ x: 8, y: 5, size: 1, rotate: 45, style: { fillStyle: "#ff6b6b" } }} layer={1} />
 
     {/* Rounded rectangle */}
-    <CanvasTileEngine.Rect items={{ x: 10, y: 5, size: 1, radius: 8, style: { fillStyle: "#2ecc71" } }} layer={1} />
+    <CanvasTileEngine.Rect items={{ x: 10, y: 5, size: 1, radius: 0.15, style: { fillStyle: "#2ecc71" } }} layer={1} />
 
     {/* Non-square rectangle: a 4x2 zone floor */}
     <CanvasTileEngine.Rect
@@ -76,7 +77,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 
     {/* Different corner radii */}
     <CanvasTileEngine.Rect
-        items={{ x: 12, y: 5, size: 1, radius: [10, 0, 10, 0], style: { fillStyle: "#9b59b6" } }}
+        items={{ x: 12, y: 5, size: 1, radius: [0.2, 0, 0.2, 0], style: { fillStyle: "#9b59b6" } }}
         layer={1}
     />
 
@@ -104,7 +105,7 @@ Draw straight lines between two points.
 | Prop    | Type                                           | Default      | Description       |
 | :------ | :--------------------------------------------- | :----------- | :---------------- |
 | `items` | `Line \| Line[]`                               | **Required** | Line definitions. |
-| `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Line style.       |
+| `style` | `LineStyle` | -            | Line style.       |
 | `layer` | `number`                                       | `1`          | Rendering layer.  |
 
 **Line Properties:** `{ from: { x, y }, to: { x, y } }`
@@ -113,7 +114,7 @@ Draw straight lines between two points.
 {/* Single line */}
 <CanvasTileEngine.Line
     items={{ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }}
-    style={{ strokeStyle: "#fb8500", lineWidth: 3 }}
+    style={{ strokeStyle: "#fb8500", lineWidthPx: 3 }}
     layer={1}
 />
 
@@ -123,7 +124,7 @@ Draw straight lines between two points.
         { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
         { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
     ]}
-    style={{ strokeStyle: "red", lineWidth: 2 }}
+    style={{ strokeStyle: "red", lineWidthPx: 2 }}
     layer={1}
 />
 ```
@@ -135,7 +136,7 @@ Draw continuous lines through multiple points.
 | Prop    | Type                                           | Default      | Description      |
 | :------ | :--------------------------------------------- | :----------- | :--------------- |
 | `items` | `Path \| Path[]`                               | **Required** | Points array.    |
-| `style` | `{ strokeStyle?: string, lineWidth?: number }` | -            | Path style.      |
+| `style` | `LineStyle` | -            | Path style.      |
 | `layer` | `number`                                       | `1`          | Rendering layer. |
 
 **Path:** An array of `{ x, y }` coordinates.
@@ -148,7 +149,7 @@ Draw continuous lines through multiple points.
         { x: 5, y: 0 },
         { x: 5, y: 5 },
     ]}
-    style={{ strokeStyle: "#219ebc", lineWidth: 2 }}
+    style={{ strokeStyle: "#219ebc", lineWidthPx: 2 }}
     layer={1}
 />
 
@@ -158,7 +159,7 @@ Draw continuous lines through multiple points.
         [{ x: 0, y: 0 }, { x: 5, y: 5 }],
         [{ x: 10, y: 0 }, { x: 15, y: 5 }],
     ]}
-    style={{ strokeStyle: "green", lineWidth: 1 }}
+    style={{ strokeStyle: "green", lineWidthPx: 1 }}
     layer={1}
 />
 ```
@@ -411,7 +412,7 @@ const miniMapItems = useMemo(
             size: 0.9,
             style: { fillStyle: item.color },
             rotate: item.rotation,
-            radius: 4,
+            radius: 0.1,
         })),
     [items]
 );

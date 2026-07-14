@@ -44,6 +44,10 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    `y`, `size` are in world (tile) units. `config.scale` is pixels per world
    unit; zooming changes it between `minScale` and `maxScale`. Text `size` is
    also in world units (or use `fontPx` for a zoom-independent pixel size).
+   The same rule covers styling: `lineWidth`, `radius`, and `lineDash` are
+   world units that scale with zoom; the `lineWidthPx`/`lineDashPx` opt-ins
+   are screen pixels and take precedence (GridLines' `lineWidth` is the one
+   px exception).
    Crucially, an item at integer `k` is centered on its
    cell: cell `k` spans world `[k - 0.5, k + 0.5]`, grid lines fall on
    half-integers, and a board of cells `0..N-1` is centered at `(N-1)/2`
