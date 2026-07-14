@@ -92,9 +92,9 @@ export interface EngineHandle {
      * priority first. Pass `coords.raw` from event callbacks. Empty before
      * mount.
      */
-    hitTest(point: Coords, opts?: HitTestOptions): HitResult<SkImage>[];
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData>[];
     /** The topmost item under a world point, or undefined. */
-    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<SkImage> | undefined;
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData> | undefined;
 
     readonly images: SkiaEngine["images"] | undefined;
     /** Decode and cache an image from a URI, resolving to a Skia `SkImage`. */
@@ -242,12 +242,12 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.removeDrawHandle(handle);
             },
 
-            hitTest(point, opts) {
-                return instanceRef.current?.hitTest(point, opts) ?? [];
+            hitTest<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTest<TData>(point, opts) ?? [];
             },
 
-            hitTestFirst(point, opts) {
-                return instanceRef.current?.hitTestFirst(point, opts);
+            hitTestFirst<TData>(point: Coords, opts?: HitTestOptions) {
+                return instanceRef.current?.hitTestFirst<TData>(point, opts);
             },
 
             loadImage(src, retry) {
