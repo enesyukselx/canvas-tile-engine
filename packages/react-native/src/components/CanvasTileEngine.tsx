@@ -352,13 +352,17 @@ function CanvasTileEngineBase({
         // gesture, whose lift would otherwise look like a clean tap.
         const suppressTap =
             multiTouchRef.current || Date.now() - lastMultiTouchAtRef.current < MULTI_TOUCH_TAP_COOLDOWN_MS;
-        // The changed pointer triggers the engine's own mouseUp/click path, so
-        // it is withheld whenever taps are suppressed: if iOS dropped the
-        // second finger's start event, the engine never entered pinch mode and
-        // would otherwise treat the final lift as a clean tap.
-        const changed = suppressTap ? undefined : toPointer(e.nativeEvent);
+        // touchEnd is dispatched without the changed pointer: the engine's
+        // touch-end mouseUp/click path would double-fire onClick alongside
+        // dispatchTap below. onMouseUp is raised via dispatchPointerUp instead,
+        // and click is owned solely by this component's tap detection (whose
+        // move threshold tolerates finger jitter the engine's path does not).
         touchCountRef.current = remaining.length;
-        rendererRef.current.dispatchTouchEnd(remaining, changed);
+        rendererRef.current.dispatchTouchEnd(remaining);
+        // Withheld whenever taps are suppressed: if iOS dropped the second
+        // finger's start event, the engine never entered pinch mode and would
+        // otherwise treat the final lift as a clean single-pointer release.
+        if (!suppressTap) rendererRef.current.dispatchPointerUp(toPointer(e.nativeEvent));
 
         const tap = tapRef.current;
         if (allowTap && !suppressTap && tap && !tap.moved && Date.now() - tap.time < TAP_TIME_THRESHOLD) {
