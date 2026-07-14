@@ -126,6 +126,9 @@ export interface EngineHandle {
     /** Set the canvas scale directly, clamped to min/max bounds. */
     setScale(newScale: number): void;
 
+    /** Animate the canvas scale to a target value, clamped to min/max bounds */
+    goScale(targetScale: number, durationMs?: number, onComplete?: () => void): void;
+
     /** Zoom in by a factor (default: 1.5) */
     zoomIn(factor?: number): void;
 
@@ -322,6 +325,10 @@ export function useCanvasTileEngine(): EngineHandle {
 
             setScale(newScale: number) {
                 instanceRef.current?.setScale(newScale);
+            },
+
+            goScale(targetScale: number, durationMs?: number, onComplete?: () => void) {
+                instanceRef.current?.goScale(targetScale, durationMs, onComplete);
             },
 
             zoomIn(factor?: number) {

@@ -57,6 +57,7 @@ export interface EngineHandle {
     getSize(): { width: number; height: number };
     getScale(): number;
     setScale(newScale: number): void;
+    goScale(targetScale: number, durationMs?: number, onComplete?: () => void): void;
     zoomIn(factor?: number): void;
     zoomOut(factor?: number): void;
     getConfig(): Required<CanvasTileEngineConfig> | undefined;
@@ -167,6 +168,9 @@ export function useCanvasTileEngine(): EngineHandle {
             },
             setScale(newScale) {
                 instanceRef.current?.setScale(newScale);
+            },
+            goScale(targetScale, durationMs, onComplete) {
+                instanceRef.current?.goScale(targetScale, durationMs, onComplete);
             },
             zoomIn(factor) {
                 instanceRef.current?.zoomIn(factor);

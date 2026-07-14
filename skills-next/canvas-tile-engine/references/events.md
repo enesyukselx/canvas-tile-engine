@@ -50,7 +50,7 @@ engine.onCoordsChange = (center: Coords) => {};
 // minimaps, URL state, or coordinate readouts.
 
 engine.onZoom = (scale: number) => {};
-// Fires on ANY scale change: wheel, pinch, setScale, zoomIn, zoomOut,
+// Fires on ANY scale change: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
 // and preserve-viewport responsive resizes (the resize changes the scale).
 
 engine.onResize = () => {};

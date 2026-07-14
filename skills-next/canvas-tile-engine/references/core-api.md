@@ -126,6 +126,7 @@ after mount.
 | `goCoords(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
 | `getScale(): number` | Current scale (px per world unit). |
 | `setScale(n): void` | Set scale directly, clamped to min/max. |
+| `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
 | `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
 | `getSize(): { width, height }` | Current logical canvas size in px. |
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
@@ -287,6 +288,6 @@ renderer authors; app code normally only needs `CanvasTileEngine`,
 ## Validation errors
 
 `scale` must be a positive finite number and coordinates finite numbers;
-`setScale`, `updateCoords`, and `goCoords` throw `ConfigValidationError`
-otherwise. Config normalization fills every optional field with the defaults
+`setScale`, `goScale`, `updateCoords`, and `goCoords` throw
+`ConfigValidationError` otherwise. Config normalization fills every optional field with the defaults
 listed above.

@@ -129,7 +129,7 @@ engine.onCoordsChange = (center) => {
 
 ### `onZoom`
 
-Fires when the scale changes through wheel, pinch, `setScale`, `zoomIn`, or `zoomOut`.
+Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut`.
 
 ```ts
 engine.onZoom = (scale) => {
@@ -391,6 +391,7 @@ Events often drive camera or viewport updates.
 engine.updateCoords({ x: 10, y: 10 });
 engine.goCoords(0, 0, 500);
 engine.setScale(64);
+engine.goScale(64, 500);
 engine.zoomIn();
 engine.zoomOut();
 engine.resize(1024, 768, 300);

@@ -70,6 +70,45 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    // Node has no requestAnimationFrame, so goScale completes instantly here;
+    // frame-by-frame interpolation is covered by the AnimationController tests.
+    describe("goScale", () => {
+        it("reaches the target scale and fires onZoom", () => {
+            engine.goScale(1.5, 0);
+            expect(engine.getScale()).toBe(1.5);
+            expect(onZoom).toHaveBeenCalledWith(1.5);
+        });
+
+        it("clamps the target to maxScale", () => {
+            engine.goScale(10, 0);
+            expect(engine.getScale()).toBe(2);
+        });
+
+        it("does not fire onZoom when already at the target scale", () => {
+            engine.goScale(1, 0);
+            expect(onZoom).not.toHaveBeenCalled();
+        });
+
+        it("keeps the viewport center fixed while zooming", () => {
+            const before = engine.getCenterCoords();
+            engine.goScale(2, 0);
+            const after = engine.getCenterCoords();
+            expect(after.x).toBeCloseTo(before.x);
+            expect(after.y).toBeCloseTo(before.y);
+        });
+
+        it("calls onComplete when the animation finishes", () => {
+            const onComplete = vi.fn();
+            engine.goScale(1.5, 0, onComplete);
+            expect(onComplete).toHaveBeenCalled();
+        });
+
+        it("rejects invalid scale values", () => {
+            expect(() => engine.goScale(-1)).toThrow();
+            expect(() => engine.goScale(NaN)).toThrow();
+        });
+    });
+
     describe("setBounds", () => {
         it("fires onCoordsChange since bounds can clamp the camera", () => {
             // Engine starts centered at (0, 0); these bounds force a clamp.
