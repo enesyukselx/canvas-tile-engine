@@ -48,7 +48,8 @@ canvas-tile-engine/
 │   └── renderer-server/      # game-map (Node.js image output)
 │
 ├── docs/                     # Docusaurus documentation site (versioned)
-├── skills/                   # AI agent skill + Claude Code plugin manifest
+├── skills/                   # AI agent skill (published packages) + Claude Code plugin manifest
+├── skills-next/              # Upcoming copy of the skill - edit this one in feature PRs
 ├── .claude-plugin/           # Plugin marketplace catalog
 └── .changeset/               # Changesets release management
 ```
@@ -246,7 +247,7 @@ PRs that only touch docs, examples, CI, or internal tooling do not need a change
 
 3. **Add a changeset** if the PR changes a published package (`pnpm changeset`)
 
-4. **Update docs and the AI skill** if the change affects usage or the public API: `docs/` (both `docs/docs/` and the current `docs/versioned_docs/` copy when it applies to the released version) and `skills/canvas-tile-engine/` (SKILL.md + references)
+4. **Update docs and the AI skill** if the change affects usage or the public API: `docs/docs/` (the upcoming docs version) and `skills-next/canvas-tile-engine/` (SKILL.md + references). Do not edit `docs/versioned_docs/` or `skills/canvas-tile-engine/` for unreleased changes - both describe the published packages and are synced from their upcoming copies at release time.
 
 5. **Push to your fork** and open a Pull Request
 
@@ -256,8 +257,8 @@ PRs that only touch docs, examples, CI, or internal tooling do not need a change
 - [ ] All tests pass
 - [ ] New code is covered by tests
 - [ ] Changeset added (if a published package changed)
-- [ ] `docs/` updated (if usage or the public API changed)
-- [ ] AI skill (`skills/canvas-tile-engine/`) updated (if usage or the public API changed)
+- [ ] `docs/docs/` updated (if usage or the public API changed)
+- [ ] AI skill (`skills-next/canvas-tile-engine/`) updated (if usage or the public API changed)
 - [ ] Commit messages follow conventional commits
 - [ ] PR description clearly explains the changes
 
@@ -315,12 +316,14 @@ Build check from the repo root: `pnpm build:docs`.
 - **Guides**: `docs/docs/introduction/`
 - **API docs**: `docs/docs/js/`, `docs/docs/react/`, `docs/docs/react-native/`, `docs/docs/server/`
 
-The docs site is versioned. `docs/docs/` is the upcoming version; `docs/versioned_docs/version-0.x.x/` is the published one. When a change applies to the current release, update both copies and keep them identical.
+The docs site is versioned. `docs/docs/` is the upcoming version; `docs/versioned_docs/version-0.x.x/` is the published one. Unreleased changes go to `docs/docs/` only - the maintainer carries them into `versioned_docs` when cutting a release. Only edit `versioned_docs` directly to fix documentation of already-published behavior.
+
+The AI agent skill follows the same model: `skills/canvas-tile-engine/` describes the published packages and is installed straight from `master` (skills CLI, plugin marketplace), so feature PRs must not touch it. Edit `skills-next/canvas-tile-engine/` instead; it is copied over `skills/` at release time.
 
 When changing a public API, also keep these in sync:
 
 - Root `README.md` and the affected package's `README.md`
-- The AI agent skill under `skills/canvas-tile-engine/` (SKILL.md + references)
+- The AI agent skill under `skills-next/canvas-tile-engine/` (SKILL.md + references)
 
 ## 🙋 Questions?
 

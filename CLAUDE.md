@@ -212,8 +212,8 @@ const png = await renderToBuffer({
 For every edit, feature, or fix, check whether these need updating alongside the code:
 
 - `.changeset/` - required whenever a published package changes (behavior or public artifact). Run `pnpm changeset` and commit the generated file. Docs-, example-, or tooling-only changes do not need one.
-- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one; when the change applies to the current release, update both and keep them identical.
-- `skills/canvas-tile-engine/` - update `SKILL.md` and its reference files when the change affects usage or the public API, so the AI agent skill stays accurate.
+- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one. Unreleased changes go to `docs/docs/` only; `versioned_docs` is synced at release time. Only edit `versioned_docs` directly to fix documentation of already-published behavior.
+- `skills-next/canvas-tile-engine/` - update `SKILL.md` and its reference files when the change affects usage or the public API. This is the upcoming (unreleased) copy of the AI agent skill. Never edit `skills/canvas-tile-engine/` in feature PRs: it describes the published packages and is consumed directly from `master` (skills CLI, plugin marketplace), so it must only be synced from `skills-next` when cutting a release.
 
 ## Releases (Changesets)
 
@@ -221,6 +221,7 @@ Publishing is managed with Changesets (`.changeset/config.json`; private package
 
 - Any PR that changes a published package's behavior or public artifact must include a changeset: run `pnpm changeset`, pick the affected packages and bump type, describe the change (this text becomes the CHANGELOG entry).
 - On push to `master`, `.github/workflows/release.yml` (changesets/action) collects pending changesets into a "Version Packages" PR. Merging that PR bumps versions, updates CHANGELOGs, publishes to npm with `pnpm release`, and pushes git tags.
+- When cutting a release, also sync the published copies: carry the released changes from `docs/docs/` into `docs/versioned_docs/version-0.x.x/`, and copy `skills-next/canvas-tile-engine/` over `skills/canvas-tile-engine/`.
 - Internal deps between published packages use `workspace:^` (published as `^x.y.z`). Do not use `workspace:*` — it publishes as an exact pin.
 - Manual release (fallback): `pnpm changeset:version` then `pnpm release` (requires npm auth).
 
