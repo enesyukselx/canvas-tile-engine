@@ -97,6 +97,14 @@ engine.onClick = (coords) => {
 };
 ```
 
+Small markers hard to click? Expand the hit area with `padding` (world
+units) or `paddingPx` (screen pixels, zoom-independent) instead of drawing
+invisible oversized halo items:
+
+```ts
+const hit = engine.hitTestFirst(coords.raw, { padding: 0.6 });
+```
+
 React / React Native: the hook handle exposes the same methods (empty
 result before mount, no null checks needed), and items drawn by the
 declarative components are included automatically:
