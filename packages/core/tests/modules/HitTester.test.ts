@@ -133,6 +133,17 @@ describe("HitTester ordering and filtering", () => {
         ht.clear();
         expect(ht.hitTest({ x: 0, y: 0 })).toHaveLength(0);
     });
+
+    it("returns the original item so attached data survives, typed via the TData param", () => {
+        const ht = new HitTester();
+        const tile = { x: 0, y: 0, size: 1, data: { id: "castle", hp: 42 } };
+        ht.register(handle(1), "rect", tile, 1);
+
+        const hit = ht.hitTestFirst<{ id: string; hp: number }>({ x: 0, y: 0 });
+        expect(hit?.item).toBe(tile);
+        expect(hit?.item.data?.id).toBe("castle");
+        expect(hit?.item.data?.hp).toBe(42);
+    });
 });
 
 describe("HitTester large datasets (spatial index path)", () => {
