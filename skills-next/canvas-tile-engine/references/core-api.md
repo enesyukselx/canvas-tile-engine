@@ -166,7 +166,7 @@ and semantics: [drawing.md](drawing.md).
 
 | Signature | Notes |
 | :-- | :-- |
-| `hitTest<TData>(point: Coords, opts?: { layer?: number }): HitResult<TImage, TData>[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
+| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
 | `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Topmost item only. |
 
 `HitResult` = `{ item, kind: "rect"|"circle"|"image", layer, handle, index }`;
@@ -183,10 +183,17 @@ hit-testable. Position mutations require re-registration to be reflected
 (same rule as rendering). 500+ item draw calls are queried via a spatial
 index - hover-frequency use is fine at scale.
 
+The hit area is exactly the drawn geometry by default; expand it for generous
+touch targets with `padding` (world units) and/or `paddingPx` (screen pixels,
+zoom-independent, converted with the current scale per query). Both expand
+every tested item outward and combine additively; negative values are 0. Use
+these instead of registering invisible oversized "halo" items.
+
 ```ts
 engine.drawRect(stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })), 2);
 engine.onClick = (coords) => {
-    const hit = engine.hitTestFirst<Station>(coords.raw);
+    // Small station dots stay clickable up to 0.6 units around each center
+    const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
     if (hit?.item.data) openPanel(hit.item.data);
 };
 ```

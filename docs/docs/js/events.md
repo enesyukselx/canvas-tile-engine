@@ -327,6 +327,26 @@ Semantics to know:
 - Draw calls with 500+ items are queried through a spatial index, so
   hit testing large scenes on hover is cheap.
 
+### Generous touch targets: `padding` and `paddingPx`
+
+By default the hit area is exactly the drawn geometry, which makes small
+markers hard to click. Both options expand every item's hit geometry outward:
+
+| Option      | Unit          | Behavior                                                             |
+| :---------- | :------------ | :------------------------------------------------------------------- |
+| `padding`   | world units   | Fixed world-space margin; grows/shrinks on screen with zoom.         |
+| `paddingPx` | screen pixels | Zoom-independent margin, converted with the current scale per query. |
+
+They can be combined (added together). Negative values are treated as 0.
+
+```ts
+// A dot drawn with size 0.95 (radius ~0.475), clickable up to 1.1 units out
+const hit = engine.hitTestFirst(coords.raw, { padding: 0.625 });
+
+// Finger-sized target at any zoom level
+const hit2 = engine.hitTestFirst(coords.raw, { paddingPx: 12 });
+```
+
 ## Managing the Cursor
 
 The engine never touches `canvas.style.cursor` - cursor styling is fully owned

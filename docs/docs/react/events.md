@@ -351,6 +351,19 @@ re-render a filtered or re-ordered items array. The `TData` parameter on
 `hitTest<TData>` / `hitTestFirst<TData>` types `hit.item.data` and is an
 assertion, not a runtime check.
 
+The hit area is exactly the drawn geometry by default. For generous touch
+targets around small markers, expand it with `padding` (world units) or
+`paddingPx` (screen pixels, zoom-independent); they can be combined (added
+together), and negative values are treated as 0:
+
+```tsx
+onClick={(coords) => {
+    // Accept clicks up to 0.6 world units around each station dot
+    const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
+    setSelected(hit?.item.data ?? null);
+}}
+```
+
 ## Managing the Cursor
 
 The engine never touches `canvas.style.cursor` - cursor styling is fully owned

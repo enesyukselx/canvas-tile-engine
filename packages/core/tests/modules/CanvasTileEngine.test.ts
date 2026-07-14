@@ -205,5 +205,36 @@ describe("CanvasTileEngine", () => {
             e.clearAll();
             expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeUndefined();
         });
+
+        it("expands hit geometry with world-unit padding", () => {
+            const e = createEngineWithDrawAPI();
+            // Station-dot scenario: small marker, generous touch target
+            e.drawCircle({ x: 0, y: 0, size: 0.95 }, 1);
+
+            // Raw (1.5, 0.5) is 1.0 world units from the dot center; radius is 0.475
+            expect(e.hitTestFirst({ x: 1.5, y: 0.5 })).toBeUndefined();
+            expect(e.hitTestFirst({ x: 1.5, y: 0.5 }, { padding: 0.625 })).toBeDefined();
+        });
+
+        it("converts paddingPx with the current scale", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawCircle({ x: 0, y: 0, size: 0.5 }, 1); // radius 0.25
+
+            // Raw (1.2, 0.5) is 0.7 world units from the center -> needs 0.45+
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { paddingPx: 0.8 })).toBeDefined(); // scale 1 -> 0.8 world
+
+            e.setScale(2);
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { paddingPx: 0.8 })).toBeUndefined(); // scale 2 -> 0.4 world
+        });
+
+        it("adds padding and paddingPx together", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawCircle({ x: 0, y: 0, size: 0.5 }, 1); // radius 0.25
+            e.setScale(2);
+
+            // 0.3 world + 0.4px / scale 2 = 0.5 -> effective radius 0.75 covers 0.7
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3, paddingPx: 0.4 })).toBeDefined();
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3 })).toBeUndefined();
+        });
     });
 });

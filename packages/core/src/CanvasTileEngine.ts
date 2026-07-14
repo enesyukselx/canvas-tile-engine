@@ -750,21 +750,29 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * results reflect item positions as of the draw call: mutating an
      * item's position requires re-registration (style mutation is fine).
      *
+     * `padding` (world units) and `paddingPx` (screen pixels, zoom
+     * independent) expand every item's hit geometry outward - generous
+     * touch targets around small markers without invisible helper items.
+     *
      * `TData` types the `data` field of returned items — it is an assertion,
      * not checked at runtime, so only pass it when every hit-testable item
      * carries that data shape (or narrow per hit).
      * @param point World coordinates (e.g. `coords.raw` from onClick/onHover).
-     * @param opts Optional filter, e.g. `{ layer: 2 }`.
+     * @param opts Optional filters, e.g. `{ layer: 2, padding: 0.5 }`.
      * @example
      * ```ts
      * engine.onClick = (coords) => {
-     *     const hit = engine.hitTestFirst<Station>(coords.raw);
+     *     // Accept clicks up to 0.6 world units around each station dot
+     *     const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
      *     if (hit?.item.data) openPanel(hit.item.data);
      * };
      * ```
      */
     hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<TImage, TData>[] {
-        return this.hitTester.hitTest<TData>(this.rawToItemSpace(point), opts) as HitResult<TImage, TData>[];
+        return this.hitTester.hitTest<TData>(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as HitResult<
+            TImage,
+            TData
+        >[];
     }
 
     /**
@@ -772,9 +780,22 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * See {@link hitTest} for semantics.
      */
     hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<TImage, TData> | undefined {
-        return this.hitTester.hitTestFirst<TData>(this.rawToItemSpace(point), opts) as
+        return this.hitTester.hitTestFirst<TData>(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as
             | HitResult<TImage, TData>
             | undefined;
+    }
+
+    /**
+     * Fold `paddingPx` into the world-unit `padding` using the current scale;
+     * the HitTester itself is scale-unaware.
+     */
+    private resolveHitOptions(opts?: HitTestOptions): HitTestOptions | undefined {
+        if (!opts || opts.paddingPx === undefined) return opts;
+        const { paddingPx, ...rest } = opts;
+        return {
+            ...rest,
+            padding: Math.max(0, rest.padding ?? 0) + Math.max(0, paddingPx) / this.camera.scale,
+        };
     }
 
     /**
