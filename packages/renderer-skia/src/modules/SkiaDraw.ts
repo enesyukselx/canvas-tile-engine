@@ -14,8 +14,10 @@ import {
     Text,
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
+    resolveLineDashPx,
     resolveRadiusPx,
 } from "@canvas-tile-engine/core";
+import type { LineStyle } from "@canvas-tile-engine/core";
 import {
     matchFont,
     PaintStyle,
@@ -206,7 +208,7 @@ export class SkiaDraw {
 
     drawLine(
         items: Array<Line> | Line,
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer: number = 1
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
@@ -214,6 +216,8 @@ export class SkiaDraw {
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
             this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, this.camera.scale));
+            const dash = resolveLineDashPx(style, this.camera.scale);
+            if (dash) this.strokePaint.setPathEffect(Skia.PathEffect.MakeDash(dash, 0));
 
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
@@ -225,6 +229,7 @@ export class SkiaDraw {
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
                 canvas.drawLine(a.x, a.y, b.x, b.y, this.strokePaint);
             }
+            if (dash) this.strokePaint.setPathEffect(null);
         });
     }
 
@@ -267,7 +272,7 @@ export class SkiaDraw {
 
     drawPath(
         items: Array<Path> | Path,
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer: number = 1
     ): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
@@ -275,6 +280,8 @@ export class SkiaDraw {
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
             this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, this.camera.scale));
+            const dash = resolveLineDashPx(style, this.camera.scale);
+            if (dash) this.strokePaint.setPathEffect(Skia.PathEffect.MakeDash(dash, 0));
 
             for (const points of list) {
                 if (points.length < 2) continue;
@@ -298,6 +305,7 @@ export class SkiaDraw {
                 }
                 canvas.drawPath(path, this.strokePaint);
             }
+            if (dash) this.strokePaint.setPathEffect(null);
         });
     }
 

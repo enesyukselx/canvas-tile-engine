@@ -146,6 +146,73 @@ describe("CanvasDraw lineWidth handling", () => {
     });
 });
 
+// Fake 2D context recording setLineDash calls and strokes for dash tests.
+function makeDashRecordingCtx() {
+    const dashes: number[][] = [];
+    let strokeCount = 0;
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        setLineDash(pattern: number[]) {
+            dashes.push(pattern);
+        },
+        stroke() {
+            strokeCount++;
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, dashes, strokes: () => strokeCount };
+}
+
+// Dash unit contract shared by all renderers: lineDash is world units
+// (px = value * scale), lineDashPx is screen pixels and wins.
+describe("CanvasDraw line dash", () => {
+    const path = [
+        { x: 0, y: 0 },
+        { x: 5, y: 0 },
+    ];
+
+    it("scales world lineDash by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawPath(path, { strokeStyle: "#f00", lineDash: [0.8, 0.4] }, 1);
+        render(ctx);
+
+        expect(dashes).toEqual([[8, 4]]);
+    });
+
+    it("passes lineDashPx through unscaled and prefers it over lineDash", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 5, y: 0 } }],
+            { strokeStyle: "#f00", lineDash: [0.8], lineDashPx: [6, 3] },
+            1,
+        );
+        render(ctx);
+
+        expect(dashes).toEqual([[6, 3]]);
+    });
+
+    it("stays solid (no setLineDash call) when no dash is given", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes, strokes } = makeDashRecordingCtx();
+
+        draw.drawPath(path, { strokeStyle: "#f00", lineWidth: 0.2 }, 1);
+        render(ctx);
+
+        expect(dashes).toEqual([]);
+        expect(strokes()).toBe(1);
+    });
+});
+
 // Fake 2D context recording every rect(x, y, w, h) call.
 function makeRectRecordingCtx() {
     const rects: Array<{ x: number; y: number; w: number; h: number }> = [];

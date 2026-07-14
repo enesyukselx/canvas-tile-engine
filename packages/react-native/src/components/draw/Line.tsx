@@ -1,6 +1,6 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { Line as LineType } from "@canvas-tile-engine/core";
+import type { Line as LineType, LineStyle } from "@canvas-tile-engine/core";
 
 export interface LineProps {
     /**
@@ -9,7 +9,7 @@ export interface LineProps {
      * keep it stable with useMemo/useState instead of an inline literal.
      */
     items: LineType | LineType[];
-    style?: { strokeStyle?: string; lineWidth?: number };
+    style?: LineStyle;
     layer?: number;
 }
 

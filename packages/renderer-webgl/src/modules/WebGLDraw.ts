@@ -14,8 +14,11 @@ import {
     Text,
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
+    resolveLineDashPx,
     resolveRadiusPx,
 } from "@canvas-tile-engine/core";
+import type { LineStyle } from "@canvas-tile-engine/core";
+import { appendDashedSegment } from "../utils/dash";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
@@ -203,7 +206,7 @@ export class WebGLDraw {
 
     drawLine(
         items: Array<Line> | Line,
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
@@ -211,6 +214,7 @@ export class WebGLDraw {
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
             const lineWidth = resolveLineWidthPx(style, this.camera.scale);
+            const dash = resolveLineDashPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
             for (const item of list) {
@@ -221,7 +225,8 @@ export class WebGLDraw {
 
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
-                this.pushLine(lines, a, b, color, lineWidth);
+                // Each Line item is its own subpath: the dash phase restarts.
+                this.pushSegment(lines, a, b, color, lineWidth, dash, 0);
             }
 
             gl.drawLines(lines);
@@ -279,7 +284,7 @@ export class WebGLDraw {
 
     drawPath(
         items: Array<Path> | Path,
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
@@ -287,6 +292,7 @@ export class WebGLDraw {
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
             const lineWidth = resolveLineWidthPx(style, this.camera.scale);
+            const dash = resolveLineDashPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
             for (const points of list) {
@@ -303,9 +309,12 @@ export class WebGLDraw {
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
                 let prev = this.transformer.worldToScreen(points[0].x, points[0].y);
+                // The dash phase carries across joints so the pattern flows
+                // continuously along the polyline, like a single ctx subpath.
+                let phase = 0;
                 for (let i = 1; i < points.length; i++) {
                     const curr = this.transformer.worldToScreen(points[i].x, points[i].y);
-                    this.pushLine(lines, prev, curr, color, lineWidth);
+                    phase = this.pushSegment(lines, prev, curr, color, lineWidth, dash, phase);
                     prev = curr;
                 }
             }
@@ -544,6 +553,29 @@ export class WebGLDraw {
         if (lineWidth >= 1) return { width: lineWidth, color };
         const alpha = Math.max(0, Math.min(lineWidth, 1));
         return { width: 1, color: [color[0], color[1], color[2], color[3] * alpha] };
+    }
+
+    /**
+     * Push a→b as a solid line or, when a dash pattern is active, as its
+     * CPU-tessellated sub-segments. Returns the advanced dash phase.
+     */
+    private pushSegment(
+        lines: LineInstance[],
+        a: Coords,
+        b: Coords,
+        color: RGBA,
+        lineWidth: number,
+        dash: number[] | undefined,
+        phase: number,
+    ): number {
+        if (!dash) {
+            this.pushLine(lines, a, b, color, lineWidth);
+            return phase;
+        }
+        const segments: Array<{ a: Coords; b: Coords }> = [];
+        const next = appendDashedSegment(segments, a, b, dash, phase);
+        for (const s of segments) this.pushLine(lines, s.a, s.b, color, lineWidth);
+        return next;
     }
 
     private pushLine(lines: LineInstance[], a: Coords, b: Coords, color: RGBA, lineWidth: number) {

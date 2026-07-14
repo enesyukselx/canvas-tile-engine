@@ -16,8 +16,10 @@ import {
     Text,
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
+    resolveLineDashPx,
     resolveRadiusPx,
 } from "@canvas-tile-engine/core";
+import type { LineStyle } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
 import { Layer } from "./Layer";
 import { applyLineWidth } from "../utils/canvas";
@@ -178,7 +180,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
     drawLine(
         items: Array<Line> | Line,
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
@@ -188,6 +190,8 @@ export class CanvasDraw implements IDrawAPI<Image> {
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
             const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+            const dash = resolveLineDashPx(style, this.camera.scale);
+            if (dash) ctx.setLineDash(dash);
 
             ctx.beginPath();
             for (const item of list) {
@@ -314,7 +318,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
     drawPath(
         items: Array<Path> | Path,
-        style?: { strokeStyle?: string; lineWidth?: number },
+        style?: LineStyle,
         layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
@@ -324,6 +328,8 @@ export class CanvasDraw implements IDrawAPI<Image> {
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
             const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+            const dash = resolveLineDashPx(style, this.camera.scale);
+            if (dash) ctx.setLineDash(dash);
 
             ctx.beginPath();
             for (const points of list) {
