@@ -244,20 +244,23 @@ Full rendering control on any layer. The `ctx` type depends on the renderer:
 | renderer-server | `SKRSContext2D` (`@napi-rs/canvas`) |
 
 ```ts
-engine.addDrawFunction((ctx, topLeft, config) => {
+engine.addDrawFunction((ctx, topLeft, config, transform) => {
     const c = ctx as CanvasRenderingContext2D;
-    // Convert world -> screen manually: screenX = (worldX - topLeft.x) * config.scale
-    const sx = (3 - topLeft.x) * config.scale;
-    const sy = (2 - topLeft.y) * config.scale;
+    // transform.worldToScreen takes ITEM-space coords (integers = cell
+    // centers) and returns the pixel position — never hand-roll
+    // (world - topLeft) * scale or the 0.5 cell offset.
+    const p = transform.worldToScreen(3, 2); // center of cell (3, 2)
     c.fillStyle = "rgba(255,255,255,0.8)";
-    c.fillRect(sx, sy, config.scale, config.scale);
+    c.fillRect(p.x - config.scale / 2, p.y - config.scale / 2, config.scale, config.scale);
 }, 5);
 ```
 
 `topLeft` is the camera's top-left world coordinate; `config` is the
-normalized config with live `scale` and `size`. `engine.onDraw = (ctx, info)`
-is similar but runs after ALL layers every frame (`info` carries `scale`,
-`width`, `height`, `coords`).
+normalized config with live `scale` and `size`; `transform` also has
+`screenToWorld(x, y)`, which returns raw corner-space coords (the same space
+as event `coords.raw`). `engine.onDraw = (ctx, info)` is similar but runs
+after ALL layers every frame (`info` carries `scale`, `width`, `height`,
+`coords`, and the same `worldToScreen`/`screenToWorld` helpers).
 
 ## High-DPI
 

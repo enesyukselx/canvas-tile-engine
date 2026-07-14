@@ -348,18 +348,25 @@ engine.drawImage([
 For maximum flexibility, you can register a custom drawing function that gets direct access to the rendering context.
 
 ```typescript
-engine.addDrawFunction((ctx, coords, config) => {
+engine.addDrawFunction((ctx, coords, config, transform) => {
     // ctx = Rendering context (type depends on renderer)
     // coords = Top-left world coordinate of the view
     // config = Current engine configuration
+    // transform = Coordinate helpers (see below)
 
     // Cast to the appropriate context type for your renderer
     const context = ctx as CanvasRenderingContext2D;
 
     context.fillStyle = "purple";
     context.fillRect(100, 100, 50, 50); // Draw in screen pixels
+
+    // Or draw at a world position without doing the pixel math yourself:
+    const p = transform.worldToScreen(5, 3); // pixel at the center of cell (5, 3)
+    context.fillRect(p.x - 5, p.y - 5, 10, 10);
 }, 4);
 ```
+
+**`transform` helpers:** `worldToScreen(x, y)` takes item-space world coordinates (integers are cell centers, the same space item `x`/`y` use) and returns the canvas pixel position. `screenToWorld(x, y)` converts a pixel position back to raw (corner-space) world coordinates — the same space event payloads report as `coords.raw`. Prefer these over hand-rolling `(world - topLeft) * scale`, which silently misses the half-cell offset.
 
 :::tip
 `addDrawFunction()` also returns a draw handle. You can remove the registered callback later via `engine.removeDrawHandle(handle)` (see "Clearing Layers").
@@ -372,7 +379,7 @@ The `onDraw` callback runs **after** all layers have been drawn but **before** t
 ```typescript
 engine.onDraw = (ctx, info) => {
     // ctx = Rendering context (type depends on renderer)
-    // info contains: { scale, width, height, coords }
+    // info contains: { scale, width, height, coords, worldToScreen, screenToWorld }
 
     // Cast to the appropriate context type for your renderer
     const context = ctx as CanvasRenderingContext2D;
