@@ -353,7 +353,8 @@ assertion, not a runtime check.
 
 The hit area is exactly the drawn geometry by default. For generous touch
 targets around small markers, expand it with `padding` (world units) or
-`paddingPx` (screen pixels, zoom-independent); they can be combined:
+`paddingPx` (screen pixels, zoom-independent); they can be combined (added
+together), and negative values are treated as 0:
 
 ```tsx
 onClick={(coords) => {
