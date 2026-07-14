@@ -312,9 +312,17 @@ rotation are handled internally. Before the engine mounts the methods
 return an empty result, so no null checks are needed.
 
 ```tsx
+type Station = { id: string; name: string };
+
 function StationMap() {
     const engine = useCanvasTileEngine();
-    const [selected, setSelected] = useState<number | null>(null);
+    const [selected, setSelected] = useState<Station | null>(null);
+
+    // Attach your own data to each item; the engine carries it through
+    const stationDots = useMemo(
+        () => stations.map((s) => ({ x: s.x, y: s.y, size: 0.6, data: s })),
+        [stations],
+    );
 
     return (
         <CanvasTileEngine
@@ -322,9 +330,8 @@ function StationMap() {
             renderer={new RendererCanvas()}
             config={config}
             onClick={(coords) => {
-                const hit = engine.hitTestFirst(coords.raw);
-                // hit.index maps back into the items array you rendered
-                setSelected(hit ? hit.index : null);
+                const hit = engine.hitTestFirst<Station>(coords.raw);
+                setSelected(hit?.item.data ?? null); // typed as Station
             }}
         >
             <CanvasTileEngine.Circle items={stationDots} layer={2} />
@@ -337,6 +344,12 @@ Results are `{ item, kind, layer, handle, index }`, ordered by visual
 priority (higher layer, then later registration, then later item). Line,
 Path, and Text are not hit-testable, and - like rendering - position
 mutations require re-registration to be reflected.
+
+Every drawable item accepts an optional `data` field the engine never reads;
+use it to identify hits instead of `hit.index`, which goes stale when you
+re-render a filtered or re-ordered items array. The `TData` parameter on
+`hitTest<TData>` / `hitTestFirst<TData>` types `hit.item.data` and is an
+assertion, not a runtime check.
 
 ## Managing the Cursor
 

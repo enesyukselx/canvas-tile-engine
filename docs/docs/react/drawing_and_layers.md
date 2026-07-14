@@ -50,6 +50,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | `height` | `number`             | `size`                             | Height in world units (only for `Rect`).                                                                                    |
 | `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `Rect`).                                                                                |
 | `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`). |
+| `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.    |
 
 **Style Options:**
 
@@ -294,6 +295,7 @@ Draw images scaled to world units.
 | `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
 | `sprite` | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
 | `opacity` | `number`          | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements. |
+| `data`   | `TData`            | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`. |
 
 ```tsx
 function MapWithImages() {
