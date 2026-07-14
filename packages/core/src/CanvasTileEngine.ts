@@ -359,11 +359,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             );
             return;
         }
-        this.renderer.resizeWithAnimation(width, height, durationMs, () => {
-            // Trigger onResize callback after programmatic resize completes
-            this._onResize?.();
-            onComplete?.();
-        });
+        // onResize is not fired here: the setter mirrors it into the renderer,
+        // whose resizeWithAnimation completion already invokes it once before
+        // this onComplete runs.
+        this.renderer.resizeWithAnimation(width, height, durationMs, onComplete);
     }
 
     /**
