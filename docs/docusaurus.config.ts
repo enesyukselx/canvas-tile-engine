@@ -75,41 +75,48 @@ const config: Config = {
             respectPrefersColorScheme: true,
         },
         navbar: {
-            title: "Canvas Tile Engine",
-            logo: {
-                alt: "Canvas Tile Engine Logo",
-                src: "img/logo.svg",
-            },
+            // The brand wordmark is a swizzled component (src/theme/Navbar/Logo)
+            // that mirrors the landing site and links to canvastileengine.com.
             items: [
-                /*{ to: "/blog", label: "Blog", position: "left" },*/
                 {
-                    to: "https://www.canvastileengine.com/",
-                    label: "Home",
+                    href: "https://www.canvastileengine.com/api-docs",
+                    label: "API",
                     position: "left",
-                },
-
-                {
-                    type: "docSidebar",
-                    sidebarId: "tutorialSidebar",
-                    position: "left",
-                    label: "Documentation",
+                    target: "_self",
                 },
                 {
                     href: "https://www.canvastileengine.com/playground",
                     label: "Playground",
                     position: "left",
+                    target: "_self",
                 },
                 {
-                    href: "https://www.canvastileengine.com/api-docs",
-                    label: "API Reference",
+                    href: "https://www.canvastileengine.com/examples",
+                    label: "Examples",
                     position: "left",
+                    target: "_self",
                 },
                 {
-                    href: "https://github.com/enesyukselx/canvas-tile-engine",
-                    label: "GitHub",
-                    position: "right",
+                    type: "docSidebar",
+                    sidebarId: "tutorialSidebar",
+                    position: "left",
+                    label: "Docs",
                 },
                 { type: "docsVersionDropdown", position: "right" },
+                {
+                    href: "https://github.com/enesyukselx/canvas-tile-engine",
+                    position: "right",
+                    className: "header-icon-link header-github-link",
+                    "aria-label": "GitHub repository",
+                    target: "_self",
+                },
+                {
+                    href: "https://www.npmjs.com/package/@canvas-tile-engine/core",
+                    position: "right",
+                    className: "header-icon-link header-npm-link",
+                    "aria-label": "npm package",
+                    target: "_self",
+                },
             ],
         },
         footer: {
