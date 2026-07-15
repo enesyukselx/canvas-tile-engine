@@ -368,6 +368,10 @@ engine.addDrawFunction((ctx, coords, config, transform) => {
 
 **`transform` helpers:** `worldToScreen(x, y)` takes item-space world coordinates (integers are cell centers, the same space item `x`/`y` use) and returns the canvas pixel position. `screenToWorld(x, y)` converts a pixel position back to raw (corner-space) world coordinates — the same space event payloads report as `coords.raw`. Prefer these over hand-rolling `(world - topLeft) * scale`, which silently misses the half-cell offset.
 
+:::tip Rule of thumb
+Everything you pass to `ctx` is pixels. `worldToScreen` is for drawing (world in, pixels out); `screenToWorld` is for querying (pixels in, world out — feed it to `Math.floor` or `hitTest`, never back into `ctx`).
+:::
+
 :::tip
 `addDrawFunction()` also returns a draw handle. You can remove the registered callback later via `engine.removeDrawHandle(handle)` (see "Clearing Layers").
 :::

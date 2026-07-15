@@ -357,6 +357,10 @@ For maximum flexibility, use a custom draw function with direct rendering contex
 </CanvasTileEngine.DrawFunction>
 ```
 
+:::tip Rule of thumb
+Everything you pass to `ctx` is pixels. `worldToScreen` is for drawing (world in, pixels out); `screenToWorld` is for querying (pixels in, world out — feed it to `Math.floor` or `hitTest`, never back into `ctx`).
+:::
+
 ### `onDraw` Callback
 
 The `onDraw` prop runs after all layers are drawn but before debug overlays.

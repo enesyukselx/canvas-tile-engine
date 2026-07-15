@@ -262,6 +262,12 @@ as event `coords.raw`). `engine.onDraw` has the SAME signature and runs after
 ALL layers every frame — code moves between the two hooks unchanged; only the
 timing/z-order differs (and `clearAll()` does not remove `onDraw`).
 
+RULE: everything passed to `ctx` is pixels. `worldToScreen` is for drawing
+(world in, pixels out); `screenToWorld` is for querying (pixels in, world
+out — feed it to `Math.floor`/`hitTest`, never back into `ctx`, and note
+`worldToScreen(screenToWorld(p))` is half a cell off by design: the two
+speak different world spaces).
+
 ## High-DPI
 
 Browser renderers automatically size the backing store by `devicePixelRatio`.
