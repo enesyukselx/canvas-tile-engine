@@ -1,11 +1,16 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { CanvasTileEngineConfig, Coords } from "@canvas-tile-engine/core";
+import type { CanvasTileEngineConfig, Coords, DrawTransform } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@canvas-tile-engine/renderer-skia";
 
 export interface DrawFunctionProps {
-    /** The draw function to execute, receiving the frame's Skia `SkCanvas`. */
-    children: (canvas: SkCanvas, coords: Coords, config: Required<CanvasTileEngineConfig>) => void;
+    /** The draw function to execute, receiving the frame's Skia `SkCanvas`; `transform.worldToScreen(x, y)` maps world coordinates to canvas pixels. */
+    children: (
+        canvas: SkCanvas,
+        coords: Coords,
+        config: Required<CanvasTileEngineConfig>,
+        transform: DrawTransform,
+    ) => void;
     layer?: number;
 }
 
@@ -43,8 +48,8 @@ export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: 
     });
 
     useEffect(() => {
-        const handle = engine.addDrawFunction((ctx, coords, config) => {
-            fnRef.current(ctx, coords, config);
+        const handle = engine.addDrawFunction((ctx, coords, config, transform) => {
+            fnRef.current(ctx, coords, config, transform);
         }, layer);
         requestRender();
 

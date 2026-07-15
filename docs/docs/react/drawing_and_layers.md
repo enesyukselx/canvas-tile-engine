@@ -10,7 +10,14 @@ The React package provides declarative draw components that automatically manage
 All drawing types are exported from the package. See [Types Reference](/docs/introduction/types) for complete type definitions.
 
 ```typescript
-import { Rect, Circle, Text, Path, ImageItem, Coords } from "@canvas-tile-engine/react";
+import {
+    Rect,
+    Circle,
+    Text,
+    Path,
+    ImageItem,
+    Coords,
+} from "@canvas-tile-engine/react";
 ```
 
 :::
@@ -32,57 +39,98 @@ Layers control the Z-order of your content. Lower numbers draw first (background
 
 Draw basic geometric shapes. Pass a single object or an array for batch rendering.
 
-| Prop    | Type                     | Default      | Description        |
-| :------ | :----------------------- | :----------- | :----------------- |
-| `items` | `Rect \| Rect[]`         | **Required** | Shape definitions (for `<Rect>`). |
-| `items` | `Circle \| Circle[]`     | **Required** | Shape definitions (for `<Circle>`). |
-| `layer` | `number`                 | `1`          | Rendering layer.   |
+| Prop    | Type                 | Default      | Description                         |
+| :------ | :------------------- | :----------- | :---------------------------------- |
+| `items` | `Rect \| Rect[]`     | **Required** | Shape definitions (for `<Rect>`).   |
+| `items` | `Circle \| Circle[]` | **Required** | Shape definitions (for `<Circle>`). |
+| `layer` | `number`             | `1`          | Rendering layer.                    |
 
 **Rect / Circle Properties:**
 
-| Property | Type                 | Default                            | Description                                                                                                                 |
-| :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
-| `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                          |
-| `size`   | `number`             | `1`                                | Size in grid units.                                                                                                         |
-| `style`  | `object`             | `{}`                               | Styling options.                                                                                                            |
-| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                               |
-| `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.         |
-| `height` | `number`             | `size`                             | Height in world units (only for `Rect`).                                                                                    |
-| `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `Rect`).                                                                                |
+| Property | Type                 | Default                            | Description                                                                                                                                         |
+| :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                                                  |
+| `size`   | `number`             | `1`                                | Size in grid units.                                                                                                                                 |
+| `style`  | `object`             | `{}`                               | Styling options.                                                                                                                                    |
+| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                       |
+| `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
+| `height` | `number`             | `size`                             | Height in world units (only for `Rect`).                                                                                                            |
+| `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `Rect`).                                                                                                        |
 | `radius` | `number \| number[]` | -                                  | Border radius in world units (scales with zoom). Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`). |
+| `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.                            |
 
 **Style Options:**
 
--   `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
--   `strokeStyle`: Border color
--   `lineWidth`: Border width in world units; scales with zoom like the shape
--   `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
+- `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
+- `strokeStyle`: Border color
+- `lineWidth`: Border width in world units; scales with zoom like the shape
+- `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
 
 ```tsx
-<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
+<CanvasTileEngine
+    engine={engine}
+    config={config}
+    renderer={new RendererCanvas()}
+>
     {/* Blue square */}
-    <CanvasTileEngine.Rect items={{ x: 5, y: 5, size: 1, style: { fillStyle: "#0077be" } }} layer={1} />
+    <CanvasTileEngine.Rect
+        items={{ x: 5, y: 5, size: 1, style: { fillStyle: "#0077be" } }}
+        layer={1}
+    />
 
     {/* Rotated rectangle */}
-    <CanvasTileEngine.Rect items={{ x: 8, y: 5, size: 1, rotate: 45, style: { fillStyle: "#ff6b6b" } }} layer={1} />
+    <CanvasTileEngine.Rect
+        items={{
+            x: 8,
+            y: 5,
+            size: 1,
+            rotate: 45,
+            style: { fillStyle: "#ff6b6b" },
+        }}
+        layer={1}
+    />
 
     {/* Rounded rectangle */}
-    <CanvasTileEngine.Rect items={{ x: 10, y: 5, size: 1, radius: 0.15, style: { fillStyle: "#2ecc71" } }} layer={1} />
+    <CanvasTileEngine.Rect
+        items={{
+            x: 10,
+            y: 5,
+            size: 1,
+            radius: 0.15,
+            style: { fillStyle: "#2ecc71" },
+        }}
+        layer={1}
+    />
 
     {/* Non-square rectangle: a 4x2 zone floor */}
     <CanvasTileEngine.Rect
-        items={{ x: 5, y: 8, width: 4, height: 2, style: { fillStyle: "rgba(34, 197, 94, 0.3)" } }}
+        items={{
+            x: 5,
+            y: 8,
+            width: 4,
+            height: 2,
+            style: { fillStyle: "rgba(34, 197, 94, 0.3)" },
+        }}
         layer={1}
     />
 
     {/* Different corner radii */}
     <CanvasTileEngine.Rect
-        items={{ x: 12, y: 5, size: 1, radius: [0.2, 0, 0.2, 0], style: { fillStyle: "#9b59b6" } }}
+        items={{
+            x: 12,
+            y: 5,
+            size: 1,
+            radius: [0.2, 0, 0.2, 0],
+            style: { fillStyle: "#9b59b6" },
+        }}
         layer={1}
     />
 
     {/* Red circle */}
-    <CanvasTileEngine.Circle items={{ x: 6, y: 5, size: 0.8, style: { fillStyle: "#e63946" } }} layer={2} />
+    <CanvasTileEngine.Circle
+        items={{ x: 6, y: 5, size: 0.8, style: { fillStyle: "#e63946" } }}
+        layer={2}
+    />
 
     {/* Batch rendering */}
     <CanvasTileEngine.Rect
@@ -102,23 +150,27 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 
 Draw straight lines between two points.
 
-| Prop    | Type                                           | Default      | Description       |
-| :------ | :--------------------------------------------- | :----------- | :---------------- |
-| `items` | `Line \| Line[]`                               | **Required** | Line definitions. |
-| `style` | `LineStyle` | -            | Line style.       |
-| `layer` | `number`                                       | `1`          | Rendering layer.  |
+| Prop    | Type             | Default      | Description       |
+| :------ | :--------------- | :----------- | :---------------- |
+| `items` | `Line \| Line[]` | **Required** | Line definitions. |
+| `style` | `LineStyle`      | -            | Line style.       |
+| `layer` | `number`         | `1`          | Rendering layer.  |
 
 **Line Properties:** `{ from: { x, y }, to: { x, y } }`
 
 ```tsx
-{/* Single line */}
+{
+    /* Single line */
+}
 <CanvasTileEngine.Line
     items={{ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }}
     style={{ strokeStyle: "#fb8500", lineWidthPx: 3 }}
     layer={1}
-/>
+/>;
 
-{/* Multiple lines */}
+{
+    /* Multiple lines */
+}
 <CanvasTileEngine.Line
     items={[
         { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
@@ -126,23 +178,25 @@ Draw straight lines between two points.
     ]}
     style={{ strokeStyle: "red", lineWidthPx: 2 }}
     layer={1}
-/>
+/>;
 ```
 
 ### `<Path>`
 
 Draw continuous lines through multiple points.
 
-| Prop    | Type                                           | Default      | Description      |
-| :------ | :--------------------------------------------- | :----------- | :--------------- |
-| `items` | `Path \| Path[]`                               | **Required** | Points array.    |
-| `style` | `LineStyle` | -            | Path style.      |
-| `layer` | `number`                                       | `1`          | Rendering layer. |
+| Prop    | Type             | Default      | Description      |
+| :------ | :--------------- | :----------- | :--------------- |
+| `items` | `Path \| Path[]` | **Required** | Points array.    |
+| `style` | `LineStyle`      | -            | Path style.      |
+| `layer` | `number`         | `1`          | Rendering layer. |
 
 **Path:** An array of `{ x, y }` coordinates.
 
 ```tsx
-{/* Single path */}
+{
+    /* Single path */
+}
 <CanvasTileEngine.Path
     items={[
         { x: 0, y: 0 },
@@ -151,17 +205,25 @@ Draw continuous lines through multiple points.
     ]}
     style={{ strokeStyle: "#219ebc", lineWidthPx: 2 }}
     layer={1}
-/>
+/>;
 
-{/* Multiple paths */}
+{
+    /* Multiple paths */
+}
 <CanvasTileEngine.Path
     items={[
-        [{ x: 0, y: 0 }, { x: 5, y: 5 }],
-        [{ x: 10, y: 0 }, { x: 15, y: 5 }],
+        [
+            { x: 0, y: 0 },
+            { x: 5, y: 5 },
+        ],
+        [
+            { x: 10, y: 0 },
+            { x: 15, y: 5 },
+        ],
     ]}
     style={{ strokeStyle: "green", lineWidthPx: 1 }}
     layer={1}
-/>
+/>;
 ```
 
 ### `<GridLines>`
@@ -199,44 +261,48 @@ Draw grid lines at specified intervals.
 
 Render text at world coordinates. Text size scales with zoom.
 
-| Prop    | Type              | Default      | Description       |
-| :------ | :---------------- | :----------- | :---------------- |
-| `items` | `Text \| Text[]`  | **Required** | Text definitions. |
-| `layer` | `number`          | `2`          | Rendering layer.  |
+| Prop    | Type             | Default      | Description       |
+| :------ | :--------------- | :----------- | :---------------- |
+| `items` | `Text \| Text[]` | **Required** | Text definitions. |
+| `layer` | `number`         | `2`          | Rendering layer.  |
 
 **Text Properties:**
 
-| Property | Type     | Default                            | Description                              |
-| :------- | :------- | :--------------------------------- | :--------------------------------------- |
-| `x`, `y` | `number` | **Required**                       | World coordinates.                       |
-| `text`   | `string` | **Required**                       | The text content.                        |
-| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set. |
+| Property | Type     | Default                            | Description                                                                   |
+| :------- | :------- | :--------------------------------- | :---------------------------------------------------------------------------- |
+| `x`, `y` | `number` | **Required**                       | World coordinates.                                                            |
+| `text`   | `string` | **Required**                       | The text content.                                                             |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set.    |
 | `fontPx` | `number` | -                                  | Fixed font size in pixels, independent of zoom. Takes precedence over `size`. |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
-| `style`  | `object` | -                                  | Font styling options.                    |
-| `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).   |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                 |
+| `style`  | `object` | -                                  | Font styling options.                                                         |
+| `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).                                        |
 
 **Style Options:**
 
--   `fillStyle`: Text color
--   `fontFamily`: Font family (default: `"sans-serif"`)
--   `textAlign`: `"left"`, `"center"`, `"right"`
--   `textBaseline`: `"top"`, `"middle"`, `"bottom"`
+- `fillStyle`: Text color
+- `fontFamily`: Font family (default: `"sans-serif"`)
+- `textAlign`: `"left"`, `"center"`, `"right"`
+- `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 
 ```tsx
-{/* Single text */}
+{
+    /* Single text */
+}
 <CanvasTileEngine.Text
     items={{
         x: 5,
         y: 5,
         text: "Base Camp",
         size: 1,
-        style: { fillStyle: "white", fontFamily: "Arial" }
+        style: { fillStyle: "white", fontFamily: "Arial" },
     }}
     layer={3}
-/>
+/>;
 
-{/* Rotated text (45 degrees) */}
+{
+    /* Rotated text (45 degrees) */
+}
 <CanvasTileEngine.Text
     items={{
         x: 8,
@@ -244,24 +310,28 @@ Render text at world coordinates. Text size scales with zoom.
         text: "Rotated",
         size: 1,
         rotate: 45,
-        style: { fillStyle: "yellow" }
+        style: { fillStyle: "yellow" },
     }}
     layer={3}
-/>
+/>;
 
-{/* Fixed-size label: always 14px on screen, regardless of zoom */}
+{
+    /* Fixed-size label: always 14px on screen, regardless of zoom */
+}
 <CanvasTileEngine.Text
     items={{
         x: 5,
         y: 3,
         text: "Ankara",
         fontPx: 14,
-        style: { fillStyle: "white" }
+        style: { fillStyle: "white" },
     }}
     layer={3}
-/>
+/>;
 
-{/* Multiple texts (batch rendering) */}
+{
+    /* Multiple texts (batch rendering) */
+}
 <CanvasTileEngine.Text
     items={[
         { x: 0, y: 0, text: "A", size: 2, style: { fillStyle: "red" } },
@@ -269,7 +339,7 @@ Render text at world coordinates. Text size scales with zoom.
         { x: 2, y: 0, text: "C", size: 2, style: { fillStyle: "green" } },
     ]}
     layer={3}
-/>
+/>;
 ```
 
 :::tip Two sizing modes
@@ -287,14 +357,15 @@ Draw images scaled to world units.
 
 **ImageItem Properties:**
 
-| Property | Type               | Description                                                        |
-| :------- | :----------------- | :----------------------------------------------------------------- |
-| `img`    | `HTMLImageElement` | The loaded image object.                                           |
-| `x`, `y` | `number`           | World coordinates.                                                 |
-| `size`   | `number`           | Size in grid units (maintains aspect ratio).                       |
-| `rotate` | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
-| `sprite` | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
-| `opacity` | `number`          | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements. |
+| Property  | Type               | Description                                                                                                        |
+| :-------- | :----------------- | :----------------------------------------------------------------------------------------------------------------- |
+| `img`     | `HTMLImageElement` | The loaded image object.                                                                                           |
+| `x`, `y`  | `number`           | World coordinates.                                                                                                 |
+| `size`    | `number`           | Size in grid units (maintains aspect ratio).                                                                       |
+| `rotate`  | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise).                                                 |
+| `sprite`  | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
+| `opacity` | `number`           | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements.                       |
+| `data`    | `TData`            | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`.                    |
 
 ```tsx
 function MapWithImages() {
@@ -308,9 +379,18 @@ function MapWithImages() {
     }, [engine.isReady, engine.images]);
 
     return (
-        <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
+        <CanvasTileEngine
+            engine={engine}
+            config={config}
+            renderer={new RendererCanvas()}
+        >
             {/* Single image */}
-            {treeImg && <CanvasTileEngine.Image items={{ x: 2, y: 3, size: 1.5, img: treeImg }} layer={2} />}
+            {treeImg && (
+                <CanvasTileEngine.Image
+                    items={{ x: 2, y: 3, size: 1.5, img: treeImg }}
+                    layer={2}
+                />
+            )}
 
             {/* Multiple images (batch rendering) */}
             {treeImg && (
@@ -334,26 +414,33 @@ function MapWithImages() {
 
 For maximum flexibility, use a custom draw function with direct rendering context access.
 
-| Prop       | Type                            | Default      | Description      |
-| :--------- | :------------------------------ | :----------- | :--------------- |
-| `children` | `(ctx, coords, config) => void` | **Required** | Draw function.   |
-| `layer`    | `number`                        | `1`          | Rendering layer. |
+| Prop       | Type                                       | Default      | Description      |
+| :--------- | :----------------------------------------- | :----------- | :--------------- |
+| `children` | `(ctx, coords, config, transform) => void` | **Required** | Draw function.   |
+| `layer`    | `number`                                   | `1`          | Rendering layer. |
 
 ```tsx
 <CanvasTileEngine.DrawFunction layer={4}>
-    {(ctx, coords, config) => {
+    {(ctx, coords, config, transform) => {
         // ctx = Rendering context (type depends on renderer)
         // coords = Top-left world coordinate of the view
         // config = Current engine configuration
+        // transform = { worldToScreen, screenToWorld } coordinate helpers
 
         // Cast to the appropriate context type for your renderer
         const context = ctx as CanvasRenderingContext2D;
 
+        // Draw at a world position without doing the pixel math yourself:
+        const p = transform.worldToScreen(5, 3); // pixel at the center of cell (5, 3)
         context.fillStyle = "purple";
-        context.fillRect(100, 100, 50, 50); // Draw in screen pixels
+        context.fillRect(p.x - 5, p.y - 5, 10, 10);
     }}
 </CanvasTileEngine.DrawFunction>
 ```
+
+:::tip Rule of thumb
+Everything you pass to `ctx` is pixels. `worldToScreen` is for drawing (world in, pixels out); `screenToWorld` is for querying (pixels in, world out — feed it to `Math.floor` or `hitTest`, never back into `ctx`).
+:::
 
 ### `onDraw` Callback
 
@@ -364,16 +451,17 @@ The `onDraw` prop runs after all layers are drawn but before debug overlays.
     engine={engine}
     config={config}
     renderer={new RendererCanvas()}
-    onDraw={(ctx, info) => {
-        // ctx = Rendering context (type depends on renderer)
-        // info contains: { scale, width, height, coords }
+    onDraw={(ctx, coords, config, transform) => {
+        // Same signature as DrawFunction children:
+        // coords = top-left world coordinate, config = live engine config,
+        // transform = { worldToScreen, screenToWorld } helpers
 
         // Cast to the appropriate context type for your renderer
         const context = ctx as CanvasRenderingContext2D;
 
         context.strokeStyle = "red";
         context.lineWidth = 5;
-        context.strokeRect(0, 0, info.width, info.height);
+        context.strokeRect(0, 0, config.size.width, config.size.height);
     }}
 >
     {/* children */}
@@ -414,10 +502,14 @@ const miniMapItems = useMemo(
             rotate: item.rotation,
             radius: 0.1,
         })),
-    [items]
+    [items],
 );
 
-<CanvasTileEngine.StaticRect items={miniMapItems} cacheKey="minimap-items" layer={1} />;
+<CanvasTileEngine.StaticRect
+    items={miniMapItems}
+    cacheKey="minimap-items"
+    layer={1}
+/>;
 ```
 
 ### `<StaticCircle>`
@@ -425,7 +517,11 @@ const miniMapItems = useMemo(
 Pre-renders circles to an offscreen canvas.
 
 ```tsx
-<CanvasTileEngine.StaticCircle items={markers} cacheKey="minimap-markers" layer={2} />
+<CanvasTileEngine.StaticCircle
+    items={markers}
+    cacheKey="minimap-markers"
+    layer={2}
+/>
 ```
 
 ### `<StaticImage>`
@@ -433,16 +529,20 @@ Pre-renders circles to an offscreen canvas.
 Pre-renders images to an offscreen canvas. Supports `rotate` property.
 
 ```tsx
-<CanvasTileEngine.StaticImage items={terrainTiles} cacheKey="terrain-cache" layer={0} />
+<CanvasTileEngine.StaticImage
+    items={terrainTiles}
+    cacheKey="terrain-cache"
+    layer={0}
+/>
 ```
 
 :::tip Automatic Cache Management
 Static components automatically:
 
--   Clear the cache when `cacheKey` changes
--   Clean up the cache on unmount
--   Rebuild when `items` change
-    :::
+- Clear the cache when `cacheKey` changes
+- Clean up the cache on unmount
+- Rebuild when `items` change
+  :::
 
 :::warning Memory Usage
 Each static cache creates an offscreen canvas sized to fit all items. Use static caching only when the performance benefit justifies the memory cost.
@@ -464,11 +564,15 @@ function DynamicScene({ seats }) {
                 size: 0.9,
                 style: { fillStyle: s.selected ? "blue" : "green" },
             })),
-        [seats]
+        [seats],
     );
 
     return (
-        <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
+        <CanvasTileEngine
+            engine={engine}
+            config={config}
+            renderer={new RendererCanvas()}
+        >
             <CanvasTileEngine.GridLines cellSize={1} />
             <CanvasTileEngine.Rect items={seatRects} layer={1} />
         </CanvasTileEngine>
@@ -478,7 +582,7 @@ function DynamicScene({ seats }) {
 
 :::tip Performance
 
--   Use `useMemo` for computed items arrays to avoid unnecessary re-renders
--   For truly static content, use `<StaticRect>`, `<StaticCircle>`, or `<StaticImage>`
--   The engine automatically batches renders when multiple components update in the same frame
-    :::
+- Use `useMemo` for computed items arrays to avoid unnecessary re-renders
+- For truly static content, use `<StaticRect>`, `<StaticCircle>`, or `<StaticImage>`
+- The engine automatically batches renders when multiple components update in the same frame
+  :::

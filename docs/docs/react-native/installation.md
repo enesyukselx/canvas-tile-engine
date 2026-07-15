@@ -128,7 +128,7 @@ import { Skia } from "@canvas-tile-engine/react-native";
 ## Runtime Notes
 
 - `config`, `center`, and `renderer` are read when the native engine is created on first layout.
-- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.updateCoords`, `engine.goCoords`, `engine.setScale`, `zoomIn`, and `zoomOut` for runtime changes.
+- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.updateCoords`, `engine.goCoords`, `engine.setScale`, `engine.goScale`, `zoomIn`, and `zoomOut` for runtime changes.
 - Static helpers record and replay Skia pictures keyed by `cacheKey`.
 - The React Native wrapper owns layout, gesture responder handling, tap detection, and presentation.
 

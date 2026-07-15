@@ -213,6 +213,28 @@ describe("CanvasDraw line dash", () => {
     });
 });
 
+// Transform contract shared by all renderers: worldToScreen takes item-space
+// coords (integers = cell centers), screenToWorld returns raw corner-space.
+describe("CanvasDraw custom draw transform", () => {
+    it("hands worldToScreen/screenToWorld helpers to draw functions", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { ctx } = makeRecordingCtx();
+
+        let toScreen: { x: number; y: number } | undefined;
+        let toWorld: { x: number; y: number } | undefined;
+        draw.addDrawFunction((_ctx, _coords, _config, transform) => {
+            toScreen = transform.worldToScreen(2, 3);
+            toWorld = transform.screenToWorld(25, 35);
+        }, 1);
+        render(ctx);
+
+        // Item-space (2,3) is the center of cell (2,3): (2.5, 3.5) * 10
+        expect(toScreen).toEqual({ x: 25, y: 35 });
+        // screenToWorld reports raw corner-space, like event coords.raw
+        expect(toWorld).toEqual({ x: 2.5, y: 3.5 });
+    });
+});
+
 // Fake 2D context recording every rect(x, y, w, h) call.
 function makeRectRecordingCtx() {
     const rects: Array<{ x: number; y: number; w: number; h: number }> = [];

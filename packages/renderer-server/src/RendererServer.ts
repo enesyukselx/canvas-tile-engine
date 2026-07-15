@@ -16,6 +16,7 @@ import {
     onZoomCallback,
     RendererDependencies,
     ViewportState,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import { createCanvas, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
 import { CanvasDraw } from "./modules/CanvasDraw";
@@ -43,6 +44,11 @@ export interface RendererServerOptions {
  * emails, and visual snapshot tests.
  */
 export class RendererServer implements IRenderer<ServerMount, Image> {
+    /** Transform helpers handed to the onDraw hook. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     private canvas!: Canvas;
     private ctx!: SKRSContext2D;
     private camera!: ICamera;
@@ -132,12 +138,7 @@ export class RendererServer implements IRenderer<ServerMount, Image> {
         });
 
         // User custom draw callback (optional)
-        this.onDraw?.(this.ctx, {
-            scale: this.camera.scale,
-            width: config.size.width,
-            height: config.size.height,
-            coords: topLeft,
-        });
+        this.onDraw?.(this.ctx, topLeft, config, this.drawTransform);
 
         // Coordinate overlay
         if (this.coordinateOverlay.shouldDraw(this.camera.scale)) {

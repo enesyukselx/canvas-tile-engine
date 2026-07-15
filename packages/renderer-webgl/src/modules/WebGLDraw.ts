@@ -16,6 +16,7 @@ import {
     resolveLineWidthPx,
     resolveLineDashPx,
     resolveRadiusPx,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
@@ -38,6 +39,11 @@ const CIRCLE_STROKE_SEGMENTS = 48;
  * @internal
  */
 export class WebGLDraw {
+    /** Transform helpers handed to custom draw callbacks. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     private colorParser = new ColorParser();
 
     constructor(
@@ -59,10 +65,18 @@ export class WebGLDraw {
         const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
         const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
         const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
-        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
+        return (
+            x + sizeWorld >= minX &&
+            x - sizeWorld <= maxX &&
+            y + sizeWorld >= minY &&
+            y - sizeWorld <= maxY
+        );
     }
 
-    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
+    private getViewportBounds(
+        topLeft: Coords,
+        config: Required<CanvasTileEngineConfig>,
+    ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
         return {
@@ -74,11 +88,16 @@ export class WebGLDraw {
     }
 
     addDrawFunction(
-        fn: (ctx: CanvasRenderingContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (
+            ctx: CanvasRenderingContext2D,
+            coords: Coords,
+            config: Required<CanvasTileEngineConfig>,
+            transform: DrawTransform,
+        ) => void,
         layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            fn(ctx, topLeft, config);
+            fn(ctx, topLeft, config, this.drawTransform);
         });
     }
 
@@ -86,12 +105,19 @@ export class WebGLDraw {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             const shapes: ShapeInstance[] = [];
@@ -104,16 +130,35 @@ export class WebGLDraw {
                 const origin = this.resolveOrigin(item.origin);
                 const style = item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(
+                        item.x,
+                        item.y,
+                        Math.max(w, h) / 2,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxW = w * this.camera.scale;
                 const pxH = h * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const { x: drawX, y: drawY } = this.computeOriginOffset(
+                    pos,
+                    pxW,
+                    pxH,
+                    origin,
+                    this.camera,
+                );
                 const cx = drawX + pxW / 2;
                 const cy = drawY + pxH / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
-                const radius = this.resolveRadius(resolveRadiusPx(item.radius, this.camera.scale), Math.min(pxW, pxH));
+                const radius = this.resolveRadius(
+                    resolveRadiusPx(item.radius, this.camera.scale),
+                    Math.min(pxW, pxH),
+                );
 
                 if (style?.fillStyle) {
                     shapes.push({
@@ -150,12 +195,19 @@ export class WebGLDraw {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             const shapes: ShapeInstance[] = [];
@@ -166,12 +218,22 @@ export class WebGLDraw {
                 const origin = this.resolveOrigin(item.origin);
                 const style = item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
                 const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: drawX, y: drawY } = this.computeOriginOffset(
+                    pos,
+                    pxSize,
+                    pxSize,
+                    origin,
+                    this.camera,
+                );
                 const cx = drawX + radius;
                 const cy = drawY + radius;
 
@@ -204,7 +266,11 @@ export class WebGLDraw {
         });
     }
 
-    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
+    drawLine(
+        items: Array<Line> | Line,
+        style?: LineStyle,
+        layer: number = 1,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
@@ -216,10 +282,26 @@ export class WebGLDraw {
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
-                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                const halfExtent =
+                    Math.max(
+                        Math.abs(item.from.x - item.to.x),
+                        Math.abs(item.from.y - item.to.y),
+                    ) / 2;
+                if (
+                    !this.isVisible(
+                        centerX,
+                        centerY,
+                        halfExtent,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
-                const a = this.transformer.worldToScreen(item.from.x, item.from.y);
+                const a = this.transformer.worldToScreen(
+                    item.from.x,
+                    item.from.y,
+                );
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
                 // Each Line item is its own subpath: the dash phase restarts.
                 this.pushSegment(lines, a, b, color, lineWidth, dash, 0);
@@ -233,12 +315,19 @@ export class WebGLDraw {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             ctx.save();
@@ -248,9 +337,22 @@ export class WebGLDraw {
                 const style = item.style;
 
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
-                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
+                const extentWorld =
+                    item.fontPx !== undefined
+                        ? item.fontPx / this.camera.scale
+                        : size;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(
+                        item.x,
+                        item.y,
+                        extentWorld,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
@@ -278,8 +380,14 @@ export class WebGLDraw {
         });
     }
 
-    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
-        const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
+    drawPath(
+        items: Array<Path> | Path,
+        style?: LineStyle,
+        layer: number = 1,
+    ): DrawHandle {
+        const list = Array.isArray(items[0])
+            ? (items as Array<Coords[]>)
+            : [items as Coords[]];
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
@@ -298,15 +406,38 @@ export class WebGLDraw {
                 const centerX = (minX + maxX) / 2;
                 const centerY = (minY + maxY) / 2;
                 const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                if (
+                    !this.isVisible(
+                        centerX,
+                        centerY,
+                        halfExtent,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
-                let prev = this.transformer.worldToScreen(points[0].x, points[0].y);
+                let prev = this.transformer.worldToScreen(
+                    points[0].x,
+                    points[0].y,
+                );
                 // The dash phase carries across joints so the pattern flows
                 // continuously along the polyline, like a single ctx subpath.
                 let phase = 0;
                 for (let i = 1; i < points.length; i++) {
-                    const curr = this.transformer.worldToScreen(points[i].x, points[i].y);
-                    phase = this.pushSegment(lines, prev, curr, color, lineWidth, dash, phase);
+                    const curr = this.transformer.worldToScreen(
+                        points[i].x,
+                        points[i].y,
+                    );
+                    phase = this.pushSegment(
+                        lines,
+                        prev,
+                        curr,
+                        color,
+                        lineWidth,
+                        dash,
+                        phase,
+                    );
                     prev = curr;
                 }
             }
@@ -315,16 +446,26 @@ export class WebGLDraw {
         });
     }
 
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem> | ImageItem,
+        layer: number = 1,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             const images: ImageInstance[] = [];
@@ -333,7 +474,11 @@ export class WebGLDraw {
                 const size = item.size ?? 1;
                 const origin = this.resolveOrigin(item.origin);
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                )
+                    continue;
 
                 const texture = gl.getTexture(item.img);
                 if (!texture) continue;
@@ -353,7 +498,13 @@ export class WebGLDraw {
                 if (aspect > 1) drawH = pxSize / aspect;
                 else drawW = pxSize * aspect;
 
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: baseX, y: baseY } = this.computeOriginOffset(
+                    pos,
+                    pxSize,
+                    pxSize,
+                    origin,
+                    this.camera,
+                );
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
@@ -383,15 +534,27 @@ export class WebGLDraw {
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+    ): DrawHandle {
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
-            const startX = Math.floor(topLeft.x / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endX = Math.ceil((topLeft.x + viewW) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const startY = Math.floor(topLeft.y / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endY = Math.ceil((topLeft.y + viewH) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startX =
+                Math.floor(topLeft.x / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endX =
+                Math.ceil((topLeft.x + viewW) / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startY =
+                Math.floor(topLeft.y / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endY =
+                Math.ceil((topLeft.y + viewH) / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
 
             const color = this.colorParser.parse(style.strokeStyle);
             const lines: LineInstance[] = [];
@@ -418,15 +581,27 @@ export class WebGLDraw {
     // and blits it each frame. With WebGL the per-frame cost of a batched draw is
     // already a single GPU call, so the static variants reuse the dynamic path.
 
-    drawStaticRect(items: Array<Rect>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticRect(
+        items: Array<Rect>,
+        _cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
         return this.drawRect(items, layer);
     }
 
-    drawStaticCircle(items: Array<Circle>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticCircle(
+        items: Array<Circle>,
+        _cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
         return this.drawCircle(items, layer);
     }
 
-    drawStaticImage(items: Array<ImageItem>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(
+        items: Array<ImageItem>,
+        _cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
         return this.drawImage(items, layer);
     }
 
@@ -459,7 +634,9 @@ export class WebGLDraw {
 
     // ─── Geometry helpers ───
 
-    private resolveOrigin(origin: { mode?: string; x?: number; y?: number } | undefined): {
+    private resolveOrigin(
+        origin: { mode?: string; x?: number; y?: number } | undefined,
+    ): {
         mode: "cell" | "self";
         x: number;
         y: number;
@@ -477,7 +654,10 @@ export class WebGLDraw {
      * arrays expand CSS-style, and when adjacent radii overflow an edge all
      * radii are scaled down proportionally.
      */
-    private resolveRadius(radius: number | number[] | undefined, pxSize: number): [number, number, number, number] {
+    private resolveRadius(
+        radius: number | number[] | undefined,
+        pxSize: number,
+    ): [number, number, number, number] {
         if (radius === undefined) return [0, 0, 0, 0];
 
         let tl: number, tr: number, br: number, bl: number;
@@ -541,10 +721,16 @@ export class WebGLDraw {
      * Emulate the Canvas2D `applyLineWidth` alpha trick: sub-pixel widths render
      * as a 1px line with proportionally reduced opacity.
      */
-    private resolveStroke(color: RGBA, lineWidth: number): { width: number; color: RGBA } {
+    private resolveStroke(
+        color: RGBA,
+        lineWidth: number,
+    ): { width: number; color: RGBA } {
         if (lineWidth >= 1) return { width: lineWidth, color };
         const alpha = Math.max(0, Math.min(lineWidth, 1));
-        return { width: 1, color: [color[0], color[1], color[2], color[3] * alpha] };
+        return {
+            width: 1,
+            color: [color[0], color[1], color[2], color[3] * alpha],
+        };
     }
 
     /**
@@ -566,13 +752,27 @@ export class WebGLDraw {
         }
         const segments: Array<{ a: Coords; b: Coords }> = [];
         const next = appendDashedSegment(segments, a, b, dash, phase);
-        for (const s of segments) this.pushLine(lines, s.a, s.b, color, lineWidth);
+        for (const s of segments)
+            this.pushLine(lines, s.a, s.b, color, lineWidth);
         return next;
     }
 
-    private pushLine(lines: LineInstance[], a: Coords, b: Coords, color: RGBA, lineWidth: number) {
+    private pushLine(
+        lines: LineInstance[],
+        a: Coords,
+        b: Coords,
+        color: RGBA,
+        lineWidth: number,
+    ) {
         const stroke = this.resolveStroke(color, lineWidth);
-        lines.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: stroke.width, color: stroke.color });
+        lines.push({
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            width: stroke.width,
+            color: stroke.color,
+        });
     }
 
     private pushRectStroke(
@@ -607,11 +807,35 @@ export class WebGLDraw {
         const vx = -sin * half; // along tl→bl
         const vy = cos * half;
 
-        this.pushLine(lines, { x: tl.x - ux, y: tl.y - uy }, { x: tr.x + ux, y: tr.y + uy }, color, lineWidth);
-        this.pushLine(lines, { x: bl.x - ux, y: bl.y - uy }, { x: br.x + ux, y: br.y + uy }, color, lineWidth);
+        this.pushLine(
+            lines,
+            { x: tl.x - ux, y: tl.y - uy },
+            { x: tr.x + ux, y: tr.y + uy },
+            color,
+            lineWidth,
+        );
+        this.pushLine(
+            lines,
+            { x: bl.x - ux, y: bl.y - uy },
+            { x: br.x + ux, y: br.y + uy },
+            color,
+            lineWidth,
+        );
         if (h > half * 2) {
-            this.pushLine(lines, { x: tl.x + vx, y: tl.y + vy }, { x: bl.x - vx, y: bl.y - vy }, color, lineWidth);
-            this.pushLine(lines, { x: tr.x + vx, y: tr.y + vy }, { x: br.x - vx, y: br.y - vy }, color, lineWidth);
+            this.pushLine(
+                lines,
+                { x: tl.x + vx, y: tl.y + vy },
+                { x: bl.x - vx, y: bl.y - vy },
+                color,
+                lineWidth,
+            );
+            this.pushLine(
+                lines,
+                { x: tr.x + vx, y: tr.y + vy },
+                { x: br.x - vx, y: br.y - vy },
+                color,
+                lineWidth,
+            );
         }
     }
 
@@ -625,11 +849,16 @@ export class WebGLDraw {
     ) {
         // Extend each chord by the miter length so adjacent segments meet
         // without gaps on the outside of the joint.
-        const ext = (Math.max(lineWidth, 1) / 2) * Math.tan(Math.PI / CIRCLE_STROKE_SEGMENTS);
+        const ext =
+            (Math.max(lineWidth, 1) / 2) *
+            Math.tan(Math.PI / CIRCLE_STROKE_SEGMENTS);
         let prev: Coords = { x: cx + radius, y: cy };
         for (let i = 1; i <= CIRCLE_STROKE_SEGMENTS; i++) {
             const angle = (i / CIRCLE_STROKE_SEGMENTS) * Math.PI * 2;
-            const curr: Coords = { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+            const curr: Coords = {
+                x: cx + Math.cos(angle) * radius,
+                y: cy + Math.sin(angle) * radius,
+            };
             const len = Math.hypot(curr.x - prev.x, curr.y - prev.y) || 1;
             const dx = ((curr.x - prev.x) / len) * ext;
             const dy = ((curr.y - prev.y) / len) * ext;

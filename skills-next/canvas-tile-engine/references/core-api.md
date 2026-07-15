@@ -80,7 +80,7 @@ type CanvasTileEngineConfig = {
 
 | Mode | Behavior |
 | :-- | :-- |
-| `"preserve-scale"` | Scale stays fixed; visible world area grows/shrinks with the wrapper. |
+| `"preserve-scale"` | Scale stays fixed; visible world area grows/shrinks with the wrapper. Width-responsive only: the wrapper is set to `width: 100%` and its height is PINNED to `config.size.height` via inline style (CSS heights are overridden). |
 | `"preserve-viewport"` | Configured tile count stays visible; scale changes with wrapper width. |
 | `false` | Fixed `config.size` until `engine.resize()` or `eventHandlers.resize`. |
 
@@ -126,6 +126,7 @@ after mount.
 | `goCoords(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
 | `getScale(): number` | Current scale (px per world unit). |
 | `setScale(n): void` | Set scale directly, clamped to min/max. |
+| `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
 | `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
 | `getSize(): { width, height }` | Current logical canvas size in px. |
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
@@ -166,23 +167,35 @@ and semantics: [drawing.md](drawing.md).
 
 | Signature | Notes |
 | :-- | :-- |
-| `hitTest(point: Coords, opts?: { layer?: number }): HitResult[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
-| `hitTestFirst(point: Coords, opts?): HitResult \| undefined` | Topmost item only. |
+| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
+| `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Topmost item only. |
 
 `HitResult` = `{ item, kind: "rect"|"circle"|"image", layer, handle, index }`;
-`index` is the item's position in the array passed to the draw call - use it
-to map back to app data. Pass `coords.raw` from event callbacks; origin
-anchoring, non-square Rect `width`/`height`, image aspect fit, and rotation
-are handled internally - the hit box is always the drawn box. Covers
-`drawStatic*` variants too; Line/Path/Text are NOT hit-testable. Position
-mutations require re-registration to be reflected (same rule as rendering).
-500+ item draw calls are queried via a spatial index - hover-frequency use is
-fine at scale.
+`item` is the exact object passed to the draw call. Every drawable item
+accepts an optional `data?: TData` field the engine never reads - attach app
+data there and read it back as `hit.item.data`. The `TData` type parameter
+types that field (assertion only, no runtime check). Prefer `data` over
+`index` for identity: `index` is the position in the array at draw time and
+goes stale when a filtered/re-ordered array is re-drawn. Pass `coords.raw`
+from event callbacks; origin anchoring, non-square Rect `width`/`height`,
+image aspect fit, and rotation are handled internally - the hit box is always
+the drawn box. Covers `drawStatic*` variants too; Line/Path/Text are NOT
+hit-testable. Position mutations require re-registration to be reflected
+(same rule as rendering). 500+ item draw calls are queried via a spatial
+index - hover-frequency use is fine at scale.
+
+The hit area is exactly the drawn geometry by default; expand it for generous
+touch targets with `padding` (world units) and/or `paddingPx` (screen pixels,
+zoom-independent, converted with the current scale per query). Both expand
+every tested item outward and combine additively; negative values are 0. Use
+these instead of registering invisible oversized "halo" items.
 
 ```ts
+engine.drawRect(stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })), 2);
 engine.onClick = (coords) => {
-    const hit = engine.hitTestFirst(coords.raw);
-    if (hit) openPanel(stations[hit.index]);
+    // Small station dots stay clickable up to 0.6 units around each center
+    const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
+    if (hit?.item.data) openPanel(hit.item.data);
 };
 ```
 
@@ -198,8 +211,8 @@ engine.onMouseLeave = (coords, mouse, client) => {};
 engine.onCoordsChange = (center: Coords) => {};       // any camera movement
 engine.onZoom       = (scale: number) => {};          // any scale change
 engine.onResize     = () => {};
-engine.onDraw       = (ctx, info) => {};              // after each frame; ctx is
-                                                      // platform-specific (see drawing.md)
+engine.onDraw       = (ctx, coords, config, transform) => {}; // after each frame,
+                                       // same signature as addDrawFunction (drawing.md)
 ```
 
 Payload details and patterns: [events.md](events.md).
@@ -275,6 +288,6 @@ renderer authors; app code normally only needs `CanvasTileEngine`,
 ## Validation errors
 
 `scale` must be a positive finite number and coordinates finite numbers;
-`setScale`, `updateCoords`, and `goCoords` throw `ConfigValidationError`
-otherwise. Config normalization fills every optional field with the defaults
+`setScale`, `goScale`, `updateCoords`, and `goCoords` throw
+`ConfigValidationError` otherwise. Config normalization fills every optional field with the defaults
 listed above.

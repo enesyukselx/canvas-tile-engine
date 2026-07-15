@@ -74,18 +74,23 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
         throw configError(`size.height must be positive, got ${config.size.height}`);
     }
 
-    // Size limits validation
-    if (config.size.minWidth !== undefined && config.size.minWidth <= 0) {
-        throw configError(`size.minWidth must be positive, got ${config.size.minWidth}`);
-    }
-    if (config.size.maxWidth !== undefined && config.size.maxWidth <= 0) {
-        throw configError(`size.maxWidth must be positive, got ${config.size.maxWidth}`);
-    }
-    if (config.size.minHeight !== undefined && config.size.minHeight <= 0) {
-        throw configError(`size.minHeight must be positive, got ${config.size.minHeight}`);
-    }
-    if (config.size.maxHeight !== undefined && config.size.maxHeight <= 0) {
-        throw configError(`size.maxHeight must be positive, got ${config.size.maxHeight}`);
+    // Size limits validation. Min limits must be finite; max limits may be
+    // Infinity (the documented "no limit" value) but never NaN. Comparison
+    // checks alone would let NaN and wrong types through (NaN <= 0 is false).
+    const sizeLimits = [
+        ["minWidth", config.size.minWidth, true],
+        ["maxWidth", config.size.maxWidth, false],
+        ["minHeight", config.size.minHeight, true],
+        ["maxHeight", config.size.maxHeight, false],
+    ] as const;
+    for (const [name, value, mustBeFinite] of sizeLimits) {
+        if (value === undefined) continue;
+        if (typeof value !== "number" || Number.isNaN(value) || (mustBeFinite && !Number.isFinite(value))) {
+            throw configError(`size.${name} must be a ${mustBeFinite ? "finite " : ""}number, got ${value}`);
+        }
+        if (value <= 0) {
+            throw configError(`size.${name} must be positive, got ${value}`);
+        }
     }
 
     if (config.size.minWidth !== undefined && config.size.maxWidth !== undefined) {
@@ -112,22 +117,7 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
 
     // Bounds validation
     if (config.bounds) {
-        const { minX, maxX, minY, maxY } = config.bounds;
-
-        if (typeof minX !== "number" || typeof maxX !== "number") {
-            throw configError("bounds.minX and bounds.maxX must be numbers");
-        }
-        if (typeof minY !== "number" || typeof maxY !== "number") {
-            throw configError("bounds.minY and bounds.maxY must be numbers");
-        }
-
-        // Allow Infinity for unbounded axes, but check finite bounds
-        if (Number.isFinite(minX) && Number.isFinite(maxX) && minX >= maxX) {
-            throw configError(`bounds.minX (${minX}) must be less than bounds.maxX (${maxX})`);
-        }
-        if (Number.isFinite(minY) && Number.isFinite(maxY) && minY >= maxY) {
-            throw configError(`bounds.minY (${minY}) must be less than bounds.maxY (${maxY})`);
-        }
+        validateBounds(config.bounds);
     }
 }
 
@@ -146,10 +136,14 @@ export function validateBounds(bounds: { minX: number; maxX: number; minY: numbe
         throw configError("bounds.minY and bounds.maxY must be numbers");
     }
 
-    if (Number.isFinite(minX) && Number.isFinite(maxX) && minX >= maxX) {
+    // `!(min < max)` also rejects NaN (every comparison is false) and
+    // degenerate infinite pairs like minX: Infinity, while -Infinity/Infinity
+    // stay valid for unbounded axes. NaN bounds would otherwise silently
+    // poison the camera clamp math and blank the canvas.
+    if (!(minX < maxX)) {
         throw configError(`bounds.minX (${minX}) must be less than bounds.maxX (${maxX})`);
     }
-    if (Number.isFinite(minY) && Number.isFinite(maxY) && minY >= maxY) {
+    if (!(minY < maxY)) {
         throw configError(`bounds.minY (${minY}) must be less than bounds.maxY (${maxY})`);
     }
 }

@@ -128,9 +128,9 @@ export interface CanvasTileEngineProps {
     onMouseLeave?: onMouseLeaveCallback;
 
     /**
-     * Callback after each draw frame. Use for custom Skia drawing.
-     * @param canvas - The Skia `SkCanvas`
-     * @param info - Frame info: `scale`, `width`, `height`, `coords` (center)
+     * Callback after each draw frame, on top of all layers. Same signature as
+     * `DrawFunction` children: the Skia `SkCanvas`, top-left world coords,
+     * live config, and coordinate transform helpers.
      */
     onDraw?: onDrawCallback;
 

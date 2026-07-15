@@ -16,6 +16,7 @@ import {
     resolveLineWidthPx,
     resolveLineDashPx,
     resolveRadiusPx,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
 import {
@@ -47,6 +48,11 @@ const SPATIAL_INDEX_THRESHOLD = 500;
  * @internal
  */
 export class SkiaDraw {
+    /** Transform helpers handed to custom draw callbacks. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     // Reusable paints, mutated per draw call (draws are immediate within a frame).
     private fillPaint: SkPaint;
     private strokePaint: SkPaint;
@@ -54,9 +60,16 @@ export class SkiaDraw {
     private fontCache = new Map<string, SkFont>();
     private colorCache = new Map<string, SkColor>();
     // Pre-recorded pictures for the drawStatic* variants, keyed by cacheKey.
-    private staticPictureCache = new Map<string, { picture: SkPicture; recordScale: number }>();
+    private staticPictureCache = new Map<
+        string,
+        { picture: SkPicture; recordScale: number }
+    >();
 
-    constructor(private layers: Layer, private transformer: CoordinateTransformer, private camera: ICamera) {
+    constructor(
+        private layers: Layer,
+        private transformer: CoordinateTransformer,
+        private camera: ICamera,
+    ) {
         this.fillPaint = Skia.Paint();
         this.fillPaint.setAntiAlias(true);
         this.fillPaint.setStyle(PaintStyle.Fill);
@@ -74,7 +87,7 @@ export class SkiaDraw {
         y: number,
         sizeWorld: number,
         topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>
+        config: Required<CanvasTileEngineConfig>,
     ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
@@ -82,10 +95,18 @@ export class SkiaDraw {
         const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
         const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
         const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
-        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
+        return (
+            x + sizeWorld >= minX &&
+            x - sizeWorld <= maxX &&
+            y + sizeWorld >= minY &&
+            y - sizeWorld <= maxY
+        );
     }
 
-    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
+    private getViewportBounds(
+        topLeft: Coords,
+        config: Required<CanvasTileEngineConfig>,
+    ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
         return {
@@ -97,11 +118,16 @@ export class SkiaDraw {
     }
 
     addDrawFunction(
-        fn: (canvas: SkCanvas, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
-        layer: number = 1
+        fn: (
+            canvas: SkCanvas,
+            coords: Coords,
+            config: Required<CanvasTileEngineConfig>,
+            transform: DrawTransform,
+        ) => void,
+        layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            fn(canvas, topLeft, config);
+            fn(canvas, topLeft, config, this.drawTransform);
         });
     }
 
@@ -109,19 +135,31 @@ export class SkiaDraw {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
-                const extent = Math.max(item.width ?? size, item.height ?? size) / 2;
+                const extent =
+                    Math.max(item.width ?? size, item.height ?? size) / 2;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extent, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(item.x, item.y, extent, topLeft, config)
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 this.paintRect(canvas, item, pos, this.camera.scale);
@@ -130,31 +168,52 @@ export class SkiaDraw {
     }
 
     /** Paint a single rect at a resolved position; `cellSize` is the pixel size of one world cell. */
-    private paintRect(canvas: SkCanvas, item: Rect, pos: Coords, cellSize: number) {
+    private paintRect(
+        canvas: SkCanvas,
+        item: Rect,
+        pos: Coords,
+        cellSize: number,
+    ) {
         const size = item.size ?? 1;
         const origin = this.resolveOrigin(item.origin);
         const style = item.style;
         const pxW = (item.width ?? size) * cellSize;
         const pxH = (item.height ?? size) * cellSize;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, cellSize);
+        const { x: drawX, y: drawY } = this.computeOriginOffset(
+            pos,
+            pxW,
+            pxH,
+            origin,
+            cellSize,
+        );
         const cx = drawX + pxW / 2;
         const cy = drawY + pxH / 2;
         const rotation = item.rotate ?? 0;
-        const radius = this.resolveRadius(resolveRadiusPx(item.radius, cellSize));
+        const radius = this.resolveRadius(
+            resolveRadiusPx(item.radius, cellSize),
+        );
 
-        const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
+        const count =
+            rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
 
         const rect = Skia.XYWHRect(drawX, drawY, pxW, pxH);
         const rounded = this.hasRadius(radius);
         if (style?.fillStyle) {
             this.fillPaint.setColor(this.color(style.fillStyle));
-            if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
+            if (rounded)
+                canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
             else canvas.drawRect(rect, this.fillPaint);
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
-            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, cellSize));
-            if (rounded) canvas.drawRRect(this.makeRRect(rect, radius), this.strokePaint);
+            this.strokePaint.setStrokeWidth(
+                resolveLineWidthPx(style, cellSize),
+            );
+            if (rounded)
+                canvas.drawRRect(
+                    this.makeRRect(rect, radius),
+                    this.strokePaint,
+                );
             else canvas.drawRect(rect, this.strokePaint);
         }
 
@@ -165,18 +224,29 @@ export class SkiaDraw {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 this.paintCircle(canvas, item, pos, this.camera.scale);
@@ -185,13 +255,24 @@ export class SkiaDraw {
     }
 
     /** Paint a single circle at a resolved position; `cellSize` is the pixel size of one world cell. */
-    private paintCircle(canvas: SkCanvas, item: Circle, pos: Coords, cellSize: number) {
+    private paintCircle(
+        canvas: SkCanvas,
+        item: Circle,
+        pos: Coords,
+        cellSize: number,
+    ) {
         const size = item.size ?? 1;
         const origin = this.resolveOrigin(item.origin);
         const style = item.style;
         const pxSize = size * cellSize;
         const radius = pxSize / 2;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, cellSize);
+        const { x: drawX, y: drawY } = this.computeOriginOffset(
+            pos,
+            pxSize,
+            pxSize,
+            origin,
+            cellSize,
+        );
         const cx = drawX + radius;
         const cy = drawY + radius;
 
@@ -201,7 +282,9 @@ export class SkiaDraw {
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
-            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, cellSize));
+            this.strokePaint.setStrokeWidth(
+                resolveLineWidthPx(style, cellSize),
+            );
             canvas.drawCircle(cx, cy, radius, this.strokePaint);
         }
     }
@@ -209,23 +292,46 @@ export class SkiaDraw {
     drawLine(
         items: Array<Line> | Line,
         style?: LineStyle,
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
-            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, this.camera.scale));
+            this.strokePaint.setColor(
+                this.color(style?.strokeStyle ?? "#000000"),
+            );
+            this.strokePaint.setStrokeWidth(
+                resolveLineWidthPx(style, this.camera.scale),
+            );
             const dash = resolveLineDashPx(style, this.camera.scale);
-            if (dash) this.strokePaint.setPathEffect(Skia.PathEffect.MakeDash(dash, 0));
+            if (dash)
+                this.strokePaint.setPathEffect(
+                    Skia.PathEffect.MakeDash(dash, 0),
+                );
 
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
-                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                const halfExtent =
+                    Math.max(
+                        Math.abs(item.from.x - item.to.x),
+                        Math.abs(item.from.y - item.to.y),
+                    ) / 2;
+                if (
+                    !this.isVisible(
+                        centerX,
+                        centerY,
+                        halfExtent,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
-                const a = this.transformer.worldToScreen(item.from.x, item.from.y);
+                const a = this.transformer.worldToScreen(
+                    item.from.x,
+                    item.from.y,
+                );
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
                 canvas.drawLine(a.x, a.y, b.x, b.y, this.strokePaint);
             }
@@ -237,12 +343,19 @@ export class SkiaDraw {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             for (const item of visibleItems) {
@@ -250,20 +363,47 @@ export class SkiaDraw {
                 const style = item.style;
 
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
-                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
+                const extentWorld =
+                    item.fontPx !== undefined
+                        ? item.fontPx / this.camera.scale
+                        : size;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(
+                        item.x,
+                        item.y,
+                        extentWorld,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
                 // Font sizing matches the Canvas2D renderer: fontPx wins, else size * scale.
                 const pxSize = item.fontPx ?? size * this.camera.scale;
-                const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize);
-                this.fillPaint.setColor(this.color(style?.fillStyle ?? "#000000"));
+                const font = this.getFont(
+                    style?.fontFamily ?? DEFAULT_SANS_SERIF,
+                    pxSize,
+                );
+                this.fillPaint.setColor(
+                    this.color(style?.fillStyle ?? "#000000"),
+                );
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const { x, y } = this.alignText(item.text, pos, font, style?.textAlign, style?.textBaseline);
+                const { x, y } = this.alignText(
+                    item.text,
+                    pos,
+                    font,
+                    style?.textAlign,
+                    style?.textBaseline,
+                );
 
                 const rotation = item.rotate ?? 0;
-                const count = rotation !== 0 ? this.withRotation(canvas, rotation, pos.x, pos.y) : -1;
+                const count =
+                    rotation !== 0
+                        ? this.withRotation(canvas, rotation, pos.x, pos.y)
+                        : -1;
                 canvas.drawText(item.text, x, y, this.fillPaint, font);
                 if (count !== -1) canvas.restoreToCount(count);
             }
@@ -273,15 +413,24 @@ export class SkiaDraw {
     drawPath(
         items: Array<Path> | Path,
         style?: LineStyle,
-        layer: number = 1
+        layer: number = 1,
     ): DrawHandle {
-        const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
+        const list = Array.isArray(items[0])
+            ? (items as Array<Coords[]>)
+            : [items as Coords[]];
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
-            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, this.camera.scale));
+            this.strokePaint.setColor(
+                this.color(style?.strokeStyle ?? "#000000"),
+            );
+            this.strokePaint.setStrokeWidth(
+                resolveLineWidthPx(style, this.camera.scale),
+            );
             const dash = resolveLineDashPx(style, this.camera.scale);
-            if (dash) this.strokePaint.setPathEffect(Skia.PathEffect.MakeDash(dash, 0));
+            if (dash)
+                this.strokePaint.setPathEffect(
+                    Skia.PathEffect.MakeDash(dash, 0),
+                );
 
             for (const points of list) {
                 if (points.length < 2) continue;
@@ -294,13 +443,28 @@ export class SkiaDraw {
                 const centerX = (minX + maxX) / 2;
                 const centerY = (minY + maxY) / 2;
                 const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                if (
+                    !this.isVisible(
+                        centerX,
+                        centerY,
+                        halfExtent,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
                 const path = Skia.Path.Make();
-                const first = this.transformer.worldToScreen(points[0].x, points[0].y);
+                const first = this.transformer.worldToScreen(
+                    points[0].x,
+                    points[0].y,
+                );
                 path.moveTo(first.x, first.y);
                 for (let i = 1; i < points.length; i++) {
-                    const p = this.transformer.worldToScreen(points[i].x, points[i].y);
+                    const p = this.transformer.worldToScreen(
+                        points[i].x,
+                        points[i].y,
+                    );
                     path.lineTo(p.x, p.y);
                 }
                 canvas.drawPath(path, this.strokePaint);
@@ -309,22 +473,36 @@ export class SkiaDraw {
         });
     }
 
-    drawImage(items: Array<ImageItem<SkImage>> | ImageItem<SkImage>, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem<SkImage>> | ImageItem<SkImage>,
+        layer: number = 1,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 this.paintImage(canvas, item, pos, this.camera.scale);
@@ -333,7 +511,12 @@ export class SkiaDraw {
     }
 
     /** Paint a single image at a resolved position; `cellSize` is the pixel size of one world cell. */
-    private paintImage(canvas: SkCanvas, item: ImageItem<SkImage>, pos: Coords, cellSize: number) {
+    private paintImage(
+        canvas: SkCanvas,
+        item: ImageItem<SkImage>,
+        pos: Coords,
+        cellSize: number,
+    ) {
         const size = item.size ?? 1;
         const origin = this.resolveOrigin(item.origin);
 
@@ -357,14 +540,21 @@ export class SkiaDraw {
         if (aspect > 1) drawH = pxSize / aspect;
         else drawW = pxSize * aspect;
 
-        const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, cellSize);
+        const { x: baseX, y: baseY } = this.computeOriginOffset(
+            pos,
+            pxSize,
+            pxSize,
+            origin,
+            cellSize,
+        );
         const offsetX = baseX + (pxSize - drawW) / 2;
         const offsetY = baseY + (pxSize - drawH) / 2;
         const rotation = item.rotate ?? 0;
 
         const cx = offsetX + drawW / 2;
         const cy = offsetY + drawH / 2;
-        const count = rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
+        const count =
+            rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
 
         const src = Skia.XYWHRect(srcX, srcY, srcW, srcH);
         const dest = Skia.XYWHRect(offsetX, offsetY, drawW, drawH);
@@ -378,15 +568,27 @@ export class SkiaDraw {
         if (count !== -1) canvas.restoreToCount(count);
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+    ): DrawHandle {
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
-            const startX = Math.floor(topLeft.x / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endX = Math.ceil((topLeft.x + viewW) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const startY = Math.floor(topLeft.y / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endY = Math.ceil((topLeft.y + viewH) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startX =
+                Math.floor(topLeft.x / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endX =
+                Math.ceil((topLeft.x + viewW) / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startY =
+                Math.floor(topLeft.y / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endY =
+                Math.ceil((topLeft.y + viewH) / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
 
             this.strokePaint.setColor(this.color(style.strokeStyle));
             this.strokePaint.setStrokeWidth(style.lineWidth);
@@ -419,21 +621,45 @@ export class SkiaDraw {
     // baked in at the record scale and scale along on replay — use the
     // dynamic draw methods when a zoom-independent px width must hold.
 
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintRect(canvas, item, pos, cellSize)
+    drawStaticRect(
+        items: Array<Rect>,
+        cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (canvas, item, pos, cellSize) =>
+                this.paintRect(canvas, item, pos, cellSize),
         );
     }
 
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintCircle(canvas, item, pos, cellSize)
+    drawStaticCircle(
+        items: Array<Circle>,
+        cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (canvas, item, pos, cellSize) =>
+                this.paintCircle(canvas, item, pos, cellSize),
         );
     }
 
-    drawStaticImage(items: Array<ImageItem<SkImage>>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintImage(canvas, item, pos, cellSize)
+    drawStaticImage(
+        items: Array<ImageItem<SkImage>>,
+        cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (canvas, item, pos, cellSize) =>
+                this.paintImage(canvas, item, pos, cellSize),
         );
     }
 
@@ -449,11 +675,18 @@ export class SkiaDraw {
      * Register a layer callback that replays a cached picture of `items` under
      * the current camera transform, recording it first if `cacheKey` is new.
      */
-    private addStaticPictureLayer<T extends { x: number; y: number; size?: number }>(
+    private addStaticPictureLayer<
+        T extends { x: number; y: number; size?: number },
+    >(
         cacheKey: string,
         items: T[],
         layer: number,
-        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void
+        paintItem: (
+            canvas: SkCanvas,
+            item: T,
+            pos: Coords,
+            cellSize: number,
+        ) => void,
     ): DrawHandle {
         if (items.length === 0) {
             return this.layers.add(layer, () => {});
@@ -481,9 +714,16 @@ export class SkiaDraw {
     }
 
     /** Record `items` into a picture using a camera fixed at (0, 0) and the current scale. */
-    private recordStaticPicture<T extends { x: number; y: number; size?: number }>(
+    private recordStaticPicture<
+        T extends { x: number; y: number; size?: number },
+    >(
         items: T[],
-        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void
+        paintItem: (
+            canvas: SkCanvas,
+            item: T,
+            pos: Coords,
+            cellSize: number,
+        ) => void,
     ): { picture: SkPicture; recordScale: number } {
         const recordScale = this.camera.scale;
 
@@ -511,8 +751,8 @@ export class SkiaDraw {
                 (minX + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
                 (minY + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
                 (maxX - minX) * recordScale,
-                (maxY - minY) * recordScale
-            )
+                (maxY - minY) * recordScale,
+            ),
         );
 
         for (const item of items) {
@@ -562,7 +802,9 @@ export class SkiaDraw {
         return parsed;
     }
 
-    private resolveOrigin(origin: { mode?: string; x?: number; y?: number } | undefined): {
+    private resolveOrigin(
+        origin: { mode?: string; x?: number; y?: number } | undefined,
+    ): {
         mode: "cell" | "self";
         x: number;
         y: number;
@@ -582,7 +824,9 @@ export class SkiaDraw {
      * Overflow handling is left to Skia's RRect, which scales radii down
      * proportionally to fit the rect just like `roundRect` does.
      */
-    private resolveRadius(radius: number | number[] | undefined): number | [number, number, number, number] {
+    private resolveRadius(
+        radius: number | number[] | undefined,
+    ): number | [number, number, number, number] {
         if (radius === undefined) return 0;
         if (!Array.isArray(radius)) return Math.max(0, radius);
 
@@ -601,12 +845,17 @@ export class SkiaDraw {
         }
     }
 
-    private hasRadius(radius: number | [number, number, number, number]): boolean {
+    private hasRadius(
+        radius: number | [number, number, number, number],
+    ): boolean {
         return Array.isArray(radius) ? radius.some((r) => r > 0) : radius > 0;
     }
 
     /** Builds an `InputRRect` from a resolved radius, using a non-uniform RRect for per-corner values. */
-    private makeRRect(rect: SkRect, radius: number | [number, number, number, number]): InputRRect {
+    private makeRRect(
+        rect: SkRect,
+        radius: number | [number, number, number, number],
+    ): InputRRect {
         if (!Array.isArray(radius)) return Skia.RRectXY(rect, radius, radius);
 
         const [topLeft, topRight, bottomRight, bottomLeft] = radius;
@@ -624,7 +873,7 @@ export class SkiaDraw {
         pxW: number,
         pxH: number,
         origin: { mode: "cell" | "self"; x: number; y: number },
-        cellSize: number
+        cellSize: number,
     ) {
         if (origin.mode === "cell") {
             const cell = cellSize;
@@ -641,7 +890,12 @@ export class SkiaDraw {
     }
 
     /** Save the canvas and rotate (degrees) about a pivot. Returns the save count. */
-    private withRotation(canvas: SkCanvas, degrees: number, px: number, py: number): number {
+    private withRotation(
+        canvas: SkCanvas,
+        degrees: number,
+        px: number,
+        py: number,
+    ): number {
         const count = canvas.save();
         canvas.rotate(degrees, px, py);
         return count;
@@ -671,7 +925,7 @@ export class SkiaDraw {
         pos: Coords,
         font: SkFont,
         textAlign: string | undefined,
-        textBaseline: string | undefined
+        textBaseline: string | undefined,
     ): Coords {
         let x = pos.x;
         let y = pos.y;

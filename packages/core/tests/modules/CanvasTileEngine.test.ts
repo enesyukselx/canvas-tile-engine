@@ -70,6 +70,45 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    // Node has no requestAnimationFrame, so goScale completes instantly here;
+    // frame-by-frame interpolation is covered by the AnimationController tests.
+    describe("goScale", () => {
+        it("reaches the target scale and fires onZoom", () => {
+            engine.goScale(1.5, 0);
+            expect(engine.getScale()).toBe(1.5);
+            expect(onZoom).toHaveBeenCalledWith(1.5);
+        });
+
+        it("clamps the target to maxScale", () => {
+            engine.goScale(10, 0);
+            expect(engine.getScale()).toBe(2);
+        });
+
+        it("does not fire onZoom when already at the target scale", () => {
+            engine.goScale(1, 0);
+            expect(onZoom).not.toHaveBeenCalled();
+        });
+
+        it("keeps the viewport center fixed while zooming", () => {
+            const before = engine.getCenterCoords();
+            engine.goScale(2, 0);
+            const after = engine.getCenterCoords();
+            expect(after.x).toBeCloseTo(before.x);
+            expect(after.y).toBeCloseTo(before.y);
+        });
+
+        it("calls onComplete when the animation finishes", () => {
+            const onComplete = vi.fn();
+            engine.goScale(1.5, 0, onComplete);
+            expect(onComplete).toHaveBeenCalled();
+        });
+
+        it("rejects invalid scale values", () => {
+            expect(() => engine.goScale(-1)).toThrow();
+            expect(() => engine.goScale(NaN)).toThrow();
+        });
+    });
+
     describe("setBounds", () => {
         it("fires onCoordsChange since bounds can clamp the camera", () => {
             // Engine starts centered at (0, 0); these bounds force a clamp.
@@ -78,6 +117,41 @@ describe("CanvasTileEngine", () => {
             const coords = onCoordsChange.mock.calls[0][0];
             expect(coords.x).toBeGreaterThan(500);
             expect(coords.y).toBeGreaterThan(500);
+        });
+    });
+
+    describe("programmatic resize fires onResize once", () => {
+        // Every renderer's resizeWithAnimation completion invokes its own
+        // onResize (the engine setter mirrors the user callback into the
+        // renderer) and then the engine-supplied onComplete. The engine must
+        // not invoke the callback again from onComplete.
+        function createEngineWithResizingRenderer() {
+            const renderer = createMockRenderer();
+            (renderer.resizeWithAnimation as ReturnType<typeof vi.fn>).mockImplementation(
+                (_w: number, _h: number, _d: number, onComplete?: () => void) => {
+                    renderer.onResize?.();
+                    onComplete?.();
+                },
+            );
+            return new CanvasTileEngine<Mount>({}, baseConfig, renderer);
+        }
+
+        it("invokes the user onResize callback exactly once", () => {
+            const e = createEngineWithResizingRenderer();
+            const onResize = vi.fn();
+            e.onResize = onResize;
+
+            e.resize(400, 300, 0);
+            expect(onResize).toHaveBeenCalledTimes(1);
+        });
+
+        it("invokes onResize before the caller's onComplete", () => {
+            const e = createEngineWithResizingRenderer();
+            const order: string[] = [];
+            e.onResize = () => order.push("onResize");
+
+            e.resize(400, 300, 0, () => order.push("onComplete"));
+            expect(order).toEqual(["onResize", "onComplete"]);
         });
     });
 
@@ -204,6 +278,37 @@ describe("CanvasTileEngine", () => {
 
             e.clearAll();
             expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeUndefined();
+        });
+
+        it("expands hit geometry with world-unit padding", () => {
+            const e = createEngineWithDrawAPI();
+            // Station-dot scenario: small marker, generous touch target
+            e.drawCircle({ x: 0, y: 0, size: 0.95 }, 1);
+
+            // Raw (1.5, 0.5) is 1.0 world units from the dot center; radius is 0.475
+            expect(e.hitTestFirst({ x: 1.5, y: 0.5 })).toBeUndefined();
+            expect(e.hitTestFirst({ x: 1.5, y: 0.5 }, { padding: 0.625 })).toBeDefined();
+        });
+
+        it("converts paddingPx with the current scale", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawCircle({ x: 0, y: 0, size: 0.5 }, 1); // radius 0.25
+
+            // Raw (1.2, 0.5) is 0.7 world units from the center -> needs 0.45+
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { paddingPx: 0.8 })).toBeDefined(); // scale 1 -> 0.8 world
+
+            e.setScale(2);
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { paddingPx: 0.8 })).toBeUndefined(); // scale 2 -> 0.4 world
+        });
+
+        it("adds padding and paddingPx together", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawCircle({ x: 0, y: 0, size: 0.5 }, 1); // radius 0.25
+            e.setScale(2);
+
+            // 0.3 world + 0.4px / scale 2 = 0.5 -> effective radius 0.75 covers 0.7
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3, paddingPx: 0.4 })).toBeDefined();
+            expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3 })).toBeUndefined();
         });
     });
 });

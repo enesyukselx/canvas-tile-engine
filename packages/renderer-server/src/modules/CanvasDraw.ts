@@ -18,6 +18,7 @@ import {
     resolveLineWidthPx,
     resolveLineDashPx,
     resolveRadiusPx,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
@@ -48,6 +49,11 @@ interface StaticCache {
  * @internal
  */
 export class CanvasDraw implements IDrawAPI<Image> {
+    /** Transform helpers handed to custom draw callbacks. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     private staticCaches = new Map<string, StaticCache>();
     private warnedStaticCacheDisabled = false;
 
@@ -71,10 +77,18 @@ export class CanvasDraw implements IDrawAPI<Image> {
         const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
         const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
         const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
-        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
+        return (
+            x + sizeWorld >= minX &&
+            x - sizeWorld <= maxX &&
+            y + sizeWorld >= minY &&
+            y - sizeWorld <= maxY
+        );
     }
 
-    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
+    private getViewportBounds(
+        topLeft: Coords,
+        config: Required<CanvasTileEngineConfig>,
+    ) {
         const viewW = config.size.width / config.scale;
         const viewH = config.size.height / config.scale;
         return {
@@ -91,11 +105,16 @@ export class CanvasDraw implements IDrawAPI<Image> {
      * @param layer Layer order (lower draws first).
      */
     addDrawFunction(
-        fn: (ctx: SKRSContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (
+            ctx: SKRSContext2D,
+            coords: Coords,
+            config: Required<CanvasTileEngineConfig>,
+            transform: DrawTransform,
+        ) => void,
         layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            fn(ctx, topLeft, config);
+            fn(ctx, topLeft, config, this.drawTransform);
         });
     }
 
@@ -104,12 +123,19 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             ctx.save();
@@ -121,26 +147,48 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const w = item.width ?? size;
                 const h = item.height ?? size;
                 const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    mode:
+                        item.origin?.mode === "self"
+                            ? "self"
+                            : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
                     y: item.origin?.y ?? 0.5,
                 };
                 const style = item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(
+                        item.x,
+                        item.y,
+                        Math.max(w, h) / 2,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxW = w * this.camera.scale;
                 const pxH = h * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const { x: drawX, y: drawY } = this.computeOriginOffset(
+                    pos,
+                    pxW,
+                    pxH,
+                    origin,
+                    this.camera,
+                );
 
                 // Only update style when changed (reduces state changes)
                 if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                     ctx.fillStyle = style.fillStyle;
                     lastFillStyle = style.fillStyle;
                 }
-                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                if (
+                    style?.strokeStyle &&
+                    style.strokeStyle !== lastStrokeStyle
+                ) {
                     ctx.strokeStyle = style.strokeStyle;
                     lastStrokeStyle = style.strokeStyle;
                 }
@@ -178,14 +226,21 @@ export class CanvasDraw implements IDrawAPI<Image> {
         });
     }
 
-    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
+    drawLine(
+        items: Array<Line> | Line,
+        style?: LineStyle,
+        layer: number = 1,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
-            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+            const resetAlpha = applyLineWidth(
+                ctx,
+                resolveLineWidthPx(style, this.camera.scale),
+            );
             const dash = resolveLineDashPx(style, this.camera.scale);
             if (dash) ctx.setLineDash(dash);
 
@@ -193,10 +248,26 @@ export class CanvasDraw implements IDrawAPI<Image> {
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
-                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                const halfExtent =
+                    Math.max(
+                        Math.abs(item.from.x - item.to.x),
+                        Math.abs(item.from.y - item.to.y),
+                    ) / 2;
+                if (
+                    !this.isVisible(
+                        centerX,
+                        centerY,
+                        halfExtent,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
-                const a = this.transformer.worldToScreen(item.from.x, item.from.y);
+                const a = this.transformer.worldToScreen(
+                    item.from.x,
+                    item.from.y,
+                );
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
 
                 ctx.moveTo(a.x, a.y);
@@ -214,12 +285,19 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             ctx.save();
@@ -229,26 +307,42 @@ export class CanvasDraw implements IDrawAPI<Image> {
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
                 const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    mode:
+                        item.origin?.mode === "self"
+                            ? "self"
+                            : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
                     y: item.origin?.y ?? 0.5,
                 };
                 const style = item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
                 const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: drawX, y: drawY } = this.computeOriginOffset(
+                    pos,
+                    pxSize,
+                    pxSize,
+                    origin,
+                    this.camera,
+                );
 
                 // Only update style when changed
                 if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                     ctx.fillStyle = style.fillStyle;
                     lastFillStyle = style.fillStyle;
                 }
-                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                if (
+                    style?.strokeStyle &&
+                    style.strokeStyle !== lastStrokeStyle
+                ) {
                     ctx.strokeStyle = style.strokeStyle;
                     lastStrokeStyle = style.strokeStyle;
                 }
@@ -266,12 +360,19 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             ctx.save();
@@ -281,10 +382,23 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const style = item.style;
 
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
-                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
+                const extentWorld =
+                    item.fontPx !== undefined
+                        ? item.fontPx / this.camera.scale
+                        : size;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(
+                        item.x,
+                        item.y,
+                        extentWorld,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
@@ -312,14 +426,23 @@ export class CanvasDraw implements IDrawAPI<Image> {
         });
     }
 
-    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
-        const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
+    drawPath(
+        items: Array<Path> | Path,
+        style?: LineStyle,
+        layer: number = 1,
+    ): DrawHandle {
+        const list = Array.isArray(items[0])
+            ? (items as Array<Coords[]>)
+            : [items as Coords[]];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
-            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+            const resetAlpha = applyLineWidth(
+                ctx,
+                resolveLineWidthPx(style, this.camera.scale),
+            );
             const dash = resolveLineDashPx(style, this.camera.scale);
             if (dash) ctx.setLineDash(dash);
 
@@ -335,13 +458,28 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const centerX = (minX + maxX) / 2;
                 const centerY = (minY + maxY) / 2;
                 const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                if (
+                    !this.isVisible(
+                        centerX,
+                        centerY,
+                        halfExtent,
+                        topLeft,
+                        config,
+                    )
+                )
+                    continue;
 
-                const first = this.transformer.worldToScreen(points[0].x, points[0].y);
+                const first = this.transformer.worldToScreen(
+                    points[0].x,
+                    points[0].y,
+                );
                 ctx.moveTo(first.x, first.y);
 
                 for (let i = 1; i < points.length; i++) {
-                    const p = this.transformer.worldToScreen(points[i].x, points[i].y);
+                    const p = this.transformer.worldToScreen(
+                        points[i].x,
+                        points[i].y,
+                    );
                     ctx.lineTo(p.x, p.y);
                 }
             }
@@ -367,36 +505,63 @@ export class CanvasDraw implements IDrawAPI<Image> {
     ) {
         if (opacity !== 1) ctx.globalAlpha = opacity;
         if (sprite) {
-            ctx.drawImage(img, sprite.x, sprite.y, sprite.w, sprite.h, dx, dy, dw, dh);
+            ctx.drawImage(
+                img,
+                sprite.x,
+                sprite.y,
+                sprite.w,
+                sprite.h,
+                dx,
+                dy,
+                dw,
+                dh,
+            );
         } else {
             ctx.drawImage(img, dx, dy, dw, dh);
         }
         if (opacity !== 1) ctx.globalAlpha = 1;
     }
 
-    drawImage(items: Array<ImageItem<Image>> | ImageItem<Image>, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem<Image>> | ImageItem<Image>,
+        layer: number = 1,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const spatialIndex = useSpatialIndex
+            ? SpatialIndex.fromArray(list)
+            : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX,
+                      bounds.minY,
+                      bounds.maxX,
+                      bounds.maxY,
+                  )
                 : list;
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
                 const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    mode:
+                        item.origin?.mode === "self"
+                            ? "self"
+                            : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
                     y: item.origin?.y ?? 0.5,
                 };
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (
+                    !spatialIndex &&
+                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                )
+                    continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = size * this.camera.scale;
@@ -413,7 +578,13 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 else drawW = pxSize * aspect;
 
                 // origin SELF/CELL
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: baseX, y: baseY } = this.computeOriginOffset(
+                    pos,
+                    pxSize,
+                    pxSize,
+                    origin,
+                    this.camera,
+                );
 
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
@@ -429,24 +600,54 @@ export class CanvasDraw implements IDrawAPI<Image> {
                     ctx.save();
                     ctx.translate(centerX, centerY);
                     ctx.rotate(rotation);
-                    this.blitImage(ctx, item.img, item.sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
+                    this.blitImage(
+                        ctx,
+                        item.img,
+                        item.sprite,
+                        -drawW / 2,
+                        -drawH / 2,
+                        drawW,
+                        drawH,
+                        opacity,
+                    );
                     ctx.restore();
                 } else {
-                    this.blitImage(ctx, item.img, item.sprite, offsetX, offsetY, drawW, drawH, opacity);
+                    this.blitImage(
+                        ctx,
+                        item.img,
+                        item.sprite,
+                        offsetX,
+                        offsetY,
+                        drawW,
+                        drawH,
+                        opacity,
+                    );
                 }
             }
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+    ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
-            const startX = Math.floor(topLeft.x / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endX = Math.ceil((topLeft.x + viewW) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const startY = Math.floor(topLeft.y / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endY = Math.ceil((topLeft.y + viewH) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startX =
+                Math.floor(topLeft.x / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endX =
+                Math.ceil((topLeft.x + viewW) / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startY =
+                Math.floor(topLeft.y / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endY =
+                Math.ceil((topLeft.y + viewH) / cellSize) * cellSize -
+                DEFAULT_VALUES.CELL_CENTER_OFFSET;
 
             ctx.save();
 
@@ -482,12 +683,22 @@ export class CanvasDraw implements IDrawAPI<Image> {
      */
     private fillStrokePath(
         ctx: SKRSContext2D,
-        style: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number } | undefined,
+        style:
+            | {
+                  fillStyle?: string;
+                  strokeStyle?: string;
+                  lineWidth?: number;
+                  lineWidthPx?: number;
+              }
+            | undefined,
         scale: number,
     ) {
         if (style?.fillStyle) ctx.fill();
         if (style?.strokeStyle) {
-            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, scale));
+            const resetAlpha = applyLineWidth(
+                ctx,
+                resolveLineWidthPx(style, scale),
+            );
             ctx.stroke();
             resetAlpha();
         }
@@ -531,7 +742,14 @@ export class CanvasDraw implements IDrawAPI<Image> {
     >(
         items: T[],
         cacheKey: string,
-        renderFn: (ctx: SKRSContext2D, item: T, x: number, y: number, pxW: number, pxH: number) => void,
+        renderFn: (
+            ctx: SKRSContext2D,
+            item: T,
+            x: number,
+            y: number,
+            pxW: number,
+            pxH: number,
+        ) => void,
     ): StaticCache | null {
         if (items.length === 0) {
             return null;
@@ -567,9 +785,14 @@ export class CanvasDraw implements IDrawAPI<Image> {
         const canvasWidth = Math.ceil(worldWidth * renderScale);
         const canvasHeight = Math.ceil(worldHeight * renderScale);
 
-        if (canvasWidth > MAX_STATIC_CANVAS_DIMENSION || canvasHeight > MAX_STATIC_CANVAS_DIMENSION) {
+        if (
+            canvasWidth > MAX_STATIC_CANVAS_DIMENSION ||
+            canvasHeight > MAX_STATIC_CANVAS_DIMENSION
+        ) {
             if (!this.warnedStaticCacheDisabled) {
-                console.warn(`Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight}).`);
+                console.warn(
+                    `Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight}).`,
+                );
                 this.warnedStaticCacheDisabled = true;
             }
             return null;
@@ -591,7 +814,9 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
             if (!offCtx) {
                 if (!this.warnedStaticCacheDisabled) {
-                    console.warn("[CanvasDraw] Static cache disabled: 2D context unavailable.");
+                    console.warn(
+                        "[CanvasDraw] Static cache disabled: 2D context unavailable.",
+                    );
                     this.warnedStaticCacheDisabled = true;
                 }
                 return null;
@@ -603,16 +828,29 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const pxW = (item.width ?? size) * renderScale;
                 const pxH = (item.height ?? size) * renderScale;
                 const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
+                    mode:
+                        item.origin?.mode === "self"
+                            ? "self"
+                            : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
                     y: item.origin?.y ?? 0.5,
                 };
                 // Cache-space equivalent of worldToScreen: cache pixel 0 is world minX.
                 const pos = {
-                    x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
-                    y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
+                    x:
+                        (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) *
+                        renderScale,
+                    y:
+                        (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) *
+                        renderScale,
                 };
-                const { x, y } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const { x, y } = this.computeOriginOffset(
+                    pos,
+                    pxW,
+                    pxH,
+                    origin,
+                    this.camera,
+                );
 
                 renderFn(offCtx, item, x, y, pxW, pxH);
             }
@@ -633,7 +871,10 @@ export class CanvasDraw implements IDrawAPI<Image> {
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
-    private addStaticCacheLayer(cache: StaticCache | null, layer: number): DrawHandle | null {
+    private addStaticCacheLayer(
+        cache: StaticCache | null,
+        layer: number,
+    ): DrawHandle | null {
         if (!cache) {
             return null;
         }
@@ -693,7 +934,12 @@ export class CanvasDraw implements IDrawAPI<Image> {
             }
 
             // Only draw if there's something to draw
-            if (cacheSourceWidth > 0 && cacheSourceHeight > 0 && screenDestWidth > 0 && screenDestHeight > 0) {
+            if (
+                cacheSourceWidth > 0 &&
+                cacheSourceHeight > 0 &&
+                screenDestWidth > 0 &&
+                screenDestHeight > 0
+            ) {
                 ctx.drawImage(
                     cachedCanvas,
                     cacheSourceX,
@@ -716,49 +962,60 @@ export class CanvasDraw implements IDrawAPI<Image> {
      * @param cacheKey Unique key for this cache (e.g., "minimap-items")
      * @param layer Layer order
      */
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticRect(
+        items: Array<Rect>,
+        cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxW, pxH) => {
-            const style = item.style;
-            const rotationDeg = item.rotate ?? 0;
-            const rotation = rotationDeg * (Math.PI / 180);
-            const radius = resolveRadiusPx(item.radius, this.camera.scale);
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            (ctx, item, x, y, pxW, pxH) => {
+                const style = item.style;
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+                const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
-            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                ctx.fillStyle = style.fillStyle;
-                lastFillStyle = style.fillStyle;
-            }
-            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
-                ctx.strokeStyle = style.strokeStyle;
-                lastStrokeStyle = style.strokeStyle;
-            }
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (
+                    style?.strokeStyle &&
+                    style.strokeStyle !== lastStrokeStyle
+                ) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
 
-            if (rotationDeg !== 0) {
-                const centerX = x + pxW / 2;
-                const centerY = y + pxH / 2;
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(rotation);
-                ctx.beginPath();
-                if (radius && ctx.roundRect) {
-                    ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
+                if (rotationDeg !== 0) {
+                    const centerX = x + pxW / 2;
+                    const centerY = y + pxH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
+                    } else {
+                        ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
+                    }
+                    this.fillStrokePath(ctx, style, this.camera.scale);
+                    ctx.restore();
                 } else {
-                    ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(x, y, pxW, pxH, radius);
+                    } else {
+                        ctx.rect(x, y, pxW, pxH);
+                    }
+                    this.fillStrokePath(ctx, style, this.camera.scale);
                 }
-                this.fillStrokePath(ctx, style, this.camera.scale);
-                ctx.restore();
-            } else {
-                ctx.beginPath();
-                if (radius && ctx.roundRect) {
-                    ctx.roundRect(x, y, pxW, pxH, radius);
-                } else {
-                    ctx.rect(x, y, pxW, pxH);
-                }
-                this.fillStrokePath(ctx, style, this.camera.scale);
-            }
-        });
+            },
+        );
 
         if (!cache) {
             return this.drawRect(items, layer);
@@ -774,38 +1031,64 @@ export class CanvasDraw implements IDrawAPI<Image> {
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache")
      * @param layer Layer order
      */
-    drawStaticImage(items: Array<ImageItem<Image>>, cacheKey: string, layer: number = 1): DrawHandle {
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
-            const img = item.img;
-            const sprite = item.sprite;
-            const opacity = item.opacity ?? 1;
-            const rotationDeg = item.rotate ?? 0;
-            const rotation = rotationDeg * (Math.PI / 180);
-            const srcW = sprite?.w ?? img.width;
-            const srcH = sprite?.h ?? img.height;
-            const aspect = srcW / srcH;
-            let drawW = pxSize;
-            let drawH = pxSize;
+    drawStaticImage(
+        items: Array<ImageItem<Image>>,
+        cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            (ctx, item, x, y, pxSize, _pxH) => {
+                const img = item.img;
+                const sprite = item.sprite;
+                const opacity = item.opacity ?? 1;
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+                const srcW = sprite?.w ?? img.width;
+                const srcH = sprite?.h ?? img.height;
+                const aspect = srcW / srcH;
+                let drawW = pxSize;
+                let drawH = pxSize;
 
-            if (aspect > 1) drawH = pxSize / aspect;
-            else drawW = pxSize * aspect;
+                if (aspect > 1) drawH = pxSize / aspect;
+                else drawW = pxSize * aspect;
 
-            // x, y are top-left of pxSize box, need to center image within it
-            const imgX = x + (pxSize - drawW) / 2;
-            const imgY = y + (pxSize - drawH) / 2;
+                // x, y are top-left of pxSize box, need to center image within it
+                const imgX = x + (pxSize - drawW) / 2;
+                const imgY = y + (pxSize - drawH) / 2;
 
-            if (rotationDeg !== 0) {
-                const centerX = imgX + drawW / 2;
-                const centerY = imgY + drawH / 2;
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(rotation);
-                this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
-                ctx.restore();
-            } else {
-                this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH, opacity);
-            }
-        });
+                if (rotationDeg !== 0) {
+                    const centerX = imgX + drawW / 2;
+                    const centerY = imgY + drawH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    this.blitImage(
+                        ctx,
+                        img,
+                        sprite,
+                        -drawW / 2,
+                        -drawH / 2,
+                        drawW,
+                        drawH,
+                        opacity,
+                    );
+                    ctx.restore();
+                } else {
+                    this.blitImage(
+                        ctx,
+                        img,
+                        sprite,
+                        imgX,
+                        imgY,
+                        drawW,
+                        drawH,
+                        opacity,
+                    );
+                }
+            },
+        );
 
         if (!cache) {
             return this.drawImage(items, layer);
@@ -821,27 +1104,38 @@ export class CanvasDraw implements IDrawAPI<Image> {
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles")
      * @param layer Layer order
      */
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticCircle(
+        items: Array<Circle>,
+        cacheKey: string,
+        layer: number = 1,
+    ): DrawHandle {
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
-            const style = item.style;
-            const radius = pxSize / 2;
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            (ctx, item, x, y, pxSize, _pxH) => {
+                const style = item.style;
+                const radius = pxSize / 2;
 
-            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                ctx.fillStyle = style.fillStyle;
-                lastFillStyle = style.fillStyle;
-            }
-            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
-                ctx.strokeStyle = style.strokeStyle;
-                lastStrokeStyle = style.strokeStyle;
-            }
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (
+                    style?.strokeStyle &&
+                    style.strokeStyle !== lastStrokeStyle
+                ) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
 
-            ctx.beginPath();
-            ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
-            this.fillStrokePath(ctx, style, this.camera.scale);
-        });
+                ctx.beginPath();
+                ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
+                this.fillStrokePath(ctx, style, this.camera.scale);
+            },
+        );
 
         if (!cache) {
             return this.drawCircle(items, layer);

@@ -27,6 +27,7 @@ import {
     IRenderer,
     IImageLoader,
     DrawHandle,
+    DrawTransform,
 } from "./types";
 
 /**
@@ -204,14 +205,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     private _onDraw?: onDrawCallback;
 
     /**
-     * Callback after each draw frame. Use for custom canvas drawing.
-     * @param ctx - The canvas 2D rendering context
-     * @param info - Frame info: `scale`, `width`, `height`, `coords` (center)
+     * Callback after each draw frame, on top of all layers. Same signature as
+     * `addDrawFunction` callbacks: platform context, top-left world coords,
+     * live config, and coordinate transform helpers.
      * @example
      * ```ts
-     * engine.onDraw = (ctx, info) => {
-     *     ctx.fillStyle = "red";
-     *     ctx.fillText(`Scale: ${info.scale}`, 10, 20);
+     * engine.onDraw = (ctx, coords, config, transform) => {
+     *     const c = ctx as CanvasRenderingContext2D;
+     *     c.fillStyle = "red";
+     *     c.fillText(`Scale: ${config.scale}`, 10, 20);
      * };
      * ```
      */
@@ -359,11 +361,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             );
             return;
         }
-        this.renderer.resizeWithAnimation(width, height, durationMs, () => {
-            // Trigger onResize callback after programmatic resize completes
-            this._onResize?.();
-            onComplete?.();
-        });
+        // onResize is not fired here: the setter mirrors it into the renderer,
+        // whose resizeWithAnimation completion already invokes it once before
+        // this onComplete runs.
+        this.renderer.resizeWithAnimation(width, height, durationMs, onComplete);
     }
 
     /**
@@ -393,6 +394,27 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.camera.setScale(newScale);
         this.notifyZoomIfChanged(prevScale);
         this.handleCameraChange();
+    }
+
+    /**
+     * Smoothly animate the canvas scale to a target value over the given duration.
+     * The zoom is anchored at the viewport center, matching zoomIn/zoomOut.
+     * @param targetScale The desired scale value, clamped to min/max bounds.
+     * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant change.
+     * @param onComplete Optional callback fired when animation completes.
+     * @throws {ConfigValidationError} If scale is not a positive finite number.
+     */
+    goScale(targetScale: number, durationMs: number = 500, onComplete?: () => void) {
+        validateScale(targetScale);
+        // Pre-clamp so the animation runs toward the effective value instead
+        // of saturating at the limit partway through the duration.
+        const clamped = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, targetScale));
+        this.animationController.animateZoomTo(
+            clamped,
+            durationMs,
+            (prevScale) => this.notifyZoomIfChanged(prevScale),
+            onComplete,
+        );
     }
 
     /**
@@ -687,12 +709,23 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /**
      * Register a custom draw function for complete rendering control.
      * Useful for complex or one-off drawing operations.
-     * @param fn Function receiving canvas context, top-left coords, and config.
+     * @param fn Function receiving canvas context, top-left coords, config, and
+     * a `transform` helper — use `transform.worldToScreen(x, y)` to position
+     * drawing at world coordinates instead of deriving the pixel math by hand.
      * @param layer Layer index (default 1).
      * @returns DrawHandle for removal.
+     * @example
+     * ```ts
+     * engine.addDrawFunction((ctx, coords, config, transform) => {
+     *     const c = ctx as CanvasRenderingContext2D;
+     *     const p = transform.worldToScreen(5, 3); // center of cell (5, 3)
+     *     c.fillStyle = "red";
+     *     c.fillRect(p.x - 4, p.y - 4, 8, 8);
+     * }, 4);
+     * ```
      */
     addDrawFunction(
-        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().addDrawFunction(fn, layer);
@@ -749,26 +782,53 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Line, Path, and Text items are not hit-testable. Like rendering,
      * results reflect item positions as of the draw call: mutating an
      * item's position requires re-registration (style mutation is fine).
+     *
+     * `padding` (world units) and `paddingPx` (screen pixels, zoom
+     * independent) expand every item's hit geometry outward - generous
+     * touch targets around small markers without invisible helper items.
+     *
+     * `TData` types the `data` field of returned items — it is an assertion,
+     * not checked at runtime, so only pass it when every hit-testable item
+     * carries that data shape (or narrow per hit).
      * @param point World coordinates (e.g. `coords.raw` from onClick/onHover).
-     * @param opts Optional filter, e.g. `{ layer: 2 }`.
+     * @param opts Optional filters, e.g. `{ layer: 2, padding: 0.5 }`.
      * @example
      * ```ts
      * engine.onClick = (coords) => {
-     *     const hit = engine.hitTestFirst(coords.raw);
-     *     if (hit) openPanel(stations[hit.index]);
+     *     // Accept clicks up to 0.6 world units around each station dot
+     *     const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
+     *     if (hit?.item.data) openPanel(hit.item.data);
      * };
      * ```
      */
-    hitTest(point: Coords, opts?: HitTestOptions): HitResult<TImage>[] {
-        return this.hitTester.hitTest(this.rawToItemSpace(point), opts) as HitResult<TImage>[];
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<TImage, TData>[] {
+        return this.hitTester.hitTest<TData>(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as HitResult<
+            TImage,
+            TData
+        >[];
     }
 
     /**
      * The topmost item under a world point, or `undefined`.
      * See {@link hitTest} for semantics.
      */
-    hitTestFirst(point: Coords, opts?: HitTestOptions): HitResult<TImage> | undefined {
-        return this.hitTester.hitTestFirst(this.rawToItemSpace(point), opts) as HitResult<TImage> | undefined;
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<TImage, TData> | undefined {
+        return this.hitTester.hitTestFirst<TData>(this.rawToItemSpace(point), this.resolveHitOptions(opts)) as
+            | HitResult<TImage, TData>
+            | undefined;
+    }
+
+    /**
+     * Fold `paddingPx` into the world-unit `padding` using the current scale;
+     * the HitTester itself is scale-unaware.
+     */
+    private resolveHitOptions(opts?: HitTestOptions): HitTestOptions | undefined {
+        if (!opts || opts.paddingPx === undefined) return opts;
+        const { paddingPx, ...rest } = opts;
+        return {
+            ...rest,
+            padding: Math.max(0, rest.padding ?? 0) + Math.max(0, paddingPx) / this.camera.scale,
+        };
     }
 
     /**

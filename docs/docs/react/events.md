@@ -149,7 +149,7 @@ Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
 | Prop             | Description                                                                                 |
 | :--------------- | :------------------------------------------------------------------------------------------ |
 | `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes. |
-| `onZoom`         | Fires after wheel, pinch, `setScale`, `zoomIn`, or `zoomOut` changes the scale.             |
+| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut` changes the scale.  |
 | `onResize`       | Fires after manual or observed resize.                                                      |
 
 ## Painting Example
@@ -296,6 +296,7 @@ The hook handle exposes the same camera controls as the core engine.
 engine.updateCoords({ x: 10, y: 10 });
 engine.goCoords(0, 0, 500);
 engine.setScale(64);
+engine.goScale(64, 500);
 engine.zoomIn();
 engine.zoomOut();
 engine.resize(1024, 768, 300);
@@ -312,9 +313,17 @@ rotation are handled internally. Before the engine mounts the methods
 return an empty result, so no null checks are needed.
 
 ```tsx
+type Station = { id: string; name: string };
+
 function StationMap() {
     const engine = useCanvasTileEngine();
-    const [selected, setSelected] = useState<number | null>(null);
+    const [selected, setSelected] = useState<Station | null>(null);
+
+    // Attach your own data to each item; the engine carries it through
+    const stationDots = useMemo(
+        () => stations.map((s) => ({ x: s.x, y: s.y, size: 0.6, data: s })),
+        [stations],
+    );
 
     return (
         <CanvasTileEngine
@@ -322,9 +331,8 @@ function StationMap() {
             renderer={new RendererCanvas()}
             config={config}
             onClick={(coords) => {
-                const hit = engine.hitTestFirst(coords.raw);
-                // hit.index maps back into the items array you rendered
-                setSelected(hit ? hit.index : null);
+                const hit = engine.hitTestFirst<Station>(coords.raw);
+                setSelected(hit?.item.data ?? null); // typed as Station
             }}
         >
             <CanvasTileEngine.Circle items={stationDots} layer={2} />
@@ -337,6 +345,25 @@ Results are `{ item, kind, layer, handle, index }`, ordered by visual
 priority (higher layer, then later registration, then later item). Line,
 Path, and Text are not hit-testable, and - like rendering - position
 mutations require re-registration to be reflected.
+
+Every drawable item accepts an optional `data` field the engine never reads;
+use it to identify hits instead of `hit.index`, which goes stale when you
+re-render a filtered or re-ordered items array. The `TData` parameter on
+`hitTest<TData>` / `hitTestFirst<TData>` types `hit.item.data` and is an
+assertion, not a runtime check.
+
+The hit area is exactly the drawn geometry by default. For generous touch
+targets around small markers, expand it with `padding` (world units) or
+`paddingPx` (screen pixels, zoom-independent); they can be combined (added
+together), and negative values are treated as 0:
+
+```tsx
+onClick={(coords) => {
+    // Accept clicks up to 0.6 world units around each station dot
+    const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
+    setSelected(hit?.item.data ?? null);
+}}
+```
 
 ## Managing the Cursor
 

@@ -175,9 +175,14 @@ type onZoomCallback = (scale: number) => void;
 ```ts
 type onDrawCallback = (
     ctx: unknown,
-    info: { scale: number; width: number; height: number; coords: Coords },
+    coords: Coords, // top-left world coordinate of the viewport
+    config: Required<CanvasTileEngineConfig>, // live scale and size
+    transform: DrawTransform, // { worldToScreen, screenToWorld }
 ) => void;
 ```
+
+The signature mirrors `addDrawFunction` callbacks, so custom drawing code can
+move between the two hooks unchanged.
 
 `ctx` is renderer-specific:
 
@@ -185,8 +190,6 @@ type onDrawCallback = (
 - The WebGL renderer's 2D overlay context for `RendererWebGL`.
 - `SkCanvas` for `RendererSkia`.
 - `SKRSContext2D` for `RendererServer`.
-
-`info.coords` is the top-left world coordinate of the viewport.
 
 ## Engine Handles
 
@@ -201,6 +204,7 @@ engine.getVisibleBounds();
 engine.updateCoords({ x: 0, y: 0 });
 engine.goCoords(10, 10, 500);
 engine.setScale(64);
+engine.goScale(64, 500);
 engine.zoomIn();
 engine.zoomOut();
 engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
