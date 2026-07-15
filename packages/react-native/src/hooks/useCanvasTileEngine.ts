@@ -15,11 +15,7 @@ import type {
     LineStyle,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import type {
-    SkiaMount,
-    SkCanvas,
-    SkImage,
-} from "@canvas-tile-engine/renderer-skia";
+import type { SkiaMount, SkCanvas, SkImage } from "@canvas-tile-engine/renderer-skia";
 
 /** The concrete engine instance type for the Skia / React Native backend. */
 export type SkiaEngine = CanvasTileEngineCore<SkiaMount, SkImage>;
@@ -32,10 +28,7 @@ const DUMMY_DRAW_HANDLE: DrawHandle = { layer: -1, id: Symbol("dummy") };
  * no-ops, which makes remount/ordering bugs invisible.
  */
 function droppedDraw(method: string): DrawHandle {
-    if (
-        typeof process !== "undefined" &&
-        process.env.NODE_ENV !== "production"
-    ) {
+    if (typeof process !== "undefined" && process.env.NODE_ENV !== "production") {
         console.warn(
             `Canvas Tile Engine: ${method}() was called before the engine mounted, so the call was dropped. ` +
                 `Gate imperative draw calls on engine.isReady and include engine.instance in your effect deps ` +
@@ -67,29 +60,15 @@ export interface EngineHandle {
         maxY: number;
     };
     updateCoords(center: Coords): void;
-    goCoords(
-        x: number,
-        y: number,
-        durationMs?: number,
-        onComplete?: () => void,
-    ): void;
+    goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
     getSize(): { width: number; height: number };
     getScale(): number;
     setScale(newScale: number): void;
-    goScale(
-        targetScale: number,
-        durationMs?: number,
-        onComplete?: () => void,
-    ): void;
+    goScale(targetScale: number, durationMs?: number, onComplete?: () => void): void;
     zoomIn(factor?: number): void;
     zoomOut(factor?: number): void;
     getConfig(): Required<CanvasTileEngineConfig> | undefined;
-    setBounds(bounds: {
-        minX: number;
-        maxX: number;
-        minY: number;
-        maxY: number;
-    }): void;
+    setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void;
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     addDrawFunction(
@@ -104,37 +83,13 @@ export interface EngineHandle {
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
-    drawStaticCircle(
-        items: Circle[],
-        cacheKey: string,
-        layer?: number,
-    ): DrawHandle;
-    drawLine(
-        items: Line | Line[],
-        style?: LineStyle,
-        layer?: number,
-    ): DrawHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
+    drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
-    drawPath(
-        items: Coords[] | Coords[][],
-        style?: LineStyle,
-        layer?: number,
-    ): DrawHandle;
-    drawImage(
-        items: ImageItem<SkImage> | ImageItem<SkImage>[],
-        layer?: number,
-    ): DrawHandle;
-    drawStaticImage(
-        items: ImageItem<SkImage>[],
-        cacheKey: string,
-        layer?: number,
-    ): DrawHandle;
-    drawGridLines(
-        cellSize: number,
-        lineWidth?: number,
-        strokeStyle?: string,
-        layer?: number,
-    ): DrawHandle;
+    drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
+    drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
+    drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
+    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
 
     clearLayer(layer: number): void;
     clearAll(): void;
@@ -146,15 +101,9 @@ export interface EngineHandle {
      * priority first. Pass `coords.raw` from event callbacks. Empty before
      * mount.
      */
-    hitTest<TData = unknown>(
-        point: Coords,
-        opts?: HitTestOptions,
-    ): HitResult<SkImage, TData>[];
+    hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData>[];
     /** The topmost item under a world point, or undefined. */
-    hitTestFirst<TData = unknown>(
-        point: Coords,
-        opts?: HitTestOptions,
-    ): HitResult<SkImage, TData> | undefined;
+    hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData> | undefined;
 
     readonly images: SkiaEngine["images"] | undefined;
     /** Decode and cache an image from a URI, resolving to a Skia `SkImage`. */
@@ -227,9 +176,7 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.goCoords(x, y, durationMs, onComplete);
             },
             getSize() {
-                return (
-                    instanceRef.current?.getSize() ?? { width: 0, height: 0 }
-                );
+                return instanceRef.current?.getSize() ?? { width: 0, height: 0 };
             },
             getScale() {
                 return instanceRef.current?.getScale() ?? 1;
@@ -238,11 +185,7 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.setScale(newScale);
             },
             goScale(targetScale, durationMs, onComplete) {
-                instanceRef.current?.goScale(
-                    targetScale,
-                    durationMs,
-                    onComplete,
-                );
+                instanceRef.current?.goScale(targetScale, durationMs, onComplete);
             },
             zoomIn(factor) {
                 instanceRef.current?.zoomIn(factor);
@@ -266,86 +209,42 @@ export function useCanvasTileEngine(): EngineHandle {
                 // to keep the cast out of user code.
                 return (
                     instanceRef.current?.addDrawFunction(
-                        fn as (
-                            ctx: unknown,
-                            coords: Coords,
-                            config: Required<CanvasTileEngineConfig>,
-                        ) => void,
+                        fn as (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
                         layer,
                     ) ?? droppedDraw("addDrawFunction")
                 );
             },
             drawRect(items, layer) {
-                return (
-                    instanceRef.current?.drawRect(items, layer) ??
-                    droppedDraw("drawRect")
-                );
+                return instanceRef.current?.drawRect(items, layer) ?? droppedDraw("drawRect");
             },
             drawStaticRect(items, cacheKey, layer) {
-                return (
-                    instanceRef.current?.drawStaticRect(
-                        items,
-                        cacheKey,
-                        layer,
-                    ) ?? droppedDraw("drawStaticRect")
-                );
+                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? droppedDraw("drawStaticRect");
             },
             drawCircle(items, layer) {
-                return (
-                    instanceRef.current?.drawCircle(items, layer) ??
-                    droppedDraw("drawCircle")
-                );
+                return instanceRef.current?.drawCircle(items, layer) ?? droppedDraw("drawCircle");
             },
             drawStaticCircle(items, cacheKey, layer) {
-                return (
-                    instanceRef.current?.drawStaticCircle(
-                        items,
-                        cacheKey,
-                        layer,
-                    ) ?? droppedDraw("drawStaticCircle")
-                );
+                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? droppedDraw("drawStaticCircle");
             },
             drawLine(items, style, layer) {
-                return (
-                    instanceRef.current?.drawLine(items, style, layer) ??
-                    droppedDraw("drawLine")
-                );
+                return instanceRef.current?.drawLine(items, style, layer) ?? droppedDraw("drawLine");
             },
             drawText(items, layer) {
-                return (
-                    instanceRef.current?.drawText(items, layer) ??
-                    droppedDraw("drawText")
-                );
+                return instanceRef.current?.drawText(items, layer) ?? droppedDraw("drawText");
             },
             drawPath(items, style, layer) {
-                return (
-                    instanceRef.current?.drawPath(items, style, layer) ??
-                    droppedDraw("drawPath")
-                );
+                return instanceRef.current?.drawPath(items, style, layer) ?? droppedDraw("drawPath");
             },
             drawImage(items, layer) {
-                return (
-                    instanceRef.current?.drawImage(items, layer) ??
-                    droppedDraw("drawImage")
-                );
+                return instanceRef.current?.drawImage(items, layer) ?? droppedDraw("drawImage");
             },
             drawStaticImage(items, cacheKey, layer) {
-                return (
-                    instanceRef.current?.drawStaticImage(
-                        items,
-                        cacheKey,
-                        layer,
-                    ) ?? droppedDraw("drawStaticImage")
-                );
+                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? droppedDraw("drawStaticImage");
             },
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
                 return (
-                    instanceRef.current?.drawGridLines(
-                        cellSize,
-                        lineWidth,
-                        strokeStyle,
-                        layer,
-                    ) ?? droppedDraw("drawGridLines")
+                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ??
+                    droppedDraw("drawGridLines")
                 );
             },
 
@@ -372,11 +271,7 @@ export function useCanvasTileEngine(): EngineHandle {
 
             loadImage(src, retry) {
                 if (!instanceRef.current) {
-                    return Promise.reject(
-                        new Error(
-                            "Engine not ready. Wait for isReady before loading images.",
-                        ),
-                    );
+                    return Promise.reject(new Error("Engine not ready. Wait for isReady before loading images."));
                 }
                 return instanceRef.current.images.load(src, retry);
             },
