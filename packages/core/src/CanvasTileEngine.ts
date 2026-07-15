@@ -205,14 +205,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     private _onDraw?: onDrawCallback;
 
     /**
-     * Callback after each draw frame. Use for custom canvas drawing.
-     * @param ctx - The canvas 2D rendering context
-     * @param info - Frame info: `scale`, `width`, `height`, `coords` (center)
+     * Callback after each draw frame, on top of all layers. Same signature as
+     * `addDrawFunction` callbacks: platform context, top-left world coords,
+     * live config, and coordinate transform helpers.
      * @example
      * ```ts
-     * engine.onDraw = (ctx, info) => {
-     *     ctx.fillStyle = "red";
-     *     ctx.fillText(`Scale: ${info.scale}`, 10, 20);
+     * engine.onDraw = (ctx, coords, config, transform) => {
+     *     const c = ctx as CanvasRenderingContext2D;
+     *     c.fillStyle = "red";
+     *     c.fillText(`Scale: ${config.scale}`, 10, 20);
      * };
      * ```
      */

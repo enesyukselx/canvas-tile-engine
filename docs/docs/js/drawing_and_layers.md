@@ -376,10 +376,14 @@ engine.addDrawFunction((ctx, coords, config, transform) => {
 
 The `onDraw` callback runs **after** all layers have been drawn but **before** the debug overlays. It is useful for post-processing effects or drawing UI elements that should always be on top of the map content.
 
+`onDraw` uses the same callback signature as `addDrawFunction`:
+
 ```typescript
-engine.onDraw = (ctx, info) => {
+engine.onDraw = (ctx, coords, config, transform) => {
     // ctx = Rendering context (type depends on renderer)
-    // info contains: { scale, width, height, coords, worldToScreen, screenToWorld }
+    // coords = Top-left world coordinate of the view
+    // config = Live engine configuration (current scale and size)
+    // transform = { worldToScreen, screenToWorld } coordinate helpers
 
     // Cast to the appropriate context type for your renderer
     const context = ctx as CanvasRenderingContext2D;
@@ -387,7 +391,7 @@ engine.onDraw = (ctx, info) => {
     // Draw a border around the entire canvas
     context.strokeStyle = "red";
     context.lineWidth = 5;
-    context.strokeRect(0, 0, info.width, info.height);
+    context.strokeRect(0, 0, config.size.width, config.size.height);
 };
 ```
 

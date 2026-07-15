@@ -19,6 +19,7 @@ import {
     onZoomCallback,
     RendererDependencies,
     ViewportState,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import { CanvasDraw } from "./modules/CanvasDraw";
 import { Layer } from "./modules/Layer";
@@ -32,6 +33,11 @@ import { SizeController } from "./modules/SizeController";
 import { initStyles } from "./utils/canvas";
 
 export class RendererCanvas implements IRenderer {
+    /** Transform helpers handed to the onDraw hook. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     //
     private canvasWrapper!: HTMLDivElement;
     private canvas!: HTMLCanvasElement;
@@ -354,14 +360,7 @@ export class RendererCanvas implements IRenderer {
         });
 
         // User custom draw callback (optional)
-        this.onDraw?.(this.canvasContext, {
-            scale: this.camera.scale,
-            width: config.size.width,
-            height: config.size.height,
-            coords: topLeft,
-            worldToScreen: (x: number, y: number) => this.transformer.worldToScreen(x, y),
-            screenToWorld: (x: number, y: number) => this.transformer.screenToWorld(x, y),
-        });
+        this.onDraw?.(this.canvasContext, topLeft, config, this.drawTransform);
 
         // Coordinate overlay
         if (this.coordinateOverlayRenderer.shouldDraw(this.camera.scale)) {

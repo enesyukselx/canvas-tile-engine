@@ -1,17 +1,17 @@
-import { Coords } from ".";
+import { Coords, DrawTransform } from ".";
+import { CanvasTileEngineConfig } from "./config";
 
+/**
+ * Post-frame draw hook. Mirrors the `addDrawFunction` callback signature:
+ * the platform context, the viewport's top-left world coordinate, the live
+ * normalized config (current scale and size), and the coordinate transform
+ * helpers.
+ */
 export type onDrawCallback = (
     ctx: unknown,
-    info: {
-        scale: number;
-        width: number;
-        height: number;
-        coords: Coords;
-        /** Item-space world coordinate → canvas pixel position (integers are cell centers). */
-        worldToScreen(x: number, y: number): Coords;
-        /** Canvas pixel position → raw (corner-space) world coordinate, like event `coords.raw`. */
-        screenToWorld(x: number, y: number): Coords;
-    },
+    coords: Coords,
+    config: Required<CanvasTileEngineConfig>,
+    transform: DrawTransform,
 ) => void;
 
 type MouseEventCallback = (

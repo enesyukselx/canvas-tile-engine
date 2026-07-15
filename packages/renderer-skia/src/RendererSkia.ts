@@ -19,6 +19,7 @@ import {
     onZoomCallback,
     RendererDependencies,
     ViewportState,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import { Skia, type SkCanvas, type SkImage, type SkPaint, type SkPicture } from "@shopify/react-native-skia";
 import { Layer } from "./modules/Layer";
@@ -38,6 +39,12 @@ import { SkiaMount } from "./types";
  * and supplies the canvas via {@link SkiaMount.present}.
  */
 export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
+
+    /** Transform helpers handed to the onDraw hook. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     private mount!: SkiaMount;
     private camera!: ICamera;
     private config!: Config;
@@ -224,14 +231,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         });
 
         // User custom draw callback (optional) — receives the SkCanvas
-        this.onDraw?.(canvas, {
-            scale: this.camera.scale,
-            width: config.size.width,
-            height: config.size.height,
-            coords: topLeft,
-            worldToScreen: (x: number, y: number) => this.transformer.worldToScreen(x, y),
-            screenToWorld: (x: number, y: number) => this.transformer.screenToWorld(x, y),
-        });
+        this.onDraw?.(canvas, topLeft, config, this.drawTransform);
 
         // Coordinate overlay
         if (this.coordinateOverlayRenderer.shouldDraw(this.camera.scale)) {

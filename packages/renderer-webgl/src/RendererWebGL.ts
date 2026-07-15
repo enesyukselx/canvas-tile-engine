@@ -19,6 +19,7 @@ import {
     onZoomCallback,
     RendererDependencies,
     ViewportState,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import { WebGLDraw } from "./modules/WebGLDraw";
 import { Layer } from "./modules/Layer";
@@ -46,6 +47,11 @@ import { createOverlayCanvas, getWebGLContext, initStyles } from "./utils/webgl"
  * surface, layer ordering is preserved.
  */
 export class RendererWebGL implements IRenderer {
+    /** Transform helpers handed to the onDraw hook. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     //
     private canvasWrapper!: HTMLDivElement;
     private canvas!: HTMLCanvasElement;
@@ -409,14 +415,7 @@ export class RendererWebGL implements IRenderer {
         });
 
         // User custom draw callback (optional) — receives the 2D overlay context
-        this.onDraw?.(this.overlayCtx, {
-            scale: this.camera.scale,
-            width: config.size.width,
-            height: config.size.height,
-            coords: topLeft,
-            worldToScreen: (x: number, y: number) => this.transformer.worldToScreen(x, y),
-            screenToWorld: (x: number, y: number) => this.transformer.screenToWorld(x, y),
-        });
+        this.onDraw?.(this.overlayCtx, topLeft, config, this.drawTransform);
 
         // Coordinate overlay
         if (this.coordinateOverlayRenderer.shouldDraw(this.camera.scale)) {

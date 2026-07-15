@@ -366,16 +366,17 @@ The `onDraw` prop runs after all layers are drawn but before debug overlays.
     engine={engine}
     config={config}
     renderer={new RendererCanvas()}
-    onDraw={(ctx, info) => {
-        // ctx = Rendering context (type depends on renderer)
-        // info contains: { scale, width, height, coords, worldToScreen, screenToWorld }
+    onDraw={(ctx, coords, config, transform) => {
+        // Same signature as DrawFunction children:
+        // coords = top-left world coordinate, config = live engine config,
+        // transform = { worldToScreen, screenToWorld } helpers
 
         // Cast to the appropriate context type for your renderer
         const context = ctx as CanvasRenderingContext2D;
 
         context.strokeStyle = "red";
         context.lineWidth = 5;
-        context.strokeRect(0, 0, info.width, info.height);
+        context.strokeRect(0, 0, config.size.width, config.size.height);
     }}
 >
     {/* children */}

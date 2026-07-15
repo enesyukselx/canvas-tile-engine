@@ -258,9 +258,9 @@ engine.addDrawFunction((ctx, topLeft, config, transform) => {
 `topLeft` is the camera's top-left world coordinate; `config` is the
 normalized config with live `scale` and `size`; `transform` also has
 `screenToWorld(x, y)`, which returns raw corner-space coords (the same space
-as event `coords.raw`). `engine.onDraw = (ctx, info)` is similar but runs
-after ALL layers every frame (`info` carries `scale`, `width`, `height`,
-`coords`, and the same `worldToScreen`/`screenToWorld` helpers).
+as event `coords.raw`). `engine.onDraw` has the SAME signature and runs after
+ALL layers every frame — code moves between the two hooks unchanged; only the
+timing/z-order differs (and `clearAll()` does not remove `onDraw`).
 
 ## High-DPI
 
