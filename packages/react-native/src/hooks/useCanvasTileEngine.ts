@@ -12,6 +12,7 @@ import type {
     Line,
     Rect,
     Text,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { SkiaMount, SkCanvas, SkImage } from "@canvas-tile-engine/renderer-skia";
 
@@ -65,7 +66,12 @@ export interface EngineHandle {
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     addDrawFunction(
-        fn: (canvas: SkCanvas, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (
+            canvas: SkCanvas,
+            coords: Coords,
+            config: Required<CanvasTileEngineConfig>,
+            transform: DrawTransform,
+        ) => void,
         layer?: number,
     ): DrawHandle;
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;

@@ -27,6 +27,7 @@ import {
     IRenderer,
     IImageLoader,
     DrawHandle,
+    DrawTransform,
 } from "./types";
 
 /**
@@ -204,14 +205,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     private _onDraw?: onDrawCallback;
 
     /**
-     * Callback after each draw frame. Use for custom canvas drawing.
-     * @param ctx - The canvas 2D rendering context
-     * @param info - Frame info: `scale`, `width`, `height`, `coords` (center)
+     * Callback after each draw frame, on top of all layers. Same signature as
+     * `addDrawFunction` callbacks: platform context, top-left world coords,
+     * live config, and coordinate transform helpers.
      * @example
      * ```ts
-     * engine.onDraw = (ctx, info) => {
-     *     ctx.fillStyle = "red";
-     *     ctx.fillText(`Scale: ${info.scale}`, 10, 20);
+     * engine.onDraw = (ctx, coords, config, transform) => {
+     *     const c = ctx as CanvasRenderingContext2D;
+     *     c.fillStyle = "red";
+     *     c.fillText(`Scale: ${config.scale}`, 10, 20);
      * };
      * ```
      */
@@ -707,12 +709,23 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /**
      * Register a custom draw function for complete rendering control.
      * Useful for complex or one-off drawing operations.
-     * @param fn Function receiving canvas context, top-left coords, and config.
+     * @param fn Function receiving canvas context, top-left coords, config, and
+     * a `transform` helper — use `transform.worldToScreen(x, y)` to position
+     * drawing at world coordinates instead of deriving the pixel math by hand.
      * @param layer Layer index (default 1).
      * @returns DrawHandle for removal.
+     * @example
+     * ```ts
+     * engine.addDrawFunction((ctx, coords, config, transform) => {
+     *     const c = ctx as CanvasRenderingContext2D;
+     *     const p = transform.worldToScreen(5, 3); // center of cell (5, 3)
+     *     c.fillStyle = "red";
+     *     c.fillRect(p.x - 4, p.y - 4, 8, 8);
+     * }, 4);
+     * ```
      */
     addDrawFunction(
-        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer: number = 1,
     ): DrawHandle {
         return this.renderer.getDrawAPI().addDrawFunction(fn, layer);

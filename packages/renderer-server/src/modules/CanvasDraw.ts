@@ -15,6 +15,7 @@ import {
     SpriteRect,
     Text,
     VISIBILITY_BUFFER,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
 import { Layer } from "./Layer";
@@ -44,6 +45,11 @@ interface StaticCache {
  * @internal
  */
 export class CanvasDraw implements IDrawAPI<Image> {
+    /** Transform helpers handed to custom draw callbacks. */
+    private drawTransform: DrawTransform = {
+        worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
+        screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
+    };
     private staticCaches = new Map<string, StaticCache>();
     private warnedStaticCacheDisabled = false;
 
@@ -87,11 +93,16 @@ export class CanvasDraw implements IDrawAPI<Image> {
      * @param layer Layer order (lower draws first).
      */
     addDrawFunction(
-        fn: (ctx: SKRSContext2D, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (
+            ctx: SKRSContext2D,
+            coords: Coords,
+            config: Required<CanvasTileEngineConfig>,
+            transform: DrawTransform,
+        ) => void,
         layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            fn(ctx, topLeft, config);
+            fn(ctx, topLeft, config, this.drawTransform);
         });
     }
 

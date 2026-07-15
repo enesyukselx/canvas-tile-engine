@@ -80,7 +80,7 @@ type CanvasTileEngineConfig = {
 
 | Mode | Behavior |
 | :-- | :-- |
-| `"preserve-scale"` | Scale stays fixed; visible world area grows/shrinks with the wrapper. |
+| `"preserve-scale"` | Scale stays fixed; visible world area grows/shrinks with the wrapper. Width-responsive only: the wrapper is set to `width: 100%` and its height is PINNED to `config.size.height` via inline style (CSS heights are overridden). |
 | `"preserve-viewport"` | Configured tile count stays visible; scale changes with wrapper width. |
 | `false` | Fixed `config.size` until `engine.resize()` or `eventHandlers.resize`. |
 
@@ -211,8 +211,8 @@ engine.onMouseLeave = (coords, mouse, client) => {};
 engine.onCoordsChange = (center: Coords) => {};       // any camera movement
 engine.onZoom       = (scale: number) => {};          // any scale change
 engine.onResize     = () => {};
-engine.onDraw       = (ctx, info) => {};              // after each frame; ctx is
-                                                      // platform-specific (see drawing.md)
+engine.onDraw       = (ctx, coords, config, transform) => {}; // after each frame,
+                                       // same signature as addDrawFunction (drawing.md)
 ```
 
 Payload details and patterns: [events.md](events.md).

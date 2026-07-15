@@ -337,24 +337,31 @@ For maximum flexibility, use a custom draw function with direct rendering contex
 
 | Prop       | Type                            | Default      | Description      |
 | :--------- | :------------------------------ | :----------- | :--------------- |
-| `children` | `(ctx, coords, config) => void` | **Required** | Draw function.   |
+| `children` | `(ctx, coords, config, transform) => void` | **Required** | Draw function.   |
 | `layer`    | `number`                        | `1`          | Rendering layer. |
 
 ```tsx
 <CanvasTileEngine.DrawFunction layer={4}>
-    {(ctx, coords, config) => {
+    {(ctx, coords, config, transform) => {
         // ctx = Rendering context (type depends on renderer)
         // coords = Top-left world coordinate of the view
         // config = Current engine configuration
+        // transform = { worldToScreen, screenToWorld } coordinate helpers
 
         // Cast to the appropriate context type for your renderer
         const context = ctx as CanvasRenderingContext2D;
 
+        // Draw at a world position without doing the pixel math yourself:
+        const p = transform.worldToScreen(5, 3); // pixel at the center of cell (5, 3)
         context.fillStyle = "purple";
-        context.fillRect(100, 100, 50, 50); // Draw in screen pixels
+        context.fillRect(p.x - 5, p.y - 5, 10, 10);
     }}
 </CanvasTileEngine.DrawFunction>
 ```
+
+:::tip Rule of thumb
+Everything you pass to `ctx` is pixels. `worldToScreen` is for drawing (world in, pixels out); `screenToWorld` is for querying (pixels in, world out — feed it to `Math.floor` or `hitTest`, never back into `ctx`).
+:::
 
 ### `onDraw` Callback
 
@@ -365,16 +372,17 @@ The `onDraw` prop runs after all layers are drawn but before debug overlays.
     engine={engine}
     config={config}
     renderer={new RendererCanvas()}
-    onDraw={(ctx, info) => {
-        // ctx = Rendering context (type depends on renderer)
-        // info contains: { scale, width, height, coords }
+    onDraw={(ctx, coords, config, transform) => {
+        // Same signature as DrawFunction children:
+        // coords = top-left world coordinate, config = live engine config,
+        // transform = { worldToScreen, screenToWorld } helpers
 
         // Cast to the appropriate context type for your renderer
         const context = ctx as CanvasRenderingContext2D;
 
         context.strokeStyle = "red";
         context.lineWidth = 5;
-        context.strokeRect(0, 0, info.width, info.height);
+        context.strokeRect(0, 0, config.size.width, config.size.height);
     }}
 >
     {/* children */}

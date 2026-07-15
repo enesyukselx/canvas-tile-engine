@@ -24,6 +24,25 @@ export interface LineStyle {
     lineWidth?: number;
 }
 
+/**
+ * Coordinate transform helpers handed to custom draw callbacks
+ * (`addDrawFunction` / `onDraw`), so user code never re-derives the
+ * `(world - topLeft) * scale` formula or the cell-center offset.
+ */
+export interface DrawTransform {
+    /**
+     * Item-space world coordinate → canvas pixel position. Integers are cell
+     * centers (the same space item `x`/`y` live in), so `worldToScreen(k, k)`
+     * is the pixel at the center of cell `k`.
+     */
+    worldToScreen(x: number, y: number): Coords;
+    /**
+     * Canvas pixel position → raw (corner-space) world coordinate — the same
+     * space event payloads report as `coords.raw`.
+     */
+    screenToWorld(x: number, y: number): Coords;
+}
+
 export interface Bounds {
     minX: number;
     maxX: number;
@@ -86,7 +105,7 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
 
 export interface IDrawAPI<TImage = HTMLImageElement> {
     addDrawFunction(
-        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
     ): DrawHandle;
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;

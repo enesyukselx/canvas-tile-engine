@@ -1,10 +1,15 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { CanvasTileEngineConfig, Coords } from "@canvas-tile-engine/core";
+import type { CanvasTileEngineConfig, Coords, DrawTransform } from "@canvas-tile-engine/core";
 
 export interface DrawFunctionProps {
-    /** The draw function to execute */
-    children: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void;
+    /** The draw function to execute; `transform.worldToScreen(x, y)` maps world coordinates to canvas pixels. */
+    children: (
+        ctx: unknown,
+        coords: Coords,
+        config: Required<CanvasTileEngineConfig>,
+        transform: DrawTransform,
+    ) => void;
     layer?: number;
 }
 
@@ -16,9 +21,10 @@ export interface DrawFunctionProps {
  * @example
  * ```tsx
  * <DrawFunction layer={3}>
- *   {(ctx, coords, config) => {
+ *   {(ctx, coords, config, transform) => {
+ *     const p = transform.worldToScreen(5, 3); // center of cell (5, 3)
  *     ctx.fillStyle = "red";
- *     ctx.fillRect(config.size.width / 2 - 5, config.size.height / 2 - 5, 10, 10);
+ *     ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
  *   }}
  * </DrawFunction>
  * ```
@@ -39,8 +45,8 @@ export const DrawFunction = memo(function DrawFunction({ children, layer = 1 }: 
     });
 
     useEffect(() => {
-        const handle = engine.addDrawFunction((ctx, coords, config) => {
-            fnRef.current(ctx, coords, config);
+        const handle = engine.addDrawFunction((ctx, coords, config, transform) => {
+            fnRef.current(ctx, coords, config, transform);
         }, layer);
         requestRender();
 

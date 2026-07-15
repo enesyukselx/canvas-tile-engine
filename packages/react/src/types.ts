@@ -182,14 +182,15 @@ export interface CanvasTileEngineProps {
     onMouseLeave?: onMouseLeaveCallback;
 
     /**
-     * Callback after each draw frame. Use for custom canvas drawing.
-     * @param ctx - The canvas 2D rendering context
-     * @param info - Frame info: `scale`, `width`, `height`, `coords` (center)
+     * Callback after each draw frame, on top of all layers. Same signature as
+     * `DrawFunction` children: platform context, top-left world coords, live
+     * config, and coordinate transform helpers.
      * @example
      * ```tsx
-     * onDraw={(ctx, info) => {
-     *     ctx.fillStyle = "red";
-     *     ctx.fillText(`Scale: ${info.scale}`, 10, 20);
+     * onDraw={(ctx, coords, config, transform) => {
+     *     const c = ctx as CanvasRenderingContext2D;
+     *     c.fillStyle = "red";
+     *     c.fillText(`Scale: ${config.scale}`, 10, 20);
      * }}
      * ```
      */

@@ -1,8 +1,17 @@
-import { Coords } from ".";
+import { Coords, DrawTransform } from ".";
+import { CanvasTileEngineConfig } from "./config";
 
+/**
+ * Post-frame draw hook. Mirrors the `addDrawFunction` callback signature:
+ * the platform context, the viewport's top-left world coordinate, the live
+ * normalized config (current scale and size), and the coordinate transform
+ * helpers.
+ */
 export type onDrawCallback = (
     ctx: unknown,
-    info: { scale: number; width: number; height: number; coords: Coords },
+    coords: Coords,
+    config: Required<CanvasTileEngineConfig>,
+    transform: DrawTransform,
 ) => void;
 
 type MouseEventCallback = (

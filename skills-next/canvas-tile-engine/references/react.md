@@ -37,7 +37,7 @@ function Map() {
             onCoordsChange={(center) => {}}
             onZoom={(scale) => {}}
             onResize={() => {}}
-            onDraw={(ctx, info) => {}}
+            onDraw={(ctx, coords, config, transform) => {}}
         >
             {/* declarative draw children */}
         </CanvasTileEngine>
@@ -136,22 +136,19 @@ array identity re-registers the callback and rebuilds the spatial index for
 | `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |
 | `<CanvasTileEngine.StaticImage>`  | `items: ImageItem[]`, `cacheKey: string`, `layer = 1`                                                                                 |
 | `<CanvasTileEngine.Sprite>`       | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?` |
-| `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config) => void`, `layer = 1`                                                                               |
+| `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config, transform) => void`, `layer = 1`                                                                    |
 
 Item shapes are identical to the core draw API: [drawing.md](drawing.md).
 Sprite semantics: [sprites.md](sprites.md).
 
 ```tsx
 <CanvasTileEngine.DrawFunction layer={5}>
-    {(ctx, topLeft, config) => {
+    {(ctx, topLeft, config, transform) => {
         const c = ctx as CanvasRenderingContext2D;
+        // worldToScreen takes item-space coords (integers = cell centers)
+        const p = transform.worldToScreen(0, 0);
         c.fillStyle = "rgba(255,255,255,0.6)";
-        c.fillRect(
-            (0 - topLeft.x) * config.scale,
-            (0 - topLeft.y) * config.scale,
-            config.scale,
-            config.scale,
-        );
+        c.fillRect(p.x - config.scale / 2, p.y - config.scale / 2, config.scale, config.scale);
     }}
 </CanvasTileEngine.DrawFunction>
 ```

@@ -12,6 +12,7 @@ import type {
     Circle,
     Line,
     Rect,
+    DrawTransform,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -146,7 +147,7 @@ export interface EngineHandle {
 
     /** Register a custom draw function */
     addDrawFunction(
-        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>) => void,
+        fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
     ): DrawHandle;
 
