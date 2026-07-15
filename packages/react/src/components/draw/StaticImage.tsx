@@ -20,6 +20,7 @@ export interface StaticImageProps {
 export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
+    const prevItemsRef = useRef(items);
 
     useEffect(() => {
         if (items.length === 0) {
@@ -29,7 +30,12 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
         if (prevCacheKeyRef.current !== cacheKey) {
             engine.clearStaticCache(prevCacheKeyRef.current);
             prevCacheKeyRef.current = cacheKey;
+        } else if (prevItemsRef.current !== items) {
+            // Same key, new items: renderers rebuild only on a cache miss (or
+            // bounds/scale change), so the stale cache must be dropped here.
+            engine.clearStaticCache(cacheKey);
         }
+        prevItemsRef.current = items;
 
         const handle = engine.drawStaticImage(items, cacheKey, layer);
         requestRender();

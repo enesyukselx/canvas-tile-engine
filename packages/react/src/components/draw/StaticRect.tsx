@@ -20,6 +20,7 @@ export interface StaticRectProps {
 export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 }: StaticRectProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
+    const prevItemsRef = useRef(items);
 
     useEffect(() => {
         if (items.length === 0) {
@@ -30,7 +31,12 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 
         if (prevCacheKeyRef.current !== cacheKey) {
             engine.clearStaticCache(prevCacheKeyRef.current);
             prevCacheKeyRef.current = cacheKey;
+        } else if (prevItemsRef.current !== items) {
+            // Same key, new items: renderers rebuild only on a cache miss (or
+            // bounds/scale change), so the stale cache must be dropped here.
+            engine.clearStaticCache(cacheKey);
         }
+        prevItemsRef.current = items;
 
         const handle = engine.drawStaticRect(items, cacheKey, layer);
         requestRender();
