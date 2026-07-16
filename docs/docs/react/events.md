@@ -90,6 +90,10 @@ function MapWithHover() {
 
 ### `onMouseDown`, `onMouseUp`, And `onMouseLeave`
 
+On browsers, `onMouseDown`/`onMouseUp` fire for the **primary (left) button
+only** — right clicks go through `onRightClick`, and the middle button is
+left to the browser. Touch input also feeds them.
+
 ```tsx
 function SelectionMap() {
     const engine = useCanvasTileEngine();
