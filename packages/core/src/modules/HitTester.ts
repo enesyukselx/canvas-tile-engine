@@ -1,13 +1,13 @@
-import { Circle, Coords, DrawHandle, ImageItem, Rect } from "../types";
+import { Circle, Coords, DrawHandle, ImageItem, Polygon, Rect } from "../types";
 import { SpatialIndex } from "./SpatialIndex";
 
 /** Primitive kinds that participate in hit testing. */
-export type HitKind = "rect" | "circle" | "image";
+export type HitKind = "rect" | "circle" | "image" | "polygon";
 
 /** A single hit returned by `hitTest`, ordered by visual priority. */
 export type HitResult<TImage = unknown, TData = unknown> = {
     /** The original item object passed to the draw call. */
-    item: Rect<TData> | Circle<TData> | ImageItem<TImage, TData>;
+    item: Rect<TData> | Circle<TData> | ImageItem<TImage, TData> | Polygon<TData>;
     /** Which primitive kind the item was drawn as. */
     kind: HitKind;
     /** Layer the item is drawn on. */
@@ -35,7 +35,7 @@ export type HitTestOptions = {
     paddingPx?: number;
 };
 
-type HitItem = Rect | Circle | ImageItem<unknown>;
+type HitItem = Rect | Circle | ImageItem<unknown> | Polygon;
 
 type HitEntry = {
     handle: DrawHandle;
@@ -47,7 +47,7 @@ type HitEntry = {
     /** Largest item size, for safe spatial query padding. */
     maxSize: number;
     /** Lazy R-Tree over item anchors, built on the first query of a large entry. */
-    index?: SpatialIndex<HitItem> | null;
+    index?: { query(minX: number, minY: number, maxX: number, maxY: number): HitItem[] } | null;
     /** Item object -> position in `items`, built alongside the lazy index. */
     indexMap?: Map<HitItem, number>;
 };
@@ -83,8 +83,14 @@ export class HitTester {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
         for (const item of list) {
-            const rect = item as Rect;
-            const extent = Math.max(item.size ?? 1, rect.width ?? 0, rect.height ?? 0);
+            let extent: number;
+            if (kind === "polygon") {
+                const b = polygonBounds((item as Polygon).points);
+                extent = b ? Math.max(b.maxX - b.minX, b.maxY - b.minY) / 2 : 0;
+            } else {
+                const rect = item as Rect;
+                extent = Math.max((rect.size ?? 1) as number, rect.width ?? 0, rect.height ?? 0);
+            }
             if (extent > maxSize) maxSize = extent;
         }
         this.entries.set(handle.id, { handle, kind, layer, items: list, seq: this.nextSeq++, maxSize });
@@ -114,10 +120,11 @@ export class HitTester {
 
             if (entry.items.length > SPATIAL_INDEX_THRESHOLD) {
                 this.ensureIndex(entry);
-                // The index stores anchor-centered boxes; origin modes shift the
-                // drawn box by up to half a cell (or half the item size), so pad
-                // the query enough to never miss an edge candidate.
-                const pad = 0.5 + entry.maxSize + padding;
+                // Anchor kinds store anchor-centered boxes; origin modes shift
+                // the drawn box by up to half a cell (or half the item size), so
+                // pad the query enough to never miss an edge candidate. Polygon
+                // boxes are exact, so only the caller's padding applies.
+                const pad = entry.kind === "polygon" ? padding : 0.5 + entry.maxSize + padding;
                 const candidates = entry.index!.query(point.x - pad, point.y - pad, point.x + pad, point.y + pad);
                 for (const item of candidates) {
                     if (!this.testItem(point, item, entry.kind, padding)) continue;
@@ -160,12 +167,31 @@ export class HitTester {
 
     private ensureIndex(entry: HitEntry): void {
         if (entry.index !== undefined) return;
-        entry.index = SpatialIndex.fromArray(entry.items);
+        if (entry.kind === "polygon") {
+            // Polygons carry no anchor x/y; index exact bbox-centered records
+            // that reference the original item.
+            const records = entry.items.map((item) => {
+                const b = polygonBounds((item as Polygon).points);
+                return {
+                    x: b ? (b.minX + b.maxX) / 2 : 0,
+                    y: b ? (b.minY + b.maxY) / 2 : 0,
+                    width: b ? b.maxX - b.minX : 0,
+                    height: b ? b.maxY - b.minY : 0,
+                    __ref: item,
+                };
+            });
+            const index = SpatialIndex.fromArray(records);
+            entry.index = {
+                query: (minX, minY, maxX, maxY) => index.query(minX, minY, maxX, maxY).map((r) => r.__ref),
+            };
+        } else {
+            entry.index = SpatialIndex.fromArray(entry.items as Array<Rect | Circle | ImageItem<unknown>>);
+        }
         entry.indexMap = new Map(entry.items.map((item, i) => [item, i]));
     }
 
     /** World-space box the item is drawn into, mirroring the renderers' math. */
-    private boxFor(item: HitItem, kind: HitKind): { left: number; top: number; w: number; h: number } {
+    private boxFor(item: Rect | Circle | ImageItem<unknown>, kind: HitKind): { left: number; top: number; w: number; h: number } {
         const size = item.size ?? 1;
         // Only rects support per-axis dimensions; circle stays size (diameter)
         // and image keeps its aspect-fit size box below.
@@ -210,7 +236,14 @@ export class HitTester {
     }
 
     private testItem(point: Coords, item: HitItem, kind: HitKind, padding: number): boolean {
-        const box = this.boxFor(item, kind);
+        if (kind === "polygon") {
+            const points = (item as Polygon).points;
+            if (points.length < 3) return false;
+            if (pointInPolygon(point, points)) return true;
+            return padding > 0 && distanceToRing(point, points) <= padding;
+        }
+
+        const box = this.boxFor(item as Rect | Circle | ImageItem<unknown>, kind);
 
         if (kind === "circle") {
             const cx = box.left + box.w / 2;
@@ -247,4 +280,54 @@ export class HitTester {
             py <= box.top + box.h + padding
         );
     }
+}
+
+/** Axis-aligned bounds of a polygon ring, or null for an empty ring. */
+function polygonBounds(points: Coords[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (!points.length) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of points) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, minY, maxX, maxY };
+}
+
+/** Ray-casting point-in-polygon test (even-odd rule); boundary counts as inside per edge orientation. */
+function pointInPolygon(point: Coords, points: Coords[]): boolean {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const xi = points[i].x;
+        const yi = points[i].y;
+        const xj = points[j].x;
+        const yj = points[j].y;
+        const crosses = yi > point.y !== yj > point.y && point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+        if (crosses) inside = !inside;
+    }
+    return inside;
+}
+
+/** Minimum distance from a point to the polygon's outline (closed ring). */
+function distanceToRing(point: Coords, points: Coords[]): number {
+    let best = Infinity;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const ax = points[j].x;
+        const ay = points[j].y;
+        const bx = points[i].x;
+        const by = points[i].y;
+        const dx = bx - ax;
+        const dy = by - ay;
+        const lenSq = dx * dx + dy * dy;
+        const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - ax) * dx + (point.y - ay) * dy) / lenSq));
+        const px = ax + dx * t;
+        const py = ay + dy * t;
+        const d = Math.hypot(point.x - px, point.y - py);
+        if (d < best) best = d;
+    }
+    return best;
 }

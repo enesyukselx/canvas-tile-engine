@@ -110,6 +110,30 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size"> &
         textBaseline?: TextBaseline;
     };
 };
+/**
+ * A filled and/or stroked closed shape. Vertices are world coordinates in the
+ * same space as `Path` points; the ring closes automatically (do not repeat
+ * the first point). Unlike Line/Path, polygons are first-class items: they
+ * carry per-item style and `data`, and participate in hit testing.
+ * Self-intersecting rings have undefined fill behavior.
+ */
+export type Polygon<TData = unknown> = {
+    points: Coords[];
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        /** Outline width in world units; scales with zoom. Ignored when `lineWidthPx` is set. */
+        lineWidth?: number;
+        /** Outline width in screen pixels, independent of zoom. Wins over `lineWidth`. */
+        lineWidthPx?: number;
+    };
+    /**
+     * Arbitrary app data carried through hit testing; read it back as
+     * `hit.item.data` without relying on array positions.
+     */
+    data?: TData;
+};
+
 export type Line = {
     from: Coords;
     to: Coords;

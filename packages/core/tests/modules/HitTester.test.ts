@@ -275,3 +275,79 @@ describe("HitTester padding", () => {
         expect(hit!.index).toBe(10);
     });
 });
+
+describe("polygon hit testing", () => {
+    // A concave L-shape: the notch at the top-right is outside the fill.
+    const lShape = [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 2 },
+        { x: 2, y: 2 },
+        { x: 2, y: 4 },
+        { x: 0, y: 4 },
+    ];
+
+    it("hits inside the ring and misses outside, including concave notches", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "polygon", { points: lShape }, 1);
+
+        expect(ht.hitTestFirst({ x: 1, y: 1 })).toBeDefined(); // solid part
+        expect(ht.hitTestFirst({ x: 1, y: 3 })).toBeDefined(); // lower leg
+        expect(ht.hitTestFirst({ x: 3, y: 3 })).toBeUndefined(); // concave notch
+        expect(ht.hitTestFirst({ x: 5, y: 1 })).toBeUndefined(); // fully outside
+    });
+
+    it("reports kind, index, and carries item data through", () => {
+        const ht = new HitTester();
+        ht.register(
+            handle(2),
+            "polygon",
+            [
+                { points: lShape, data: "zone-a" },
+                { points: lShape.map((p) => ({ x: p.x + 10, y: p.y })), data: "zone-b" },
+            ],
+            2,
+        );
+
+        const hit = ht.hitTestFirst<string>({ x: 11, y: 1 })!;
+        expect(hit.kind).toBe("polygon");
+        expect(hit.index).toBe(1);
+        expect(hit.item.data).toBe("zone-b");
+    });
+
+    it("expands the hit area with padding measured to the nearest edge", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "polygon", { points: lShape }, 1);
+
+        expect(ht.hitTestFirst({ x: 4.4, y: 1 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 4.4, y: 1 }, { padding: 0.5 })).toBeDefined();
+        // Padding also reaches into the concave notch's surroundings
+        expect(ht.hitTestFirst({ x: 2.4, y: 2.4 }, { padding: 0.5 })).toBeDefined();
+    });
+
+    it("ignores degenerate rings with fewer than 3 points", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "polygon", { points: [{ x: 0, y: 0 }, { x: 5, y: 5 }] }, 1);
+
+        expect(ht.hitTestFirst({ x: 2, y: 2 })).toBeUndefined();
+    });
+
+    it("resolves through the spatial index path for 500+ polygons", () => {
+        const ht = new HitTester();
+        const triangles = Array.from({ length: 600 }, (_, i) => ({
+            points: [
+                { x: i * 10, y: 0 },
+                { x: i * 10 + 2, y: 0 },
+                { x: i * 10 + 1, y: 2 },
+            ],
+            data: i,
+        }));
+        ht.register(handle(1), "polygon", triangles, 1);
+
+        const hit = ht.hitTestFirst<number>({ x: 4231, y: 0.5 })!; // triangle 423
+        expect(hit).toBeDefined();
+        expect(hit.item.data).toBe(423);
+        expect(hit.index).toBe(423);
+        expect(ht.hitTestFirst({ x: 4235, y: 0.5 })).toBeUndefined(); // gap between triangles
+    });
+});

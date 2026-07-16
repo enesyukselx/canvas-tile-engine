@@ -24,6 +24,7 @@ import {
     Rect,
     Line,
     Path,
+    Polygon,
     IRenderer,
     IImageLoader,
     DrawHandle,
@@ -661,6 +662,26 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     drawText(items: Array<Text> | Text, layer: number = 2): DrawHandle {
         return this.renderer.getDrawAPI().drawText(items, layer);
+    }
+
+    /**
+     * Draw one or many filled/stroked closed shapes. Vertices are world
+     * coordinates; the ring closes automatically. Polygons carry per-item
+     * style and `data`, and participate in hit testing.
+     * @param items Polygon definitions.
+     * @param layer Layer order.
+     * @example
+     * ```ts
+     * engine.drawPolygon({
+     *     points: [{ x: 0, y: 0 }, { x: 4, y: 1 }, { x: 2, y: 5 }],
+     *     style: { fillStyle: "rgba(14,165,233,0.3)", strokeStyle: "#0ea5e9", lineWidthPx: 2 },
+     * }, 1);
+     * ```
+     */
+    drawPolygon(items: Polygon | Array<Polygon>, layer: number = 1): DrawHandle {
+        const handle = this.renderer.getDrawAPI().drawPolygon(items, layer);
+        this.hitTester.register(handle, "polygon", items, layer);
+        return handle;
     }
 
     /**

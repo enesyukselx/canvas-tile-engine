@@ -11,7 +11,7 @@ import {
     onRightClickCallback,
     onZoomCallback,
 } from "./callback";
-import { Circle, ImageItem, Line, Path, Rect, Text } from "./draw-object";
+import { Circle, ImageItem, Line, Path, Polygon, Rect, Text } from "./draw-object";
 import { CanvasTileEngineConfig } from "./config";
 
 export type Coords = {
@@ -134,6 +134,7 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
     drawText(items: Text | Text[], layer?: number): DrawHandle;
     drawImage(items: ImageItem<TImage> | ImageItem<TImage>[], layer?: number): DrawHandle;
     drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle;
+    drawPolygon(items: Polygon | Polygon[], layer?: number): DrawHandle;
     drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
