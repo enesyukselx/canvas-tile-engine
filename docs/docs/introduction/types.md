@@ -87,6 +87,8 @@ type LineStyle = {
     lineWidthPx?: number; // screen pixels, wins over lineWidth
     lineDash?: number[]; // dash pattern in world units, anchored to the world
     lineDashPx?: number[]; // dash pattern in screen pixels, wins over lineDash
+    cornerRadius?: number; // Path corner rounding in world units, clamped per corner
+    cornerRadiusPx?: number; // corner rounding in screen pixels, wins over cornerRadius
 };
 ```
 

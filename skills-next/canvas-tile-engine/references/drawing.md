@@ -199,11 +199,16 @@ engine.drawPath(
 // Dashed (e.g. ferry routes, planned segments): lineDash is world units,
 // lineDashPx is screen px and wins. Pattern flows around Path corners.
 engine.drawPath(route, { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] }, 1);
+
+// Rounded corners (metro-map style): cornerRadius is world units,
+// cornerRadiusPx screen px and wins; clamped per corner, Line unaffected.
+engine.drawPath(metro, { strokeStyle: "#00a650", lineWidthPx: 4, cornerRadiusPx: 10 }, 1);
 ```
 
 Note the style object is a separate second argument for Line/Path (not per
 item). LineStyle = { strokeStyle?, lineWidth? (world), lineWidthPx?,
-lineDash? (world), lineDashPx? }. UNIT RULE (matches Text size/fontPx):
+lineDash? (world), lineDashPx?, cornerRadius? (world), cornerRadiusPx? }.
+UNIT RULE (matches Text size/fontPx):
 plain numbers are world units and scale with zoom; *Px variants are screen
 pixels and take precedence. GridLines lineWidth stays px by design.
 

@@ -206,6 +206,8 @@ drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle
 | `lineWidthPx` | px    | Zoom-independent thickness (cartographic lines); wins over `lineWidth`. |
 | `lineDash`    | world | Dash pattern anchored to the world; dashes scale with zoom.             |
 | `lineDashPx`  | px    | Zoom-independent dash pattern; wins over `lineDash`.                    |
+| `cornerRadius` | world | Rounds `Path` interior corners with a tangent arc; scales with zoom. Clamped per corner so short segments never overlap. No effect on `Line`. |
+| `cornerRadiusPx` | px  | Zoom-independent corner rounding; wins over `cornerRadius`.             |
 
 Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat). Along a `Path`, the pattern flows continuously around corners.
 
