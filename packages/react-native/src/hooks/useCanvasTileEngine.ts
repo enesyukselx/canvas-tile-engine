@@ -14,6 +14,7 @@ import type {
     Text,
     LineStyle,
     DrawTransform,
+    Polygon,
 } from "@canvas-tile-engine/core";
 import type { SkiaMount, SkCanvas, SkImage } from "@canvas-tile-engine/renderer-skia";
 
@@ -83,6 +84,7 @@ export interface EngineHandle {
     drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
+    drawPolygon(items: Polygon | Polygon[], layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
     drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
@@ -222,6 +224,9 @@ export function useCanvasTileEngine(): EngineHandle {
             },
             drawCircle(items, layer) {
                 return instanceRef.current?.drawCircle(items, layer) ?? droppedDraw("drawCircle");
+            },
+            drawPolygon(items, layer) {
+                return instanceRef.current?.drawPolygon(items, layer) ?? droppedDraw("drawPolygon");
             },
             drawStaticCircle(items, cacheKey, layer) {
                 return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? droppedDraw("drawStaticCircle");

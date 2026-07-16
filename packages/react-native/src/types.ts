@@ -17,6 +17,7 @@ import type {
     Line,
     Circle,
     Path,
+    Polygon,
     Text,
     ImageItem,
 } from "@canvas-tile-engine/core";
@@ -41,6 +42,7 @@ export type {
     Circle,
     Text,
     Path,
+    Polygon,
     ImageItem,
 };
 

@@ -12,6 +12,7 @@ import { GridLines } from "./draw/GridLines";
 import { Line } from "./draw/Line";
 import { Text } from "./draw/Text";
 import { Path } from "./draw/Path";
+import { Polygon } from "./draw/Polygon";
 import { StaticRect } from "./draw/StaticRect";
 import { StaticCircle } from "./draw/StaticCircle";
 import { StaticImage } from "./draw/StaticImage";
@@ -207,6 +208,7 @@ export const CanvasTileEngine = Object.assign(CanvasTileEngineBase, {
     Line,
     Text,
     Path,
+    Polygon,
     StaticRect,
     StaticCircle,
     StaticImage,

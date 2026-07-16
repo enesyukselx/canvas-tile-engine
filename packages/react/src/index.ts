@@ -11,6 +11,7 @@ export {
     type LineProps,
     type TextProps,
     type PathProps,
+    type PolygonProps,
     type StaticRectProps,
     type StaticCircleProps,
     type StaticImageProps,
@@ -41,6 +42,7 @@ export type {
     Circle,
     Text,
     Path,
+    Polygon,
     ImageItem,
 } from "./types";
 export type { EngineHandle } from "./hooks/useCanvasTileEngine";

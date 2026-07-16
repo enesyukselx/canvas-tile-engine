@@ -14,6 +14,7 @@ import type {
     Rect,
     LineStyle,
     DrawTransform,
+    Polygon,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -172,6 +173,8 @@ export interface EngineHandle {
 
     /** Draw circles */
     drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
+    /** Draw filled/stroked closed shapes (hit-testable, carries `data`) */
+    drawPolygon(items: Polygon | Polygon[], layer?: number): DrawHandle;
 
     /** Draw static circles (cached) */
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
@@ -382,6 +385,9 @@ export function useCanvasTileEngine(): EngineHandle {
 
             drawCircle(items, layer) {
                 return instanceRef.current?.drawCircle(items, layer) ?? droppedDraw("drawCircle");
+            },
+            drawPolygon(items, layer) {
+                return instanceRef.current?.drawPolygon(items, layer) ?? droppedDraw("drawPolygon");
             },
 
             drawStaticCircle(items, cacheKey, layer) {

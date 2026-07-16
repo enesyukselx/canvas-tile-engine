@@ -6,6 +6,7 @@ export { GridLines, type GridLinesProps } from "./GridLines";
 export { Line, type LineProps } from "./Line";
 export { Text, type TextProps } from "./Text";
 export { Path, type PathProps } from "./Path";
+export { Polygon, type PolygonProps } from "./Polygon";
 export { StaticRect, type StaticRectProps } from "./StaticRect";
 export { StaticCircle, type StaticCircleProps } from "./StaticCircle";
 export { StaticImage, type StaticImageProps } from "./StaticImage";
