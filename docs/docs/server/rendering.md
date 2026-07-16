@@ -33,7 +33,7 @@ const png = await renderToBuffer({
     format: "png",
     draw: (engine) => {
         engine.drawGridLines(1, 1, "#1e2a45", 0);
-        engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 6, style: { fillStyle: "#4ade80" } }, 1);
+        engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 0.12, style: { fillStyle: "#4ade80" } }, 1);
         engine.drawCircle({ x: 2, y: 2, size: 1.4, style: { fillStyle: "#22d3ee" } }, 1);
     },
 });

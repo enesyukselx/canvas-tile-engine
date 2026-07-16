@@ -12,6 +12,7 @@ import type {
     Line,
     Rect,
     Text,
+    LineStyle,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { SkiaMount, SkCanvas, SkImage } from "@canvas-tile-engine/renderer-skia";
@@ -52,7 +53,12 @@ export interface EngineHandle {
 
     render(): void;
     getCenterCoords(): Coords;
-    getVisibleBounds(): { minX: number; maxX: number; minY: number; maxY: number };
+    getVisibleBounds(): {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+    };
     updateCoords(center: Coords): void;
     goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
     getSize(): { width: number; height: number };
@@ -78,13 +84,9 @@ export interface EngineHandle {
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
-    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle;
+    drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
-    drawPath(
-        items: Coords[] | Coords[][],
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer?: number,
-    ): DrawHandle;
+    drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
     drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
     drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
@@ -158,7 +160,14 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.getCenterCoords() ?? { x: 0, y: 0 };
             },
             getVisibleBounds() {
-                return instanceRef.current?.getVisibleBounds() ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+                return (
+                    instanceRef.current?.getVisibleBounds() ?? {
+                        minX: 0,
+                        maxX: 0,
+                        minY: 0,
+                        maxY: 0,
+                    }
+                );
             },
             updateCoords(center) {
                 instanceRef.current?.updateCoords(center);

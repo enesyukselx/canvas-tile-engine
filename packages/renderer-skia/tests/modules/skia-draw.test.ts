@@ -51,15 +51,16 @@ describe("resolveRadius roundRect semantics", () => {
         return ops[0];
     }
 
+    // Radii are world units: px = radius * scale (scale is 10 in setup).
     it("expands a single-element array to all four corners", () => {
-        const op = drawAndGetRRect([10]);
+        const op = drawAndGetRRect([1]);
         // Uniform radius goes through RRectXY
         expect(op.op).toBe("rrect");
         expect(op.rrect).toMatchObject({ rx: 10, ry: 10 });
     });
 
     it("expands a two-element array as [tl+br, tr+bl]", () => {
-        const op = drawAndGetRRect([10, 5]);
+        const op = drawAndGetRRect([1, 0.5]);
         expect(op.op).toBe("rrect");
         expect(op.rrect).toMatchObject({
             topLeft: { x: 10, y: 10 },
@@ -70,7 +71,7 @@ describe("resolveRadius roundRect semantics", () => {
     });
 
     it("expands a three-element array as [tl, tr+bl, br]", () => {
-        const op = drawAndGetRRect([10, 5, 2]);
+        const op = drawAndGetRRect([1, 0.5, 0.2]);
         expect(op.op).toBe("rrect");
         expect(op.rrect).toMatchObject({
             topLeft: { x: 10, y: 10 },
@@ -314,12 +315,14 @@ describe("static picture cache", () => {
 });
 
 describe("stroke width handling", () => {
+    // Stroke unit contract shared by all renderers: lineWidth is world units
+    // (px = lineWidth * scale), lineWidthPx is screen pixels and wins.
     it("defaults to strokeWidth 1 when lineWidth is not given", () => {
-        const { draw, render } = setup();
+        const { draw, render } = setup(); // scale 10
         const { canvas, ops } = makeCanvas();
         draw.drawRect(
             [
-                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 8 } },
+                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.8 } },
                 { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } },
             ],
             1
@@ -328,8 +331,21 @@ describe("stroke width handling", () => {
 
         const strokes = ops.filter((o) => o.op === "rect");
         expect(strokes).toHaveLength(2);
-        expect(strokes[0].strokeWidth).toBe(8);
+        expect(strokes[0].strokeWidth).toBe(8); // world: 0.8 * scale 10
         expect(strokes[1].strokeWidth).toBe(1);
+    });
+
+    it("uses lineWidthPx as a zoom-independent pixel width that wins over lineWidth", () => {
+        const { draw, render } = setup(); // scale 10
+        const { canvas, ops } = makeCanvas();
+        draw.drawRect(
+            [{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.8, lineWidthPx: 3 } }],
+            1
+        );
+        render(canvas);
+
+        const strokes = ops.filter((o) => o.op === "rect");
+        expect(strokes[0].strokeWidth).toBe(3);
     });
 });
 

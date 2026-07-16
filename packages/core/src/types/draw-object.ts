@@ -9,10 +9,27 @@ export type DrawObject<TData = unknown> = {
         x?: number; // 0 to 1
         y?: number; // 0 to 1
     };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        /**
+         * Border width in world units; scales with zoom like the item's
+         * geometry. Ignored when `lineWidthPx` is set. Default: 1px hairline.
+         */
+        lineWidth?: number;
+        /**
+         * Border width in screen pixels, independent of zoom.
+         * Takes precedence over `lineWidth`.
+         */
+        lineWidthPx?: number;
+    };
     /** Rotation angle in degrees (0 = no rotation, positive = clockwise) */
     rotate?: number;
-    /** Border radius in pixels. Single value for all corners, or array for [topLeft, topRight, bottomRight, bottomLeft] */
+    /**
+     * Border radius in world units; scales with zoom so corners stay
+     * proportional to the shape. Single value for all corners, or array for
+     * [topLeft, topRight, bottomRight, bottomLeft].
+     */
     radius?: number | number[];
     /**
      * Arbitrary app data attached to the item. Never read by the engine or

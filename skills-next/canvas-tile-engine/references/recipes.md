@@ -39,7 +39,7 @@ let hover: DrawHandle | undefined;
 engine.onHover = (c) => {
     if (hover) engine.removeDrawHandle(hover);
     hover = engine.drawRect({ x: c.snapped.x, y: c.snapped.y, size: 1,
-                              style: { strokeStyle: "#38bdf8", lineWidth: 2 } }, 10);
+                              style: { strokeStyle: "#38bdf8", lineWidthPx: 2 } }, 10);
     engine.render();
 };
 engine.onMouseLeave = () => { if (hover) { engine.removeDrawHandle(hover); hover = undefined; engine.render(); } };

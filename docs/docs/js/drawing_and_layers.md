@@ -10,7 +10,14 @@ The engine provides a layered rendering system where you can draw shapes, text, 
 All drawing types are exported from the package. See [Types Reference](/docs/introduction/types) for complete type definitions.
 
 ```typescript
-import { Rect, Circle, Text, Path, ImageItem, Coords } from "@canvas-tile-engine/core";
+import {
+    Rect,
+    Circle,
+    Text,
+    Path,
+    ImageItem,
+    Coords,
+} from "@canvas-tile-engine/core";
 ```
 
 :::
@@ -43,23 +50,24 @@ drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 
 **Rect / Circle Properties:**
 
-| Property | Type                 | Default                            | Description                                                                                                                     |
-| :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
-| `x`, `y` | `number`             | **Required**                       | World coordinates of the center/origin.                                                                                         |
-| `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                            |
-| `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                    |
-| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                   |
-| `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.         |
-| `height` | `number`             | `size`                             | Height in world units (only for `drawRect`).                                                                                    |
-| `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                |
-| `radius` | `number \| number[]` | -                                  | Border radius in pixels. Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
-| `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.        |
+| Property | Type                 | Default                            | Description                                                                                                                                             |
+| :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `x`, `y` | `number`             | **Required**                       | World coordinates of the center/origin.                                                                                                                 |
+| `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                                                    |
+| `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                                            |
+| `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                           |
+| `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
+| `height` | `number`             | `size`                             | Height in world units (only for `drawRect`).                                                                                                            |
+| `rotate` | `number`             | `0`                                | Rotation angle in degrees (only for `drawRect`).                                                                                                        |
+| `radius` | `number \| number[]` | -                                  | Border radius in world units (scales with zoom). Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
+| `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.                                |
 
 **Style Options:**
 
--   `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
--   `strokeStyle`: Border color
--   `lineWidth`: Border width in pixels
+- `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
+- `strokeStyle`: Border color
+- `lineWidth`: Border width in world units; scales with zoom like the shape
+- `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
 
 ```typescript
 // Draw a blue square on layer 1
@@ -70,7 +78,7 @@ engine.drawRect(
         size: 1,
         style: { fillStyle: "#0077be" },
     },
-    1
+    1,
 );
 
 // Draw a 4x2 zone floor (anchored on its center cell)
@@ -82,7 +90,7 @@ engine.drawRect(
         height: 2,
         style: { fillStyle: "rgba(34, 197, 94, 0.3)", strokeStyle: "#166534" },
     },
-    1
+    1,
 );
 
 // Draw a rotated rectangle (45 degrees)
@@ -94,7 +102,7 @@ engine.drawRect(
         rotate: 45, // 45 degrees
         style: { fillStyle: "#ff6b6b" },
     },
-    1
+    1,
 );
 
 // Draw a rounded rectangle
@@ -103,10 +111,10 @@ engine.drawRect(
         x: 10,
         y: 5,
         size: 1,
-        radius: 8, // 8px radius for all corners
+        radius: 0.15, // world units: corners stay proportional at every zoom
         style: { fillStyle: "#2ecc71" },
     },
-    1
+    1,
 );
 
 // Draw with different corner radii [topLeft, topRight, bottomRight, bottomLeft]
@@ -115,10 +123,10 @@ engine.drawRect(
         x: 12,
         y: 5,
         size: 1,
-        radius: [10, 0, 10, 0], // Diagonal rounded corners
+        radius: [0.2, 0, 0.2, 0], // Diagonal rounded corners
         style: { fillStyle: "#9b59b6" },
     },
-    1
+    1,
 );
 
 // Draw a red circle on layer 2
@@ -129,7 +137,7 @@ engine.drawCircle(
         size: 0.8,
         style: { fillStyle: "#e63946" },
     },
-    2
+    2,
 );
 
 // Batch drawing (Array)
@@ -139,7 +147,7 @@ engine.drawRect(
         { x: 12, y: 10 },
         { x: 14, y: 10 },
     ],
-    1
+    1,
 );
 ```
 
@@ -150,7 +158,7 @@ engine.drawRect(
 Draw a straight line between two points. Supports single object or array of objects.
 
 ```typescript
-drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle
+drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle
 ```
 
 **Line Properties:**
@@ -162,13 +170,21 @@ drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: numbe
 
 ```typescript
 // Single line
-engine.drawLine({ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }, { strokeStyle: "#fb8500", lineWidth: 3 }, 1);
+engine.drawLine(
+    { from: { x: 0, y: 0 }, to: { x: 10, y: 10 } },
+    { strokeStyle: "#fb8500", lineWidthPx: 3 },
+    1,
+);
 
 // Multiple lines
-engine.drawLine([
-    { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
-    { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
-], { strokeStyle: "red", lineWidth: 2 }, 1);
+engine.drawLine(
+    [
+        { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
+        { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
+    ],
+    { strokeStyle: "red", lineWidthPx: 2 },
+    1,
+);
 ```
 
 ### `drawPath`
@@ -176,10 +192,31 @@ engine.drawLine([
 Draw a continuous line through multiple points. Supports a single path (array of points) or an array of paths.
 
 ```typescript
-drawPath(items: Path | Path[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle
+drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle
 ```
 
 **Path:** An array of `{ x, y }` coordinates.
+
+**`LineStyle`** (shared by `drawLine` and `drawPath`):
+
+| Property      | Unit  | Description                                                             |
+| :------------ | :---- | :---------------------------------------------------------------------- |
+| `strokeStyle` | -     | Line color.                                                             |
+| `lineWidth`   | world | Thickness scales with zoom (a road/river that belongs to the world).    |
+| `lineWidthPx` | px    | Zoom-independent thickness (cartographic lines); wins over `lineWidth`. |
+| `lineDash`    | world | Dash pattern anchored to the world; dashes scale with zoom.             |
+| `lineDashPx`  | px    | Zoom-independent dash pattern; wins over `lineDash`.                    |
+
+Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat). Along a `Path`, the pattern flows continuously around corners.
+
+```typescript
+// A ferry route: 3px dashed line at every zoom level
+engine.drawPath(
+    ferryPoints,
+    { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] },
+    1,
+);
+```
 
 ```typescript
 // Single path
@@ -189,18 +226,24 @@ engine.drawPath(
         { x: 5, y: 0 },
         { x: 5, y: 5 },
     ],
-    { strokeStyle: "#219ebc", lineWidth: 2 },
-    1
+    { strokeStyle: "#219ebc", lineWidthPx: 2 },
+    1,
 );
 
 // Multiple paths
 engine.drawPath(
     [
-        [{ x: 0, y: 0 }, { x: 5, y: 5 }],
-        [{ x: 10, y: 0 }, { x: 15, y: 5 }],
+        [
+            { x: 0, y: 0 },
+            { x: 5, y: 5 },
+        ],
+        [
+            { x: 10, y: 0 },
+            { x: 15, y: 5 },
+        ],
     ],
-    { strokeStyle: "green", lineWidth: 1 },
-    1
+    { strokeStyle: "green", lineWidthPx: 1 },
+    1,
 );
 ```
 
@@ -244,58 +287,70 @@ drawText(items: Text | Text[], layer?: number): DrawHandle
 
 **Text Properties:**
 
-| Property | Type     | Default                            | Description                              |
-| :------- | :------- | :--------------------------------- | :--------------------------------------- |
-| `x`, `y` | `number` | **Required**                       | World coordinates.                       |
-| `text`   | `string` | **Required**                       | The text content.                        |
-| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set. |
+| Property | Type     | Default                            | Description                                                                   |
+| :------- | :------- | :--------------------------------- | :---------------------------------------------------------------------------- |
+| `x`, `y` | `number` | **Required**                       | World coordinates.                                                            |
+| `text`   | `string` | **Required**                       | The text content.                                                             |
+| `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set.    |
 | `fontPx` | `number` | -                                  | Fixed font size in pixels, independent of zoom. Takes precedence over `size`. |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                            |
-| `style`  | `object` | -                                  | Font styling options.                    |
-| `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).   |
+| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                 |
+| `style`  | `object` | -                                  | Font styling options.                                                         |
+| `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).                                        |
 
 **Style Options:**
 
--   `fillStyle`: Text color
--   `fontFamily`: Font family (default: `"sans-serif"`)
--   `textAlign`: `"left"`, `"center"`, `"right"`
--   `textBaseline`: `"top"`, `"middle"`, `"bottom"`
+- `fillStyle`: Text color
+- `fontFamily`: Font family (default: `"sans-serif"`)
+- `textAlign`: `"left"`, `"center"`, `"right"`
+- `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 
 ```typescript
 // Single text
-engine.drawText({
-    x: 5,
-    y: 5,
-    text: "Base Camp",
-    size: 1,
-    style: { fillStyle: "white", fontFamily: "Arial" }
-}, 3);
+engine.drawText(
+    {
+        x: 5,
+        y: 5,
+        text: "Base Camp",
+        size: 1,
+        style: { fillStyle: "white", fontFamily: "Arial" },
+    },
+    3,
+);
 
 // Rotated text (45 degrees)
-engine.drawText({
-    x: 8,
-    y: 5,
-    text: "Rotated",
-    size: 1,
-    rotate: 45,
-    style: { fillStyle: "yellow" }
-}, 3);
+engine.drawText(
+    {
+        x: 8,
+        y: 5,
+        text: "Rotated",
+        size: 1,
+        rotate: 45,
+        style: { fillStyle: "yellow" },
+    },
+    3,
+);
 
 // Fixed-size label: always 14px on screen, regardless of zoom
-engine.drawText({
-    x: 5,
-    y: 3,
-    text: "Ankara",
-    fontPx: 14,
-    style: { fillStyle: "white" }
-}, 3);
+engine.drawText(
+    {
+        x: 5,
+        y: 3,
+        text: "Ankara",
+        fontPx: 14,
+        style: { fillStyle: "white" },
+    },
+    3,
+);
 
 // Multiple texts (batch rendering)
-engine.drawText([
-    { x: 0, y: 0, text: "A", size: 2, style: { fillStyle: "red" } },
-    { x: 1, y: 0, text: "B", size: 2, style: { fillStyle: "blue" } },
-    { x: 2, y: 0, text: "C", size: 2, style: { fillStyle: "green" } },
-], 3);
+engine.drawText(
+    [
+        { x: 0, y: 0, text: "A", size: 2, style: { fillStyle: "red" } },
+        { x: 1, y: 0, text: "B", size: 2, style: { fillStyle: "blue" } },
+        { x: 2, y: 0, text: "C", size: 2, style: { fillStyle: "green" } },
+    ],
+    3,
+);
 ```
 
 :::tip Two sizing modes
@@ -312,16 +367,16 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 
 **ImageItem Properties:**
 
-| Property | Type               | Default      | Description                                                        |
-| :------- | :----------------- | :----------- | :----------------------------------------------------------------- |
-| `x`, `y` | `number`           | **Required** | World coordinates.                                                 |
-| `img`    | `HTMLImageElement` | **Required** | The loaded image object.                                           |
-| `size`   | `number`           | `1`          | Size in grid units (maintains aspect ratio).                       |
-| `rotate` | `number`           | `0`          | Rotation angle in degrees (0 = no rotation, positive = clockwise). |
-| `origin` | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                  |
-| `sprite` | `SpriteRect`       | -            | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
-| `opacity` | `number`          | `1`          | Opacity from 0 (transparent) to 1 (opaque). Ideal for ghost/preview placements. |
-| `data`   | `TData`            | -            | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`. |
+| Property  | Type               | Default                            | Description                                                                                                      |
+| :-------- | :----------------- | :--------------------------------- | :--------------------------------------------------------------------------------------------------------------- |
+| `x`, `y`  | `number`           | **Required**                       | World coordinates.                                                                                               |
+| `img`     | `HTMLImageElement` | **Required**                       | The loaded image object.                                                                                         |
+| `size`    | `number`           | `1`                                | Size in grid units (maintains aspect ratio).                                                                     |
+| `rotate`  | `number`           | `0`                                | Rotation angle in degrees (0 = no rotation, positive = clockwise).                                               |
+| `origin`  | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                    |
+| `sprite`  | `SpriteRect`       | -                                  | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
+| `opacity` | `number`           | `1`                                | Opacity from 0 (transparent) to 1 (opaque). Ideal for ghost/preview placements.                                  |
+| `data`    | `TData`            | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`.                  |
 
 ```typescript
 // Single image
@@ -336,11 +391,14 @@ engine.drawImage({ x: 5, y: 3, size: 1, img: arrow, rotate: 90 }, 2);
 engine.drawImage({ x: 7, y: 3, size: 1.5, img, opacity: 0.5 }, 3);
 
 // Multiple images
-engine.drawImage([
-    { x: 0, y: 0, size: 1, img: treeImg },
-    { x: 2, y: 0, size: 1, img: treeImg },
-    { x: 4, y: 0, size: 1, img: treeImg },
-], 2);
+engine.drawImage(
+    [
+        { x: 0, y: 0, size: 1, img: treeImg },
+        { x: 2, y: 0, size: 1, img: treeImg },
+        { x: 4, y: 0, size: 1, img: treeImg },
+    ],
+    2,
+);
 ```
 
 ## Advanced
@@ -405,8 +463,8 @@ engine.onDraw = (ctx, coords, config, transform) => {
 
 The `origin` property controls how shapes and images are positioned relative to their `x, y` coordinates.
 
--   **`mode: "cell"` (Default)**: Anchors relative to the grid cell. `x: 0.5, y: 0.5` centers the object in the cell.
--   **`mode: "self"`**: Anchors relative to the object's own size. `x: 0.5, y: 0.5` centers the object on the coordinate.
+- **`mode: "cell"` (Default)**: Anchors relative to the grid cell. `x: 0.5, y: 0.5` centers the object in the cell.
+- **`mode: "self"`**: Anchors relative to the object's own size. `x: 0.5, y: 0.5` centers the object on the coordinate.
 
 ### Performance (Culling)
 
@@ -436,7 +494,7 @@ const miniMapItems = items.map((item) => ({
     size: 0.9,
     style: { fillStyle: item.color },
     rotate: item.rotation, // Optional rotation in degrees
-    radius: 4, // Optional rounded corners
+    radius: 0.1, // Optional rounded corners
 }));
 
 // "minimap-items" is a unique cache key
@@ -517,17 +575,17 @@ With static caching, dragging remains smooth because only a **single `drawImage`
 
 **We recommend using static caching when:**
 
--   You have 50k–100k+ items visible at once (e.g., mini-maps, overview maps)
--   Dragging/panning is enabled on that canvas
+- You have 50k–100k+ items visible at once (e.g., mini-maps, overview maps)
+- Dragging/panning is enabled on that canvas
 
 If your canvas doesn't support drag interactions, or only a small portion of items are visible at a time, the regular `drawRect`/`drawCircle`/`drawImage` methods with automatic culling are sufficient.
 
 :::tip
 Static caching is most effective when:
 
--   Zoom level is fixed (like a mini-map)
--   Content doesn't change frequently
--   All or most items are visible at once
+- Zoom level is fixed (like a mini-map)
+- Content doesn't change frequently
+- All or most items are visible at once
 
 For scrollable maps where only a small portion is visible, the regular `drawRect`/`drawCircle`/`drawImage` methods with automatic culling are more efficient.
 :::
@@ -566,7 +624,10 @@ This is especially useful for temporary overlays (hover highlights, selections, 
 
 ```typescript
 // Add a temporary overlay
-const handle = engine.drawRect({ x: 5, y: 5, size: 1, style: { fillStyle: "rgba(255, 255, 0, 0.25)" } }, 3);
+const handle = engine.drawRect(
+    { x: 5, y: 5, size: 1, style: { fillStyle: "rgba(255, 255, 0, 0.25)" } },
+    3,
+);
 engine.render();
 
 // Later: remove only this draw callback (no need to clear the entire layer)
@@ -653,7 +714,7 @@ function redraw() {
             size: 0.9,
             style: { fillStyle: s.selected ? "blue" : "green" },
         })),
-        1
+        1,
     );
     engine.render();
 }
@@ -683,7 +744,7 @@ engine.render(); // Must be called to see the rectangle
 **Automatic Renders:**
 The engine automatically calls `render()` when:
 
--   The camera is panned or zoomed.
--   The viewport is resized.
+- The camera is panned or zoomed.
+- The viewport is resized.
 
 For all other changes (adding shapes, changing config, loading images), you must call `render()` manually.

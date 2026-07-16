@@ -5,6 +5,7 @@ export type * from "./types";
 export * from "./constants";
 // Utilities
 export { gridToSize } from "./utils/gridToSize";
+export { resolveLineWidthPx, resolveLineDashPx, resolveRadiusPx } from "./utils/strokeStyle";
 // Additional core modules
 export { Config } from "./modules/Config";
 export { ViewportState } from "./modules/ViewportState";

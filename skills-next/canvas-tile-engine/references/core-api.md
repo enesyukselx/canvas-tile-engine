@@ -146,8 +146,8 @@ and semantics: [drawing.md](drawing.md).
 | `drawCircle(items: Circle \| Circle[], layer?)` | 1 |
 | `drawImage(items: ImageItem \| ImageItem[], layer?)` | 1 |
 | `drawText(items: Text \| Text[], layer?)` | 2 |
-| `drawLine(items: Line \| Line[], style?: { strokeStyle?, lineWidth? }, layer?)` | 1 |
-| `drawPath(items: Path \| Path[], style?: { strokeStyle?, lineWidth? }, layer?)` | 1 |
+| `drawLine(items: Line \| Line[], style?: LineStyle, layer?)` | 1 |
+| `drawPath(items: Path \| Path[], style?: LineStyle, layer?)` | 1 |
 | `drawGridLines(cellSize: number, lineWidth = 1, strokeStyle = "black", layer = 0)` | 0 |
 | `drawStaticRect(items: Rect[], cacheKey: string, layer?)` | 1 |
 | `drawStaticCircle(items: Circle[], cacheKey: string, layer?)` | 1 |

@@ -30,13 +30,13 @@ type Rect = {
     y: number;
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number };
     rotate?: number;
     radius?: number | number[];
 };
 ```
 
-`size` is in world units. `radius` and `style.lineWidth` are in pixels. `rotate` is degrees, clockwise.
+`size`, `radius`, and `style.lineWidth` are world units and scale with zoom, so borders and corner rounding stay proportional to the shape. `style.lineWidthPx` is a zoom-independent width in screen pixels and takes precedence over `lineWidth` (the same pattern as `Text`'s `size`/`fontPx`). `rotate` is degrees, clockwise.
 
 ### `Circle`
 
@@ -46,7 +46,7 @@ type Circle = {
     y: number;
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number };
 };
 ```
 
@@ -80,9 +80,17 @@ type Line = {
 };
 
 type Path = Coords[];
+
+type LineStyle = {
+    strokeStyle?: string;
+    lineWidth?: number; // world units, scales with zoom
+    lineWidthPx?: number; // screen pixels, wins over lineWidth
+    lineDash?: number[]; // dash pattern in world units, anchored to the world
+    lineDashPx?: number[]; // dash pattern in screen pixels, wins over lineDash
+};
 ```
 
-`Path` represents a polyline. Pass `Path[]` to draw multiple polylines in one call.
+`Path` represents a polyline. Pass `Path[]` to draw multiple polylines in one call. `drawLine` and `drawPath` take a `LineStyle` as their second argument; dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around a `Path`'s corners.
 
 ### `ImageItem<TImage>`
 

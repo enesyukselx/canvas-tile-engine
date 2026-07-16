@@ -1,6 +1,6 @@
 import { useEffect, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { Path as PathType } from "@canvas-tile-engine/core";
+import type { Path as PathType, LineStyle } from "@canvas-tile-engine/core";
 
 export interface PathProps {
     /**
@@ -9,7 +9,7 @@ export interface PathProps {
      * keep it stable with useMemo/useState instead of an inline literal.
      */
     items: PathType | PathType[];
-    style?: { strokeStyle?: string; lineWidth?: number };
+    style?: LineStyle;
     layer?: number;
 }
 

@@ -15,8 +15,12 @@ import {
     SpriteRect,
     Text,
     VISIBILITY_BUFFER,
+    resolveLineWidthPx,
+    resolveLineDashPx,
+    resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
+import type { LineStyle } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
 import { Layer } from "./Layer";
 import { applyLineWidth } from "../utils/canvas";
@@ -155,7 +159,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
 
-                const radius = item.radius;
+                const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
                 if (rotationDeg !== 0) {
                     const centerX = drawX + pxW / 2;
@@ -169,7 +173,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
                     } else {
                         ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
                     }
-                    this.fillStrokePath(ctx, style);
+                    this.fillStrokePath(ctx, style, this.camera.scale);
                     ctx.restore();
                 } else {
                     ctx.beginPath();
@@ -178,25 +182,23 @@ export class CanvasDraw implements IDrawAPI<Image> {
                     } else {
                         ctx.rect(drawX, drawY, pxW, pxH);
                     }
-                    this.fillStrokePath(ctx, style);
+                    this.fillStrokePath(ctx, style, this.camera.scale);
                 }
             }
             ctx.restore();
         });
     }
 
-    drawLine(
-        items: Array<Line> | Line,
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1,
-    ): DrawHandle {
+    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
-            const resetAlpha = style?.lineWidth ? applyLineWidth(ctx, style.lineWidth) : undefined;
+            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+            const dash = resolveLineDashPx(style, this.camera.scale);
+            if (dash) ctx.setLineDash(dash);
 
             ctx.beginPath();
             for (const item of list) {
@@ -264,7 +266,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
                 ctx.beginPath();
                 ctx.arc(drawX + radius, drawY + radius, radius, 0, Math.PI * 2);
-                this.fillStrokePath(ctx, style);
+                this.fillStrokePath(ctx, style, this.camera.scale);
             }
             ctx.restore();
         });
@@ -321,18 +323,16 @@ export class CanvasDraw implements IDrawAPI<Image> {
         });
     }
 
-    drawPath(
-        items: Array<Path> | Path,
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1,
-    ): DrawHandle {
+    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
             if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
 
-            const resetAlpha = style?.lineWidth ? applyLineWidth(ctx, style.lineWidth) : undefined;
+            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+            const dash = resolveLineDashPx(style, this.camera.scale);
+            if (dash) ctx.setLineDash(dash);
 
             ctx.beginPath();
             for (const points of list) {
@@ -493,11 +493,19 @@ export class CanvasDraw implements IDrawAPI<Image> {
      */
     private fillStrokePath(
         ctx: SKRSContext2D,
-        style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number },
+        style:
+            | {
+                  fillStyle?: string;
+                  strokeStyle?: string;
+                  lineWidth?: number;
+                  lineWidthPx?: number;
+              }
+            | undefined,
+        scale: number,
     ) {
         if (style?.fillStyle) ctx.fill();
         if (style?.strokeStyle) {
-            const resetAlpha = applyLineWidth(ctx, style.lineWidth ?? 1);
+            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, scale));
             ctx.stroke();
             resetAlpha();
         }
@@ -734,7 +742,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
             const style = item.style;
             const rotationDeg = item.rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
-            const radius = item.radius;
+            const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
             if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
                 ctx.fillStyle = style.fillStyle;
@@ -757,7 +765,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 } else {
                     ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
                 }
-                this.fillStrokePath(ctx, style);
+                this.fillStrokePath(ctx, style, this.camera.scale);
                 ctx.restore();
             } else {
                 ctx.beginPath();
@@ -766,7 +774,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 } else {
                     ctx.rect(x, y, pxW, pxH);
                 }
-                this.fillStrokePath(ctx, style);
+                this.fillStrokePath(ctx, style, this.camera.scale);
             }
         });
 
@@ -850,7 +858,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
 
             ctx.beginPath();
             ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
-            this.fillStrokePath(ctx, style);
+            this.fillStrokePath(ctx, style, this.camera.scale);
         });
 
         if (!cache) {

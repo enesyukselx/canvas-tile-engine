@@ -13,8 +13,13 @@ import {
     SpatialIndex,
     Text,
     VISIBILITY_BUFFER,
+    resolveLineWidthPx,
+    resolveLineDashPx,
+    resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
+import type { LineStyle } from "@canvas-tile-engine/core";
+import { appendDashedSegment } from "../utils/dash";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
@@ -119,7 +124,7 @@ export class WebGLDraw {
                 const cx = drawX + pxW / 2;
                 const cy = drawY + pxH / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
-                const radius = this.resolveRadius(item.radius, Math.min(pxW, pxH));
+                const radius = this.resolveRadius(resolveRadiusPx(item.radius, this.camera.scale), Math.min(pxW, pxH));
 
                 if (style?.fillStyle) {
                     shapes.push({
@@ -142,7 +147,7 @@ export class WebGLDraw {
                         pxH,
                         rotation,
                         this.colorParser.parse(style.strokeStyle),
-                        style.lineWidth ?? 1,
+                        resolveLineWidthPx(style, this.camera.scale),
                     );
                 }
             }
@@ -200,7 +205,7 @@ export class WebGLDraw {
                         cy,
                         radius,
                         this.colorParser.parse(style.strokeStyle),
-                        style.lineWidth ?? 1,
+                        resolveLineWidthPx(style, this.camera.scale),
                     );
                 }
             }
@@ -210,16 +215,13 @@ export class WebGLDraw {
         });
     }
 
-    drawLine(
-        items: Array<Line> | Line,
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1,
-    ): DrawHandle {
+    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
-            const lineWidth = style?.lineWidth ?? 1;
+            const lineWidth = resolveLineWidthPx(style, this.camera.scale);
+            const dash = resolveLineDashPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
             for (const item of list) {
@@ -230,7 +232,8 @@ export class WebGLDraw {
 
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
-                this.pushLine(lines, a, b, color, lineWidth);
+                // Each Line item is its own subpath: the dash phase restarts.
+                this.pushSegment(lines, a, b, color, lineWidth, dash, 0);
             }
 
             gl.drawLines(lines);
@@ -286,16 +289,13 @@ export class WebGLDraw {
         });
     }
 
-    drawPath(
-        items: Array<Path> | Path,
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1,
-    ): DrawHandle {
+    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
         const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
-            const lineWidth = style?.lineWidth ?? 1;
+            const lineWidth = resolveLineWidthPx(style, this.camera.scale);
+            const dash = resolveLineDashPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
             for (const points of list) {
@@ -312,9 +312,12 @@ export class WebGLDraw {
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
                 let prev = this.transformer.worldToScreen(points[0].x, points[0].y);
+                // The dash phase carries across joints so the pattern flows
+                // continuously along the polyline, like a single ctx subpath.
+                let phase = 0;
                 for (let i = 1; i < points.length; i++) {
                     const curr = this.transformer.worldToScreen(points[i].x, points[i].y);
-                    this.pushLine(lines, prev, curr, color, lineWidth);
+                    phase = this.pushSegment(lines, prev, curr, color, lineWidth, dash, phase);
                     prev = curr;
                 }
             }
@@ -552,12 +555,45 @@ export class WebGLDraw {
     private resolveStroke(color: RGBA, lineWidth: number): { width: number; color: RGBA } {
         if (lineWidth >= 1) return { width: lineWidth, color };
         const alpha = Math.max(0, Math.min(lineWidth, 1));
-        return { width: 1, color: [color[0], color[1], color[2], color[3] * alpha] };
+        return {
+            width: 1,
+            color: [color[0], color[1], color[2], color[3] * alpha],
+        };
+    }
+
+    /**
+     * Push a→b as a solid line or, when a dash pattern is active, as its
+     * CPU-tessellated sub-segments. Returns the advanced dash phase.
+     */
+    private pushSegment(
+        lines: LineInstance[],
+        a: Coords,
+        b: Coords,
+        color: RGBA,
+        lineWidth: number,
+        dash: number[] | undefined,
+        phase: number,
+    ): number {
+        if (!dash) {
+            this.pushLine(lines, a, b, color, lineWidth);
+            return phase;
+        }
+        const segments: Array<{ a: Coords; b: Coords }> = [];
+        const next = appendDashedSegment(segments, a, b, dash, phase);
+        for (const s of segments) this.pushLine(lines, s.a, s.b, color, lineWidth);
+        return next;
     }
 
     private pushLine(lines: LineInstance[], a: Coords, b: Coords, color: RGBA, lineWidth: number) {
         const stroke = this.resolveStroke(color, lineWidth);
-        lines.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, width: stroke.width, color: stroke.color });
+        lines.push({
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            width: stroke.width,
+            color: stroke.color,
+        });
     }
 
     private pushRectStroke(
@@ -614,7 +650,10 @@ export class WebGLDraw {
         let prev: Coords = { x: cx + radius, y: cy };
         for (let i = 1; i <= CIRCLE_STROKE_SEGMENTS; i++) {
             const angle = (i / CIRCLE_STROKE_SEGMENTS) * Math.PI * 2;
-            const curr: Coords = { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+            const curr: Coords = {
+                x: cx + Math.cos(angle) * radius,
+                y: cy + Math.sin(angle) * radius,
+            };
             const len = Math.hypot(curr.x - prev.x, curr.y - prev.y) || 1;
             const dx = ((curr.x - prev.x) / len) * ext;
             const dy = ((curr.y - prev.y) / len) * ext;

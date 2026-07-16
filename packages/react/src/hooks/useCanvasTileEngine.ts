@@ -12,6 +12,7 @@ import type {
     Circle,
     Line,
     Rect,
+    LineStyle,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 
@@ -36,7 +37,14 @@ function droppedDraw(method: string): DrawHandle {
 
 /** Default config when engine is not ready */
 const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
-    size: { width: 0, height: 0, minWidth: 100, minHeight: 100, maxWidth: Infinity, maxHeight: Infinity },
+    size: {
+        width: 0,
+        height: 0,
+        minWidth: 100,
+        minHeight: 100,
+        maxWidth: Infinity,
+        maxHeight: Infinity,
+    },
     responsive: false,
     scale: 1,
     minScale: 0.5,
@@ -107,7 +115,12 @@ export interface EngineHandle {
     getCenterCoords(): Coords;
 
     /** Get visible world coordinate bounds of the viewport */
-    getVisibleBounds(): { minX: number; maxX: number; minY: number; maxY: number };
+    getVisibleBounds(): {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+    };
 
     /** Update center coordinates */
     updateCoords(center: Coords): void;
@@ -164,17 +177,13 @@ export interface EngineHandle {
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
 
     /** Draw lines */
-    drawLine(items: Line | Line[], style?: { strokeStyle?: string; lineWidth?: number }, layer?: number): DrawHandle;
+    drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
 
     /** Draw text */
     drawText(items: Text | Text[], layer?: number): DrawHandle;
 
     /** Draw paths/polylines */
-    drawPath(
-        items: Coords[] | Coords[][],
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer?: number,
-    ): DrawHandle;
+    drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
 
     /** Draw images */
     drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle;
@@ -301,7 +310,14 @@ export function useCanvasTileEngine(): EngineHandle {
             },
 
             getVisibleBounds() {
-                return instanceRef.current?.getVisibleBounds() ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+                return (
+                    instanceRef.current?.getVisibleBounds() ?? {
+                        minX: 0,
+                        maxX: 0,
+                        minY: 0,
+                        maxY: 0,
+                    }
+                );
             },
 
             updateCoords(center: Coords) {

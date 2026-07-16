@@ -43,15 +43,45 @@ function setup() {
 }
 
 describe("CanvasDraw lineWidth handling", () => {
+    // Stroke unit contract shared by all renderers: lineWidth is world units
+    // (px = lineWidth * scale), lineWidthPx is screen pixels and wins.
+    it("scales world lineWidth by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, strokes } = makeRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } }], 1);
+        render(ctx);
+
+        expect(strokes).toHaveLength(1);
+        expect(strokes[0].lineWidth).toBe(5);
+        expect(strokes[0].globalAlpha).toBe(1);
+    });
+
+    it("uses lineWidthPx as a zoom-independent pixel width that wins over lineWidth", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, strokes } = makeRecordingCtx();
+
+        draw.drawRect(
+            [
+                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidthPx: 3 } },
+                { x: 3, y: 3, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5, lineWidthPx: 3 } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(strokes.map((s) => s.lineWidth)).toEqual([3, 3]);
+    });
+
     it("applies the sub-pixel lineWidth alpha to every item, not just the first", () => {
         const { draw, render } = setup();
         const { ctx, strokes } = makeRecordingCtx();
 
         draw.drawRect(
             [
-                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
-                { x: 3, y: 3, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
-                { x: 5, y: 5, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
+                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidthPx: 0.5 } },
+                { x: 3, y: 3, size: 1, style: { strokeStyle: "#f00", lineWidthPx: 0.5 } },
+                { x: 5, y: 5, size: 1, style: { strokeStyle: "#f00", lineWidthPx: 0.5 } },
             ],
             1,
         );
@@ -68,20 +98,23 @@ describe("CanvasDraw lineWidth handling", () => {
         const { draw, render } = setup();
         const { ctx, fills } = makeRecordingCtx();
 
-        draw.drawRect([{ x: 1, y: 1, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineWidth: 0.5 } }], 1);
+        draw.drawRect(
+            [{ x: 1, y: 1, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineWidthPx: 0.5 } }],
+            1,
+        );
         render(ctx);
 
         expect(fills).toHaveLength(1);
         expect(fills[0].globalAlpha).toBe(1);
     });
 
-    it("defaults to lineWidth 1 instead of leaking the previous item's width", () => {
+    it("defaults to a 1px hairline instead of leaking the previous item's width", () => {
         const { draw, render } = setup();
         const { ctx, strokes } = makeRecordingCtx();
 
         draw.drawRect(
             [
-                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 8 } },
+                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidthPx: 8 } },
                 { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } }, // no lineWidth
             ],
             1,
@@ -100,16 +133,83 @@ describe("CanvasDraw lineWidth handling", () => {
         draw.drawCircle(
             [
                 { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
-                { x: 3, y: 3, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.5 } },
+                { x: 3, y: 3, size: 1, style: { strokeStyle: "#f00", lineWidthPx: 0.5 } },
             ],
             1,
         );
         render(ctx);
 
         expect(strokes).toHaveLength(2);
-        for (const stroke of strokes) {
-            expect(stroke.globalAlpha).toBe(0.5);
-        }
+        expect(strokes[0].lineWidth).toBe(5); // world: 0.5 * scale 10
+        expect(strokes[1].lineWidth).toBe(1); // sub-pixel px width -> alpha trick
+        expect(strokes[1].globalAlpha).toBe(0.5);
+    });
+});
+
+// Fake 2D context recording setLineDash calls and strokes for dash tests.
+function makeDashRecordingCtx() {
+    const dashes: number[][] = [];
+    let strokeCount = 0;
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        setLineDash(pattern: number[]) {
+            dashes.push(pattern);
+        },
+        stroke() {
+            strokeCount++;
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, dashes, strokes: () => strokeCount };
+}
+
+// Dash unit contract shared by all renderers: lineDash is world units
+// (px = value * scale), lineDashPx is screen pixels and wins.
+describe("CanvasDraw line dash", () => {
+    const path = [
+        { x: 0, y: 0 },
+        { x: 5, y: 0 },
+    ];
+
+    it("scales world lineDash by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawPath(path, { strokeStyle: "#f00", lineDash: [0.8, 0.4] }, 1);
+        render(ctx);
+
+        expect(dashes).toEqual([[8, 4]]);
+    });
+
+    it("passes lineDashPx through unscaled and prefers it over lineDash", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 5, y: 0 } }],
+            { strokeStyle: "#f00", lineDash: [0.8], lineDashPx: [6, 3] },
+            1,
+        );
+        render(ctx);
+
+        expect(dashes).toEqual([[6, 3]]);
+    });
+
+    it("stays solid (no setLineDash call) when no dash is given", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes, strokes } = makeDashRecordingCtx();
+
+        draw.drawPath(path, { strokeStyle: "#f00", lineWidth: 0.2 }, 1);
+        render(ctx);
+
+        expect(dashes).toEqual([]);
+        expect(strokes()).toBe(1);
     });
 });
 

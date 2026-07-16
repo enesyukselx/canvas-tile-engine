@@ -21,7 +21,27 @@ export type Coords = {
 
 export interface LineStyle {
     strokeStyle?: string;
+    /**
+     * Line thickness in world units; scales with zoom.
+     * Ignored when {@link lineWidthPx} is set. Default: 1px hairline.
+     */
     lineWidth?: number;
+    /**
+     * Line thickness in screen pixels, independent of zoom.
+     * Takes precedence over {@link lineWidth}.
+     */
+    lineWidthPx?: number;
+    /**
+     * Dash pattern in world units (dashes are anchored to the world and scale
+     * with zoom). Follows Canvas2D `setLineDash` semantics. Ignored when
+     * {@link lineDashPx} is set. Omit for a solid line.
+     */
+    lineDash?: number[];
+    /**
+     * Dash pattern in screen pixels, independent of zoom.
+     * Takes precedence over {@link lineDash}.
+     */
+    lineDashPx?: number[];
 }
 
 /**
