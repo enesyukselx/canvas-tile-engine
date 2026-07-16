@@ -15,11 +15,13 @@ import {
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveLineDashPx,
+    resolveCornerRadiusPx,
     resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
+import { roundedPolyline } from "../utils/corners";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
@@ -296,6 +298,7 @@ export class WebGLDraw {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
             const lineWidth = resolveLineWidthPx(style, this.camera.scale);
             const dash = resolveLineDashPx(style, this.camera.scale);
+            const cornerR = resolveCornerRadiusPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
             for (const points of list) {
@@ -311,14 +314,17 @@ export class WebGLDraw {
                 const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-                let prev = this.transformer.worldToScreen(points[0].x, points[0].y);
+                // Corner rounding flattens interior arcs into a denser
+                // polyline first, so the dash phase below flows through the
+                // corners exactly like the native-arc renderers.
+                const screenPts = points.map((p) => this.transformer.worldToScreen(p.x, p.y));
+                const pts = cornerR > 0 ? roundedPolyline(screenPts, cornerR) : screenPts;
+
                 // The dash phase carries across joints so the pattern flows
                 // continuously along the polyline, like a single ctx subpath.
                 let phase = 0;
-                for (let i = 1; i < points.length; i++) {
-                    const curr = this.transformer.worldToScreen(points[i].x, points[i].y);
-                    phase = this.pushSegment(lines, prev, curr, color, lineWidth, dash, phase);
-                    prev = curr;
+                for (let i = 1; i < pts.length; i++) {
+                    phase = this.pushSegment(lines, pts[i - 1], pts[i], color, lineWidth, dash, phase);
                 }
             }
 
