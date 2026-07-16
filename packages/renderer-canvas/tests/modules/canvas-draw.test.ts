@@ -235,6 +235,79 @@ describe("CanvasDraw custom draw transform", () => {
     });
 });
 
+// Fake 2D context recording arcTo/lineTo calls for corner-rounding tests.
+function makeArcRecordingCtx() {
+    const arcs: Array<{ x1: number; y1: number; x2: number; y2: number; r: number }> = [];
+    const lines: Array<{ x: number; y: number }> = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        setLineDash() {},
+        lineTo(x: number, y: number) {
+            lines.push({ x, y });
+        },
+        arcTo(x1: number, y1: number, x2: number, y2: number, r: number) {
+            arcs.push({ x1, y1, x2, y2, r });
+        },
+        stroke() {},
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, arcs, lines };
+}
+
+// Corner-rounding contract shared by all renderers: interior vertices round
+// via a tangent arc with a per-corner clamped radius (cornerRadius = world
+// units, cornerRadiusPx = screen px and wins); endpoints stay sharp.
+describe("CanvasDraw path corner rounding", () => {
+    // Right angle at world (1, 0): screen pts (5,5) → (15,5) → (15,15) at scale 10.
+    const path = [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+    ];
+
+    it("rounds interior corners through arcTo with the resolved px radius", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, arcs, lines } = makeArcRecordingCtx();
+
+        draw.drawPath(path, { strokeStyle: "#f00", cornerRadius: 0.2 }, 1); // world 0.2 → 2px
+        render(ctx);
+
+        expect(arcs).toEqual([{ x1: 15, y1: 5, x2: 15, y2: 15, r: 2 }]);
+        expect(lines).toEqual([{ x: 15, y: 15 }]); // final endpoint stays a lineTo
+    });
+
+    it("clamps the radius on short segments and prefers cornerRadiusPx", () => {
+        const { draw, render } = setup();
+        const { ctx, arcs } = makeArcRecordingCtx();
+
+        // Segments are 10px; a 100px request clamps to 5px at a right angle.
+        draw.drawPath(path, { strokeStyle: "#f00", cornerRadius: 9, cornerRadiusPx: 100 }, 1);
+        render(ctx);
+
+        expect(arcs).toHaveLength(1);
+        expect(arcs[0].r).toBeCloseTo(5);
+    });
+
+    it("draws straight joins when no corner radius is given", () => {
+        const { draw, render } = setup();
+        const { ctx, arcs, lines } = makeArcRecordingCtx();
+
+        draw.drawPath(path, { strokeStyle: "#f00" }, 1);
+        render(ctx);
+
+        expect(arcs).toEqual([]);
+        expect(lines).toEqual([
+            { x: 15, y: 5 },
+            { x: 15, y: 15 },
+        ]);
+    });
+});
+
 // Fake 2D context recording every rect(x, y, w, h) call.
 function makeRectRecordingCtx() {
     const rects: Array<{ x: number; y: number; w: number; h: number }> = [];

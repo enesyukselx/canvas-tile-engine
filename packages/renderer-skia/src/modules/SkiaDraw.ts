@@ -15,6 +15,8 @@ import {
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveLineDashPx,
+    resolveCornerRadiusPx,
+    cornerArc,
     resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
@@ -432,6 +434,8 @@ export class SkiaDraw {
                     Skia.PathEffect.MakeDash(dash, 0),
                 );
 
+            const cornerR = resolveCornerRadiusPx(style, this.camera.scale);
+
             for (const points of list) {
                 if (points.length < 2) continue;
                 const xs = points.map((p) => p.x);
@@ -455,18 +459,29 @@ export class SkiaDraw {
                     continue;
 
                 const path = Skia.Path.Make();
-                const first = this.transformer.worldToScreen(
-                    points[0].x,
-                    points[0].y,
+                const pts = points.map((p) =>
+                    this.transformer.worldToScreen(p.x, p.y),
                 );
-                path.moveTo(first.x, first.y);
-                for (let i = 1; i < points.length; i++) {
-                    const p = this.transformer.worldToScreen(
-                        points[i].x,
-                        points[i].y,
-                    );
-                    path.lineTo(p.x, p.y);
+                path.moveTo(pts[0].x, pts[0].y);
+                for (let i = 1; i < pts.length - 1; i++) {
+                    // Interior vertices round through a tangent arc when a
+                    // corner radius is active; degenerate corners fall back
+                    // to a straight join.
+                    const arc =
+                        cornerR > 0
+                            ? cornerArc(pts[i - 1], pts[i], pts[i + 1], cornerR)
+                            : null;
+                    if (arc)
+                        path.arcToTangent(
+                            pts[i].x,
+                            pts[i].y,
+                            pts[i + 1].x,
+                            pts[i + 1].y,
+                            arc.radius,
+                        );
+                    else path.lineTo(pts[i].x, pts[i].y);
                 }
+                path.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
                 canvas.drawPath(path, this.strokePaint);
             }
             if (dash) this.strokePaint.setPathEffect(null);

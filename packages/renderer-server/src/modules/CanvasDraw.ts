@@ -17,6 +17,8 @@ import {
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveLineDashPx,
+    resolveCornerRadiusPx,
+    cornerArc,
     resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
@@ -333,6 +335,7 @@ export class CanvasDraw implements IDrawAPI<Image> {
             const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
             const dash = resolveLineDashPx(style, this.camera.scale);
             if (dash) ctx.setLineDash(dash);
+            const cornerR = resolveCornerRadiusPx(style, this.camera.scale);
 
             ctx.beginPath();
             for (const points of list) {
@@ -348,13 +351,18 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-                const first = this.transformer.worldToScreen(points[0].x, points[0].y);
-                ctx.moveTo(first.x, first.y);
+                const pts = points.map((p) => this.transformer.worldToScreen(p.x, p.y));
+                ctx.moveTo(pts[0].x, pts[0].y);
 
-                for (let i = 1; i < points.length; i++) {
-                    const p = this.transformer.worldToScreen(points[i].x, points[i].y);
-                    ctx.lineTo(p.x, p.y);
+                for (let i = 1; i < pts.length - 1; i++) {
+                    // Interior vertices round through a tangent arc when a
+                    // corner radius is active; degenerate corners fall back
+                    // to a straight join.
+                    const arc = cornerR > 0 ? cornerArc(pts[i - 1], pts[i], pts[i + 1], cornerR) : null;
+                    if (arc) ctx.arcTo(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, arc.radius);
+                    else ctx.lineTo(pts[i].x, pts[i].y);
                 }
+                if (pts.length > 1) ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
             }
             ctx.stroke();
 
