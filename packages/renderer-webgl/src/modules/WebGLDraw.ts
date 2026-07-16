@@ -9,6 +9,7 @@ import {
     ImageItem,
     Line,
     Path,
+    Polygon,
     Rect,
     SpatialIndex,
     Text,
@@ -20,6 +21,7 @@ import {
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
+import earcut from "earcut";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
@@ -322,6 +324,64 @@ export class WebGLDraw {
                 }
             }
 
+            gl.drawLines(lines);
+        });
+    }
+
+    drawPolygon(items: Array<Polygon> | Polygon, layer: number = 1): DrawHandle {
+        const list = Array.isArray(items) ? items : [items];
+
+        // Triangulate once at registration: triangulation is pure topology
+        // and the world→screen transform is affine, so the indices are
+        // camera-independent; per frame only the vertices move.
+        const triangulated = list.map((item) => {
+            if (item.points.length < 3) return null;
+            const flat: number[] = [];
+            for (const p of item.points) flat.push(p.x, p.y);
+            const indices = earcut(flat);
+            return indices.length ? indices : null;
+        });
+
+        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+            const lines: LineInstance[] = [];
+            const fill: number[] = [];
+
+            for (let n = 0; n < list.length; n++) {
+                const item = list[n];
+                const points = item.points;
+                if (points.length < 3) continue;
+                const xs = points.map((p) => p.x);
+                const ys = points.map((p) => p.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+
+                const pts = points.map((p) => this.transformer.worldToScreen(p.x, p.y));
+                const style = item.style;
+
+                const indices = triangulated[n];
+                if (style?.fillStyle && indices) {
+                    const color = this.colorParser.parse(style.fillStyle);
+                    for (const idx of indices) {
+                        const p = pts[idx];
+                        fill.push(p.x, p.y, color[0], color[1], color[2], color[3]);
+                    }
+                }
+                if (style?.strokeStyle) {
+                    const color = this.colorParser.parse(style.strokeStyle);
+                    const width = resolveLineWidthPx(style, this.camera.scale);
+                    for (let i = 0; i < pts.length; i++) {
+                        this.pushLine(lines, pts[i], pts[(i + 1) % pts.length], color, width);
+                    }
+                }
+            }
+
+            gl.drawTriangles(new Float32Array(fill), fill.length / 6);
             gl.drawLines(lines);
         });
     }
