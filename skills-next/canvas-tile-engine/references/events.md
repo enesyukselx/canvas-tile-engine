@@ -2,6 +2,12 @@
 
 All interaction is opt-in via `config.eventHandlers` (every flag defaults to
 `false`) and can be changed at runtime with `engine.setEventHandlers()`.
+Disabled flags leave platform defaults intact: with `zoom` off the wheel
+scrolls the page, with `rightClick` off the context menu opens, and with
+`click`/`drag`/`zoom`/`hover` all off touch gestures scroll the page. On
+React Native the wrapper claims the gesture responder only while an
+interaction is enabled (or `onMouseDown`/`onMouseUp` is set), so parent
+scroll views keep working.
 
 ```ts
 eventHandlers: {

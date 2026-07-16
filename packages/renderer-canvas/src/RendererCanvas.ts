@@ -286,6 +286,9 @@ export class RendererCanvas implements IRenderer {
     };
 
     private handleContextMenu = (e: MouseEvent): void => {
+        // Claim the event only when right-click handling is opted into;
+        // otherwise the browser context menu must keep working.
+        if (!this.config.get().eventHandlers.rightClick) return;
         e.preventDefault();
         this.gestureProcessor.handleRightClick(this.normalizePointer(e));
     };
@@ -307,21 +310,44 @@ export class RendererCanvas implements IRenderer {
     };
 
     private handleWheel = (e: WheelEvent): void => {
+        // Without zoom opted in, the wheel must keep scrolling the page.
+        if (!this.config.get().eventHandlers.zoom) return;
         e.preventDefault();
         this.gestureProcessor.handleWheel(this.normalizePointer(e), e.deltaY);
     };
 
+    // Touch events are claimed only while some touch-driven interaction is
+    // enabled (checked per event: setEventHandlers can toggle at runtime).
+    // While claimed, preventDefault stays unconditional: it stops page
+    // scrolling mid-gesture and suppresses the synthetic mouse events that
+    // would double-fire click/mouse callbacks. When nothing is enabled the
+    // events are left alone so the page scrolls, and taps still reach the
+    // mouse callbacks via the browser's synthetic mouse events.
+    private touchInteractionsEnabled(): boolean {
+        const eventHandlers = this.config.get().eventHandlers;
+        return Boolean(eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover);
+    }
+
     private handleTouchStart = (e: TouchEvent): void => {
+        if (!this.touchInteractionsEnabled()) return;
         e.preventDefault();
         this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.touches));
     };
 
     private handleTouchMove = (e: TouchEvent): void => {
+        if (!this.touchInteractionsEnabled()) return;
         e.preventDefault();
         this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.touches));
     };
 
     private handleTouchEnd = (e: TouchEvent): void => {
+        if (!this.touchInteractionsEnabled()) {
+            // Handlers may have been disabled mid-gesture: reset the
+            // processor's drag/pinch state (no changed pointer → no
+            // callbacks) without claiming the event.
+            this.gestureProcessor.handleTouchEnd(this.normalizeTouches(e.touches));
+            return;
+        }
         e.preventDefault();
         const remaining = this.normalizeTouches(e.touches);
         const changed = e.changedTouches.length > 0 ? this.normalizePointer(e.changedTouches[0]) : undefined;

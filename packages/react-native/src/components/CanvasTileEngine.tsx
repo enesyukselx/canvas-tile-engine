@@ -371,13 +371,26 @@ function CanvasTileEngineBase({
     const onResponderRelease = useCallback((e: GestureResponderEvent) => endTouch(e, true), [endTouch]);
     const onResponderTerminate = useCallback((e: GestureResponderEvent) => endTouch(e, false), [endTouch]);
 
+    // Claim the responder only while some interaction is actually consumed —
+    // otherwise a parent ScrollView must keep receiving the touches. Checked
+    // per gesture because setEventHandlers can toggle handlers at runtime.
+    // onMouseDown/onMouseUp are not config-gated, and unlike the web there is
+    // no synthetic-mouse fallback, so their presence also claims the responder.
+    const shouldClaimResponder = useCallback(() => {
+        const instance = instanceRef.current;
+        if (!instance) return false;
+        const eventHandlers = instance.getConfig().eventHandlers;
+        if (eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover) return true;
+        return Boolean(callbacksRef.current.onMouseDown || callbacksRef.current.onMouseUp);
+    }, []);
+
     return (
         <EngineContext.Provider value={contextValue}>
             <View
                 style={[styles.fill, style]}
                 onLayout={handleLayout}
-                onStartShouldSetResponder={() => true}
-                onMoveShouldSetResponder={() => true}
+                onStartShouldSetResponder={shouldClaimResponder}
+                onMoveShouldSetResponder={shouldClaimResponder}
                 onResponderGrant={onResponderGrant}
                 onResponderStart={onResponderStart}
                 onResponderEnd={onResponderEnd}

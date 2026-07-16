@@ -101,6 +101,8 @@ You can update interaction flags at runtime:
 engine.setEventHandlers({ drag: false, hover: true });
 ```
 
+Disabled interactions leave the platform's default behavior intact: with `zoom` off the mouse wheel keeps scrolling the page, with `rightClick` off the browser context menu opens, and when `click`, `drag`, `zoom`, and `hover` are all off, touch gestures scroll the page instead of being captured by the canvas. On React Native the wrapper only claims the gesture responder while an interaction is enabled (or an `onMouseDown`/`onMouseUp` callback is set), so parent scroll views keep receiving touches.
+
 ## Bounds
 
 Bounds restrict camera movement.
