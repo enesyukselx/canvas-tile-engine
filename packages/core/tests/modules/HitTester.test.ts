@@ -327,7 +327,17 @@ describe("polygon hit testing", () => {
 
     it("ignores degenerate rings with fewer than 3 points", () => {
         const ht = new HitTester();
-        ht.register(handle(1), "polygon", { points: [{ x: 0, y: 0 }, { x: 5, y: 5 }] }, 1);
+        ht.register(
+            handle(1),
+            "polygon",
+            {
+                points: [
+                    { x: 0, y: 0 },
+                    { x: 5, y: 5 },
+                ],
+            },
+            1,
+        );
 
         expect(ht.hitTestFirst({ x: 2, y: 2 })).toBeUndefined();
     });

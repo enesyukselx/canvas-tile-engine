@@ -278,10 +278,7 @@ describe("CanvasDraw polygons", () => {
         const { draw, render } = setup(); // scale 10
         const { ctx, ops, moves } = makePolyRecordingCtx();
 
-        draw.drawPolygon(
-            { points: triangle, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineWidthPx: 2 } },
-            1,
-        );
+        draw.drawPolygon({ points: triangle, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineWidthPx: 2 } }, 1);
         render(ctx);
 
         expect(ops).toEqual(["begin", "close", "fill", "stroke"]);
@@ -306,7 +303,13 @@ describe("CanvasDraw polygons", () => {
         draw.drawPolygon(
             [
                 { points: triangle.map((p) => ({ x: p.x + 100, y: p.y })), style: { fillStyle: "#0f0" } },
-                { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], style: { fillStyle: "#0f0" } },
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 1, y: 1 },
+                    ],
+                    style: { fillStyle: "#0f0" },
+                },
             ],
             1,
         );

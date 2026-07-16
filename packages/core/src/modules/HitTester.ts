@@ -191,7 +191,10 @@ export class HitTester {
     }
 
     /** World-space box the item is drawn into, mirroring the renderers' math. */
-    private boxFor(item: Rect | Circle | ImageItem<unknown>, kind: HitKind): { left: number; top: number; w: number; h: number } {
+    private boxFor(
+        item: Rect | Circle | ImageItem<unknown>,
+        kind: HitKind,
+    ): { left: number; top: number; w: number; h: number } {
         const size = item.size ?? 1;
         // Only rects support per-axis dimensions; circle stays size (diameter)
         // and image keeps its aspect-fit size box below.
