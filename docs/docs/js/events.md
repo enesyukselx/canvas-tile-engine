@@ -81,7 +81,10 @@ For high-frequency hover work, prefer replacing one previous `DrawHandle` or cle
 
 ### `onMouseDown` And `onMouseUp`
 
-Useful for painting, selection, drag handles, and other tool modes.
+Useful for painting, selection, drag handles, and other tool modes. On
+browsers these fire for the **primary (left) button only** — right clicks go
+through `onRightClick`, and the middle button is left to the browser. Touch
+input also feeds them (touch start/end).
 
 ```ts
 let selecting = false;

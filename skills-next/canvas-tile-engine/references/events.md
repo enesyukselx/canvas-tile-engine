@@ -25,7 +25,9 @@ eventHandlers: {
 ## Pointer callback payload
 
 `onClick`, `onRightClick`, `onHover`, `onMouseDown`, `onMouseUp`,
-`onMouseLeave` all receive `(coords, mouse, client)`:
+`onMouseLeave` all receive `(coords, mouse, client)`.
+`onMouseDown`/`onMouseUp` fire for the primary (left) mouse button only
+(right → `onRightClick`, middle → browser) and for touch start/end:
 
 | Argument | Space       | `raw`                                     | `snapped`                                    |
 | :------- | :---------- | :---------------------------------------- | :------------------------------------------- |
