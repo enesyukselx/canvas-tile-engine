@@ -294,6 +294,10 @@ export class RendererCanvas implements IRenderer {
     };
 
     private handleMouseDown = (e: MouseEvent): void => {
+        // Primary button only: the right button belongs to the context-menu
+        // path (onRightClick) and the middle button to the browser
+        // (autoscroll) — neither should start a drag or fire onMouseDown.
+        if (e.button !== 0) return;
         this.gestureProcessor.handlePointerDown(this.normalizePointer(e));
     };
 
@@ -302,6 +306,9 @@ export class RendererCanvas implements IRenderer {
     };
 
     private handleMouseUp = (e: MouseEvent): void => {
+        // Primary button only, so releasing a secondary button mid-drag
+        // does not end the primary-button drag or fire onMouseUp.
+        if (e.button !== 0) return;
         this.gestureProcessor.handlePointerUp(this.normalizePointer(e));
     };
 
