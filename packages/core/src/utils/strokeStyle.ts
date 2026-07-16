@@ -17,6 +17,11 @@ export interface LineDashStyle {
     lineDashPx?: number[];
 }
 
+export interface CornerRadiusStyle {
+    cornerRadius?: number;
+    cornerRadiusPx?: number;
+}
+
 /**
  * Effective stroke width in screen pixels.
  * `lineWidthPx` wins; `lineWidth` is world units (multiplied by `scale`);
@@ -53,4 +58,14 @@ export function resolveLineDashPx(style: LineDashStyle | undefined, scale: numbe
 export function resolveRadiusPx(radius: number | number[] | undefined, scale: number): number | number[] | undefined {
     if (radius === undefined) return undefined;
     return Array.isArray(radius) ? radius.map((v) => v * scale) : radius * scale;
+}
+
+/**
+ * Effective Path corner-rounding radius in screen pixels; 0 disables
+ * rounding. `cornerRadiusPx` wins; `cornerRadius` is world units.
+ */
+export function resolveCornerRadiusPx(style: CornerRadiusStyle | undefined, scale: number): number {
+    if (style?.cornerRadiusPx !== undefined) return Math.max(0, style.cornerRadiusPx);
+    if (style?.cornerRadius !== undefined) return Math.max(0, style.cornerRadius * scale);
+    return 0;
 }

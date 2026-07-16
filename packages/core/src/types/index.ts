@@ -42,6 +42,18 @@ export interface LineStyle {
      * Takes precedence over {@link lineDash}.
      */
     lineDashPx?: number[];
+    /**
+     * Corner rounding radius for Path polylines, in world units (scales with
+     * zoom). Clamped per corner so short segments never overlap. Ignored when
+     * {@link cornerRadiusPx} is set; has no effect on Line items (single
+     * segments have no corners).
+     */
+    cornerRadius?: number;
+    /**
+     * Corner rounding radius in screen pixels, independent of zoom.
+     * Takes precedence over {@link cornerRadius}.
+     */
+    cornerRadiusPx?: number;
 }
 
 /**
