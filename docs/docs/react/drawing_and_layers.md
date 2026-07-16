@@ -226,6 +226,29 @@ Draw continuous lines through multiple points.
 />;
 ```
 
+### `<Polygon>`
+
+Filled/stroked closed shapes with per-item style, `data`, and hit testing.
+
+| Prop    | Type                     | Default      | Description          |
+| :------ | :----------------------- | :----------- | :------------------- |
+| `items` | `Polygon \| Polygon[]`  | **Required** | Polygon definitions. |
+| `layer` | `number`                 | `1`          | Rendering layer.     |
+
+```tsx
+<CanvasTileEngine.Polygon
+    items={{
+        points: [
+            { x: 0, y: 0 },
+            { x: 4, y: 1 },
+            { x: 2, y: 5 },
+        ],
+        style: { fillStyle: "rgba(14,165,233,0.3)", strokeStyle: "#0ea5e9", lineWidthPx: 2 },
+    }}
+    layer={1}
+/>
+```
+
 ### `<GridLines>`
 
 Draw grid lines at specified intervals.

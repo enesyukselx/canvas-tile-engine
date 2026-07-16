@@ -92,6 +92,23 @@ type LineStyle = {
 
 `Path` represents a polyline. Pass `Path[]` to draw multiple polylines in one call. `drawLine` and `drawPath` take a `LineStyle` as their second argument; dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around a `Path`'s corners.
 
+### `Polygon`
+
+```ts
+type Polygon<TData = unknown> = {
+    points: Coords[]; // world coordinates; the ring closes automatically
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        lineWidth?: number; // outline width in world units, scales with zoom
+        lineWidthPx?: number; // outline width in screen pixels, wins over lineWidth
+    };
+    data?: TData; // carried through hit testing
+};
+```
+
+A filled and/or stroked closed shape. Unlike `Line` and `Path`, polygons are first-class items: they carry per-item style and `data`, and participate in hit testing (`kind: "polygon"`). Concave rings fill correctly; self-intersecting rings have undefined fill behavior.
+
 ### `ImageItem<TImage>`
 
 ```ts

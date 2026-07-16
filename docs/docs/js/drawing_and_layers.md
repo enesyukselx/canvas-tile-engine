@@ -459,6 +459,31 @@ engine.onDraw = (ctx, coords, config, transform) => {
 };
 ```
 
+### `drawPolygon`
+
+Draw filled and/or stroked closed shapes: zones, lakes, territories, selection regions.
+
+```typescript
+drawPolygon(items: Polygon | Polygon[], layer?: number): DrawHandle
+```
+
+```typescript
+engine.drawPolygon(
+    {
+        points: [
+            { x: 0, y: 0 },
+            { x: 4, y: 1 },
+            { x: 2, y: 5 },
+        ],
+        style: { fillStyle: "rgba(14,165,233,0.3)", strokeStyle: "#0ea5e9", lineWidthPx: 2 },
+        data: { id: "zone-a" },
+    },
+    1,
+);
+```
+
+The ring closes automatically — do not repeat the first point. Unlike `drawLine`/`drawPath`, polygons are first-class items: per-item style, a `data` field, and **hit testing** — `hitTestFirst(coords.raw)` returns them with `kind: "polygon"`, so clickable regions need no invisible helper shapes. Concave rings fill correctly; self-intersecting rings have undefined fill behavior.
+
 ### Origin & Anchoring
 
 The `origin` property controls how shapes and images are positioned relative to their `x, y` coordinates.

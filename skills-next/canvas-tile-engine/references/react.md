@@ -131,6 +131,7 @@ array identity re-registers the callback and rebuilds the spatial index for
 | `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`                                                                                                  |
 | `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`                                                          |
 | `<CanvasTileEngine.Path>`         | `items: Path \| Path[]`, `style?: LineStyle`, `layer = 1`                                                          |
+| `<CanvasTileEngine.Polygon>`      | `items: Polygon \| Polygon[]`, `layer = 1` (hit-testable, carries `data`)                                                             |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
 | `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
 | `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |

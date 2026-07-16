@@ -207,6 +207,29 @@ lineDash? (world), lineDashPx? }. UNIT RULE (matches Text size/fontPx):
 plain numbers are world units and scale with zoom; *Px variants are screen
 pixels and take precedence. GridLines lineWidth stays px by design.
 
+### Polygon (filled closed shapes — zones, lakes, territories)
+
+```ts
+type Polygon<TData = unknown> = {
+    points: Coords[];   // world coords, same space as Path points; ring
+                        // closes automatically (don't repeat the first point)
+    style?: { fillStyle?; strokeStyle?; lineWidth? /* world */; lineWidthPx? };
+    data?: TData;       // carried through hit testing
+};
+
+engine.drawPolygon({
+    points: [{ x: 0, y: 0 }, { x: 4, y: 1 }, { x: 2, y: 5 }],
+    style: { fillStyle: "rgba(14,165,233,0.3)", strokeStyle: "#0ea5e9", lineWidthPx: 2 },
+    data: zone,
+}, 1);
+```
+
+Unlike Line/Path, polygons are first-class items: per-item style, `data`,
+and HIT-TESTABLE (`hitTestFirst(coords.raw)` returns them with
+kind "polygon") — use them for clickable regions instead of invisible
+helper rects. Concave rings fill correctly; self-intersecting rings are
+undefined. React/RN: `<CanvasTileEngine.Polygon items={zones} layer={1} />`.
+
 ### Grid lines
 
 ```ts

@@ -794,13 +794,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     // ─── Hit testing ───────────
 
     /**
-     * All rect/circle/image items under a world point, highest visual
+     * All rect/circle/image/polygon items under a world point, highest visual
      * priority first (higher layer, then later registration, then later
      * item within a draw call). Pass the `coords.raw` value from event
      * callbacks - origin anchoring, image aspect fit, and rotation are
      * handled internally.
      *
-     * Line, Path, and Text items are not hit-testable. Like rendering,
+     * Line, Path, and Text items are not hit-testable (use Polygon for
+     * clickable shapes). Like rendering,
      * results reflect item positions as of the draw call: mutating an
      * item's position requires re-registration (style mutation is fine).
      *
