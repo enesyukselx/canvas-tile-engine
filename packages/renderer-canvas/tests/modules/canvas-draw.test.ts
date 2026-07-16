@@ -235,6 +235,87 @@ describe("CanvasDraw custom draw transform", () => {
     });
 });
 
+// Polygon contract shared by all renderers: closed ring, per-item
+// fill/stroke, world/px outline width pair, bbox culling.
+describe("CanvasDraw polygons", () => {
+    function makePolyRecordingCtx() {
+        const ops: string[] = [];
+        const moves: Array<{ x: number; y: number }> = [];
+        const ctx = {
+            lineWidth: 1,
+            globalAlpha: 1,
+            fillStyle: "#000",
+            strokeStyle: "#000",
+            save() {},
+            restore() {},
+            beginPath() {
+                ops.push("begin");
+            },
+            moveTo(x: number, y: number) {
+                moves.push({ x, y });
+            },
+            lineTo() {},
+            closePath() {
+                ops.push("close");
+            },
+            fill() {
+                ops.push("fill");
+            },
+            stroke() {
+                ops.push("stroke");
+            },
+        };
+        return { ctx: ctx as unknown as CanvasRenderingContext2D, ops, moves };
+    }
+
+    const triangle = [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 2, y: 3 },
+    ];
+
+    it("closes the ring and fills/strokes per item style", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, ops, moves } = makePolyRecordingCtx();
+
+        draw.drawPolygon(
+            { points: triangle, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineWidthPx: 2 } },
+            1,
+        );
+        render(ctx);
+
+        expect(ops).toEqual(["begin", "close", "fill", "stroke"]);
+        // World (0,0) is the cell center: screen (5,5) at scale 10
+        expect(moves).toEqual([{ x: 5, y: 5 }]);
+    });
+
+    it("skips fill/stroke that the style does not request", () => {
+        const { draw, render } = setup();
+        const { ctx, ops } = makePolyRecordingCtx();
+
+        draw.drawPolygon({ points: triangle, style: { fillStyle: "#0f0" } }, 1);
+        render(ctx);
+
+        expect(ops).toEqual(["begin", "close", "fill"]);
+    });
+
+    it("culls polygons fully outside the viewport and ignores degenerate rings", () => {
+        const { draw, render } = setup(); // 10x10 world units visible (+1 buffer)
+        const { ctx, ops } = makePolyRecordingCtx();
+
+        draw.drawPolygon(
+            [
+                { points: triangle.map((p) => ({ x: p.x + 100, y: p.y })), style: { fillStyle: "#0f0" } },
+                { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], style: { fillStyle: "#0f0" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(ops).toEqual([]);
+    });
+});
+
 // Fake 2D context recording every rect(x, y, w, h) call.
 function makeRectRecordingCtx() {
     const rects: Array<{ x: number; y: number; w: number; h: number }> = [];

@@ -10,6 +10,7 @@ import {
     ImageItem,
     Line,
     Path,
+    Polygon,
     Rect,
     SpatialIndex,
     SpriteRect,
@@ -359,6 +360,43 @@ export class CanvasDraw implements IDrawAPI<Image> {
             ctx.stroke();
 
             resetAlpha?.();
+            ctx.restore();
+        });
+    }
+
+    drawPolygon(items: Array<Polygon> | Polygon, layer: number = 1): DrawHandle {
+        const list = Array.isArray(items) ? items : [items];
+
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            ctx.save();
+            for (const item of list) {
+                const points = item.points;
+                if (points.length < 3) continue;
+                const xs = points.map((p) => p.x);
+                const ys = points.map((p) => p.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+
+                const style = item.style;
+                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+                if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+
+                ctx.beginPath();
+                const first = this.transformer.worldToScreen(points[0].x, points[0].y);
+                ctx.moveTo(first.x, first.y);
+                for (let i = 1; i < points.length; i++) {
+                    const p = this.transformer.worldToScreen(points[i].x, points[i].y);
+                    ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+                this.fillStrokePath(ctx, style, this.camera.scale);
+            }
             ctx.restore();
         });
     }

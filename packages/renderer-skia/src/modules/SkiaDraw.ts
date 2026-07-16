@@ -9,6 +9,7 @@ import {
     ImageItem,
     Line,
     Path,
+    Polygon,
     Rect,
     SpatialIndex,
     Text,
@@ -470,6 +471,56 @@ export class SkiaDraw {
                 canvas.drawPath(path, this.strokePaint);
             }
             if (dash) this.strokePaint.setPathEffect(null);
+        });
+    }
+
+    drawPolygon(items: Array<Polygon> | Polygon, layer: number = 1): DrawHandle {
+        const list = Array.isArray(items) ? items : [items];
+
+        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+            for (const item of list) {
+                const points = item.points;
+                if (points.length < 3) continue;
+                const xs = points.map((p) => p.x);
+                const ys = points.map((p) => p.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config))
+                    continue;
+
+                const path = Skia.Path.Make();
+                const first = this.transformer.worldToScreen(
+                    points[0].x,
+                    points[0].y,
+                );
+                path.moveTo(first.x, first.y);
+                for (let i = 1; i < points.length; i++) {
+                    const p = this.transformer.worldToScreen(
+                        points[i].x,
+                        points[i].y,
+                    );
+                    path.lineTo(p.x, p.y);
+                }
+                path.close();
+
+                const style = item.style;
+                if (style?.fillStyle) {
+                    this.fillPaint.setColor(this.color(style.fillStyle));
+                    canvas.drawPath(path, this.fillPaint);
+                }
+                if (style?.strokeStyle) {
+                    this.strokePaint.setColor(this.color(style.strokeStyle));
+                    this.strokePaint.setStrokeWidth(
+                        resolveLineWidthPx(style, this.camera.scale),
+                    );
+                    canvas.drawPath(path, this.strokePaint);
+                }
+            }
         });
     }
 
