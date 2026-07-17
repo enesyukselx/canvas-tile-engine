@@ -135,7 +135,7 @@ import { Skia } from "@canvas-tile-engine/react-native";
 - The React Native wrapper owns layout, touch handling (via react-native-gesture-handler), tap detection, and presentation.
 
 :::info Maps inside a ScrollView
-Because touch input participates in native gesture arbitration (react-native-gesture-handler), an interactive map inside a `ScrollView` works: while interactions are enabled the map claims the touch stream and the page does not scroll under it; with interactions off (no `eventHandlers`) the gesture yields and the page scrolls naturally over the map.
+Because touch input participates in native gesture arbitration (react-native-gesture-handler), an interactive map inside a `ScrollView` works: while interactions are enabled the map claims the touch stream and the page does not scroll under it; with interactions off (no `eventHandlers`) the gesture yields and the page scrolls naturally over the map. For reliable arbitration, import the `ScrollView` from `react-native-gesture-handler` (not from `react-native`) when embedding a map in it.
 :::
 
 ## Web vs Native

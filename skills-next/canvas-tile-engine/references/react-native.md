@@ -153,4 +153,5 @@ Sprite mechanics are identical across platforms: [sprites.md](sprites.md).
   runs through react-native-gesture-handler's native arbitration, so an
   interactive map claims the touch stream (page does not scroll under it)
   and a non-interactive one (no `eventHandlers`) yields so the page scrolls
-  over it.
+  over it. Import the `ScrollView` from react-native-gesture-handler (not
+  react-native) when embedding a map in one.
