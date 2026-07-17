@@ -33,7 +33,7 @@ Access camera methods through the engine handle when `engine.isReady` is `true`.
 
 ### Moving the Camera
 
-#### `goCoords(x, y, duration?)`
+#### `goCenter(x, y, duration?)`
 
 Smoothly animates the camera to a new position.
 
@@ -43,13 +43,13 @@ function MapWithNavigation() {
 
     const goToBase = () => {
         if (engine.isReady) {
-            engine.goCoords(0, 0, 1000); // Pan to origin over 1 second
+            engine.goCenter(0, 0, 1000); // Pan to origin over 1 second
         }
     };
 
     const goToMarker = () => {
         if (engine.isReady) {
-            engine.goCoords(50, 50, 500); // Pan to (50, 50) over 500ms
+            engine.goCenter(50, 50, 500); // Pan to (50, 50) over 500ms
         }
     };
 
@@ -66,30 +66,34 @@ function MapWithNavigation() {
 }
 ```
 
-#### `updateCoords(center)`
+#### `setCenter(center)`
 
 Instantly jumps to a position without animation.
 
 ```tsx
 const jumpToPosition = (x: number, y: number) => {
     if (engine.isReady) {
-        engine.updateCoords({ x, y });
+        engine.setCenter({ x, y });
     }
 };
 ```
 
-#### `getCenterCoords()`
+#### `getCenter()`
 
 Returns the current center coordinates of the view.
 
 ```tsx
 const logPosition = () => {
     if (engine.isReady) {
-        const center = engine.getCenterCoords();
+        const center = engine.getCenter();
         console.log("Current position:", center); // { x: 5.5, y: 10.2 }
     }
 };
 ```
+
+:::note Renamed APIs
+`goCenter`, `setCenter`, and `getCenter` were previously named `goCoords`, `updateCoords`, and `getCenterCoords`. The old names still work as deprecated aliases and will be removed in a future major version.
+:::
 
 #### `getVisibleBounds()`
 
@@ -205,7 +209,7 @@ const setZoom = (scale: number) => {
 
 ### `goScale(scale, duration?, onComplete?)`
 
-Smoothly animates the zoom level to a target value, like `goCoords` does for position. The zoom is anchored at the viewport center (matching `zoomIn`/`zoomOut`), and the target is clamped to `minScale` and `maxScale` bounds.
+Smoothly animates the zoom level to a target value, like `goCenter` does for position. The zoom is anchored at the viewport center (matching `zoomIn`/`zoomOut`), and the target is clamped to `minScale` and `maxScale` bounds.
 
 | Parameter    | Type       | Default      | Description                                    |
 | :----------- | :--------- | :----------- | :--------------------------------------------- |
@@ -218,8 +222,8 @@ const zoomToDetail = () => {
     // Smoothly zoom to 100 pixels per grid unit over 1 second
     engine.goScale(100, 1000);
 
-    // Combine with goCoords for a fly-to effect
-    engine.goCoords(15, 20, 1000);
+    // Combine with goCenter for a fly-to effect
+    engine.goCenter(15, 20, 1000);
 };
 ```
 

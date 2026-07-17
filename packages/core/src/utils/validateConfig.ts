@@ -149,7 +149,7 @@ export function validateBounds(bounds: { minX: number; maxX: number; minY: numbe
 }
 
 /**
- * Validates coordinates for goCoords method.
+ * Validates coordinates for goCenter method.
  * @param x X coordinate.
  * @param y Y coordinate.
  * @throws {ConfigValidationError} If coordinates are invalid.

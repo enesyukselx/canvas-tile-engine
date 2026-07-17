@@ -74,7 +74,7 @@ engine.render();                                   // explicit render required h
 const png = renderer.toBuffer("png");              // sync encode
 const jpeg = await renderer.encode("jpeg", 80);    // async encode (prefer in request handlers)
 
-engine.updateCoords({ x: 50, y: 50 });             // camera moves re-render automatically
+engine.setCenter({ x: 50, y: 50 });             // camera moves re-render automatically
 const secondView = await renderer.encode("png");
 
 engine.destroy();

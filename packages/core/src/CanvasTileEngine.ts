@@ -474,10 +474,21 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         };
     }
 
-    /** Center coordinates of the map. */
-    getCenterCoords(): Coords {
+    /**
+     * Current center of the view in world coordinates.
+     * @returns Center coordinates `{ x, y }`.
+     */
+    getCenter(): Coords {
         const size = this.viewport.getSize();
         return this.camera.getCenter(size.width, size.height);
+    }
+
+    /**
+     * Current center of the view in world coordinates.
+     * @deprecated Use {@link getCenter} instead.
+     */
+    getCenterCoords(): Coords {
+        return this.getCenter();
     }
 
     /**
@@ -499,11 +510,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
-     * Set center coordinates from outside (adjusts the camera accordingly).
+     * Move the view center to new world coordinates instantly.
      * @param newCenter The new center coordinates.
      * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
-    updateCoords(newCenter: Coords) {
+    setCenter(newCenter: Coords) {
         validateCoords(newCenter.x, newCenter.y);
         const size = this.viewport.getSize();
         this.camera.setCenter(newCenter, size.width, size.height);
@@ -511,16 +522,32 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
-     * Smoothly move the camera center to target coordinates over the given duration.
+     * Move the view center to new world coordinates instantly.
+     * @deprecated Use {@link setCenter} instead.
+     */
+    updateCoords(newCenter: Coords) {
+        this.setCenter(newCenter);
+    }
+
+    /**
+     * Smoothly animate the view center to target world coordinates over the given duration.
      * @param x Target world x.
      * @param y Target world y.
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
      * @param onComplete Optional callback fired when animation completes.
      * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
-    goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
+    goCenter(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
         validateCoords(x, y);
         this.animationController.animateMoveTo(x, y, durationMs, onComplete);
+    }
+
+    /**
+     * Smoothly animate the view center to target world coordinates.
+     * @deprecated Use {@link goCenter} instead.
+     */
+    goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
+        this.goCenter(x, y, durationMs, onComplete);
     }
 
     /**
@@ -881,7 +908,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     private handleCameraChange() {
         if (this.onCoordsChange) {
-            this.onCoordsChange(this.getCenterCoords());
+            this.onCoordsChange(this.getCenter());
         }
         this.render();
     }

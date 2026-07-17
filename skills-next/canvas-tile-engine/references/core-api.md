@@ -114,16 +114,16 @@ after mount.
 
 | Signature | Notes |
 | :-- | :-- |
-| `render(): void` | Paint one frame. Needed after initial draw registration and after data mutation. Camera changes (drag/zoom/goCoords/...) render automatically. |
+| `render(): void` | Paint one frame. Needed after initial draw registration and after data mutation. Camera changes (drag/zoom/goCenter/...) render automatically. |
 | `destroy(): void` | Cancel animations, remove listeners/observers. Call on teardown (React does this on unmount). |
 
 ### Camera and viewport
 
 | Signature | Notes |
 | :-- | :-- |
-| `getCenterCoords(): Coords` | Current world center. |
-| `updateCoords(center: Coords): void` | Jump to a new center instantly. Throws on non-finite values. |
-| `goCoords(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
+| `getCenter(): Coords` | Current world center. |
+| `setCenter(center: Coords): void` | Jump to a new center instantly. Throws on non-finite values. |
+| `goCenter(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
 | `getScale(): number` | Current scale (px per world unit). |
 | `setScale(n): void` | Set scale directly, clamped to min/max. |
 | `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
@@ -289,6 +289,6 @@ renderer authors; app code normally only needs `CanvasTileEngine`,
 ## Validation errors
 
 `scale` must be a positive finite number and coordinates finite numbers;
-`setScale`, `goScale`, `updateCoords`, and `goCoords` throw
+`setScale`, `goScale`, `setCenter`, and `goCenter` throw
 `ConfigValidationError` otherwise. Config normalization fills every optional field with the defaults
 listed above.
