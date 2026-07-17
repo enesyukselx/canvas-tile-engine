@@ -5,11 +5,13 @@ import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
 import { HitTester, HitResult, HitTestOptions } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
-import { validateCoords, validateScale } from "./utils/validateConfig";
+import { validateCoords, validateFitBounds, validateScale } from "./utils/validateConfig";
 import { snapCenterToGrid } from "./utils/viewport";
 import {
+    Bounds,
     Coords,
     CanvasTileEngineConfig,
+    FitBoundsOptions,
     onClickCallback,
     onRightClickCallback,
     onDrawCallback,
@@ -548,6 +550,63 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
         this.goCenter(x, y, durationMs, onComplete);
+    }
+
+    /**
+     * Fit a world-space rectangle into the viewport: centers the view on the
+     * rectangle and picks the largest scale that keeps the whole (padded)
+     * area visible, clamped to the scale limits. Animated by default; not
+     * related to setBounds, which restricts camera movement.
+     * @param bounds Rectangle to fit. Every edge must be finite.
+     * @param options `padding` in world units (default 0), `durationMs`
+     * (default 500, 0 = instant), and `onComplete`.
+     * @throws {ConfigValidationError} If an edge is not finite, min >= max on
+     * an axis, or padding is negative.
+     * @example
+     * ```ts
+     * // Show the whole board with one cell of margin
+     * engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+     *
+     * // Jump to a selection instantly
+     * engine.fitBounds(selectionBounds, { durationMs: 0 });
+     * ```
+     */
+    fitBounds(bounds: Bounds, options: FitBoundsOptions = {}) {
+        const { padding = 0, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
+        validateFitBounds(bounds, padding);
+
+        const size = this.viewport.getSize();
+        const fitWidth = bounds.maxX - bounds.minX + padding * 2;
+        const fitHeight = bounds.maxY - bounds.minY + padding * 2;
+        const rawScale = Math.min(size.width / fitWidth, size.height / fitHeight);
+        const targetScale = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, rawScale));
+        const center = {
+            x: (bounds.minX + bounds.maxX) / 2,
+            y: (bounds.minY + bounds.maxY) / 2,
+        };
+
+        if (durationMs <= 0) {
+            const prevScale = this.camera.scale;
+            this.camera.setScale(targetScale);
+            // Center after the scale change so the final center is exact
+            // regardless of how the scale change shifted the view.
+            this.camera.setCenter(center, size.width, size.height);
+            this.notifyZoomIfChanged(prevScale);
+            this.handleCameraChange();
+            onComplete?.();
+            return;
+        }
+
+        // Concurrent move and zoom animations cooperate: the zoom step
+        // re-reads the (moving) center every frame. onComplete rides on the
+        // zoom animation; both share the same duration.
+        this.animationController.animateMoveTo(center.x, center.y, durationMs);
+        this.animationController.animateZoomTo(
+            targetScale,
+            durationMs,
+            (prevScale) => this.notifyZoomIfChanged(prevScale),
+            onComplete,
+        );
     }
 
     /**

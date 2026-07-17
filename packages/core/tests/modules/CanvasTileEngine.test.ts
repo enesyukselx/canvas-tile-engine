@@ -173,6 +173,66 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    describe("fitBounds", () => {
+        // Wide limits so the fit math is observable without clamping.
+        const wideLimits: CanvasTileEngineConfig = { ...baseConfig, minScale: 0.01, maxScale: 1000 };
+
+        it("centers on the bounds and picks the scale that fits the tighter axis", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { durationMs: 0 });
+            // min(800 / 100, 600 / 50) = 8
+            expect(e.getScale()).toBe(8);
+            expect(e.getCenter().x).toBeCloseTo(50);
+            expect(e.getCenter().y).toBeCloseTo(25);
+        });
+
+        it("applies padding on every side", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { padding: 10, durationMs: 0 });
+            // min(800 / 120, 600 / 70)
+            expect(e.getScale()).toBeCloseTo(800 / 120);
+        });
+
+        it("clamps the scale to the limits", () => {
+            engine.fitBounds({ minX: 0, maxX: 1, minY: 0, maxY: 1 }, { durationMs: 0 });
+            expect(engine.getScale()).toBe(2); // maxScale
+            engine.fitBounds({ minX: -10000, maxX: 10000, minY: -10000, maxY: 10000 }, { durationMs: 0 });
+            expect(engine.getScale()).toBe(0.5); // minScale
+        });
+
+        it("respects limits updated via setScaleLimits", () => {
+            engine.setScaleLimits(0.5, 4);
+            engine.fitBounds({ minX: 0, maxX: 1, minY: 0, maxY: 1 }, { durationMs: 0 });
+            expect(engine.getScale()).toBe(4);
+        });
+
+        it("fires onZoom and onCoordsChange", () => {
+            engine.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { durationMs: 0 });
+            expect(onZoom).toHaveBeenCalledWith(2); // clamped to maxScale
+            expect(onCoordsChange).toHaveBeenCalled();
+        });
+
+        // Node has no requestAnimationFrame, so the animated path (default
+        // 500ms) completes instantly here.
+        it("animated fit reaches the target and calls onComplete", () => {
+            const onComplete = vi.fn();
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { onComplete });
+            expect(e.getScale()).toBe(8);
+            expect(e.getCenter().x).toBeCloseTo(50);
+            expect(e.getCenter().y).toBeCloseTo(25);
+            expect(onComplete).toHaveBeenCalled();
+        });
+
+        it("rejects invalid bounds and padding", () => {
+            expect(() => engine.fitBounds({ minX: 10, maxX: 0, minY: 0, maxY: 10 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 0, minY: 0, maxY: 10 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: Infinity, minY: 0, maxY: 10 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: NaN })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { padding: -1 })).toThrow();
+        });
+    });
+
     describe("setBounds", () => {
         it("fires onCoordsChange since bounds can clamp the camera", () => {
             // Engine starts centered at (0, 0); these bounds force a clamp.
