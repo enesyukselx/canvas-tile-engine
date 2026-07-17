@@ -11,6 +11,7 @@ import type {
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    onWheelCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -34,6 +35,7 @@ export type {
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    onWheelCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -144,4 +146,11 @@ export interface CanvasTileEngineProps {
      * @param scale - The new scale value
      */
     onZoom?: onZoomCallback;
+
+    /**
+     * Callback for pinch zoom gestures (the touch counterpart of the web
+     * wheel event). Requires `eventHandlers.zoom`. Reports the input gesture
+     * with its position; the coordinates describe the pinch midpoint.
+     */
+    onWheel?: onWheelCallback;
 }
