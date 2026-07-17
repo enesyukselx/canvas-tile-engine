@@ -70,6 +70,30 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    describe("setScale anchoring", () => {
+        it("keeps the viewport center fixed, matching goScale", () => {
+            engine.setCenter({ x: 12, y: 34 });
+            engine.setScale(2);
+            const after = engine.getCenter();
+            expect(after.x).toBeCloseTo(12);
+            expect(after.y).toBeCloseTo(34);
+        });
+
+        it("produces the same view as goScale with zero duration", () => {
+            engine.setCenter({ x: 5, y: 7 });
+            engine.setScale(1.5);
+            const viaSet = { center: engine.getCenter(), scale: engine.getScale() };
+
+            const other = createEngine();
+            other.setCenter({ x: 5, y: 7 });
+            other.goScale(1.5, 0);
+
+            expect(other.getScale()).toBe(viaSet.scale);
+            expect(other.getCenter().x).toBeCloseTo(viaSet.center.x);
+            expect(other.getCenter().y).toBeCloseTo(viaSet.center.y);
+        });
+    });
+
     // Node has no requestAnimationFrame, so goScale completes instantly here;
     // frame-by-frame interpolation is covered by the AnimationController tests.
     describe("goScale", () => {
