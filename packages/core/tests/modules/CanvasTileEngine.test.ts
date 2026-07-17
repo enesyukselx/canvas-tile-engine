@@ -109,6 +109,36 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    describe("center API (getCenter / setCenter / goCenter)", () => {
+        it("setCenter moves the view center instantly and fires onCoordsChange", () => {
+            engine.setCenter({ x: 25, y: 40 });
+            expect(engine.getCenter()).toEqual({ x: 25, y: 40 });
+            expect(onCoordsChange).toHaveBeenCalledWith({ x: 25, y: 40 });
+        });
+
+        // Node has no requestAnimationFrame, so goCenter completes instantly.
+        it("goCenter animates to the target center", () => {
+            const onComplete = vi.fn();
+            engine.goCenter(10, 20, 0, onComplete);
+            expect(engine.getCenter()).toEqual({ x: 10, y: 20 });
+            expect(onComplete).toHaveBeenCalled();
+        });
+
+        it("setCenter and goCenter reject non-finite coordinates", () => {
+            expect(() => engine.setCenter({ x: NaN, y: 0 })).toThrow();
+            expect(() => engine.goCenter(0, Infinity)).toThrow();
+        });
+
+        it("deprecated aliases delegate to the new methods", () => {
+            engine.updateCoords({ x: 5, y: 6 });
+            expect(engine.getCenterCoords()).toEqual({ x: 5, y: 6 });
+            expect(engine.getCenterCoords()).toEqual(engine.getCenter());
+
+            engine.goCoords(7, 8, 0);
+            expect(engine.getCenter()).toEqual({ x: 7, y: 8 });
+        });
+    });
+
     describe("setBounds", () => {
         it("fires onCoordsChange since bounds can clamp the camera", () => {
             // Engine starts centered at (0, 0); these bounds force a clamp.
