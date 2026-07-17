@@ -52,6 +52,8 @@ export interface EngineHandle {
     readonly instance: SkiaEngine | null;
 
     render(): void;
+    getCenter(): Coords;
+    /** @deprecated Use {@link getCenter} instead. */
     getCenterCoords(): Coords;
     getVisibleBounds(): {
         minX: number;
@@ -59,7 +61,11 @@ export interface EngineHandle {
         minY: number;
         maxY: number;
     };
+    setCenter(center: Coords): void;
+    /** @deprecated Use {@link setCenter} instead. */
     updateCoords(center: Coords): void;
+    goCenter(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
+    /** @deprecated Use {@link goCenter} instead. */
     goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
     getSize(): { width: number; height: number };
     getScale(): number;
@@ -156,8 +162,11 @@ export function useCanvasTileEngine(): EngineHandle {
             render() {
                 instanceRef.current?.render();
             },
+            getCenter() {
+                return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
+            },
             getCenterCoords() {
-                return instanceRef.current?.getCenterCoords() ?? { x: 0, y: 0 };
+                return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
             },
             getVisibleBounds() {
                 return (
@@ -169,11 +178,17 @@ export function useCanvasTileEngine(): EngineHandle {
                     }
                 );
             },
+            setCenter(center) {
+                instanceRef.current?.setCenter(center);
+            },
             updateCoords(center) {
-                instanceRef.current?.updateCoords(center);
+                instanceRef.current?.setCenter(center);
+            },
+            goCenter(x, y, durationMs, onComplete) {
+                instanceRef.current?.goCenter(x, y, durationMs, onComplete);
             },
             goCoords(x, y, durationMs, onComplete) {
-                instanceRef.current?.goCoords(x, y, durationMs, onComplete);
+                instanceRef.current?.goCenter(x, y, durationMs, onComplete);
             },
             getSize() {
                 return instanceRef.current?.getSize() ?? { width: 0, height: 0 };
