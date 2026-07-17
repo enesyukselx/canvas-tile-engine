@@ -4,6 +4,7 @@ import type {
     CanvasTileEngineConfig,
     Coords,
     EventHandlers,
+    FitBoundsOptions,
     DrawHandle,
     HitResult,
     HitTestOptions,
@@ -166,6 +167,9 @@ export interface EngineHandle {
 
     /** Set map boundaries */
     setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void;
+
+    /** Fit a world rectangle into the viewport (centers and rescales, clamped to scale limits) */
+    fitBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }, options?: FitBoundsOptions): void;
 
     /** Dynamically update event handlers at runtime */
     setEventHandlers(handlers: Partial<EventHandlers>): void;
@@ -390,6 +394,10 @@ export function useCanvasTileEngine(): EngineHandle {
 
             setBounds(bounds) {
                 instanceRef.current?.setBounds(bounds);
+            },
+
+            fitBounds(bounds, options) {
+                instanceRef.current?.fitBounds(bounds, options);
             },
 
             setEventHandlers(handlers) {
