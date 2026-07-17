@@ -160,6 +160,26 @@ engine.goCoords(15, 20, 1000);
 engine.goScale(50, 1000);
 ```
 
+#### `setScaleLimits(minScale, maxScale)`
+
+Updates the `minScale` and `maxScale` limits at runtime. All zooming (gestures, `setScale`, `goScale`, `zoomIn`, `zoomOut`) clamps to the new range, and the current scale is clamped into it immediately (firing `onZoom` if it changes).
+
+| Parameter  | Type     | Description                                 |
+| :--------- | :------- | :------------------------------------------ |
+| `minScale` | `number` | New minimum zoom level. Must be positive.   |
+| `maxScale` | `number` | New maximum zoom level. Must be >= minScale. |
+
+```typescript
+// Allow zooming between 10 and 200 pixels per grid unit
+engine.setScaleLimits(10, 200);
+
+// Lock the zoom at the current scale
+const scale = engine.getScale();
+engine.setScaleLimits(scale, scale);
+```
+
+Throws a `ConfigValidationError` if either limit is not a positive finite number or `minScale` is greater than `maxScale`.
+
 ## Viewport & Resizing
 
 The viewport is the visible area of the canvas. The engine can handle resizing automatically or manually.

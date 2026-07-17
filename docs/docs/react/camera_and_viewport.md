@@ -223,6 +223,22 @@ const zoomToDetail = () => {
 };
 ```
 
+### `setScaleLimits(minScale, maxScale)`
+
+Updates the `minScale` and `maxScale` limits at runtime. All zooming (gestures, `setScale`, `goScale`, `zoomIn`, `zoomOut`) clamps to the new range, and the current scale is clamped into it immediately (firing `onZoom` if it changes).
+
+| Parameter  | Type     | Description                                 |
+| :--------- | :------- | :------------------------------------------ |
+| `minScale` | `number` | New minimum zoom level. Must be positive.   |
+| `maxScale` | `number` | New maximum zoom level. Must be >= minScale. |
+
+```tsx
+const allowDeepZoom = () => {
+    // Allow zooming between 10 and 200 pixels per grid unit
+    engine.setScaleLimits(10, 200);
+};
+```
+
 ### Example: Zoom Controls
 
 ```tsx

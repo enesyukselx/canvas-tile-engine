@@ -73,6 +73,7 @@ engine.updateCoords({ x: 10, y: 10 });
 engine.goCoords(0, 0, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
+engine.setScaleLimits(16, 256);
 ```
 
 Remount with a new `key` when you need to apply a new full config or renderer.
