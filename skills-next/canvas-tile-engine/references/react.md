@@ -36,6 +36,7 @@ function Map() {
             onMouseLeave={(coords, mouse, client) => {}}
             onCoordsChange={(center) => {}}
             onZoom={(scale) => {}}
+            onWheel={(coords, mouse, client, wheel) => {}}
             onResize={() => {}}
             onDraw={(ctx, coords, config, transform) => {}}
         >
