@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { Asset } from "expo-asset";
 import {
@@ -142,7 +143,9 @@ export default function App() {
     const isMini = scale < MINI_MAP_SCALE_THRESHOLD;
 
     return (
-        <View style={styles.root}>
+        // Touch input runs through react-native-gesture-handler; the app root
+        // must be wrapped in GestureHandlerRootView.
+        <GestureHandlerRootView style={styles.root}>
             <StatusBar style="light" />
             <CanvasTileEngine
                 engine={map}
@@ -203,7 +206,7 @@ export default function App() {
                 visible={modalVisible}
                 onClose={() => setModalVisible(false)}
             />
-        </View>
+        </GestureHandlerRootView>
     );
 }
 
