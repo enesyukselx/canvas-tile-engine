@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PixelRatio, StyleSheet, View, type LayoutChangeEvent } from "react-native";
-import {
-    Gesture,
-    GestureDetector,
-    type GestureStateManager,
-    type GestureTouchEvent,
-    type TouchData,
-} from "react-native-gesture-handler";
+import { Gesture, GestureDetector, type GestureTouchEvent, type TouchData } from "react-native-gesture-handler";
 import {
     Canvas,
     createPicture,
@@ -271,19 +265,32 @@ function CanvasTileEngineBase({
 
     // ─── Touch → renderer gesture forwarding (react-native-gesture-handler) ───
     //
-    // A Manual RNGH gesture is used purely as a touch transport: raw touches
-    // feed the renderer's existing dispatchTouch* API and the core
-    // GestureProcessor stays untouched. Unlike the old responder system, RNGH
-    // participates in the NATIVE gesture arbitration, so activating this
-    // gesture genuinely cancels a parent ScrollView's pan on Fabric — maps
-    // inside scrollable screens work. When no interaction would consume the
-    // touch, the gesture fails immediately and scrolling proceeds.
+    // Two composed RNGH gestures, deliberately avoiding the GestureStateManager:
+    // with Reanimated installed, manager.activate()/fail() (setGestureState)
+    // only works from UI-thread worklets and silently no-ops from runOnJS
+    // callbacks — a library cannot ship reliably workletized code. Instead:
+    //
+    // - A Manual gesture is a pure touch TRANSPORT: raw touches feed the
+    //   renderer's existing dispatchTouch* API on the JS thread. It never
+    //   changes gesture state; whether a gesture's touches are forwarded at
+    //   all is decided in JS on the first touch (claimRef).
+    // - A callback-less Pan "blocker" activates NATIVELY after a tiny
+    //   movement, which is what actually cancels an enclosing ScrollView's
+    //   pan (native arbitration needs a native activation, not JS state
+    //   calls). It runs simultaneous with the transport and is disabled
+    //   whenever no interaction would consume the touches, so scrollable
+    //   parents keep working over non-interactive maps.
 
     // Number of touches last forwarded to the engine, tracked to re-dispatch
     // touchStart/touchEnd whenever the finger count changes, mirroring DOM
     // touchstart/touchend semantics that GestureProcessor's pinch handling
     // expects.
     const touchCountRef = useRef(0);
+
+    // Whether the current gesture's touches are forwarded to the engine.
+    // Decided once per gesture on the first touch, like the old responder
+    // claim check.
+    const claimRef = useRef(false);
 
     // True once the current gesture has ever had more than one finger down.
     // Kept separately from tapRef because iOS can drop individual touch-start
@@ -300,11 +307,11 @@ function CanvasTileEngineBase({
         tapRef.current = null;
     }, []);
 
-    // Claim the gesture only while some interaction is actually consumed —
-    // otherwise a parent ScrollView must keep receiving the touches. Checked
+    // Consume touches only while some interaction actually uses them —
+    // otherwise a parent ScrollView must keep receiving the gesture. Checked
     // per gesture because setEventHandlers can toggle handlers at runtime.
     // onMouseDown/onMouseUp are not config-gated, and unlike the web there is
-    // no synthetic-mouse fallback, so their presence also claims the gesture.
+    // no synthetic-mouse fallback, so their presence also claims the touches.
     const shouldClaimGesture = useCallback(() => {
         const instance = instanceRef.current;
         if (!instance) return false;
@@ -314,25 +321,19 @@ function CanvasTileEngineBase({
     }, []);
 
     const onTouchesDown = useCallback(
-        (e: GestureTouchEvent, manager: GestureStateManager) => {
+        (e: GestureTouchEvent) => {
             const pointers = e.allTouches.map(toPointer);
 
             if (touchCountRef.current === 0) {
-                // First finger: decide the gesture's fate up front. Failing
-                // hands the touch stream to enclosing gestures (ScrollView);
-                // activating cancels them and claims the stream natively.
-                if (!shouldClaimGesture()) {
-                    manager.fail();
-                    return;
-                }
-                manager.begin();
-                manager.activate();
+                claimRef.current = shouldClaimGesture();
+                if (!claimRef.current) return;
                 multiTouchRef.current = false;
                 tapRef.current =
                     pointers.length === 1
                         ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false }
                         : null;
             }
+            if (!claimRef.current) return;
 
             if (pointers.length > 1) markMultiTouch();
             if (pointers.length === touchCountRef.current) return;
@@ -346,6 +347,7 @@ function CanvasTileEngineBase({
 
     const onTouchesMove = useCallback(
         (e: GestureTouchEvent) => {
+            if (!claimRef.current) return;
             const pointers = e.allTouches.map(toPointer);
             if (pointers.length > 1) markMultiTouch();
 
@@ -374,12 +376,13 @@ function CanvasTileEngineBase({
 
     const endTouch = useCallback(
         (e: GestureTouchEvent, allowTap: boolean) => {
+            if (!claimRef.current) return;
             const remaining = remainingPointers(e);
             const changed = e.changedTouches.length > 0 ? toPointer(e.changedTouches[0]) : undefined;
 
             if (remaining.length > 0) {
                 // A finger lifted while others remain: proves multi-touch, and
-                // the engine leaves/rebases pinch mode. The gesture stays active.
+                // the engine leaves/rebases pinch mode.
                 markMultiTouch();
                 if (remaining.length !== touchCountRef.current) {
                     touchCountRef.current = remaining.length;
@@ -426,35 +429,35 @@ function CanvasTileEngineBase({
         [markMultiTouch],
     );
 
-    const onTouchesUp = useCallback(
-        (e: GestureTouchEvent, manager: GestureStateManager) => {
-            endTouch(e, true);
-            if (touchCountRef.current === 0) manager.end();
-        },
-        [endTouch],
-    );
+    const onTouchesUp = useCallback((e: GestureTouchEvent) => endTouch(e, true), [endTouch]);
+    const onTouchesCancelled = useCallback((e: GestureTouchEvent) => endTouch(e, false), [endTouch]);
 
-    const onTouchesCancelled = useCallback(
-        (e: GestureTouchEvent) => {
-            endTouch(e, false);
-        },
-        [endTouch],
-    );
+    // Blocker enablement is read at render time; the component re-renders on
+    // every engine frame (picture state), so a runtime setEventHandlers
+    // toggle is picked up on the next painted frame.
+    const interactionsClaimed = shouldClaimGesture();
 
-    // The gesture is created once; every handler reads live state through
-    // refs, so no dependency-driven re-creation is needed. runOnJS keeps the
+    // The transport reads live state through refs; runOnJS keeps the
     // callbacks on the JS thread (the engine is a plain JS object) even when
     // Reanimated is installed.
-    const gesture = useMemo(
-        () =>
-            Gesture.Manual()
-                .runOnJS(true)
-                .onTouchesDown(onTouchesDown)
-                .onTouchesMove(onTouchesMove)
-                .onTouchesUp(onTouchesUp)
-                .onTouchesCancelled(onTouchesCancelled),
-        [onTouchesDown, onTouchesMove, onTouchesUp, onTouchesCancelled],
-    );
+    const gesture = useMemo(() => {
+        const transport = Gesture.Manual()
+            .runOnJS(true)
+            .onTouchesDown(onTouchesDown)
+            .onTouchesMove(onTouchesMove)
+            .onTouchesUp(onTouchesUp)
+            .onTouchesCancelled(onTouchesCancelled);
+        // Callback-less by design: its only job is to activate natively on a
+        // tiny movement, which cancels an enclosing ScrollView's pan. Taps
+        // don't move far enough to activate it — and don't scroll pages
+        // either, so nothing needs blocking for them.
+        const blocker = Gesture.Pan()
+            .enabled(interactionsClaimed)
+            .minDistance(2)
+            .maxPointers(10)
+            .shouldCancelWhenOutside(false);
+        return Gesture.Simultaneous(transport, blocker);
+    }, [interactionsClaimed, onTouchesDown, onTouchesMove, onTouchesUp, onTouchesCancelled]);
 
     return (
         <EngineContext.Provider value={contextValue}>
