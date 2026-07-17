@@ -56,7 +56,7 @@ function Map() {
 ```
 
 - For dynamic changes use runtime APIs instead: `engine.setBounds`,
-  `engine.setEventHandlers`, `engine.updateCoords`, `engine.goCoords`,
+  `engine.setEventHandlers`, `engine.setCenter`, `engine.goCenter`,
   `engine.setScale`, `engine.goScale`, `engine.resize`.
 - Event callback props CAN change freely - they are kept fresh via refs
   without re-creating the engine.
@@ -111,7 +111,7 @@ Handle members beyond the core engine API (see
 | `loadImage(src, retry?)` | `Promise<HTMLImageElement>`; rejects if called before ready. |
 
 The same handle can drive multiple concerns (toolbar buttons calling
-`engine.zoomIn()`, effects calling `engine.goCoords(...)`) without prop
+`engine.zoomIn()`, effects calling `engine.goCenter(...)`) without prop
 drilling the instance around. One handle per `<CanvasTileEngine>`; create two
 handles for two canvases (e.g. main map + minimap).
 

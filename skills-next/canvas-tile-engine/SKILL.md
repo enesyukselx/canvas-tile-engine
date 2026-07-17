@@ -167,7 +167,7 @@ const png = await renderToBuffer({
   Without this the board renders mostly off-screen or half a cell off.
 - **React props are mount-only**: `config`, `renderer`, and `center` are read
   once. Changing them later is ignored - use runtime APIs
-  (`engine.setBounds`, `engine.updateCoords`, ...) or remount with a `key`.
+  (`engine.setBounds`, `engine.setCenter`, ...) or remount with a `key`.
 - **React items stability**: `items` props are compared by reference. Inline
   array literals cause re-registration (and spatial index rebuilds) every
   render. Use `useMemo` or state.

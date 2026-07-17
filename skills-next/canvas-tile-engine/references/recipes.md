@@ -81,7 +81,7 @@ export function MapWithMinimap({ world }: { world: Rect[] }) {
                 center={{ x: 50, y: 50 }}
                 onCoordsChange={(center) => {
                     // keep the minimap centered on the main camera
-                    mini.updateCoords(center);
+                    mini.setCenter(center);
                 }}
             >
                 <CanvasTileEngine.GridLines cellSize={1} strokeStyle="#1e293b" layer={0} />
@@ -95,7 +95,7 @@ export function MapWithMinimap({ world }: { world: Rect[] }) {
                     config={{ scale: 2, size: { width: 200, height: 200 },
                               eventHandlers: { click: true } }}   // no drag/zoom on minimap
                     center={{ x: 50, y: 50 }}
-                    onClick={(c) => main.goCoords(c.raw.x, c.raw.y, 300)}  // click to jump
+                    onClick={(c) => main.goCenter(c.raw.x, c.raw.y, 300)}  // click to jump
                 >
                     <CanvasTileEngine.StaticRect items={worldItems} cacheKey="minimap" layer={1} />
                 </CanvasTileEngine>
@@ -270,7 +270,7 @@ primitives): [performance.md](performance.md).
 
 ## Cross-cutting reminders
 
-- Every camera-moving API (`goCoords`, `updateCoords`, `setScale`, `goScale`, `zoomIn`,
+- Every camera-moving API (`goCenter`, `setCenter`, `setScale`, `goScale`, `zoomIn`,
   `zoomOut`, `setBounds`, drag/zoom gestures) re-renders automatically; only
   draw registration and data mutation need an explicit `render()`.
 - Group scene content into meaningful layers from the start (0 grid,
