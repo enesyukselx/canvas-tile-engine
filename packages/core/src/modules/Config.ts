@@ -1,6 +1,6 @@
 import { CanvasTileEngineConfig, EventHandlers, ZoomMode } from "../types";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
-import { validateConfig, validateBounds } from "../utils/validateConfig";
+import { validateConfig, validateBounds, validateScaleLimits } from "../utils/validateConfig";
 
 /** Normalize the zoom setting so consumers only see a mode or `false` (`true` means `"pointer"`). */
 function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
@@ -128,6 +128,22 @@ export class Config {
         this.config = Object.freeze({
             ...this.config,
             eventHandlers: Object.freeze(merged),
+        });
+    }
+
+    /**
+     * Update scale limits at runtime.
+     * @param minScale New minimum scale.
+     * @param maxScale New maximum scale.
+     * @throws {ConfigValidationError} If limits are invalid.
+     */
+    updateScaleLimits(minScale: number, maxScale: number) {
+        validateScaleLimits(minScale, maxScale);
+
+        this.config = Object.freeze({
+            ...this.config,
+            minScale,
+            maxScale,
         });
     }
 

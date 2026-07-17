@@ -11,10 +11,7 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engi
 ## Component and hook
 
 ```tsx
-import {
-    CanvasTileEngine,
-    useCanvasTileEngine,
-} from "@canvas-tile-engine/react";
+import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 function Map() {
@@ -57,7 +54,7 @@ function Map() {
 
 - For dynamic changes use runtime APIs instead: `engine.setBounds`,
   `engine.setEventHandlers`, `engine.setCenter`, `engine.goCenter`,
-  `engine.setScale`, `engine.goScale`, `engine.resize`.
+  `engine.setScale`, `engine.goScale`, `engine.setScaleLimits` `engine.resize`.
 - Event callback props CAN change freely - they are kept fresh via refs
   without re-creating the engine.
 - The engine is destroyed automatically on unmount.
@@ -129,8 +126,8 @@ array identity re-registers the callback and rebuilds the spatial index for
 | `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`                                                                                              |
 | `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`                                                                                        |
 | `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`                                                                                                  |
-| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`                                                          |
-| `<CanvasTileEngine.Path>`         | `items: Path \| Path[]`, `style?: LineStyle`, `layer = 1`                                                          |
+| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`                                                                             |
+| `<CanvasTileEngine.Path>`         | `items: Path \| Path[]`, `style?: LineStyle`, `layer = 1`                                                                             |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
 | `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
 | `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |
@@ -176,12 +173,7 @@ const paint = (coords: ProcessedClick) =>
         },
     ]);
 
-<CanvasTileEngine
-    engine={engine}
-    config={config}
-    renderer={renderer}
-    onClick={(coords) => paint(coords)}
->
+<CanvasTileEngine engine={engine} config={config} renderer={renderer} onClick={(coords) => paint(coords)}>
     <CanvasTileEngine.Rect items={tiles} layer={1} />
 </CanvasTileEngine>;
 ```

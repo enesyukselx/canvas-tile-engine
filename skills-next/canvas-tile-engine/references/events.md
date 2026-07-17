@@ -59,7 +59,8 @@ engine.onCoordsChange = (center: Coords) => {};
 
 engine.onZoom = (scale: number) => {};
 // Fires on ANY scale change: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
-// and preserve-viewport responsive resizes (the resize changes the scale).
+// setScaleLimits clamping the current scale into a new range, and
+// preserve-viewport responsive resizes (the resize changes the scale).
 
 engine.onResize = () => {};
 // Fires after manual resize() or an observed wrapper resize.

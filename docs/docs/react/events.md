@@ -153,7 +153,7 @@ Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
 | Prop             | Description                                                                                 |
 | :--------------- | :------------------------------------------------------------------------------------------ |
 | `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes. |
-| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut` changes the scale.  |
+| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping changes the scale. |
 | `onResize`       | Fires after manual or observed resize.                                                      |
 
 ## Painting Example

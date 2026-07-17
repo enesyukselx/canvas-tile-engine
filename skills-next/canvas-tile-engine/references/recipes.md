@@ -18,10 +18,12 @@ import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 const engine = new CanvasTileEngine(
     document.getElementById("map") as HTMLDivElement,
     {
-        scale: 48, minScale: 16, maxScale: 128,
+        scale: 48,
+        minScale: 16,
+        maxScale: 128,
         size: { width: 960, height: 600 },
         backgroundColor: "#0f172a",
-        bounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 },   // world edges
+        bounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 }, // world edges
         eventHandlers: { drag: true, zoom: "pointer", click: true, hover: true },
         coordinates: { enabled: true, shownScaleRange: { min: 24, max: 128 } },
     },
@@ -31,24 +33,34 @@ const engine = new CanvasTileEngine(
 
 // Layer 0: grid, Layer 1: terrain, Layer 2: units, Layer 3: labels, Layer 10: UI
 engine.drawGridLines(1, 1, "#1e293b", 0);
-engine.drawRect(terrainTiles, 1);              // big array - culling handles it
+engine.drawRect(terrainTiles, 1); // big array - culling handles it
 engine.drawCircle(unitMarkers, 2);
 engine.drawText(placeLabels, 3);
 
 let hover: DrawHandle | undefined;
 engine.onHover = (c) => {
     if (hover) engine.removeDrawHandle(hover);
-    hover = engine.drawRect({ x: c.snapped.x, y: c.snapped.y, size: 1,
-                              style: { strokeStyle: "#38bdf8", lineWidthPx: 2 } }, 10);
+    hover = engine.drawRect(
+        { x: c.snapped.x, y: c.snapped.y, size: 1, style: { strokeStyle: "#38bdf8", lineWidthPx: 2 } },
+        10,
+    );
     engine.render();
 };
-engine.onMouseLeave = () => { if (hover) { engine.removeDrawHandle(hover); hover = undefined; engine.render(); } };
+engine.onMouseLeave = () => {
+    if (hover) {
+        engine.removeDrawHandle(hover);
+        hover = undefined;
+        engine.render();
+    }
+};
 
 let selection: DrawHandle | undefined;
 engine.onClick = (c) => {
     if (selection) engine.removeDrawHandle(selection);
-    selection = engine.drawRect({ x: c.snapped.x, y: c.snapped.y, size: 1,
-                                  style: { fillStyle: "rgba(34,197,94,0.3)" } }, 10);
+    selection = engine.drawRect(
+        { x: c.snapped.x, y: c.snapped.y, size: 1, style: { fillStyle: "rgba(34,197,94,0.3)" } },
+        10,
+    );
     engine.render();
     onTileSelected(c.snapped);
 };
@@ -76,8 +88,11 @@ export function MapWithMinimap({ world }: { world: Rect[] }) {
             <CanvasTileEngine
                 engine={main}
                 renderer={new RendererCanvas()}
-                config={{ scale: 48, size: { width: 960, height: 600 },
-                          eventHandlers: { drag: true, zoom: true, click: true } }}
+                config={{
+                    scale: 48,
+                    size: { width: 960, height: 600 },
+                    eventHandlers: { drag: true, zoom: true, click: true },
+                }}
                 center={{ x: 50, y: 50 }}
                 onCoordsChange={(center) => {
                     // keep the minimap centered on the main camera
@@ -92,10 +107,9 @@ export function MapWithMinimap({ world }: { world: Rect[] }) {
                 <CanvasTileEngine
                     engine={mini}
                     renderer={new RendererCanvas()}
-                    config={{ scale: 2, size: { width: 200, height: 200 },
-                              eventHandlers: { click: true } }}   // no drag/zoom on minimap
+                    config={{ scale: 2, size: { width: 200, height: 200 }, eventHandlers: { click: true } }} // no drag/zoom on minimap
                     center={{ x: 50, y: 50 }}
-                    onClick={(c) => main.goCenter(c.raw.x, c.raw.y, 300)}  // click to jump
+                    onClick={(c) => main.goCenter(c.raw.x, c.raw.y, 300)} // click to jump
                 >
                     <CanvasTileEngine.StaticRect items={worldItems} cacheKey="minimap" layer={1} />
                 </CanvasTileEngine>
@@ -130,15 +144,19 @@ export function PixelPainter() {
     const [color, setColor] = useState("#38bdf8");
     const [down, setDown] = useState(false);
 
-    const paint = useCallback((x: number, y: number) => {
-        setPixels((prev) => new Map(prev).set(`${x},${y}`, color));
-    }, [color]);
+    const paint = useCallback(
+        (x: number, y: number) => {
+            setPixels((prev) => new Map(prev).set(`${x},${y}`, color));
+        },
+        [color],
+    );
 
     const items = useMemo<Rect[]>(
-        () => Array.from(pixels, ([key, fill]) => {
-            const [x, y] = key.split(",").map(Number);
-            return { x, y, size: 1, style: { fillStyle: fill } };
-        }),
+        () =>
+            Array.from(pixels, ([key, fill]) => {
+                const [x, y] = key.split(",").map(Number);
+                return { x, y, size: 1, style: { fillStyle: fill } };
+            }),
         [pixels],
     );
 
@@ -153,8 +171,13 @@ export function PixelPainter() {
                 backgroundColor: "#ffffff",
                 eventHandlers: { click: true, hover: true, drag: false, zoom: false },
             }}
-            onMouseDown={(c) => { setDown(true); paint(c.snapped.x, c.snapped.y); }}
-            onHover={(c) => { if (down) paint(c.snapped.x, c.snapped.y); }}
+            onMouseDown={(c) => {
+                setDown(true);
+                paint(c.snapped.x, c.snapped.y);
+            }}
+            onHover={(c) => {
+                if (down) paint(c.snapped.x, c.snapped.y);
+            }}
             onMouseUp={() => setDown(false)}
             onMouseLeave={() => setDown(false)}
         >
@@ -180,12 +203,17 @@ import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 // and not the default (0, 0) - integers are cell centers.
 const { center, ...board } = gridToSize({ columns: 8, rows: 8, cellSize: 60 }); // 480x480, scale 60
 
-const engine = new CanvasTileEngine(wrapper, {
-    ...board,
-    gridAligned: true,
-    backgroundColor: "#2d2d2d",
-    eventHandlers: { click: true, hover: true, drag: false, zoom: false },
-}, new RendererCanvas(), center);
+const engine = new CanvasTileEngine(
+    wrapper,
+    {
+        ...board,
+        gridAligned: true,
+        backgroundColor: "#2d2d2d",
+        eventHandlers: { click: true, hover: true, drag: false, zoom: false },
+    },
+    new RendererCanvas(),
+    center,
+);
 
 // Checkerboard
 const squares = [];
@@ -205,12 +233,16 @@ value.
 
 ```ts
 // Wrapper styled by CSS (e.g. width:100%; height:100vh). The engine follows it.
-const engine = new CanvasTileEngine(wrapper, {
-    scale: 48,
-    size: { width: 800, height: 600, minWidth: 320, minHeight: 240 },  // initial + clamps
-    responsive: "preserve-scale",     // or "preserve-viewport" to keep tile count
-    eventHandlers: { drag: true, zoom: true },
-}, new RendererCanvas());
+const engine = new CanvasTileEngine(
+    wrapper,
+    {
+        scale: 48,
+        size: { width: 800, height: 600, minWidth: 320, minHeight: 240 }, // initial + clamps
+        responsive: "preserve-scale", // or "preserve-viewport" to keep tile count
+        eventHandlers: { drag: true, zoom: true },
+    },
+    new RendererCanvas(),
+);
 ```
 
 Do not call `engine.resize()` in responsive mode - CSS on the wrapper is the
@@ -236,7 +268,7 @@ engine.render();
 
 const walk = new SpriteAnimator({ frames: sheet.framesInRow(0, 0, 3), fps: 8 });
 walk.start((frame) => {
-    for (const u of units) u.sprite = frame;   // all units flip in sync
+    for (const u of units) u.sprite = frame; // all units flip in sync
     engine.render();
 });
 // Different unit types animating different rows: one SpriteAnimator per row,
@@ -271,7 +303,7 @@ primitives): [performance.md](performance.md).
 ## Cross-cutting reminders
 
 - Every camera-moving API (`goCenter`, `setCenter`, `setScale`, `goScale`, `zoomIn`,
-  `zoomOut`, `setBounds`, drag/zoom gestures) re-renders automatically; only
+  `zoomOut`, `setScaleLimits`, `setBounds`, drag/zoom gestures) re-renders automatically; only
   draw registration and data mutation need an explicit `render()`.
 - Group scene content into meaningful layers from the start (0 grid,
   1 terrain, 2 entities, 3 labels, 10 transient UI) - it makes selective

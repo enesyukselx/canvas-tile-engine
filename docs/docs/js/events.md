@@ -132,7 +132,7 @@ engine.onCoordsChange = (center) => {
 
 ### `onZoom`
 
-Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut`.
+Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping the current scale into a new range.
 
 ```ts
 engine.onZoom = (scale) => {

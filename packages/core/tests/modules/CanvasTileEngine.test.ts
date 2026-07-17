@@ -109,6 +109,40 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    describe("setScaleLimits", () => {
+        it("updates the limits used by zoom clamping", () => {
+            engine.setScaleLimits(0.5, 4);
+            engine.setScale(3);
+            expect(engine.getScale()).toBe(3);
+        });
+
+        it("reflects the new limits in getConfig", () => {
+            engine.setScaleLimits(0.25, 8);
+            const config = engine.getConfig();
+            expect(config.minScale).toBe(0.25);
+            expect(config.maxScale).toBe(8);
+        });
+
+        it("clamps the current scale into the new range and fires onZoom", () => {
+            engine.setScaleLimits(1.5, 4);
+            expect(engine.getScale()).toBe(1.5);
+            expect(onZoom).toHaveBeenCalledWith(1.5);
+        });
+
+        it("does not fire onZoom when the current scale stays in range", () => {
+            engine.setScaleLimits(0.25, 8);
+            expect(onZoom).not.toHaveBeenCalled();
+        });
+
+        it("rejects invalid limits without touching the camera", () => {
+            expect(() => engine.setScaleLimits(4, 2)).toThrow();
+            expect(() => engine.setScaleLimits(0, 2)).toThrow();
+            expect(() => engine.setScaleLimits(NaN, 2)).toThrow();
+            engine.setScale(10); // still clamped by the original maxScale 2
+            expect(engine.getScale()).toBe(2);
+        });
+    });
+
     describe("center API (getCenter / setCenter / goCenter)", () => {
         it("setCenter moves the view center instantly and fires onCoordsChange", () => {
             engine.setCenter({ x: 25, y: 40 });

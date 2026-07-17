@@ -158,6 +158,9 @@ export interface EngineHandle {
     /** Zoom out by a factor (default: 1.5) */
     zoomOut(factor?: number): void;
 
+    /** Update the min/max scale limits at runtime, clamping the current scale into the new range */
+    setScaleLimits(minScale: number, maxScale: number): void;
+
     /** Get current config */
     getConfig(): Required<CanvasTileEngineConfig>;
 
@@ -375,6 +378,10 @@ export function useCanvasTileEngine(): EngineHandle {
 
             zoomOut(factor?: number) {
                 instanceRef.current?.zoomOut(factor);
+            },
+
+            setScaleLimits(minScale: number, maxScale: number) {
+                instanceRef.current?.setScaleLimits(minScale, maxScale);
             },
 
             getConfig() {
