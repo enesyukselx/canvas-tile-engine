@@ -334,6 +334,33 @@ export class GLRenderer {
         this.disableAttrib(this.line.a_color);
     }
 
+    // ─── Triangles ───
+
+    /**
+     * Filled triangles with per-vertex color, interleaved as
+     * [x, y, r, g, b, a] — 3 vertices per triangle. Reuses the line
+     * pipeline's flat-color program (positions + colors, no instancing),
+     * which is exactly what CPU-triangulated polygon fills need.
+     */
+    drawTriangles(data: Float32Array, vertexCount: number) {
+        if (vertexCount === 0) return;
+        const gl = this.gl;
+
+        gl.useProgram(this.line.program);
+        gl.uniform2f(this.line.u_resolution, this.cssWidth, this.cssHeight);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+
+        const stride = LINE_FLOATS_PER_VERTEX * 4;
+        this.enableAttrib(this.line.a_position, 2, stride, 0);
+        this.enableAttrib(this.line.a_color, 4, stride, 2 * 4);
+
+        gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+
+        this.disableAttrib(this.line.a_position);
+        this.disableAttrib(this.line.a_color);
+    }
+
     // ─── Images ───
 
     /**

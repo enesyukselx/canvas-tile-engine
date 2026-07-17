@@ -7,6 +7,7 @@ import { HitTester, HitResult, HitTestOptions } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateFitBounds, validateScale } from "./utils/validateConfig";
 import { snapCenterToGrid } from "./utils/viewport";
+import { normalizePathItems } from "./utils/normalizePath";
 import {
     Bounds,
     Coords,
@@ -26,7 +27,9 @@ import {
     Text,
     Rect,
     Line,
+    LineStyle,
     Path,
+    PathItem,
     IRenderer,
     IImageLoader,
     DrawHandle,
@@ -755,16 +758,16 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Draw one or many lines between world points.
+     * Lines participate in hit testing: a point within half the stroke width
+     * of a segment (with a minimum tap width for hairlines) hits it.
      * @param items Line segments.
      * @param style Line style overrides.
      * @param layer Layer order.
      */
-    drawLine(
-        items: Array<Line> | Line,
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1,
-    ): DrawHandle {
-        return this.renderer.getDrawAPI().drawLine(items, style, layer);
+    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
+        const handle = this.renderer.getDrawAPI().drawLine(items, style, layer);
+        this.hitTester.register(handle, "line", items, layer, style);
+        return handle;
     }
 
     /**
@@ -807,17 +810,50 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
-     * Draw one or many polylines through world points.
-     * @param items Polyline point collections.
-     * @param style Stroke style overrides.
+     * Draw one or many free-form paths through world points.
+     *
+     * Each `PathItem` owns its geometry and style: `points` traces the
+     * outline, `closed` joins it back to the start, `style.fillStyle` fills
+     * the interior (under `fillRule`), and stroke/dash/corner options follow
+     * the shared world-vs-`*Px` unit convention. Paths participate in hit
+     * testing: filled paths hit on their interior, unfilled paths on the
+     * stroke itself.
+     *
+     * The legacy `Coords[]` / `Coords[][]` form with a call-level stroke
+     * style is still accepted and normalized into items internally.
+     * @param items Path item(s), or legacy polyline point collections.
      * @param layer Layer order.
+     * @example
+     * ```ts
+     * // Filled shape with a rounded outline
+     * engine.drawPath({
+     *     points: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }],
+     *     closed: true,
+     *     style: { fillStyle: "#22c55e", strokeStyle: "#166534", lineWidthPx: 2, cornerRadius: 0.5 },
+     *     data: { id: "zone-a" },
+     * });
+     *
+     * // Open route line
+     * engine.drawPath({ points: route, style: { strokeStyle: "#3b82f6", lineWidthPx: 4 } });
+     * ```
      */
-    drawPath(
-        items: Array<Path> | Path,
-        style?: { strokeStyle?: string; lineWidth?: number },
-        layer: number = 1,
+    drawPath<TData = unknown>(items: PathItem<TData> | Array<PathItem<TData>>, layer?: number): DrawHandle;
+    /**
+     * @deprecated Pass `PathItem` objects instead (`{ points, style }`); this
+     * form only supports call-level stroke styling and no fill or hit data.
+     */
+    drawPath(items: Array<Path> | Path, style?: LineStyle, layer?: number): DrawHandle;
+    drawPath<TData = unknown>(
+        items: PathItem<TData> | Array<PathItem<TData>> | Array<Path> | Path,
+        styleOrLayer?: LineStyle | number,
+        maybeLayer?: number,
     ): DrawHandle {
-        return this.renderer.getDrawAPI().drawPath(items, style, layer);
+        const legacyStyle = typeof styleOrLayer === "object" ? styleOrLayer : undefined;
+        const layer = typeof styleOrLayer === "number" ? styleOrLayer : (maybeLayer ?? 1);
+        const normalized = normalizePathItems(items, legacyStyle);
+        const handle = this.renderer.getDrawAPI().drawPath(normalized, layer);
+        this.hitTester.register(handle, "path", normalized, layer);
+        return handle;
     }
 
     /**

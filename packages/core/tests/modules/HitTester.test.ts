@@ -275,3 +275,137 @@ describe("HitTester padding", () => {
         expect(hit!.index).toBe(10);
     });
 });
+
+describe("HitTester paths", () => {
+    // Scale 40 px/cell: an 8px-wide stroke covers 0.1 world units each side.
+    const scaled = () => new HitTester(() => 40);
+
+    it("hits an unfilled path on the stroke, not beside it", () => {
+        const ht = scaled();
+        const points = [
+            { x: 0, y: 0 },
+            { x: 4, y: 0 },
+        ];
+        ht.register(handle(1), "path", { points, style: { strokeStyle: "red", lineWidthPx: 8 } }, 1);
+
+        expect(ht.hitTestFirst({ x: 2, y: 0.05 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 2, y: 0.2 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: -0.2, y: 0 })).toBeUndefined(); // beyond the endpoint
+    });
+
+    it("includes the closing segment when closed", () => {
+        const points = [
+            { x: 0, y: 0 },
+            { x: 4, y: 0 },
+            { x: 4, y: 4 },
+            { x: 0, y: 4 },
+        ];
+        const open = scaled();
+        open.register(handle(1), "path", { points, style: { strokeStyle: "red", lineWidthPx: 8 } }, 1);
+        expect(open.hitTestFirst({ x: 0, y: 2 })).toBeUndefined();
+
+        const closed = scaled();
+        closed.register(handle(1), "path", { points, closed: true, style: { strokeStyle: "red", lineWidthPx: 8 } }, 1);
+        expect(closed.hitTestFirst({ x: 0, y: 2 })).toBeDefined();
+        // Interior stays a miss without a fill
+        expect(closed.hitTestFirst({ x: 2, y: 2 })).toBeUndefined();
+    });
+
+    it("hits a filled path on its interior", () => {
+        const ht = scaled();
+        const points = [
+            { x: 0, y: 0 },
+            { x: 4, y: 0 },
+            { x: 4, y: 4 },
+            { x: 0, y: 4 },
+        ];
+        ht.register(handle(1), "path", { points, style: { fillStyle: "green" }, data: { id: "zone" } }, 1);
+
+        const hit = ht.hitTestFirst<{ id: string }>({ x: 2, y: 2 });
+        expect(hit?.kind).toBe("path");
+        expect(hit?.item.data?.id).toBe("zone");
+        expect(ht.hitTestFirst({ x: 5, y: 5 })).toBeUndefined();
+    });
+
+    it("applies the item's fill rule on self-intersecting outlines", () => {
+        // Pentagram: the center winds twice, so nonzero fills it and evenodd does not.
+        const star = Array.from({ length: 5 }, (_, k) => {
+            const angle = ((-90 + k * 144) * Math.PI) / 180;
+            return { x: 2 * Math.cos(angle), y: 2 * Math.sin(angle) };
+        });
+        const nonzero = scaled();
+        nonzero.register(handle(1), "path", { points: star, style: { fillStyle: "red" } }, 1);
+        expect(nonzero.hitTestFirst({ x: 0, y: 0 })).toBeDefined();
+
+        const evenodd = scaled();
+        evenodd.register(handle(1), "path", { points: star, fillRule: "evenodd", style: { fillStyle: "red" } }, 1);
+        expect(evenodd.hitTestFirst({ x: 0, y: 0 })).toBeUndefined();
+        // The star tips are single-winding and hit under both rules
+        expect(evenodd.hitTestFirst({ x: 0, y: -1.8 })).toBeDefined();
+    });
+
+    it("keeps hairline strokes tappable via the minimum tap width", () => {
+        const ht = scaled();
+        // No style: 1px hairline, but the hit test treats it as 8px wide
+        ht.register(
+            handle(1),
+            "path",
+            {
+                points: [
+                    { x: 0, y: 0 },
+                    { x: 4, y: 0 },
+                ],
+            },
+            1,
+        );
+
+        expect(ht.hitTestFirst({ x: 2, y: 0.09 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 2, y: 0.11 })).toBeUndefined();
+    });
+
+    it("expands the stroke threshold by world padding", () => {
+        const ht = scaled();
+        ht.register(
+            handle(1),
+            "path",
+            {
+                points: [
+                    { x: 0, y: 0 },
+                    { x: 4, y: 0 },
+                ],
+            },
+            1,
+        );
+
+        expect(ht.hitTestFirst({ x: 2, y: 0.5 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 2, y: 0.5 }, { padding: 0.45 })).toBeDefined();
+    });
+});
+
+describe("HitTester lines", () => {
+    it("hits segments within half the stroke width and carries data", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "line", [{ from: { x: 0, y: 0 }, to: { x: 3, y: 0 }, data: { id: "edge" } }], 1, {
+            strokeStyle: "blue",
+            lineWidthPx: 8,
+        });
+
+        const hit = ht.hitTestFirst<{ id: string }>({ x: 1.5, y: 0.05 });
+        expect(hit?.kind).toBe("line");
+        expect(hit?.item.data?.id).toBe("edge");
+        expect(ht.hitTestFirst({ x: 1.5, y: 0.3 })).toBeUndefined();
+    });
+
+    it("linear-scans large line/path entries instead of the anchor index", () => {
+        const ht = new HitTester(() => 40);
+        const items = Array.from({ length: 600 }, (_, i) => ({
+            from: { x: i * 2, y: 0 },
+            to: { x: i * 2, y: 1 },
+        }));
+        ht.register(handle(1), "line", items, 1);
+
+        const hit = ht.hitTestFirst({ x: 1000, y: 0.5 });
+        expect(hit).toBeDefined();
+        expect(hit?.index).toBe(500);
+    });
+});
