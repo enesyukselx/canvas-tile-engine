@@ -43,7 +43,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     private coordinateTransformer: CoordinateTransformer;
     private renderer: IRenderer<TMount, TImage>;
     private animationController: AnimationController;
-    private hitTester = new HitTester();
+    private hitTester = new HitTester(() => this.camera.scale);
 
     public canvasWrapper: TMount;
     /**

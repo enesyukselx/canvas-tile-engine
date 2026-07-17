@@ -79,6 +79,13 @@ export class HitTester {
     private entries = new Map<symbol, HitEntry>();
     private nextSeq = 0;
 
+    /**
+     * Live camera scale accessor. The registry's geometry is world-space and
+     * scale-free, but screen-pixel style values (`lineWidthPx`, future
+     * `sizePx`) must resolve against the current scale at query time.
+     */
+    constructor(private getScale: () => number = () => 1) {}
+
     register(handle: DrawHandle, kind: HitKind, items: HitItem | HitItem[], layer: number): void {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
