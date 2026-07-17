@@ -164,6 +164,40 @@ export function validateCoords(x: number, y: number): void {
 }
 
 /**
+ * Validates arguments for the fitBounds method. Unlike camera bounds
+ * (validateBounds), every edge must be finite: an infinite rectangle cannot
+ * be fitted into the viewport.
+ * @param bounds The rectangle to fit.
+ * @param padding World-unit margin added on every side.
+ * @throws {ConfigValidationError} If bounds or padding are invalid.
+ */
+export function validateFitBounds(
+    bounds: { minX: number; maxX: number; minY: number; maxY: number },
+    padding: number,
+): void {
+    const edges = [
+        ["minX", bounds.minX],
+        ["maxX", bounds.maxX],
+        ["minY", bounds.minY],
+        ["maxY", bounds.maxY],
+    ] as const;
+    for (const [name, value] of edges) {
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+            throw configError(`fitBounds bounds.${name} must be a finite number, got ${value}`);
+        }
+    }
+    if (bounds.minX >= bounds.maxX) {
+        throw configError(`fitBounds bounds.minX (${bounds.minX}) must be less than bounds.maxX (${bounds.maxX})`);
+    }
+    if (bounds.minY >= bounds.maxY) {
+        throw configError(`fitBounds bounds.minY (${bounds.minY}) must be less than bounds.maxY (${bounds.maxY})`);
+    }
+    if (typeof padding !== "number" || !Number.isFinite(padding) || padding < 0) {
+        throw configError(`fitBounds padding must be a non-negative finite number, got ${padding}`);
+    }
+}
+
+/**
  * Validates scale value for setScale method.
  * @param scale The scale value to validate.
  * @throws {ConfigValidationError} If scale is invalid.

@@ -243,6 +243,27 @@ const allowDeepZoom = () => {
 };
 ```
 
+### `fitBounds(bounds, options?)`
+
+Fits a world-space rectangle into the viewport: centers the view on the rectangle and picks the largest scale that keeps the whole (padded) area visible, clamped to the scale limits. Animated by default. Not related to `setBounds`, which restricts camera movement.
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `bounds` | `{ minX, maxX, minY, maxY }` | Rectangle to fit. Every edge must be finite. |
+| `options.padding` | `number` | Extra world-unit margin on every side. Default `0`. |
+| `options.durationMs` | `number` | Animation duration in ms. Default `500`; `0` = instant. |
+| `options.onComplete` | `function` | Called when the fit completes. |
+
+```tsx
+const showWholeBoard = () => {
+    engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+};
+
+const zoomToSelection = (selection: { minX: number; maxX: number; minY: number; maxY: number }) => {
+    engine.fitBounds(selection, { padding: 0.5, durationMs: 300 });
+};
+```
+
 ### Example: Zoom Controls
 
 ```tsx

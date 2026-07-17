@@ -184,6 +184,27 @@ engine.setScaleLimits(scale, scale);
 
 Throws a `ConfigValidationError` if either limit is not a positive finite number or `minScale` is greater than `maxScale`.
 
+#### `fitBounds(bounds, options?)`
+
+Fits a world-space rectangle into the viewport: centers the view on the rectangle and picks the largest scale that keeps the whole (padded) area visible, clamped to the scale limits. Animated by default. Not related to `setBounds`, which restricts camera movement.
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `bounds` | `{ minX, maxX, minY, maxY }` | Rectangle to fit. Every edge must be finite. |
+| `options.padding` | `number` | Extra world-unit margin on every side. Default `0`. |
+| `options.durationMs` | `number` | Animation duration in ms. Default `500`; `0` = instant. |
+| `options.onComplete` | `function` | Called when the fit completes. |
+
+```typescript
+// Show the whole 32x32 board with one cell of margin
+engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+
+// Jump to a selection instantly
+engine.fitBounds(selectionBounds, { durationMs: 0 });
+```
+
+Throws a `ConfigValidationError` if an edge is not finite, `min >= max` on an axis, or padding is negative.
+
 ## Viewport & Resizing
 
 The viewport is the visible area of the canvas. The engine can handle resizing automatically or manually.

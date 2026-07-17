@@ -71,6 +71,16 @@ export interface Bounds {
     maxY: number;
 }
 
+/** Options for the engine's `fitBounds` method. */
+export interface FitBoundsOptions {
+    /** Extra world-unit margin added on every side of the rectangle. Default 0. */
+    padding?: number;
+    /** Animation duration in ms (default 500). Use 0 for an instant jump. */
+    durationMs?: number;
+    /** Fired when the fit completes (synchronously when instant). */
+    onComplete?: () => void;
+}
+
 export interface ViewportBounds {
     left: number;
     top: number;
