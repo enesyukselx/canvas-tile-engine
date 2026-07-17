@@ -99,7 +99,7 @@ const config: CanvasTileEngineConfig = {
 const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), { x: 0, y: 0 });
 
 engine.drawGridLines(1, 1, "#1e293b", 0);
-engine.drawRect({ x: 0, y: 0, size: 1, radius: 4, style: { fillStyle: "#22c55e" } }, 1);
+engine.drawRect({ x: 0, y: 0, size: 1, radius: 0.1, style: { fillStyle: "#22c55e" } }, 1);
 engine.drawText(
     {
         x: 0,

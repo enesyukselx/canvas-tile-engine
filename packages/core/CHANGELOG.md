@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.8.0
+
+### Minor Changes
+
+- c4c5c01: Custom draw callbacks receive ready-made coordinate transform helpers, so user code never re-derives the `(world - topLeft) * scale` formula or the cell-center offset. `addDrawFunction` callbacks (and the React/RN `DrawFunction` children) get a fourth `transform` argument with `worldToScreen(x, y)` (item-space in, integers are cell centers) and `screenToWorld(x, y)` (raw corner-space out, like event `coords.raw`); existing three-argument callbacks keep working.
+
+  **BREAKING:** `onDraw` now uses the same signature as `addDrawFunction`: `(ctx, coords, config, transform)` instead of `(ctx, info)`. Migration: `info.scale` → `config.scale`, `info.width`/`info.height` → `config.size.width`/`config.size.height`, `info.coords` → the `coords` argument.
+
+- 030cbdd: Add `engine.goScale(targetScale, durationMs?, onComplete?)` - animated zoom, the `goCoords` counterpart for scale.
+
+  - Smoothly animates the scale to the target value (default 500ms, `0` = instant), anchored at the viewport center like `zoomIn`/`zoomOut`.
+  - Interpolation is geometric (log-space), so the zoom speed feels uniform across the whole range instead of front-loading the zoomed-in half.
+  - The target is clamped to `minScale`/`maxScale` up front, so the animation runs toward the effective value instead of saturating at the limit partway through.
+  - Fires `onZoom` on every frame that changes the scale and `onCoordsChange`/render per frame; composes with a concurrent `goCoords` animation for fly-to effects.
+  - Completes instantly in headless environments (no `requestAnimationFrame`), matching `goCoords`.
+
+- 204ec08: Add `padding` and `paddingPx` to `HitTestOptions` - generous touch targets for `hitTest`/`hitTestFirst` without invisible helper items.
+
+  - `padding` (world units) expands every tested item's hit geometry outward: circles gain radius, rect/image boxes grow on every side (in the item's rotated frame, so rotation keeps working).
+  - `paddingPx` (screen pixels) is zoom-independent: the engine converts it with the current scale at query time, so targets stay finger-sized at any zoom. Combined additively with `padding`.
+  - The spatial-index query on the 500+ item path widens by the padding too, so no edge candidates are missed.
+  - Negative values are treated as 0. React and React Native handles pick the options up automatically (`HitTestOptions` is re-exported from core).
+
+- a959abc: Add an optional `data` field to drawable items (`Rect`, `Circle`, `ImageItem`, `Text`) for attaching arbitrary app data, typed through a new `TData` generic parameter (`Rect<TData>`, `ImageItem<TImage, TData>`, ...) that defaults to `unknown` - fully backward compatible.
+
+  - The engine and renderers never read `data`; it is carried through so `hitTest` results can identify the hit item via `hit.item.data` instead of the position-based `index`, which goes stale when a filtered or re-ordered items array is re-drawn.
+  - `hitTest<TData>(point)` / `hitTestFirst<TData>(point)` (core and the React / React Native hook handles) accept a type parameter that types `hit.item.data` on the results - a compile-time assertion, not a runtime check.
+  - `HitResult` gains a second generic parameter: `HitResult<TImage, TData = unknown>`.
+
+- b8e76ca: **BREAKING:** `style.lineWidth` and `radius` are now world units and scale with zoom, matching item geometry and Text's `size`/`fontPx` precedent (previously they were fixed screen pixels). Migration: keep old visuals with the new `lineWidthPx`; divide old radius values by your typical scale (e.g. `radius: 8` at scale 40 becomes `radius: 0.2`). GridLines keep their zoom-independent pixel width. This also makes Skia static-picture replay consistent with dynamic drawing instead of a documented quirk.
+
+  **New:** dashed Line/Path rendering via `LineStyle.lineDash` (world units, dashes anchored to the world) and `lineDashPx` (screen pixels). Follows Canvas2D `setLineDash` semantics; the pattern flows continuously around Path corners on every renderer (WebGL tessellates dashes on the CPU). Shared unit resolvers (`resolveLineWidthPx`, `resolveLineDashPx`, `resolveRadiusPx`) are exported from core.
+
+### Patch Changes
+
+- 8fe841d: Close config validation gaps: size limits (`minWidth`/`maxWidth`/`minHeight`/`maxHeight`) now reject NaN, non-number values, and `Infinity` min limits (Infinity stays valid for max limits); bounds now reject NaN and degenerate infinite pairs like `minX: Infinity`, which previously slipped through and silently blanked the canvas via NaN camera math. `-Infinity`/`Infinity` remain valid for unbounded axes.
+- 87614ab: Fix `onResize` firing twice after a programmatic `resize()`. The engine mirrors the callback into the renderer, whose resize completion already invokes it; the engine no longer invokes it a second time from its own completion handler. Watcher-driven (responsive/resize-event) notifications are unaffected.
+
 ## 0.7.0
 
 ### Minor Changes

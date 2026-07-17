@@ -141,6 +141,25 @@ engine.setScale(100);
 engine.setScale(10);
 ```
 
+#### `goScale(scale, duration?, onComplete?)`
+
+Smoothly animates the zoom level to a target value, like `goCoords` does for position. The zoom is anchored at the viewport center (matching `zoomIn`/`zoomOut`), and the target is clamped to `minScale` and `maxScale` bounds.
+
+| Parameter    | Type       | Default      | Description                                    |
+| :----------- | :--------- | :----------- | :--------------------------------------------- |
+| `scale`      | `number`   | **Required** | The desired zoom level (pixels per grid unit). |
+| `duration`   | `number`   | `500`        | Animation duration in ms. `0` = instant.       |
+| `onComplete` | `function` | -            | Called when the animation finishes.            |
+
+```typescript
+// Smoothly zoom to 100 pixels per grid unit over 1 second
+engine.goScale(100, 1000);
+
+// Combine with goCoords for a fly-to effect
+engine.goCoords(15, 20, 1000);
+engine.goScale(50, 1000);
+```
+
 ## Viewport & Resizing
 
 The viewport is the visible area of the canvas. The engine can handle resizing automatically or manually.

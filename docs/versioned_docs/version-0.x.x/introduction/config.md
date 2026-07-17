@@ -48,7 +48,7 @@ Responsive mode is handled by the browser renderers. It is ignored by the server
 
 | Mode | Behavior |
 | :-- | :-- |
-| `"preserve-scale"` | Keeps `scale` fixed. The visible world area changes as the wrapper size changes. |
+| `"preserve-scale"` | Keeps `scale` fixed. The visible world area changes as the wrapper size changes. Width-responsive only: the wrapper gets `width: 100%` and its height is pinned to `config.size.height` with an inline style, overriding CSS heights. Use `"preserve-viewport"` if the height should follow the container. |
 | `"preserve-viewport"` | Keeps the configured tile count visible. The scale changes when the wrapper width changes. |
 | `false` | The engine uses the configured `size` until you call `resize()` or enable `eventHandlers.resize`. |
 
@@ -100,6 +100,8 @@ You can update interaction flags at runtime:
 ```ts
 engine.setEventHandlers({ drag: false, hover: true });
 ```
+
+Disabled interactions leave the platform's default behavior intact: with `zoom` off the mouse wheel keeps scrolling the page, with `rightClick` off the browser context menu opens, and when `click`, `drag`, `zoom`, and `hover` are all off, touch gestures scroll the page instead of being captured by the canvas. On React Native the wrapper only claims the gesture responder while an interaction is enabled (or an `onMouseDown`/`onMouseUp` callback is set), so parent scroll views keep receiving touches.
 
 ## Bounds
 

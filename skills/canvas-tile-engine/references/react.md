@@ -37,7 +37,7 @@ function Map() {
             onCoordsChange={(center) => {}}
             onZoom={(scale) => {}}
             onResize={() => {}}
-            onDraw={(ctx, info) => {}}
+            onDraw={(ctx, coords, config, transform) => {}}
         >
             {/* declarative draw children */}
         </CanvasTileEngine>
@@ -57,7 +57,7 @@ function Map() {
 
 - For dynamic changes use runtime APIs instead: `engine.setBounds`,
   `engine.setEventHandlers`, `engine.updateCoords`, `engine.goCoords`,
-  `engine.setScale`, `engine.resize`.
+  `engine.setScale`, `engine.goScale`, `engine.resize`.
 - Event callback props CAN change freely - they are kept fresh via refs
   without re-creating the engine.
 - The engine is destroyed automatically on unmount.
@@ -129,29 +129,30 @@ array identity re-registers the callback and rebuilds the spatial index for
 | `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`                                                                                              |
 | `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`                                                                                        |
 | `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`                                                                                                  |
-| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: { strokeStyle?, lineWidth? }`, `layer = 1`                                                          |
-| `<CanvasTileEngine.Path>`         | `items: Path \| Path[]`, `style?: { strokeStyle?, lineWidth? }`, `layer = 1`                                                          |
+| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`                                                          |
+| `<CanvasTileEngine.Path>`         | `items: Path \| Path[]`, `style?: LineStyle`, `layer = 1`                                                          |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
 | `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
 | `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |
 | `<CanvasTileEngine.StaticImage>`  | `items: ImageItem[]`, `cacheKey: string`, `layer = 1`                                                                                 |
 | `<CanvasTileEngine.Sprite>`       | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?` |
-| `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config) => void`, `layer = 1`                                                                               |
+| `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config, transform) => void`, `layer = 1`                                                                    |
 
 Item shapes are identical to the core draw API: [drawing.md](drawing.md).
 Sprite semantics: [sprites.md](sprites.md).
 
+Static components clear their cache automatically when `items` gets a new
+array identity (or when `cacheKey` changes) — no manual `clearStaticCache`
+call is needed, unlike the core API.
+
 ```tsx
 <CanvasTileEngine.DrawFunction layer={5}>
-    {(ctx, topLeft, config) => {
+    {(ctx, topLeft, config, transform) => {
         const c = ctx as CanvasRenderingContext2D;
+        // worldToScreen takes item-space coords (integers = cell centers)
+        const p = transform.worldToScreen(0, 0);
         c.fillStyle = "rgba(255,255,255,0.6)";
-        c.fillRect(
-            (0 - topLeft.x) * config.scale,
-            (0 - topLeft.y) * config.scale,
-            config.scale,
-            config.scale,
-        );
+        c.fillRect(p.x - config.scale / 2, p.y - config.scale / 2, config.scale, config.scale);
     }}
 </CanvasTileEngine.DrawFunction>
 ```

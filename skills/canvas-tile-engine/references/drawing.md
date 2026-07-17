@@ -63,10 +63,17 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
         x?: number;               // 0..1, default 0.5
         y?: number;               // 0..1, default 0.5
     };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number };
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        lineWidth?: number;    // border width in WORLD units (scales with zoom)
+        lineWidthPx?: number;  // border width in screen px (zoom-independent); wins over lineWidth
+    };
     rotate?: number;          // degrees, positive = clockwise (Rect/Image only)
-    radius?: number | number[]; // px corner radius (Rect only);
+    radius?: number | number[]; // corner radius in WORLD units, scales with zoom (Rect only);
                               // array = [topLeft, topRight, bottomRight, bottomLeft]
+    data?: TData;             // arbitrary app data; never read by the engine,
+                              // returned as hit.item.data from hitTest
 }
 ```
 
@@ -97,8 +104,8 @@ Adds to the shared fields:
 ```
 
 ```ts
-engine.drawRect({ x: 2, y: 3, size: 1, rotate: 45, radius: 6,
-                  style: { fillStyle: "#22c55e", strokeStyle: "#166534", lineWidth: 2 } }, 1);
+engine.drawRect({ x: 2, y: 3, size: 1, rotate: 45, radius: 0.12,
+                  style: { fillStyle: "#22c55e", strokeStyle: "#166534", lineWidth: 0.05 } }, 1);
 engine.drawRect(rectArray, 1);   // arrays are the fast path for many items
 
 // Non-square: one 4x2 zone floor instead of 8 one-cell rects
@@ -178,20 +185,27 @@ animation: [sprites.md](sprites.md).
 // Line: independent segments
 engine.drawLine(
     [{ from: { x: 0, y: 0 }, to: { x: 5, y: 5 } }],
-    { strokeStyle: "#f59e0b", lineWidth: 2 },
+    { strokeStyle: "#f59e0b", lineWidthPx: 2 },
     1,
 );
 
 // Path: polyline through points (Path = Coords[]; pass Path or Path[])
 engine.drawPath(
     [{ x: 0, y: 0 }, { x: 2, y: 1 }, { x: 4, y: 0 }],
-    { strokeStyle: "#a78bfa", lineWidth: 2 },
+    { strokeStyle: "#a78bfa", lineWidthPx: 2 },
     1,
 );
+
+// Dashed (e.g. ferry routes, planned segments): lineDash is world units,
+// lineDashPx is screen px and wins. Pattern flows around Path corners.
+engine.drawPath(route, { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] }, 1);
 ```
 
 Note the style object is a separate second argument for Line/Path (not per
-item).
+item). LineStyle = { strokeStyle?, lineWidth? (world), lineWidthPx?,
+lineDash? (world), lineDashPx? }. UNIT RULE (matches Text size/fontPx):
+plain numbers are world units and scale with zoom; *Px variants are screen
+pixels and take precedence. GridLines lineWidth stays px by design.
 
 ### Grid lines
 
@@ -244,20 +258,29 @@ Full rendering control on any layer. The `ctx` type depends on the renderer:
 | renderer-server | `SKRSContext2D` (`@napi-rs/canvas`) |
 
 ```ts
-engine.addDrawFunction((ctx, topLeft, config) => {
+engine.addDrawFunction((ctx, topLeft, config, transform) => {
     const c = ctx as CanvasRenderingContext2D;
-    // Convert world -> screen manually: screenX = (worldX - topLeft.x) * config.scale
-    const sx = (3 - topLeft.x) * config.scale;
-    const sy = (2 - topLeft.y) * config.scale;
+    // transform.worldToScreen takes ITEM-space coords (integers = cell
+    // centers) and returns the pixel position — never hand-roll
+    // (world - topLeft) * scale or the 0.5 cell offset.
+    const p = transform.worldToScreen(3, 2); // center of cell (3, 2)
     c.fillStyle = "rgba(255,255,255,0.8)";
-    c.fillRect(sx, sy, config.scale, config.scale);
+    c.fillRect(p.x - config.scale / 2, p.y - config.scale / 2, config.scale, config.scale);
 }, 5);
 ```
 
 `topLeft` is the camera's top-left world coordinate; `config` is the
-normalized config with live `scale` and `size`. `engine.onDraw = (ctx, info)`
-is similar but runs after ALL layers every frame (`info` carries `scale`,
-`width`, `height`, `coords`).
+normalized config with live `scale` and `size`; `transform` also has
+`screenToWorld(x, y)`, which returns raw corner-space coords (the same space
+as event `coords.raw`). `engine.onDraw` has the SAME signature and runs after
+ALL layers every frame — code moves between the two hooks unchanged; only the
+timing/z-order differs (and `clearAll()` does not remove `onDraw`).
+
+RULE: everything passed to `ctx` is pixels. `worldToScreen` is for drawing
+(world in, pixels out); `screenToWorld` is for querying (pixels in, world
+out — feed it to `Math.floor`/`hitTest`, never back into `ctx`, and note
+`worldToScreen(screenToWorld(p))` is half a cell off by design: the two
+speak different world spaces).
 
 ## High-DPI
 

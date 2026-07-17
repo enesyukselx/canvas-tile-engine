@@ -145,3 +145,10 @@ Sprite mechanics are identical across platforms: [sprites.md](sprites.md).
   `View` renders nothing.
 - Writing 2D-context code in `DrawFunction`: the ctx is an `SkCanvas`; use
   `Skia.Paint()` and SkCanvas methods.
+- Putting an interactive (drag/zoom) map inside a `ScrollView`: NOT
+  supported — on RN's New Architecture the JS responder cannot block the
+  parent's native scroll gesture, so both pan at once, and `scrollEnabled`
+  toggling / `canCancelContentTouches` workarounds lose the race. Keep the
+  map outside the scroll area, or embed a non-interactive preview (no
+  `eventHandlers` — the wrapper then doesn't claim the responder and the
+  page scrolls over it) with a fullscreen interactive map behind a tap.
