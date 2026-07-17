@@ -56,10 +56,7 @@
         "@canvas-tile-engine/core": ">=0.4.0"
     },
     "dependencies": {
-        "@canvas-tile-engine/core": "workspace:^",
-        "earcut": "^2.2.4"
+        "@canvas-tile-engine/core": "workspace:^"
     },
-    "devDependencies": {
-        "@types/earcut": "^2.1.4"
-    }
+    "devDependencies": {}
 }

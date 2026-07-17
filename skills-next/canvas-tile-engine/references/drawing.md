@@ -223,9 +223,9 @@ items accept `data?` now that lines surface in hit results. LineStyle =
 { strokeStyle?, lineWidth? (world), lineWidthPx?, lineDash? (world),
 lineDashPx? }. UNIT RULE (matches Text size/fontPx): plain numbers are world
 units and scale with zoom; *Px variants are screen pixels and take
-precedence. GridLines lineWidth stays px by design. WebGL fills paths via
-earcut triangulation, so fillRule on self-intersecting outlines is
-approximated there (exact on Canvas2D/Skia/server).
+precedence. GridLines lineWidth stays px by design. Path fills are exact on
+every renderer, both fill rules and self-intersecting outlines included
+(WebGL uses a two-pass stencil-then-cover fill).
 
 ### Grid lines
 

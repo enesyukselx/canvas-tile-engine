@@ -22,7 +22,6 @@ import {
 import type { LineStyle } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
 import { roundedPolyline, roundedRing } from "../utils/corners";
-import earcut from "earcut";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
@@ -293,27 +292,10 @@ export class WebGLDraw {
     }
 
     drawPath(items: PathItem[], layer: number = 1): DrawHandle {
-        // Pre-triangulate filled items without corner rounding: triangulation
-        // is pure topology and the world→screen transform is affine, so the
-        // indices are camera-independent and per frame only the vertices
-        // move. Rounded outlines are defined in screen pixels, so they
-        // re-flatten and re-triangulate per frame instead.
-        const staticIndices = items.map((item) => {
-            const style = item.style;
-            if (style?.fillStyle === undefined || item.points.length < 3) return null;
-            if (style.cornerRadius !== undefined || style.cornerRadiusPx !== undefined) return null;
-            const flat: number[] = [];
-            for (const p of item.points) flat.push(p.x, p.y);
-            const indices = earcut(flat);
-            return indices.length ? indices : null;
-        });
-
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const lines: LineInstance[] = [];
-            const fill: number[] = [];
 
-            for (let n = 0; n < items.length; n++) {
-                const item = items[n];
+            for (const item of items) {
                 const points = item.points;
                 if (!points || points.length < 2) continue;
 
@@ -340,18 +322,11 @@ export class WebGLDraw {
 
                 if (filled && points.length >= 3) {
                     // Like Canvas2D fill(), the outline closes implicitly.
-                    // Note: earcut triangulates simple polygons, so the
-                    // fillRule distinction on self-intersecting outlines is
-                    // approximated (exact on the Canvas2D/Skia renderers).
+                    // Stencil-then-cover fill: exact nonzero/evenodd winding
+                    // (self-intersecting outlines included), same result as
+                    // the Canvas2D/Skia renderers.
                     const color = this.colorParser.parse(style!.fillStyle!);
-                    const indices = staticIndices[n] ?? this.triangulate(outline);
-                    const ring = staticIndices[n] ? pts : outline;
-                    if (indices) {
-                        for (const idx of indices) {
-                            const p = ring[idx];
-                            fill.push(p.x, p.y, color[0], color[1], color[2], color[3]);
-                        }
-                    }
+                    gl.fillPath(outline, color, item.fillRule === "evenodd");
                 }
 
                 if (style?.strokeStyle !== undefined || !filled) {
@@ -371,18 +346,8 @@ export class WebGLDraw {
                 }
             }
 
-            gl.drawTriangles(new Float32Array(fill), fill.length / 6);
             gl.drawLines(lines);
         });
-    }
-
-    /** Per-frame triangulation for rounded (screen-pixel-defined) outlines. */
-    private triangulate(ring: Coords[]): number[] | null {
-        if (ring.length < 3) return null;
-        const flat: number[] = [];
-        for (const p of ring) flat.push(p.x, p.y);
-        const indices = earcut(flat);
-        return indices.length ? indices : null;
     }
 
     drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {

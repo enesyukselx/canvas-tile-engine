@@ -1,23 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
+import { CoordinateTransformer, Coords, ICamera } from "@canvas-tile-engine/core";
 import { WebGLDraw } from "../../src/modules/WebGLDraw";
 import { Layer } from "../../src/modules/Layer";
+import type { RGBA } from "../../src/utils/color";
 import type { GLRenderer, LineInstance } from "../../src/modules/gl/GLRenderer";
 
-// Fake GL renderer recording triangle batches and line instances.
+// Fake GL renderer recording stencil-cover fills and line instances.
 function makeRecordingGL() {
-    const triangles: Array<{ data: Float32Array; vertexCount: number }> = [];
+    const fills: Array<{ ring: Coords[]; color: RGBA; evenOdd: boolean }> = [];
     const lines: LineInstance[] = [];
     const gl = {
-        drawTriangles(data: Float32Array, vertexCount: number) {
-            triangles.push({ data, vertexCount });
+        fillPath(ring: Coords[], color: RGBA, evenOdd: boolean) {
+            fills.push({ ring, color, evenOdd });
         },
         drawLines(items: LineInstance[]) {
             lines.push(...items);
         },
         drawShapes() {},
     } as unknown as GLRenderer;
-    return { gl, triangles, lines };
+    return { gl, fills, lines };
 }
 
 function setup() {
@@ -40,15 +41,23 @@ const square = [
 ];
 
 describe("WebGLDraw path items", () => {
-    it("triangulates filled items (two triangles for a square) and skips the stroke when fill-only", () => {
+    it("fills via stencil-cover with the item's fill rule and skips the stroke when fill-only", () => {
         const { draw, render } = setup();
-        const { gl, triangles, lines } = makeRecordingGL();
+        const { gl, fills, lines } = makeRecordingGL();
 
-        draw.drawPath([{ points: square, style: { fillStyle: "#f00" } }], 1);
+        draw.drawPath(
+            [
+                { points: square, style: { fillStyle: "#f00" } },
+                { points: square, fillRule: "evenodd", style: { fillStyle: "#0f0" } },
+            ],
+            1,
+        );
         render(gl);
 
-        expect(triangles).toHaveLength(1);
-        expect(triangles[0].vertexCount).toBe(6);
+        expect(fills).toHaveLength(2);
+        expect(fills[0].ring).toHaveLength(4);
+        expect(fills[0].evenOdd).toBe(false);
+        expect(fills[1].evenOdd).toBe(true);
         expect(lines).toHaveLength(0);
     });
 
@@ -68,12 +77,12 @@ describe("WebGLDraw path items", () => {
 
     it("strokes a hairline by default when the item has no style", () => {
         const { draw, render } = setup();
-        const { gl, lines, triangles } = makeRecordingGL();
+        const { gl, lines, fills } = makeRecordingGL();
 
         draw.drawPath([{ points: square.slice(0, 2) }], 1);
         render(gl);
 
-        expect(triangles[0].vertexCount).toBe(0);
+        expect(fills).toHaveLength(0);
         expect(lines).toHaveLength(1);
     });
 
@@ -88,15 +97,14 @@ describe("WebGLDraw path items", () => {
         expect(lines.length).toBeGreaterThan(8);
     });
 
-    it("re-triangulates rounded filled outlines instead of using the registration-time indices", () => {
+    it("fills the rounded (flattened) outline, not the raw polygon", () => {
         const { draw, render } = setup();
-        const { gl, triangles } = makeRecordingGL();
+        const { gl, fills } = makeRecordingGL();
 
         draw.drawPath([{ points: square, closed: true, style: { fillStyle: "#f00", cornerRadius: 1 } }], 1);
         render(gl);
 
-        // The rounded ring has more vertices than the square, so the fan
-        // produces more than the square's two triangles.
-        expect(triangles[0].vertexCount).toBeGreaterThan(6);
+        // The rounded ring has more vertices than the source square
+        expect(fills[0].ring.length).toBeGreaterThan(4);
     });
 });
