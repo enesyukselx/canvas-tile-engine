@@ -15,6 +15,7 @@ import type {
     Rect,
     LineStyle,
     DrawTransform,
+    PathItem,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -198,7 +199,9 @@ export interface EngineHandle {
     /** Draw text */
     drawText(items: Text | Text[], layer?: number): DrawHandle;
 
-    /** Draw paths/polylines */
+    /** Draw free-form paths: open/closed polylines, filled shapes, per-item styling */
+    drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle;
+    /** @deprecated Pass `PathItem` objects instead (`{ points, style }`). */
     drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
 
     /** Draw images */
@@ -432,8 +435,15 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.drawText(items, layer) ?? droppedDraw("drawText");
             },
 
-            drawPath(items, style, layer) {
-                return instanceRef.current?.drawPath(items, style, layer) ?? droppedDraw("drawPath");
+            drawPath(
+                items: PathItem | PathItem[] | Coords[] | Coords[][],
+                styleOrLayer?: LineStyle | number,
+                maybeLayer?: number,
+            ) {
+                return (
+                    instanceRef.current?.drawPath(items as never, styleOrLayer as never, maybeLayer as never) ??
+                    droppedDraw("drawPath")
+                );
             },
 
             drawImage(items, layer) {

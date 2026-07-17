@@ -16,6 +16,8 @@ import type {
     Line,
     Circle,
     Path,
+    PathItem,
+    PathStyle,
     Text,
     ImageItem,
     IRenderer,
@@ -41,6 +43,8 @@ export type {
     Circle,
     Text,
     Path,
+    PathItem,
+    PathStyle,
     ImageItem,
     IRenderer,
 };
