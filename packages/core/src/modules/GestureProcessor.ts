@@ -6,8 +6,10 @@ import {
     onMouseDownCallback,
     onMouseLeaveCallback,
     onMouseUpCallback,
+    onWheelCallback,
     onZoomCallback,
 } from "../types";
+import { DEFAULT_VALUES } from "../constants";
 import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
@@ -97,6 +99,7 @@ export class GestureProcessor {
     public onMouseUp?: onMouseUpCallback;
     public onMouseLeave?: onMouseLeaveCallback;
     public onZoom?: onZoomCallback;
+    public onWheel?: onWheelCallback;
 
     constructor(
         private camera: ICamera,
@@ -131,6 +134,21 @@ export class GestureProcessor {
                 },
             },
         };
+    }
+
+    /**
+     * Fire onWheel with processed coords for the gesture position. Coords are
+     * processed after the zoom is applied, so they reflect the new camera
+     * state (matching onZoom, which reports the new scale).
+     */
+    private notifyWheel(pointer: NormalizedPointer, deltaY: number, source: "wheel" | "pinch"): void {
+        if (!this.onWheel || deltaY === 0) return;
+        const { coords, mouse, client } = this.processCoords(pointer);
+        this.onWheel(coords, mouse, client, {
+            deltaY,
+            direction: deltaY < 0 ? "in" : "out",
+            source,
+        });
     }
 
     /**
@@ -292,6 +310,19 @@ export class GestureProcessor {
 
             this.lastPinchDistance = currentDistance;
             this.lastPinchCenter = currentCenter;
+            // Deltas are synthesized as the wheel delta producing the same
+            // zoom factor (factor = exp(-delta * sensitivity), inverted), so
+            // wheel and pinch consumers read one consistent axis.
+            this.notifyWheel(
+                {
+                    x: currentCenter.x - bounds.left,
+                    y: currentCenter.y - bounds.top,
+                    clientX: currentCenter.x,
+                    clientY: currentCenter.y,
+                },
+                scaleFactor === 1 ? 0 : -Math.log(scaleFactor) / DEFAULT_VALUES.ZOOM_SENSITIVITY,
+                "pinch",
+            );
             if (this.onZoom) {
                 this.onZoom(this.camera.scale);
             }
@@ -373,6 +404,7 @@ export class GestureProcessor {
                 ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
                 : { x: pointer.clientX, y: pointer.clientY };
         this.camera.zoom(anchor.x, anchor.y, deltaY, bounds as DOMRect);
+        this.notifyWheel(pointer, deltaY, "wheel");
         if (this.onZoom) {
             this.onZoom(this.camera.scale);
         }

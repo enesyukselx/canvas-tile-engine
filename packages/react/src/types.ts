@@ -9,6 +9,7 @@ import type {
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    onWheelCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -32,6 +33,7 @@ export type {
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    onWheelCallback,
     onZoomCallback,
     onDrawCallback,
     Rect,
@@ -218,4 +220,17 @@ export interface CanvasTileEngineProps {
      * ```
      */
     onZoom?: onZoomCallback;
+
+    /**
+     * Callback for wheel (desktop) and pinch (touch) zoom gestures. Requires
+     * `eventHandlers.zoom`. Reports the input gesture with its position; for
+     * pinch the coordinates describe the pinch midpoint.
+     * @example
+     * ```tsx
+     * onWheel={(coords, mouse, client, wheel) => {
+     *     console.log(`${wheel.source} zoom ${wheel.direction} at`, coords.snapped);
+     * }}
+     * ```
+     */
+    onWheel?: onWheelCallback;
 }

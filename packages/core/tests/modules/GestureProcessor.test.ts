@@ -266,6 +266,111 @@ describe("GestureProcessor", () => {
         });
     });
 
+    describe("onWheel callback", () => {
+        const coordsShape = expect.objectContaining({
+            raw: expect.any(Object) as unknown,
+            snapped: expect.any(Object) as unknown,
+        }) as unknown;
+
+        it("fires on wheel with coords and gesture info", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+
+            processor.handleWheel(createPointer(100, 100), -50);
+
+            expect(onWheel).toHaveBeenCalledTimes(1);
+            expect(onWheel).toHaveBeenCalledWith(coordsShape, coordsShape, coordsShape, {
+                deltaY: -50,
+                direction: "in",
+                source: "wheel",
+            });
+        });
+
+        it("reports direction out for positive wheel delta", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+
+            processor.handleWheel(createPointer(100, 100), 50);
+
+            expect(onWheel).toHaveBeenCalledWith(
+                coordsShape,
+                coordsShape,
+                coordsShape,
+                expect.objectContaining({ direction: "out" }),
+            );
+        });
+
+        it("does not fire on a wheel event with zero deltaY", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+
+            processor.handleWheel(createPointer(100, 100), 0);
+
+            expect(onWheel).not.toHaveBeenCalled();
+        });
+
+        it("does not fire when zoom is disabled", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+            config.updateEventHandlers({ zoom: false });
+
+            processor.handleWheel(createPointer(100, 100), -50);
+
+            expect(onWheel).not.toHaveBeenCalled();
+        });
+
+        it("fires on pinch with the midpoint position and a factor-equivalent delta", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+
+            // Distance grows from ~141 to ~283: factor 2 (zoom in)
+            processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+            processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
+
+            expect(onWheel).toHaveBeenCalledTimes(1);
+            const [coords, mouse, , wheel] = onWheel.mock.calls[0] as [
+                unknown,
+                { raw: { x: number; y: number } },
+                unknown,
+                { deltaY: number; direction: string; source: string },
+            ];
+            expect(coords).toEqual(coordsShape);
+            // Pinch midpoint is (150, 150), canvas offset is (0, 0)
+            expect(mouse.raw).toEqual({ x: 150, y: 150 });
+            expect(wheel.source).toBe("pinch");
+            expect(wheel.direction).toBe("in");
+            // The synthesized delta must reproduce the pinch factor through
+            // the wheel formula: factor = exp(-deltaY * sensitivity)
+            expect(Math.exp(-wheel.deltaY * 0.001)).toBeCloseTo(2);
+        });
+
+        it("reports direction out when the pinch closes", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+
+            processor.handleTouchStart([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
+            processor.handleTouchMove([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+
+            expect(onWheel).toHaveBeenCalledWith(
+                coordsShape,
+                coordsShape,
+                coordsShape,
+                expect.objectContaining({ direction: "out", source: "pinch" }),
+            );
+        });
+
+        it("does not fire when a pinch moves without changing distance", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+
+            processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+            // Both fingers shift +60 on x: midpoint moves, distance unchanged
+            processor.handleTouchMove([createPointer(160, 100, 160, 100), createPointer(260, 200, 260, 200)]);
+
+            expect(onWheel).not.toHaveBeenCalled();
+        });
+    });
+
     describe("touch handlers", () => {
         describe("handleTouchStart", () => {
             it("starts drag mode with single finger", () => {

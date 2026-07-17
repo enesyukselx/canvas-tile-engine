@@ -211,6 +211,8 @@ engine.onMouseUp    = (coords, mouse, client) => {};
 engine.onMouseLeave = (coords, mouse, client) => {};
 engine.onCoordsChange = (center: Coords) => {};       // any camera movement
 engine.onZoom       = (scale: number) => {};          // any scale change
+engine.onWheel      = (coords, mouse, client, wheel) => {}; // wheel/pinch zoom
+                                       // gesture; wheel = { deltaY, direction, source }
 engine.onResize     = () => {};
 engine.onDraw       = (ctx, coords, config, transform) => {}; // after each frame,
                                        // same signature as addDrawFunction (drawing.md)
