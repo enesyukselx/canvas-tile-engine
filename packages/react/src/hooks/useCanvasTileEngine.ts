@@ -111,7 +111,10 @@ export interface EngineHandle {
     /** Render a frame */
     render(): void;
 
-    /** Get current center coordinates */
+    /** Get the current view center in world coordinates */
+    getCenter(): Coords;
+
+    /** @deprecated Use {@link getCenter} instead. */
     getCenterCoords(): Coords;
 
     /** Get visible world coordinate bounds of the viewport */
@@ -122,10 +125,16 @@ export interface EngineHandle {
         maxY: number;
     };
 
-    /** Update center coordinates */
+    /** Move the view center instantly */
+    setCenter(center: Coords): void;
+
+    /** @deprecated Use {@link setCenter} instead. */
     updateCoords(center: Coords): void;
 
-    /** Animate to target coordinates */
+    /** Animate the view center to target coordinates */
+    goCenter(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
+
+    /** @deprecated Use {@link goCenter} instead. */
     goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
 
     /** Resize the canvas */
@@ -305,8 +314,12 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.render();
             },
 
+            getCenter() {
+                return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
+            },
+
             getCenterCoords() {
-                return instanceRef.current?.getCenterCoords() ?? { x: 0, y: 0 };
+                return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
             },
 
             getVisibleBounds() {
@@ -320,12 +333,20 @@ export function useCanvasTileEngine(): EngineHandle {
                 );
             },
 
+            setCenter(center: Coords) {
+                instanceRef.current?.setCenter(center);
+            },
+
             updateCoords(center: Coords) {
-                instanceRef.current?.updateCoords(center);
+                instanceRef.current?.setCenter(center);
+            },
+
+            goCenter(x: number, y: number, durationMs?: number, onComplete?: () => void) {
+                instanceRef.current?.goCenter(x, y, durationMs, onComplete);
             },
 
             goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void) {
-                instanceRef.current?.goCoords(x, y, durationMs, onComplete);
+                instanceRef.current?.goCenter(x, y, durationMs, onComplete);
             },
 
             resize(width: number, height: number, durationMs?: number, onComplete?: () => void) {

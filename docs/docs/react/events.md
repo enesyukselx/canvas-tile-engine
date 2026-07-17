@@ -297,8 +297,8 @@ useEffect(() => {
 The hook handle exposes the same camera controls as the core engine.
 
 ```tsx
-engine.updateCoords({ x: 10, y: 10 });
-engine.goCoords(0, 0, 500);
+engine.setCenter({ x: 10, y: 10 });
+engine.goCenter(0, 0, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
 engine.zoomIn();

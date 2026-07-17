@@ -69,8 +69,8 @@ import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 ```tsx
 engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
 engine.setEventHandlers({ drag: false, hover: true });
-engine.updateCoords({ x: 10, y: 10 });
-engine.goCoords(0, 0, 500);
+engine.setCenter({ x: 10, y: 10 });
+engine.goCenter(0, 0, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
 ```
@@ -95,9 +95,9 @@ Common methods:
 
 ```tsx
 engine.render();
-engine.getCenterCoords();
+engine.getCenter();
 engine.getVisibleBounds();
-engine.goCoords(10, 10, 500);
+engine.goCenter(10, 10, 500);
 engine.resize(1024, 768, 300);
 engine.zoomIn();
 engine.zoomOut();
