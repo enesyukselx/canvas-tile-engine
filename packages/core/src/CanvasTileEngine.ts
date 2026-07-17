@@ -385,13 +385,19 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Set the canvas scale directly, clamped to min/max bounds.
+     * The change is anchored at the viewport center, matching goScale/zoomIn/zoomOut.
      * @param newScale The desired scale value.
      * @throws {ConfigValidationError} If scale is not a positive finite number.
      */
     setScale(newScale: number) {
         validateScale(newScale);
         const prevScale = this.camera.scale;
+        const size = this.viewport.getSize();
+        // Restore the center after the scale change: camera.setScale alone
+        // anchors at the top-left corner, which would drift the view.
+        const center = this.camera.getCenter(size.width, size.height);
         this.camera.setScale(newScale);
+        this.camera.setCenter(center, size.width, size.height);
         this.notifyZoomIfChanged(prevScale);
         this.handleCameraChange();
     }

@@ -125,7 +125,7 @@ after mount.
 | `setCenter(center: Coords): void` | Jump to a new center instantly. Throws on non-finite values. |
 | `goCenter(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
 | `getScale(): number` | Current scale (px per world unit). |
-| `setScale(n): void` | Set scale directly, clamped to min/max. |
+| `setScale(n): void` | Set scale directly, clamped to min/max. Anchored at the viewport center. |
 | `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
 | `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
 | `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Throws on non-positive/non-finite values or `minScale > maxScale`. |
