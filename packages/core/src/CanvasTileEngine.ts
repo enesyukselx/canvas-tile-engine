@@ -18,6 +18,7 @@ import {
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    onWheelCallback,
     Circle,
     ImageItem,
     Text,
@@ -262,6 +263,34 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     public set onZoom(cb: ((scale: number) => void) | undefined) {
         this._onZoom = cb;
         this.renderer.onZoom = cb;
+    }
+
+    private _onWheel?: onWheelCallback;
+
+    /**
+     * Callback for wheel (desktop) and pinch (touch) zoom gestures. Requires
+     * `eventHandlers.zoom`; fires even when the scale is clamped at a limit.
+     * Unlike `onZoom` (which reports the resulting scale, including
+     * programmatic changes), this reports the input gesture itself with its
+     * position. For pinch, the coordinates describe the pinch midpoint and
+     * `deltaY` is the wheel delta that would produce the same zoom factor.
+     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
+     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
+     * @param client - Viewport position: `raw` (exact), `snapped` (tile-aligned)
+     * @param wheel - Gesture details: `deltaY` (negative = zoom in), `direction`, `source`
+     * @example
+     * ```ts
+     * engine.onWheel = (coords, mouse, client, wheel) => {
+     *     console.log(`${wheel.source} zoom ${wheel.direction} at`, coords.snapped);
+     * };
+     * ```
+     */
+    public get onWheel(): onWheelCallback | undefined {
+        return this._onWheel;
+    }
+    public set onWheel(cb: onWheelCallback | undefined) {
+        this._onWheel = cb;
+        this.renderer.onWheel = cb;
     }
 
     /**
