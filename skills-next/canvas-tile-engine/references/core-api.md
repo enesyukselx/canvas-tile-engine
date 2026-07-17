@@ -149,7 +149,7 @@ and semantics: [drawing.md](drawing.md).
 | `drawImage(items: ImageItem \| ImageItem[], layer?)` | 1 |
 | `drawText(items: Text \| Text[], layer?)` | 2 |
 | `drawLine(items: Line \| Line[], style?: LineStyle, layer?)` | 1 |
-| `drawPath(items: Path \| Path[], style?: LineStyle, layer?)` | 1 |
+| `drawPath(items: PathItem \| PathItem[], layer?)` — legacy `(Path \| Path[], style?, layer?)` deprecated | 1 |
 | `drawGridLines(cellSize: number, lineWidth = 1, strokeStyle = "black", layer = 0)` | 0 |
 | `drawStaticRect(items: Rect[], cacheKey: string, layer?)` | 1 |
 | `drawStaticCircle(items: Circle[], cacheKey: string, layer?)` | 1 |
@@ -169,10 +169,10 @@ and semantics: [drawing.md](drawing.md).
 
 | Signature | Notes |
 | :-- | :-- |
-| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
+| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image/path/line items under a world point, highest visual priority first (higher layer, later registration, later item). |
 | `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Topmost item only. |
 
-`HitResult` = `{ item, kind: "rect"|"circle"|"image", layer, handle, index }`;
+`HitResult` = `{ item, kind: "rect"|"circle"|"image"|"path"|"line", layer, handle, index }`;
 `item` is the exact object passed to the draw call. Every drawable item
 accepts an optional `data?: TData` field the engine never reads - attach app
 data there and read it back as `hit.item.data`. The `TData` type parameter
@@ -181,8 +181,11 @@ types that field (assertion only, no runtime check). Prefer `data` over
 goes stale when a filtered/re-ordered array is re-drawn. Pass `coords.raw`
 from event callbacks; origin anchoring, non-square Rect `width`/`height`,
 image aspect fit, and rotation are handled internally - the hit box is always
-the drawn box. Covers `drawStatic*` variants too; Line/Path/Text are NOT
-hit-testable. Position mutations require re-registration to be reflected
+the drawn box. Covers `drawStatic*` variants too. Paths and lines: filled
+paths hit on their interior (item `fillRule`); unfilled paths and lines hit
+within half the stroke width (resolved against the live scale, min 8px tap
+width so hairlines stay tappable). Text is NOT hit-testable. Position
+mutations require re-registration to be reflected
 (same rule as rendering). 500+ item draw calls are queried via a spatial
 index - hover-frequency use is fine at scale.
 

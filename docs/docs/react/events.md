@@ -314,8 +314,9 @@ engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
 ## Hit Testing
 
 `engine.hitTest` / `engine.hitTestFirst` answer "which item is under this
-point?" for rect, circle, and image items - including items drawn by the
-declarative components, which register through the same engine. Pass
+point?" for rect, circle, image, path, and line items - including items
+drawn by the declarative components, which register through the same
+engine. Pass
 `coords.raw` from any event prop; origin anchoring, image aspect fit, and
 rotation are handled internally. Before the engine mounts the methods
 return an empty result, so no null checks are needed.
@@ -350,9 +351,11 @@ function StationMap() {
 ```
 
 Results are `{ item, kind, layer, handle, index }`, ordered by visual
-priority (higher layer, then later registration, then later item). Line,
-Path, and Text are not hit-testable, and - like rendering - position
-mutations require re-registration to be reflected.
+priority (higher layer, then later registration, then later item). Filled
+paths hit on their interior; unfilled paths and lines hit within half the
+stroke width of the geometry (with a minimum tap width for hairlines). Text
+is not hit-testable, and - like rendering - position mutations require
+re-registration to be reflected.
 
 Every drawable item accepts an optional `data` field the engine never reads;
 use it to identify hits instead of `hit.index`, which goes stale when you

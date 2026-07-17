@@ -189,23 +189,43 @@ engine.drawLine(
     1,
 );
 
-// Path: polyline through points (Path = Coords[]; pass Path or Path[])
+// Path: PathItem objects — open polylines, closed outlines, filled shapes
 engine.drawPath(
-    [{ x: 0, y: 0 }, { x: 2, y: 1 }, { x: 4, y: 0 }],
-    { strokeStyle: "#a78bfa", lineWidthPx: 2 },
+    {
+        points: [{ x: 0, y: 0 }, { x: 2, y: 1 }, { x: 4, y: 0 }],
+        style: { strokeStyle: "#a78bfa", lineWidthPx: 2 },
+    },
     1,
 );
 
+// Filled zone: closed rounds every corner; fillStyle closes implicitly for
+// filling (Canvas2D fill() semantics) and makes the interior hit-testable.
+engine.drawPath({
+    points: zoneOutline,
+    closed: true,
+    fillRule: "nonzero", // or "evenodd"; matters on self-intersecting outlines
+    style: { fillStyle: "#22c55e55", strokeStyle: "#166534", lineWidthPx: 2, cornerRadius: 0.5 },
+    data: { id: "zone-a" },
+}, 1);
+
 // Dashed (e.g. ferry routes, planned segments): lineDash is world units,
-// lineDashPx is screen px and wins. Pattern flows around Path corners.
-engine.drawPath(route, { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] }, 1);
+// lineDashPx is screen px and wins. Pattern flows around corners, rounded ones too.
+engine.drawPath({ points: route, style: { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] } }, 1);
 ```
 
-Note the style object is a separate second argument for Line/Path (not per
-item). LineStyle = { strokeStyle?, lineWidth? (world), lineWidthPx?,
-lineDash? (world), lineDashPx? }. UNIT RULE (matches Text size/fontPx):
-plain numbers are world units and scale with zoom; *Px variants are screen
-pixels and take precedence. GridLines lineWidth stays px by design.
+PathItem = { points: Coords[], closed?, fillRule? ("nonzero" default |
+"evenodd"), style?, data? }. PathStyle = LineStyle fields + fillStyle? +
+cornerRadius? (world) / cornerRadiusPx? (px, wins) for tangent-arc corner
+rounding. Fill-only items draw no outline; unstyled items stroke a hairline.
+The legacy `drawPath(Coords[] | Coords[][], style?, layer?)` form is
+deprecated (stroke-only). Line keeps its call-level style argument, and Line
+items accept `data?` now that lines surface in hit results. LineStyle =
+{ strokeStyle?, lineWidth? (world), lineWidthPx?, lineDash? (world),
+lineDashPx? }. UNIT RULE (matches Text size/fontPx): plain numbers are world
+units and scale with zoom; *Px variants are screen pixels and take
+precedence. GridLines lineWidth stays px by design. WebGL fills paths via
+earcut triangulation, so fillRule on self-intersecting outlines is
+approximated there (exact on Canvas2D/Skia/server).
 
 ### Grid lines
 

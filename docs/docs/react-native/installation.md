@@ -71,7 +71,7 @@ The same compound components are available:
 | `CanvasTileEngine.Sprite`                  | Animated spritesheet frames.                            |
 | `CanvasTileEngine.GridLines`               | Infinite grid lines.                                    |
 | `CanvasTileEngine.Line`                    | Line segments.                                          |
-| `CanvasTileEngine.Path`                    | Polylines.                                              |
+| `CanvasTileEngine.Path`                    | Free-form paths: polylines, closed/filled shapes.       |
 | `CanvasTileEngine.Text`                    | Text in world space.                                    |
 | `CanvasTileEngine.DrawFunction`            | Custom Skia drawing.                                    |
 

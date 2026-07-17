@@ -952,7 +952,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     // ─── Hit testing ───────────
 
     /**
-     * All rect/circle/image items under a world point, highest visual
+     * All rect/circle/image/path/line items under a world point, highest visual
      * priority first (higher layer, then later registration, then later
      * item within a draw call). Pass the `coords.raw` value from event
      * callbacks - origin anchoring, image aspect fit, and rotation are

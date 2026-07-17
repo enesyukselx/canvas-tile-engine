@@ -187,17 +187,7 @@ engine.drawLine(
 );
 ```
 
-### `drawPath`
-
-Draw a continuous line through multiple points. Supports a single path (array of points) or an array of paths.
-
-```typescript
-drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle
-```
-
-**Path:** An array of `{ x, y }` coordinates.
-
-**`LineStyle`** (shared by `drawLine` and `drawPath`):
+**`LineStyle`** (used by `drawLine`):
 
 | Property      | Unit  | Description                                                             |
 | :------------ | :---- | :---------------------------------------------------------------------- |
@@ -207,45 +197,76 @@ drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle
 | `lineDash`    | world | Dash pattern anchored to the world; dashes scale with zoom.             |
 | `lineDashPx`  | px    | Zoom-independent dash pattern; wins over `lineDash`.                    |
 
-Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat). Along a `Path`, the pattern flows continuously around corners.
+Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat).
+
+Lines participate in hit testing: a click/tap within half the stroke width of a segment hits it (with a minimum tap width for hairlines). An optional `data` field on each line carries through to hit results.
+
+### `drawPath`
+
+Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `PathItem` owns its geometry and style.
+
+```typescript
+drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle
+```
+
+**`PathItem` properties:**
+
+| Property   | Type                      | Default     | Description                                                                                 |
+| :--------- | :------------------------ | :---------- | :------------------------------------------------------------------------------------------ |
+| `points`   | `Coords[]`                | -           | **Required.** Polyline vertices in world units.                                             |
+| `closed`   | `boolean`                 | `false`     | Join the last point back to the first with a closing segment.                               |
+| `fillRule` | `"nonzero" \| "evenodd"`  | `"nonzero"` | Canvas2D fill rule; the difference shows on self-intersecting outlines.                     |
+| `style`    | `PathStyle`               | -           | Per-item styling (below).                                                                   |
+| `data`     | `TData`                   | -           | App data carried through to hit results; never read by the engine.                          |
+
+**`PathStyle`** extends the `LineStyle` fields above with:
+
+| Property         | Unit  | Description                                                                             |
+| :--------------- | :---- | :-------------------------------------------------------------------------------------- |
+| `fillStyle`      | -     | Fill color. Setting it makes the path a filled shape (the outline closes implicitly for filling, like Canvas2D `fill()`). |
+| `cornerRadius`   | world | Rounds every corner with a tangent arc; scales with zoom.                               |
+| `cornerRadiusPx` | px    | Zoom-independent corner rounding; wins over `cornerRadius`.                             |
 
 ```typescript
 // A ferry route: 3px dashed line at every zoom level
 engine.drawPath(
-    ferryPoints,
-    { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] },
-    1,
-);
-```
-
-```typescript
-// Single path
-engine.drawPath(
-    [
-        { x: 0, y: 0 },
-        { x: 5, y: 0 },
-        { x: 5, y: 5 },
-    ],
-    { strokeStyle: "#219ebc", lineWidthPx: 2 },
+    { points: ferryPoints, style: { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] } },
     1,
 );
 
-// Multiple paths
+// A filled zone with a rounded outline, identifiable in hit results
 engine.drawPath(
-    [
-        [
+    {
+        points: [
             { x: 0, y: 0 },
-            { x: 5, y: 5 },
+            { x: 4, y: 0 },
+            { x: 4, y: 3 },
+            { x: 0, y: 3 },
         ],
-        [
-            { x: 10, y: 0 },
-            { x: 15, y: 5 },
-        ],
+        closed: true,
+        style: { fillStyle: "#22c55e55", strokeStyle: "#166534", lineWidthPx: 2, cornerRadius: 0.5 },
+        data: { id: "zone-a" },
+    },
+    1,
+);
+
+// Multiple items, each with its own style
+engine.drawPath(
+    [
+        { points: routeA, style: { strokeStyle: "#219ebc", lineWidthPx: 2 } },
+        { points: routeB, style: { strokeStyle: "green", lineWidthPx: 1 } },
     ],
-    { strokeStyle: "green", lineWidthPx: 1 },
     1,
 );
 ```
+
+Paths participate in hit testing: filled paths hit on their interior (under the item's `fillRule`), unfilled paths hit on the stroke itself — within half the stroke width, with a minimum tap width so hairlines stay tappable.
+
+Dash patterns flow continuously around corners, including rounded ones.
+
+:::note Legacy form
+The previous `drawPath(points | points[], style?, layer?)` signature (bare coordinate arrays with a call-level `LineStyle`) still works but is deprecated; it only supports stroking. Prefer `PathItem` objects.
+:::
 
 ### `drawGridLines`
 

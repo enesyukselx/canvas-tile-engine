@@ -111,7 +111,7 @@ export interface EngineHandle {
     removeDrawHandle(handle: DrawHandle): void;
 
     /**
-     * All rect/circle/image items under a world point, highest visual
+     * All rect/circle/image/path/line items under a world point, highest visual
      * priority first. Pass `coords.raw` from event callbacks. Empty before
      * mount.
      */

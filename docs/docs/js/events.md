@@ -299,8 +299,8 @@ window.addEventListener("keyup", (event) => {
 ## Hit Testing
 
 `hitTest` / `hitTestFirst` answer "which item is under this point?" for rect,
-circle, and image items - no more hand-written lookup maps or manual 0.5-cell
-offset math. Pass the `coords.raw` value from any event callback; origin
+circle, image, path, and line items - no more hand-written lookup maps or
+manual 0.5-cell offset math. Pass the `coords.raw` value from any event callback; origin
 anchoring, image aspect fit, and rotation are handled internally.
 
 ```ts
@@ -331,8 +331,11 @@ a draw call - the item you see on top comes first.
 
 Semantics to know:
 
-- Works for `drawRect` / `drawCircle` / `drawImage` and their `drawStatic*`
-  variants. Line, Path, and Text items are not hit-testable.
+- Works for `drawRect` / `drawCircle` / `drawImage` (and their `drawStatic*`
+  variants), plus `drawPath` and `drawLine`. Filled paths hit on their
+  interior (under the item's `fillRule`); unfilled paths and lines hit
+  within half the stroke width of the geometry, with a minimum tap width so
+  hairlines stay tappable. Text items are not hit-testable.
 - Every drawable item accepts an optional `data` field. The engine never
   reads it - it is carried through to `hit.item.data` so you can identify
   what was hit. The `TData` type parameter on `hitTest<TData>` /
