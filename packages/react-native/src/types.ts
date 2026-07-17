@@ -81,7 +81,7 @@ export interface CanvasTileEngineProps {
      */
     config: CanvasTileEngineConfig;
 
-    /** Initial center coordinates. Read once on creation; use `engine.updateCoords`/`engine.goCoords` to move later. */
+    /** Initial center coordinates. Read once on creation; use `engine.setCenter`/`engine.goCenter` to move later. */
     center?: Coords;
 
     /** Additional styles for the wrapper View */

@@ -51,10 +51,7 @@ export function NativeMap() {
             onClick={(coords) => console.log("Tapped", coords.snapped)}
         >
             <CanvasTileEngine.GridLines cellSize={1} strokeStyle="#1e293b" layer={0} />
-            <CanvasTileEngine.Circle
-                items={{ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }}
-                layer={1}
-            />
+            <CanvasTileEngine.Circle items={{ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }} layer={1} />
         </CanvasTileEngine>
     );
 }
@@ -66,17 +63,17 @@ The native component measures its wrapping `View` with `onLayout`. `config.size`
 
 The same compound components are available:
 
-| Component | Draws |
-| :-- | :-- |
-| `CanvasTileEngine.Rect` / `StaticRect` | Dynamic or cached rectangles. |
-| `CanvasTileEngine.Circle` / `StaticCircle` | Dynamic or cached circles. |
-| `CanvasTileEngine.Image` / `StaticImage` | `SkImage` draw items and spritesheet source rectangles. |
-| `CanvasTileEngine.Sprite` | Animated spritesheet frames. |
-| `CanvasTileEngine.GridLines` | Infinite grid lines. |
-| `CanvasTileEngine.Line` | Line segments. |
-| `CanvasTileEngine.Path` | Polylines. |
-| `CanvasTileEngine.Text` | Text in world space. |
-| `CanvasTileEngine.DrawFunction` | Custom Skia drawing. |
+| Component                                  | Draws                                                   |
+| :----------------------------------------- | :------------------------------------------------------ |
+| `CanvasTileEngine.Rect` / `StaticRect`     | Dynamic or cached rectangles.                           |
+| `CanvasTileEngine.Circle` / `StaticCircle` | Dynamic or cached circles.                              |
+| `CanvasTileEngine.Image` / `StaticImage`   | `SkImage` draw items and spritesheet source rectangles. |
+| `CanvasTileEngine.Sprite`                  | Animated spritesheet frames.                            |
+| `CanvasTileEngine.GridLines`               | Infinite grid lines.                                    |
+| `CanvasTileEngine.Line`                    | Line segments.                                          |
+| `CanvasTileEngine.Path`                    | Polylines.                                              |
+| `CanvasTileEngine.Text`                    | Text in world space.                                    |
+| `CanvasTileEngine.DrawFunction`            | Custom Skia drawing.                                    |
 
 Keep large `items` arrays stable with `useMemo` or state. New array identities re-register draw callbacks and can rebuild spatial indexes.
 
@@ -86,12 +83,7 @@ Keep large `items` arrays stable with `useMemo` or state. New array identities r
 
 ```tsx
 import { useEffect, useMemo, useState } from "react";
-import {
-    CanvasTileEngine,
-    SpriteSheet,
-    type EngineHandle,
-    type SkImage,
-} from "@canvas-tile-engine/react-native";
+import { CanvasTileEngine, SpriteSheet, type EngineHandle, type SkImage } from "@canvas-tile-engine/react-native";
 
 function UnitLayer({ engine }: { engine: EngineHandle }) {
     const [img, setImg] = useState<SkImage | null>(null);
@@ -122,13 +114,13 @@ import { Skia } from "@canvas-tile-engine/react-native";
         paint.setColor(Skia.Color("#f97316"));
         canvas.drawRect(Skia.XYWHRect(12, 12, 80, 24), paint);
     }}
-</CanvasTileEngine.DrawFunction>
+</CanvasTileEngine.DrawFunction>;
 ```
 
 ## Runtime Notes
 
 - `config`, `center`, and `renderer` are read when the native engine is created on first layout.
-- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.updateCoords`, `engine.goCoords`, `engine.setScale`, `engine.goScale`, `zoomIn`, and `zoomOut` for runtime changes.
+- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.setCenter`, `engine.goCenter`, `engine.setScale`, `engine.goScale`, `engine.setScaleLimits`, `zoomIn`, and `zoomOut` for runtime changes.
 - Static helpers record and replay Skia pictures keyed by `cacheKey`.
 - The React Native wrapper owns layout, gesture responder handling, tap detection, and presentation.
 
@@ -137,15 +129,15 @@ An interactive (drag/zoom-enabled) map inside a `ScrollView` is not supported: o
 
 - Keep the map **outside** the scroll area (e.g. pinned above it) and let only the page content scroll.
 - Embed a **non-interactive preview** (no `eventHandlers`): with interactions off the wrapper does not claim the gesture responder, so the page scrolls naturally over the map. Open a fullscreen interactive map on tap.
-:::
+  :::
 
 ## Web vs Native
 
-| Concern | React web | React Native |
-| :-- | :-- | :-- |
-| Renderer | `RendererCanvas` or `RendererWebGL` | `RendererSkia` |
-| Mount | Wrapper `<div>` with a `<canvas>` | Skia `<Canvas>` inside a `<View>` |
-| Styling | `className` / `CSSProperties` | `ViewStyle` |
-| Images | `HTMLImageElement` | `SkImage` |
-| Custom draw context | Canvas2D or overlay context | `SkCanvas` |
-| Input | DOM mouse/touch/wheel | Native touch responder |
+| Concern             | React web                           | React Native                      |
+| :------------------ | :---------------------------------- | :-------------------------------- |
+| Renderer            | `RendererCanvas` or `RendererWebGL` | `RendererSkia`                    |
+| Mount               | Wrapper `<div>` with a `<canvas>`   | Skia `<Canvas>` inside a `<View>` |
+| Styling             | `className` / `CSSProperties`       | `ViewStyle`                       |
+| Images              | `HTMLImageElement`                  | `SkImage`                         |
+| Custom draw context | Canvas2D or overlay context         | `SkCanvas`                        |
+| Input               | DOM mouse/touch/wheel               | Native touch responder            |

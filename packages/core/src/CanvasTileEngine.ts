@@ -414,13 +414,19 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Set the canvas scale directly, clamped to min/max bounds.
+     * The change is anchored at the viewport center, matching goScale/zoomIn/zoomOut.
      * @param newScale The desired scale value.
      * @throws {ConfigValidationError} If scale is not a positive finite number.
      */
     setScale(newScale: number) {
         validateScale(newScale);
         const prevScale = this.camera.scale;
+        const size = this.viewport.getSize();
+        // Restore the center after the scale change: camera.setScale alone
+        // anchors at the top-left corner, which would drift the view.
+        const center = this.camera.getCenter(size.width, size.height);
         this.camera.setScale(newScale);
+        this.camera.setCenter(center, size.width, size.height);
         this.notifyZoomIfChanged(prevScale);
         this.handleCameraChange();
     }
@@ -470,6 +476,28 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.handleCameraChange();
     }
 
+    /**
+     * Update the minimum and maximum scale limits at runtime.
+     * The current scale is clamped into the new range immediately.
+     * @param minScale New minimum scale.
+     * @param maxScale New maximum scale.
+     * @throws {ConfigValidationError} If limits are not positive finite numbers or minScale is greater than maxScale.
+     * @example
+     * ```ts
+     * // Allow zooming between 0.25x and 8x
+     * engine.setScaleLimits(0.25, 8);
+     * ```
+     */
+    setScaleLimits(minScale: number, maxScale: number) {
+        this.config.updateScaleLimits(minScale, maxScale);
+        const prevScale = this.camera.scale;
+        this.camera.setScaleLimits(minScale, maxScale);
+        // Clamping into the new range may change the scale, so notify like
+        // the other camera-mutating APIs (also renders).
+        this.notifyZoomIfChanged(prevScale);
+        this.handleCameraChange();
+    }
+
     /** Snapshot of current normalized config. */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
@@ -481,10 +509,21 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         };
     }
 
-    /** Center coordinates of the map. */
-    getCenterCoords(): Coords {
+    /**
+     * Current center of the view in world coordinates.
+     * @returns Center coordinates `{ x, y }`.
+     */
+    getCenter(): Coords {
         const size = this.viewport.getSize();
         return this.camera.getCenter(size.width, size.height);
+    }
+
+    /**
+     * Current center of the view in world coordinates.
+     * @deprecated Use {@link getCenter} instead.
+     */
+    getCenterCoords(): Coords {
+        return this.getCenter();
     }
 
     /**
@@ -506,11 +545,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
-     * Set center coordinates from outside (adjusts the camera accordingly).
+     * Move the view center to new world coordinates instantly.
      * @param newCenter The new center coordinates.
      * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
-    updateCoords(newCenter: Coords) {
+    setCenter(newCenter: Coords) {
         validateCoords(newCenter.x, newCenter.y);
         const size = this.viewport.getSize();
         this.camera.setCenter(newCenter, size.width, size.height);
@@ -518,16 +557,32 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
-     * Smoothly move the camera center to target coordinates over the given duration.
+     * Move the view center to new world coordinates instantly.
+     * @deprecated Use {@link setCenter} instead.
+     */
+    updateCoords(newCenter: Coords) {
+        this.setCenter(newCenter);
+    }
+
+    /**
+     * Smoothly animate the view center to target world coordinates over the given duration.
      * @param x Target world x.
      * @param y Target world y.
      * @param durationMs Animation duration in milliseconds (default: 500ms). Set to 0 for instant move.
      * @param onComplete Optional callback fired when animation completes.
      * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
-    goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
+    goCenter(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
         validateCoords(x, y);
         this.animationController.animateMoveTo(x, y, durationMs, onComplete);
+    }
+
+    /**
+     * Smoothly animate the view center to target world coordinates.
+     * @deprecated Use {@link goCenter} instead.
+     */
+    goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
+        this.goCenter(x, y, durationMs, onComplete);
     }
 
     /**
@@ -888,7 +943,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     private handleCameraChange() {
         if (this.onCoordsChange) {
-            this.onCoordsChange(this.getCenterCoords());
+            this.onCoordsChange(this.getCenter());
         }
         this.render();
     }

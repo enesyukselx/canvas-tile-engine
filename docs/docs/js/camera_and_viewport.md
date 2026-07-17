@@ -18,7 +18,7 @@ You can move the camera using the engine instance.
 
 ### Moving the Camera
 
-#### `goCoords(x, y, duration?)`
+#### `goCenter(x, y, duration?)`
 
 Smoothly animates the camera to a new position.
 
@@ -30,25 +30,29 @@ Smoothly animates the camera to a new position.
 
 ```typescript
 // Pan to coordinates (15, 20) over 1 second
-engine.goCoords(15, 20, 1000);
+engine.goCenter(15, 20, 1000);
 ```
 
-#### `updateCoords(center)`
+#### `setCenter(center)`
 
 Instantly jumps to a position without animation.
 
 ```typescript
-engine.updateCoords({ x: 0, y: 0 });
+engine.setCenter({ x: 0, y: 0 });
 ```
 
-#### `getCenterCoords()`
+#### `getCenter()`
 
 Returns the current center coordinates of the view.
 
 ```typescript
-const center = engine.getCenterCoords();
+const center = engine.getCenter();
 console.log(center); // { x: 5.5, y: 10.2 }
 ```
+
+:::note Renamed APIs
+`goCenter`, `setCenter`, and `getCenter` were previously named `goCoords`, `updateCoords`, and `getCenterCoords`. The old names still work as deprecated aliases and will be removed in a future major version.
+:::
 
 #### `getVisibleBounds()`
 
@@ -124,7 +128,7 @@ console.log(scale); // 50
 
 #### `setScale(scale)`
 
-Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds.
+Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds, and the change is anchored at the viewport center (matching `goScale`/`zoomIn`/`zoomOut`).
 
 | Parameter | Type     | Description                                    |
 | :-------- | :------- | :--------------------------------------------- |
@@ -143,7 +147,7 @@ engine.setScale(10);
 
 #### `goScale(scale, duration?, onComplete?)`
 
-Smoothly animates the zoom level to a target value, like `goCoords` does for position. The zoom is anchored at the viewport center (matching `zoomIn`/`zoomOut`), and the target is clamped to `minScale` and `maxScale` bounds.
+Smoothly animates the zoom level to a target value, like `goCenter` does for position. The zoom is anchored at the viewport center (matching `zoomIn`/`zoomOut`), and the target is clamped to `minScale` and `maxScale` bounds.
 
 | Parameter    | Type       | Default      | Description                                    |
 | :----------- | :--------- | :----------- | :--------------------------------------------- |
@@ -155,10 +159,30 @@ Smoothly animates the zoom level to a target value, like `goCoords` does for pos
 // Smoothly zoom to 100 pixels per grid unit over 1 second
 engine.goScale(100, 1000);
 
-// Combine with goCoords for a fly-to effect
-engine.goCoords(15, 20, 1000);
+// Combine with goCenter for a fly-to effect
+engine.goCenter(15, 20, 1000);
 engine.goScale(50, 1000);
 ```
+
+#### `setScaleLimits(minScale, maxScale)`
+
+Updates the `minScale` and `maxScale` limits at runtime. All zooming (gestures, `setScale`, `goScale`, `zoomIn`, `zoomOut`) clamps to the new range, and the current scale is clamped into it immediately (firing `onZoom` if it changes).
+
+| Parameter  | Type     | Description                                 |
+| :--------- | :------- | :------------------------------------------ |
+| `minScale` | `number` | New minimum zoom level. Must be positive.   |
+| `maxScale` | `number` | New maximum zoom level. Must be >= minScale. |
+
+```typescript
+// Allow zooming between 10 and 200 pixels per grid unit
+engine.setScaleLimits(10, 200);
+
+// Lock the zoom at the current scale
+const scale = engine.getScale();
+engine.setScaleLimits(scale, scale);
+```
+
+Throws a `ConfigValidationError` if either limit is not a positive finite number or `minScale` is greater than `maxScale`.
 
 ## Viewport & Resizing
 

@@ -70,6 +70,30 @@ describe("CanvasTileEngine", () => {
         });
     });
 
+    describe("setScale anchoring", () => {
+        it("keeps the viewport center fixed, matching goScale", () => {
+            engine.setCenter({ x: 12, y: 34 });
+            engine.setScale(2);
+            const after = engine.getCenter();
+            expect(after.x).toBeCloseTo(12);
+            expect(after.y).toBeCloseTo(34);
+        });
+
+        it("produces the same view as goScale with zero duration", () => {
+            engine.setCenter({ x: 5, y: 7 });
+            engine.setScale(1.5);
+            const viaSet = { center: engine.getCenter(), scale: engine.getScale() };
+
+            const other = createEngine();
+            other.setCenter({ x: 5, y: 7 });
+            other.goScale(1.5, 0);
+
+            expect(other.getScale()).toBe(viaSet.scale);
+            expect(other.getCenter().x).toBeCloseTo(viaSet.center.x);
+            expect(other.getCenter().y).toBeCloseTo(viaSet.center.y);
+        });
+    });
+
     // Node has no requestAnimationFrame, so goScale completes instantly here;
     // frame-by-frame interpolation is covered by the AnimationController tests.
     describe("goScale", () => {
@@ -106,6 +130,70 @@ describe("CanvasTileEngine", () => {
         it("rejects invalid scale values", () => {
             expect(() => engine.goScale(-1)).toThrow();
             expect(() => engine.goScale(NaN)).toThrow();
+        });
+    });
+
+    describe("setScaleLimits", () => {
+        it("updates the limits used by zoom clamping", () => {
+            engine.setScaleLimits(0.5, 4);
+            engine.setScale(3);
+            expect(engine.getScale()).toBe(3);
+        });
+
+        it("reflects the new limits in getConfig", () => {
+            engine.setScaleLimits(0.25, 8);
+            const config = engine.getConfig();
+            expect(config.minScale).toBe(0.25);
+            expect(config.maxScale).toBe(8);
+        });
+
+        it("clamps the current scale into the new range and fires onZoom", () => {
+            engine.setScaleLimits(1.5, 4);
+            expect(engine.getScale()).toBe(1.5);
+            expect(onZoom).toHaveBeenCalledWith(1.5);
+        });
+
+        it("does not fire onZoom when the current scale stays in range", () => {
+            engine.setScaleLimits(0.25, 8);
+            expect(onZoom).not.toHaveBeenCalled();
+        });
+
+        it("rejects invalid limits without touching the camera", () => {
+            expect(() => engine.setScaleLimits(4, 2)).toThrow();
+            expect(() => engine.setScaleLimits(0, 2)).toThrow();
+            expect(() => engine.setScaleLimits(NaN, 2)).toThrow();
+            engine.setScale(10); // still clamped by the original maxScale 2
+            expect(engine.getScale()).toBe(2);
+        });
+    });
+
+    describe("center API (getCenter / setCenter / goCenter)", () => {
+        it("setCenter moves the view center instantly and fires onCoordsChange", () => {
+            engine.setCenter({ x: 25, y: 40 });
+            expect(engine.getCenter()).toEqual({ x: 25, y: 40 });
+            expect(onCoordsChange).toHaveBeenCalledWith({ x: 25, y: 40 });
+        });
+
+        // Node has no requestAnimationFrame, so goCenter completes instantly.
+        it("goCenter animates to the target center", () => {
+            const onComplete = vi.fn();
+            engine.goCenter(10, 20, 0, onComplete);
+            expect(engine.getCenter()).toEqual({ x: 10, y: 20 });
+            expect(onComplete).toHaveBeenCalled();
+        });
+
+        it("setCenter and goCenter reject non-finite coordinates", () => {
+            expect(() => engine.setCenter({ x: NaN, y: 0 })).toThrow();
+            expect(() => engine.goCenter(0, Infinity)).toThrow();
+        });
+
+        it("deprecated aliases delegate to the new methods", () => {
+            engine.updateCoords({ x: 5, y: 6 });
+            expect(engine.getCenterCoords()).toEqual({ x: 5, y: 6 });
+            expect(engine.getCenterCoords()).toEqual(engine.getCenter());
+
+            engine.goCoords(7, 8, 0);
+            expect(engine.getCenter()).toEqual({ x: 7, y: 8 });
         });
     });
 

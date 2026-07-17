@@ -146,17 +146,19 @@ Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
     config={config}
     onCoordsChange={setCenter}
     onZoom={setScale}
-    onWheel={(coords, mouse, client, wheel) => console.log(wheel.source, wheel.direction)}
+    onWheel={(coords, mouse, client, wheel) =>
+        console.log(wheel.source, wheel.direction)
+    }
     onResize={() => console.log(engine.getSize())}
 />
 ```
 
-| Prop             | Description                                                                                 |
-| :--------------- | :------------------------------------------------------------------------------------------ |
-| `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes. |
-| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut` changes the scale.  |
+| Prop             | Description                                                                                                                                   |
+| :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes.                                                   |
+| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping changes the scale.                         |
 | `onWheel`        | Fires for wheel/pinch zoom gestures with the standard coordinate payload plus `{ deltaY, direction, source }`. Requires `eventHandlers.zoom`. |
-| `onResize`       | Fires after manual or observed resize.                                                      |
+| `onResize`       | Fires after manual or observed resize.                                                                                                        |
 
 ## Painting Example
 
@@ -299,8 +301,8 @@ useEffect(() => {
 The hook handle exposes the same camera controls as the core engine.
 
 ```tsx
-engine.updateCoords({ x: 10, y: 10 });
-engine.goCoords(0, 0, 500);
+engine.setCenter({ x: 10, y: 10 });
+engine.goCenter(0, 0, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
 engine.zoomIn();

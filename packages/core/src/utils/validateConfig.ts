@@ -149,7 +149,7 @@ export function validateBounds(bounds: { minX: number; maxX: number; minY: numbe
 }
 
 /**
- * Validates coordinates for goCoords method.
+ * Validates coordinates for goCenter method.
  * @param x X coordinate.
  * @param y Y coordinate.
  * @throws {ConfigValidationError} If coordinates are invalid.
@@ -174,5 +174,29 @@ export function validateScale(scale: number): void {
     }
     if (scale <= 0) {
         throw configError(`scale must be positive, got ${scale}`);
+    }
+}
+
+/**
+ * Validates scale limits for setScaleLimits method.
+ * @param minScale Minimum scale.
+ * @param maxScale Maximum scale.
+ * @throws {ConfigValidationError} If limits are invalid.
+ */
+export function validateScaleLimits(minScale: number, maxScale: number): void {
+    if (typeof minScale !== "number" || !Number.isFinite(minScale)) {
+        throw configError(`minScale must be a finite number, got ${minScale}`);
+    }
+    if (minScale <= 0) {
+        throw configError(`minScale must be positive, got ${minScale}`);
+    }
+    if (typeof maxScale !== "number" || !Number.isFinite(maxScale)) {
+        throw configError(`maxScale must be a finite number, got ${maxScale}`);
+    }
+    if (maxScale <= 0) {
+        throw configError(`maxScale must be positive, got ${maxScale}`);
+    }
+    if (minScale > maxScale) {
+        throw configError(`minScale (${minScale}) cannot be greater than maxScale (${maxScale})`);
     }
 }

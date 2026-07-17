@@ -121,7 +121,7 @@ engine.onMouseLeave = () => {
 
 ### `onCoordsChange`
 
-Fires after camera movement: drag, wheel/pinch zoom, `updateCoords`, `goCoords`, `setBounds` clamping, or resize-centered updates.
+Fires after camera movement: drag, wheel/pinch zoom, `setCenter`, `goCenter`, `setBounds` clamping, or resize-centered updates.
 
 ```ts
 engine.onCoordsChange = (center) => {
@@ -132,7 +132,7 @@ engine.onCoordsChange = (center) => {
 
 ### `onZoom`
 
-Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut`.
+Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping the current scale into a new range.
 
 ```ts
 engine.onZoom = (scale) => {
@@ -409,8 +409,8 @@ Always pair the `onMouseDown` override with resets in **both** `onMouseUp` and
 Events often drive camera or viewport updates.
 
 ```ts
-engine.updateCoords({ x: 10, y: 10 });
-engine.goCoords(0, 0, 500);
+engine.setCenter({ x: 10, y: 10 });
+engine.goCenter(0, 0, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
 engine.zoomIn();

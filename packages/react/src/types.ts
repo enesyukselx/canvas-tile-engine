@@ -75,7 +75,7 @@ export interface CanvasTileEngineProps {
      */
     config: CanvasTileEngineConfig;
 
-    /** Initial center coordinates. Read once on mount; use `engine.updateCoords`/`engine.goCoords` to move later. */
+    /** Initial center coordinates. Read once on mount; use `engine.setCenter`/`engine.goCenter` to move later. */
     center?: Coords;
 
     /** Additional class name for the wrapper div */
