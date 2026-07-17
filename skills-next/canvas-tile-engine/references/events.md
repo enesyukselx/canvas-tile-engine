@@ -62,6 +62,13 @@ engine.onZoom = (scale: number) => {};
 // setScaleLimits clamping the current scale into a new range, and
 // preserve-viewport responsive resizes (the resize changes the scale).
 
+engine.onWheel = (coords, mouse, client, wheel) => {};
+// Fires for wheel (desktop) and pinch (touch) zoom gestures — requires
+// eventHandlers.zoom, and fires even when the scale is clamped at a limit.
+// coords/mouse/client are the standard payload (pinch: the pinch midpoint);
+// wheel = { deltaY, direction: "in" | "out", source: "wheel" | "pinch" }
+// (deltaY < 0 = zoom in; for pinch it is the factor-equivalent wheel delta).
+
 engine.onResize = () => {};
 // Fires after manual resize() or an observed wrapper resize.
 ```

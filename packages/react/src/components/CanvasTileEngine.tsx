@@ -70,6 +70,7 @@ function CanvasTileEngineBase({
     onDraw,
     onResize,
     onZoom,
+    onWheel,
 }: CanvasTileEngineProps) {
     // Children mount gate. This must be component-local state, not
     // `engine.isReady`: the handle outlives this component, so during a
@@ -93,6 +94,7 @@ function CanvasTileEngineBase({
         onDraw,
         onResize,
         onZoom,
+        onWheel,
     });
 
     // Update callback refs
@@ -108,6 +110,7 @@ function CanvasTileEngineBase({
             onDraw,
             onResize,
             onZoom,
+            onWheel,
         };
     });
 
@@ -164,6 +167,7 @@ function CanvasTileEngineBase({
         instance.onDraw = (...args) => callbacksRef.current.onDraw?.(...args);
         instance.onResize = () => callbacksRef.current.onResize?.();
         instance.onZoom = (scale) => callbacksRef.current.onZoom?.(scale);
+        instance.onWheel = (...args) => callbacksRef.current.onWheel?.(...args);
 
         // Attach to handle, then open the children gate
         engine._setInstance(instance);

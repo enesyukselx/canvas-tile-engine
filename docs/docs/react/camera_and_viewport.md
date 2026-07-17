@@ -193,7 +193,7 @@ const logScale = () => {
 
 ### `setScale(scale)`
 
-Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds.
+Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds, and the change is anchored at the viewport center (matching `goScale`/`zoomIn`/`zoomOut`).
 
 | Parameter | Type     | Description                                    |
 | :-------- | :------- | :--------------------------------------------- |

@@ -146,15 +146,19 @@ Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
     config={config}
     onCoordsChange={setCenter}
     onZoom={setScale}
+    onWheel={(coords, mouse, client, wheel) =>
+        console.log(wheel.source, wheel.direction)
+    }
     onResize={() => console.log(engine.getSize())}
 />
 ```
 
-| Prop             | Description                                                                                 |
-| :--------------- | :------------------------------------------------------------------------------------------ |
-| `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes. |
-| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping changes the scale. |
-| `onResize`       | Fires after manual or observed resize.                                                      |
+| Prop             | Description                                                                                                                                   |
+| :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes.                                                   |
+| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping changes the scale.                         |
+| `onWheel`        | Fires for wheel/pinch zoom gestures with the standard coordinate payload plus `{ deltaY, direction, source }`. Requires `eventHandlers.zoom`. |
+| `onResize`       | Fires after manual or observed resize.                                                                                                        |
 
 ## Painting Example
 

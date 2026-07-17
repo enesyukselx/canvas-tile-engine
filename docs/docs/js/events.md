@@ -140,6 +140,24 @@ engine.onZoom = (scale) => {
 };
 ```
 
+### `onWheel`
+
+Fires for wheel (desktop) and pinch (touch) zoom gestures. Requires `eventHandlers.zoom`. Unlike `onZoom`, which reports the resulting scale (including programmatic changes), `onWheel` reports the input gesture itself with its position — and it still fires when the scale is clamped at a limit.
+
+The first three arguments are the standard coordinate payload (for pinch they describe the pinch midpoint). The fourth describes the gesture:
+
+| Property    | Type                   | Description                                                                                              |
+| :---------- | :--------------------- | :------------------------------------------------------------------------------------------------------- |
+| `deltaY`    | `number`               | Vertical wheel delta (negative = zoom in). For pinch: the wheel delta that would produce the same factor. |
+| `direction` | `"in" \| "out"`        | Zoom direction implied by the gesture.                                                                    |
+| `source`    | `"wheel" \| "pinch"`   | Input source.                                                                                             |
+
+```ts
+engine.onWheel = (coords, mouse, client, wheel) => {
+    console.log(`${wheel.source} zoom ${wheel.direction} at`, coords.snapped);
+};
+```
+
 ### `onResize`
 
 Fires after manual resize or observed wrapper resize.

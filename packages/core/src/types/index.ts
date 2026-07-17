@@ -9,6 +9,7 @@ import {
     onMouseLeaveCallback,
     onMouseUpCallback,
     onRightClickCallback,
+    onWheelCallback,
     onZoomCallback,
 } from "./callback";
 import { Circle, ImageItem, Line, Path, Rect, Text } from "./draw-object";
@@ -128,6 +129,7 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     onMouseUp?: onMouseUpCallback;
     onMouseLeave?: onMouseLeaveCallback;
     onZoom?: onZoomCallback;
+    onWheel?: onWheelCallback;
     onResize?: () => void;
     onCameraChange?: () => void;
     onDraw?: onDrawCallback;

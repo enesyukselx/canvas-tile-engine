@@ -16,6 +16,7 @@ import {
     onMouseLeaveCallback,
     onMouseUpCallback,
     onRightClickCallback,
+    onWheelCallback,
     onZoomCallback,
     RendererDependencies,
     ViewportState,
@@ -120,6 +121,13 @@ export class RendererCanvas implements IRenderer {
     }
     set onZoom(cb: onZoomCallback | undefined) {
         if (this.gestureProcessor) this.gestureProcessor.onZoom = cb;
+    }
+
+    get onWheel(): onWheelCallback | undefined {
+        return this.gestureProcessor?.onWheel;
+    }
+    set onWheel(cb: onWheelCallback | undefined) {
+        if (this.gestureProcessor) this.gestureProcessor.onWheel = cb;
     }
 
     /** Callback fired when camera position changes (drag/zoom). */

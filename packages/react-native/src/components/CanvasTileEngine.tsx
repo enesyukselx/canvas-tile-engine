@@ -114,6 +114,7 @@ function CanvasTileEngineBase({
     onDraw,
     onResize,
     onZoom,
+    onWheel,
 }: CanvasTileEngineProps) {
     const [picture, setPicture] = useState<SkPicture | null>(null);
     const [size, setSize] = useState({ width: 0, height: 0 });
@@ -146,6 +147,7 @@ function CanvasTileEngineBase({
         onDraw,
         onResize,
         onZoom,
+        onWheel,
     });
     useEffect(() => {
         callbacksRef.current = {
@@ -159,6 +161,7 @@ function CanvasTileEngineBase({
             onDraw,
             onResize,
             onZoom,
+            onWheel,
         };
     });
 
@@ -209,6 +212,7 @@ function CanvasTileEngineBase({
         instance.onDraw = (...args) => callbacksRef.current.onDraw?.(...args);
         instance.onResize = () => callbacksRef.current.onResize?.();
         instance.onZoom = (scale) => callbacksRef.current.onZoom?.(scale);
+        instance.onWheel = (...args) => callbacksRef.current.onWheel?.(...args);
     }, []);
 
     const handleLayout = useCallback(
