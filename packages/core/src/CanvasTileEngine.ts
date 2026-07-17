@@ -441,6 +441,28 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.handleCameraChange();
     }
 
+    /**
+     * Update the minimum and maximum scale limits at runtime.
+     * The current scale is clamped into the new range immediately.
+     * @param minScale New minimum scale.
+     * @param maxScale New maximum scale.
+     * @throws {ConfigValidationError} If limits are not positive finite numbers or minScale is greater than maxScale.
+     * @example
+     * ```ts
+     * // Allow zooming between 0.25x and 8x
+     * engine.setScaleLimits(0.25, 8);
+     * ```
+     */
+    setScaleLimits(minScale: number, maxScale: number) {
+        this.config.updateScaleLimits(minScale, maxScale);
+        const prevScale = this.camera.scale;
+        this.camera.setScaleLimits(minScale, maxScale);
+        // Clamping into the new range may change the scale, so notify like
+        // the other camera-mutating APIs (also renders).
+        this.notifyZoomIfChanged(prevScale);
+        this.handleCameraChange();
+    }
+
     /** Snapshot of current normalized config. */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();

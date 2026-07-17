@@ -349,6 +349,30 @@ describe("Config", () => {
         });
     });
 
+    describe("updateScaleLimits", () => {
+        it("updates minScale and maxScale", () => {
+            const config = new Config(minimalConfig);
+            config.updateScaleLimits(0.25, 8);
+            const result = config.get();
+            expect(result.minScale).toBe(0.25);
+            expect(result.maxScale).toBe(8);
+        });
+
+        it("throws on invalid limits (minScale > maxScale)", () => {
+            const config = new Config(minimalConfig);
+            expect(() => {
+                config.updateScaleLimits(4, 2);
+            }).toThrow();
+        });
+
+        it("throws on non-positive limits", () => {
+            const config = new Config(minimalConfig);
+            expect(() => {
+                config.updateScaleLimits(0, 2);
+            }).toThrow();
+        });
+    });
+
     describe("immutable snapshots", () => {
         it("returns a frozen snapshot from get()", () => {
             const config = new Config(minimalConfig);

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { validateConfig, validateBounds, validateCoords, validateScale } from "../../src/utils/validateConfig";
+import {
+    validateConfig,
+    validateBounds,
+    validateCoords,
+    validateScale,
+    validateScaleLimits,
+} from "../../src/utils/validateConfig";
 import { CanvasTileEngineConfig } from "../../src/types";
 
 const validConfig: CanvasTileEngineConfig = {
@@ -366,5 +372,30 @@ describe("validateScale", () => {
 
     it("throws on Infinity scale", () => {
         expect(() => validateScale(Infinity)).toThrow("scale must be a finite number");
+    });
+});
+
+describe("validateScaleLimits", () => {
+    it("accepts valid limits", () => {
+        expect(() => validateScaleLimits(0.5, 2)).not.toThrow();
+        expect(() => validateScaleLimits(1, 1)).not.toThrow();
+    });
+
+    it("throws on non-positive minScale", () => {
+        expect(() => validateScaleLimits(0, 2)).toThrow("minScale must be positive, got 0");
+        expect(() => validateScaleLimits(-1, 2)).toThrow("minScale must be positive, got -1");
+    });
+
+    it("throws on non-positive maxScale", () => {
+        expect(() => validateScaleLimits(0.5, 0)).toThrow("maxScale must be positive, got 0");
+    });
+
+    it("throws on non-finite limits", () => {
+        expect(() => validateScaleLimits(NaN, 2)).toThrow("minScale must be a finite number");
+        expect(() => validateScaleLimits(0.5, Infinity)).toThrow("maxScale must be a finite number");
+    });
+
+    it("throws when minScale is greater than maxScale", () => {
+        expect(() => validateScaleLimits(3, 2)).toThrow("minScale (3) cannot be greater than maxScale (2)");
     });
 });
