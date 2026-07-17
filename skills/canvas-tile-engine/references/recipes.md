@@ -39,7 +39,7 @@ let hover: DrawHandle | undefined;
 engine.onHover = (c) => {
     if (hover) engine.removeDrawHandle(hover);
     hover = engine.drawRect({ x: c.snapped.x, y: c.snapped.y, size: 1,
-                              style: { strokeStyle: "#38bdf8", lineWidth: 2 } }, 10);
+                              style: { strokeStyle: "#38bdf8", lineWidthPx: 2 } }, 10);
     engine.render();
 };
 engine.onMouseLeave = () => { if (hover) { engine.removeDrawHandle(hover); hover = undefined; engine.render(); } };
@@ -270,7 +270,7 @@ primitives): [performance.md](performance.md).
 
 ## Cross-cutting reminders
 
-- Every camera-moving API (`goCoords`, `updateCoords`, `setScale`, `zoomIn`,
+- Every camera-moving API (`goCoords`, `updateCoords`, `setScale`, `goScale`, `zoomIn`,
   `zoomOut`, `setBounds`, drag/zoom gestures) re-renders automatically; only
   draw registration and data mutation need an explicit `render()`.
 - Group scene content into meaningful layers from the start (0 grid,

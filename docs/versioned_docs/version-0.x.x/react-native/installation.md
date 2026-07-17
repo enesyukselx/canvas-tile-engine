@@ -128,9 +128,16 @@ import { Skia } from "@canvas-tile-engine/react-native";
 ## Runtime Notes
 
 - `config`, `center`, and `renderer` are read when the native engine is created on first layout.
-- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.updateCoords`, `engine.goCoords`, `engine.setScale`, `zoomIn`, and `zoomOut` for runtime changes.
+- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.updateCoords`, `engine.goCoords`, `engine.setScale`, `engine.goScale`, `zoomIn`, and `zoomOut` for runtime changes.
 - Static helpers record and replay Skia pictures keyed by `cacheKey`.
 - The React Native wrapper owns layout, gesture responder handling, tap detection, and presentation.
+
+:::warning Maps inside a ScrollView
+An interactive (drag/zoom-enabled) map inside a `ScrollView` is not supported: on React Native's New Architecture a JS responder cannot block the parent's native scroll gesture, so the map and the page end up panning at the same time — and app-level workarounds (`scrollEnabled` toggling, `canCancelContentTouches`) lose the race against the native recognizer. Use one of these layouts instead:
+
+- Keep the map **outside** the scroll area (e.g. pinned above it) and let only the page content scroll.
+- Embed a **non-interactive preview** (no `eventHandlers`): with interactions off the wrapper does not claim the gesture responder, so the page scrolls naturally over the map. Open a fullscreen interactive map on tap.
+:::
 
 ## Web vs Native
 

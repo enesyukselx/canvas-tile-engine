@@ -81,7 +81,10 @@ For high-frequency hover work, prefer replacing one previous `DrawHandle` or cle
 
 ### `onMouseDown` And `onMouseUp`
 
-Useful for painting, selection, drag handles, and other tool modes.
+Useful for painting, selection, drag handles, and other tool modes. On
+browsers these fire for the **primary (left) button only** — right clicks go
+through `onRightClick`, and the middle button is left to the browser. Touch
+input also feeds them (touch start/end).
 
 ```ts
 let selecting = false;
@@ -129,7 +132,7 @@ engine.onCoordsChange = (center) => {
 
 ### `onZoom`
 
-Fires when the scale changes through wheel, pinch, `setScale`, `zoomIn`, or `zoomOut`.
+Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut`.
 
 ```ts
 engine.onZoom = (scale) => {
@@ -283,12 +286,18 @@ offset math. Pass the `coords.raw` value from any event callback; origin
 anchoring, image aspect fit, and rotation are handled internally.
 
 ```ts
+type Station = { id: string; name: string };
+
+// Attach your own data to items when drawing:
+engine.drawRect(
+    stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })),
+    2,
+);
+
 engine.onClick = (coords) => {
-    const hit = engine.hitTestFirst(coords.raw);
-    if (!hit) return;
-    // hit.index is the item's position in the array you passed to drawX -
-    // use it to reach your own richer data:
-    openStationPanel(stations[hit.index]);
+    const hit = engine.hitTestFirst<Station>(coords.raw);
+    if (!hit?.item.data) return;
+    openStationPanel(hit.item.data); // typed as Station
 };
 
 // All overlapping items, highest visual priority first
@@ -306,11 +315,40 @@ Semantics to know:
 
 - Works for `drawRect` / `drawCircle` / `drawImage` and their `drawStatic*`
   variants. Line, Path, and Text items are not hit-testable.
+- Every drawable item accepts an optional `data` field. The engine never
+  reads it - it is carried through to `hit.item.data` so you can identify
+  what was hit. The `TData` type parameter on `hitTest<TData>` /
+  `hitTestFirst<TData>` types that field for you; it is an assertion, not a
+  runtime check.
+- `hit.item` is the exact object you passed to the draw call (same
+  reference), and `hit.index` is its position in that array at draw time.
+  Prefer `data` for identity - indexes go stale when you re-draw a filtered
+  or re-ordered array.
 - Like rendering, results reflect item positions as of the draw call:
   mutating an item's position requires re-registration (style mutation is
   unaffected).
 - Draw calls with 500+ items are queried through a spatial index, so
   hit testing large scenes on hover is cheap.
+
+### Generous touch targets: `padding` and `paddingPx`
+
+By default the hit area is exactly the drawn geometry, which makes small
+markers hard to click. Both options expand every item's hit geometry outward:
+
+| Option      | Unit          | Behavior                                                             |
+| :---------- | :------------ | :------------------------------------------------------------------- |
+| `padding`   | world units   | Fixed world-space margin; grows/shrinks on screen with zoom.         |
+| `paddingPx` | screen pixels | Zoom-independent margin, converted with the current scale per query. |
+
+They can be combined (added together). Negative values are treated as 0.
+
+```ts
+// A dot drawn with size 0.95 (radius ~0.475), clickable up to 1.1 units out
+const hit = engine.hitTestFirst(coords.raw, { padding: 0.625 });
+
+// Finger-sized target at any zoom level
+const hit2 = engine.hitTestFirst(coords.raw, { paddingPx: 12 });
+```
 
 ## Managing the Cursor
 
@@ -356,6 +394,7 @@ Events often drive camera or viewport updates.
 engine.updateCoords({ x: 10, y: 10 });
 engine.goCoords(0, 0, 500);
 engine.setScale(64);
+engine.goScale(64, 500);
 engine.zoomIn();
 engine.zoomOut();
 engine.resize(1024, 768, 300);
