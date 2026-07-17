@@ -1,6 +1,7 @@
 import { Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathItem, Rect } from "../types";
 import { distanceToPolyline, pointInRing } from "../utils/pathGeometry";
-import { resolveLineWidthPx } from "../utils/strokeStyle";
+import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
+import { resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { SpatialIndex } from "./SpatialIndex";
 
 /** Primitive kinds that participate in hit testing. */
@@ -254,10 +255,23 @@ export class HitTester {
     private testPath(point: Coords, item: PathItem, padding: number): boolean {
         const points = item.points;
         if (!points || points.length < 2) return false;
+
+        // Test against the same rounded outline the renderers draw: corner
+        // radii resolve to screen pixels, so convert to world units with the
+        // live scale and flatten at the renderers' sampling density.
+        const scale = this.getScale();
+        const radiusWorld = resolveCornerRadiusPx(item.style, scale) / scale;
+        const outline =
+            radiusWorld > 0
+                ? item.closed === true
+                    ? roundedRing(points, radiusWorld, ARC_SEGMENT_LENGTH / scale)
+                    : roundedPolyline(points, radiusWorld, ARC_SEGMENT_LENGTH / scale)
+                : points;
+
         const filled = item.style?.fillStyle !== undefined;
-        if (filled && pointInRing(point, points, item.fillRule)) return true;
+        if (filled && pointInRing(point, outline, item.fillRule)) return true;
         const closed = filled || item.closed === true;
-        return distanceToPolyline(point, points, closed) <= this.strokeHalfWorld(item.style) + padding;
+        return distanceToPolyline(point, outline, closed) <= this.strokeHalfWorld(item.style) + padding;
     }
 
     private testLine(point: Coords, item: Line, style: LineStyle | undefined, padding: number): boolean {

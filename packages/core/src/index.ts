@@ -8,6 +8,7 @@ export { gridToSize } from "./utils/gridToSize";
 export { resolveLineWidthPx, resolveLineDashPx, resolveRadiusPx, resolveCornerRadiusPx } from "./utils/strokeStyle";
 export { cornerArc } from "./utils/pathCorners";
 export { traceRoundedPath, type PathTraceTarget } from "./utils/tracePath";
+export { roundedPolyline, roundedRing, ARC_SEGMENT_LENGTH } from "./utils/pathFlatten";
 export type { CornerArc } from "./utils/pathCorners";
 // Additional core modules
 export { Config } from "./modules/Config";

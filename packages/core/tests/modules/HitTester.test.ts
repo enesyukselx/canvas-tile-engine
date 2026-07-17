@@ -409,3 +409,44 @@ describe("HitTester lines", () => {
         expect(hit?.index).toBe(500);
     });
 });
+
+describe("HitTester rounded corners", () => {
+    // Scale 40; cornerRadius 1 world unit -> the corner arc of the square
+    // (0,0)-(4,0)-(4,4)-(0,4) at vertex (0,0) is centered at (1,1), r=1.
+    const points = [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+        { x: 0, y: 4 },
+    ];
+
+    it("misses the cut-off sharp-corner region of a rounded filled path", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "path", { points, closed: true, style: { fillStyle: "red", cornerRadius: 1 } }, 1);
+
+        // Inside the sharp square but outside the rounded outline
+        expect(ht.hitTestFirst({ x: 0.08, y: 0.08 })).toBeUndefined();
+        // Inside the rounded outline
+        expect(ht.hitTestFirst({ x: 1, y: 1 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 2, y: 2 })).toBeDefined();
+        // Edge midpoints are untouched by rounding
+        expect(ht.hitTestFirst({ x: 2, y: 0.05 })).toBeDefined();
+    });
+
+    it("hits the arc itself on a rounded unfilled path, not the sharp corner", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(
+            handle(1),
+            "path",
+            { points, closed: true, style: { strokeStyle: "red", lineWidthPx: 8, cornerRadius: 1 } },
+            1,
+        );
+
+        // The sharp vertex sits ~0.41 world units from the arc; the stroke
+        // threshold is 0.1, so it no longer hits.
+        expect(ht.hitTestFirst({ x: 0, y: 0 })).toBeUndefined();
+        // A point on the arc (45deg around the corner center) hits.
+        const onArc = { x: 1 - Math.SQRT1_2, y: 1 - Math.SQRT1_2 };
+        expect(ht.hitTestFirst(onArc)).toBeDefined();
+    });
+});

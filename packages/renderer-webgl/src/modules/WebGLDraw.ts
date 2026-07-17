@@ -16,12 +16,13 @@ import {
     resolveLineWidthPx,
     resolveLineDashPx,
     resolveCornerRadiusPx,
+    roundedPolyline,
+    roundedRing,
     resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
-import { roundedPolyline, roundedRing } from "../utils/corners";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
