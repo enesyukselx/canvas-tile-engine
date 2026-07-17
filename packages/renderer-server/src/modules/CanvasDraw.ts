@@ -9,7 +9,9 @@ import {
     IDrawAPI,
     ImageItem,
     Line,
-    Path,
+    PathItem,
+    resolveCornerRadiusPx,
+    traceRoundedPath,
     Rect,
     SpatialIndex,
     SpriteRect,
@@ -323,20 +325,12 @@ export class CanvasDraw implements IDrawAPI<Image> {
         });
     }
 
-    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
-        const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
-
+    drawPath(items: PathItem[], layer: number = 1): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            ctx.save();
-            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+            for (const item of items) {
+                const points = item.points;
+                if (!points || points.length < 2) continue;
 
-            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
-            const dash = resolveLineDashPx(style, this.camera.scale);
-            if (dash) ctx.setLineDash(dash);
-
-            ctx.beginPath();
-            for (const points of list) {
-                if (!points.length) continue;
                 const xs = points.map((p) => p.x);
                 const ys = points.map((p) => p.y);
                 const minX = Math.min(...xs);
@@ -348,18 +342,30 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-                const first = this.transformer.worldToScreen(points[0].x, points[0].y);
-                ctx.moveTo(first.x, first.y);
+                const style = item.style;
+                const filled = style?.fillStyle !== undefined;
+                const pts = points.map((p) => this.transformer.worldToScreen(p.x, p.y));
 
-                for (let i = 1; i < points.length; i++) {
-                    const p = this.transformer.worldToScreen(points[i].x, points[i].y);
-                    ctx.lineTo(p.x, p.y);
+                ctx.save();
+                ctx.beginPath();
+                traceRoundedPath(ctx, pts, item.closed === true, resolveCornerRadiusPx(style, this.camera.scale));
+
+                if (filled) {
+                    ctx.fillStyle = style!.fillStyle!;
+                    ctx.fill(item.fillRule ?? "nonzero");
                 }
+                // A fill-only item draws no outline; everything else strokes
+                // (defaulting to a hairline, matching the legacy behavior).
+                if (style?.strokeStyle !== undefined || !filled) {
+                    if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+                    const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+                    const dash = resolveLineDashPx(style, this.camera.scale);
+                    if (dash) ctx.setLineDash(dash);
+                    ctx.stroke();
+                    resetAlpha?.();
+                }
+                ctx.restore();
             }
-            ctx.stroke();
-
-            resetAlpha?.();
-            ctx.restore();
         });
     }
 

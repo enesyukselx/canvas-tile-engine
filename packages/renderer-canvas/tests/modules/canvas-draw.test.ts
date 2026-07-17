@@ -181,7 +181,7 @@ describe("CanvasDraw line dash", () => {
         const { draw, render } = setup(); // scale 10
         const { ctx, dashes } = makeDashRecordingCtx();
 
-        draw.drawPath(path, { strokeStyle: "#f00", lineDash: [0.8, 0.4] }, 1);
+        draw.drawPath([{ points: path, style: { strokeStyle: "#f00", lineDash: [0.8, 0.4] } }], 1);
         render(ctx);
 
         expect(dashes).toEqual([[8, 4]]);
@@ -205,7 +205,7 @@ describe("CanvasDraw line dash", () => {
         const { draw, render } = setup();
         const { ctx, dashes, strokes } = makeDashRecordingCtx();
 
-        draw.drawPath(path, { strokeStyle: "#f00", lineWidth: 0.2 }, 1);
+        draw.drawPath([{ points: path, style: { strokeStyle: "#f00", lineWidth: 0.2 } }], 1);
         render(ctx);
 
         expect(dashes).toEqual([]);
@@ -421,5 +421,102 @@ describe("CanvasDraw image opacity", () => {
 
         expect(blits.map((b) => b.alpha)).toEqual([0.5, 1, 0.25]);
         expect(ctx.globalAlpha).toBe(1);
+    });
+});
+
+function makePathRecordingCtx() {
+    const ops: string[] = [];
+    const fillRules: string[] = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        strokeStyle: "#000",
+        fillStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {
+            ops.push("beginPath");
+        },
+        moveTo() {
+            ops.push("moveTo");
+        },
+        lineTo() {
+            ops.push("lineTo");
+        },
+        arc() {
+            ops.push("arc");
+        },
+        closePath() {
+            ops.push("closePath");
+        },
+        setLineDash() {},
+        fill(rule?: string) {
+            ops.push("fill");
+            fillRules.push(rule ?? "nonzero");
+        },
+        stroke() {
+            ops.push("stroke");
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, ops, fillRules };
+}
+
+describe("CanvasDraw path items", () => {
+    const square = [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+        { x: 0, y: 4 },
+    ];
+
+    it("fills a fill-only item without stroking and honors the fill rule", () => {
+        const { draw, render } = setup();
+        const { ctx, ops, fillRules } = makePathRecordingCtx();
+
+        draw.drawPath([{ points: square, fillRule: "evenodd", style: { fillStyle: "#0f0" } }], 1);
+        render(ctx);
+
+        expect(ops).toContain("fill");
+        expect(ops).not.toContain("stroke");
+        expect(fillRules).toEqual(["evenodd"]);
+    });
+
+    it("closes the outline and both fills and strokes when styled for both", () => {
+        const { draw, render } = setup();
+        const { ctx, ops } = makePathRecordingCtx();
+
+        draw.drawPath([{ points: square, closed: true, style: { fillStyle: "#0f0", strokeStyle: "#f00" } }], 1);
+        render(ctx);
+
+        expect(ops).toContain("closePath");
+        expect(ops.indexOf("fill")).toBeGreaterThan(-1);
+        expect(ops.indexOf("stroke")).toBeGreaterThan(ops.indexOf("fill"));
+    });
+
+    it("rounds corners through arcs when cornerRadius is set", () => {
+        const { draw, render } = setup();
+        const { ctx, ops } = makePathRecordingCtx();
+
+        draw.drawPath([{ points: square, closed: true, style: { strokeStyle: "#f00", cornerRadius: 0.5 } }], 1);
+        render(ctx);
+
+        expect(ops.filter((op) => op === "arc")).toHaveLength(4);
+    });
+
+    it("strokes each item with its own style in item order", () => {
+        const { draw, render } = setup();
+        const { ctx, ops } = makePathRecordingCtx();
+
+        draw.drawPath(
+            [
+                { points: square, style: { strokeStyle: "#f00" } },
+                { points: square.map((p) => ({ x: p.x + 1, y: p.y })), style: { strokeStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(ops.filter((op) => op === "stroke")).toHaveLength(2);
+        expect(ops.filter((op) => op === "beginPath")).toHaveLength(2);
     });
 });
