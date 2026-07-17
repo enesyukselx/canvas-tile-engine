@@ -271,8 +271,8 @@ primitives): [performance.md](performance.md).
 ## Cross-cutting reminders
 
 - Every camera-moving API (`goCoords`, `updateCoords`, `setScale`, `goScale`, `zoomIn`,
-  `zoomOut`, `setBounds`, drag/zoom gestures) re-renders automatically; only
-  draw registration and data mutation need an explicit `render()`.
+  `zoomOut`, `setScaleLimits`, `setBounds`, drag/zoom gestures) re-renders automatically;
+  only draw registration and data mutation need an explicit `render()`.
 - Group scene content into meaningful layers from the start (0 grid,
   1 terrain, 2 entities, 3 labels, 10 transient UI) - it makes selective
   `clearLayer` updates trivial.

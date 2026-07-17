@@ -128,6 +128,7 @@ after mount.
 | `setScale(n): void` | Set scale directly, clamped to min/max. |
 | `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
 | `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
+| `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Throws on non-positive/non-finite values or `minScale > maxScale`. |
 | `getSize(): { width, height }` | Current logical canvas size in px. |
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
 | `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |

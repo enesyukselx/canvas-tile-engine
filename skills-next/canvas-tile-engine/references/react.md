@@ -57,7 +57,7 @@ function Map() {
 
 - For dynamic changes use runtime APIs instead: `engine.setBounds`,
   `engine.setEventHandlers`, `engine.updateCoords`, `engine.goCoords`,
-  `engine.setScale`, `engine.goScale`, `engine.resize`.
+  `engine.setScale`, `engine.goScale`, `engine.setScaleLimits`, `engine.resize`.
 - Event callback props CAN change freely - they are kept fresh via refs
   without re-creating the engine.
 - The engine is destroyed automatically on unmount.
