@@ -1,4 +1,4 @@
-import type { Coords, LineStyle, Path, PathItem } from "../types";
+import type { LineStyle, Path, PathItem } from "../types";
 
 /**
  * Normalizes every accepted `drawPath` input into `PathItem[]`, so renderers
