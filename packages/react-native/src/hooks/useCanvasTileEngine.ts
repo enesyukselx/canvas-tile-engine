@@ -67,6 +67,7 @@ export interface EngineHandle {
     goScale(targetScale: number, durationMs?: number, onComplete?: () => void): void;
     zoomIn(factor?: number): void;
     zoomOut(factor?: number): void;
+    setScaleLimits(minScale: number, maxScale: number): void;
     getConfig(): Required<CanvasTileEngineConfig> | undefined;
     setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void;
     setEventHandlers(handlers: Partial<EventHandlers>): void;
@@ -192,6 +193,9 @@ export function useCanvasTileEngine(): EngineHandle {
             },
             zoomOut(factor) {
                 instanceRef.current?.zoomOut(factor);
+            },
+            setScaleLimits(minScale, maxScale) {
+                instanceRef.current?.setScaleLimits(minScale, maxScale);
             },
             getConfig() {
                 return instanceRef.current?.getConfig();
