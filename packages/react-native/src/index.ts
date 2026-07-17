@@ -41,6 +41,8 @@ export type {
     Circle,
     Text,
     Path,
+    PathItem,
+    PathStyle,
     ImageItem,
 } from "./types";
 export type { EngineHandle, SkiaEngine } from "./hooks/useCanvasTileEngine";
