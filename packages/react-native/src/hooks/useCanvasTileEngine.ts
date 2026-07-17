@@ -6,6 +6,7 @@ import type {
     Coords,
     DrawHandle,
     EventHandlers,
+    FitBoundsOptions,
     HitResult,
     HitTestOptions,
     ImageItem,
@@ -76,6 +77,9 @@ export interface EngineHandle {
     setScaleLimits(minScale: number, maxScale: number): void;
     getConfig(): Required<CanvasTileEngineConfig> | undefined;
     setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void;
+
+    /** Fit a world rectangle into the viewport (centers and rescales, clamped to scale limits) */
+    fitBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }, options?: FitBoundsOptions): void;
     setEventHandlers(handlers: Partial<EventHandlers>): void;
 
     addDrawFunction(
@@ -217,6 +221,10 @@ export function useCanvasTileEngine(): EngineHandle {
             },
             setBounds(bounds) {
                 instanceRef.current?.setBounds(bounds);
+            },
+
+            fitBounds(bounds, options) {
+                instanceRef.current?.fitBounds(bounds, options);
             },
             setEventHandlers(handlers) {
                 instanceRef.current?.setEventHandlers(handlers);
