@@ -46,7 +46,16 @@ export type Rect<TData = unknown> = DrawObject<TData> & {
     height?: number;
 };
 
-export type Circle<TData = unknown> = Omit<DrawObject<TData>, "rotate" | "radius">;
+export type Circle<TData = unknown> = Omit<DrawObject<TData>, "rotate" | "radius"> & {
+    /**
+     * Fixed diameter in screen pixels, independent of zoom — the marker
+     * pattern (station dots, POI markers) analog of Text's `fontPx`. Takes
+     * precedence over {@link DrawObject.size}. Ignored by `drawStaticCircle`:
+     * static caches replay at their recorded scale, so pixel sizing cannot
+     * hold there.
+     */
+    sizePx?: number;
+};
 
 /**
  * Horizontal text alignment. Mirrors the DOM `CanvasTextAlign` values but is
@@ -83,6 +92,23 @@ export type ImageItem<TImage = HTMLImageElement, TData = unknown> = Omit<DrawObj
      * `img` is drawn (spritesheet frame); when omitted the whole image is drawn.
      */
     sprite?: SpriteRect;
+    /**
+     * Fixed size in screen pixels, independent of zoom — for marker-style
+     * images that must stay readable at any zoom level. Takes precedence
+     * over {@link DrawObject.size}. Ignored by `drawStaticImage`: static
+     * caches replay at their recorded scale, so pixel sizing cannot hold
+     * there.
+     */
+    sizePx?: number;
+    /**
+     * Mirror the image horizontally. Unlike `rotate`, flipping produces a
+     * true mirror (a right-facing sprite faces left), which no rotation can.
+     * Applied around the draw box center; combines with `rotate` and
+     * spritesheet frames, and works in `drawStaticImage` too.
+     */
+    flipX?: boolean;
+    /** Mirror the image vertically. See {@link flipX}. */
+    flipY?: boolean;
     /**
      * Opacity from 0 (transparent) to 1 (opaque). Default: 1.
      * Useful for ghost/preview placements in editor-style apps.
