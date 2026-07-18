@@ -3,11 +3,13 @@ import type {
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
     Coords,
+    Bounds,
     EventHandlers,
     FitBoundsOptions,
     DrawHandle,
     HitResult,
     HitTestOptions,
+    HitTestRectOptions,
     ImageItem,
     Text,
     Circle,
@@ -223,6 +225,13 @@ export interface EngineHandle {
 
     /** The topmost item under a world point, or undefined. */
     hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<HTMLImageElement, TData> | undefined;
+
+    /**
+     * All items whose geometry intersects (default) or lies fully inside a
+     * world rectangle — marquee/box selection. Corners may be in any order;
+     * build them from event `coords.raw` values. Empty before mount.
+     */
+    hitTestRect<TData = unknown>(rect: Bounds, opts?: HitTestRectOptions): HitResult<HTMLImageElement, TData>[];
 
     /** Image loader instance (undefined until engine mounts) */
     readonly images: CanvasTileEngineCore["images"] | undefined;
@@ -453,6 +462,9 @@ export function useCanvasTileEngine(): EngineHandle {
 
             hitTestFirst<TData>(point: Coords, opts?: HitTestOptions) {
                 return instanceRef.current?.hitTestFirst<TData>(point, opts);
+            },
+            hitTestRect<TData>(rect: Bounds, opts?: HitTestRectOptions) {
+                return instanceRef.current?.hitTestRect<TData>(rect, opts) ?? [];
             },
 
             loadImage(src: string, retry?: number) {

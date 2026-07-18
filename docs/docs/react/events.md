@@ -357,6 +357,10 @@ stroke width of the geometry (with a minimum tap width for hairlines). Text
 is not hit-testable, and - like rendering - position mutations require
 re-registration to be reflected.
 
+For box selection, `engine.hitTestRect(rect, { mode })` returns every item
+intersecting (default) or fully inside (`"contain"`) a world rectangle —
+build the corners from drag-start/end `coords.raw` values (any order works).
+
 Every drawable item accepts an optional `data` field the engine never reads;
 use it to identify hits instead of `hit.index`, which goes stale when you
 re-render a filtered or re-ordered items array. The `TData` parameter on

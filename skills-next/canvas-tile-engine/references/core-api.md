@@ -171,6 +171,7 @@ and semantics: [drawing.md](drawing.md).
 | :-- | :-- |
 | `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image/path/line items under a world point, highest visual priority first (higher layer, later registration, later item). |
 | `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Topmost item only. |
+| `hitTestRect<TData>(rect: Bounds, opts?: { layer?: number; mode?: "intersect" \| "contain" }): HitResult<TImage, TData>[]` | Marquee/box selection: every item intersecting (default) or fully inside (`"contain"`) a world rectangle. Corners in any order, built from `coords.raw` drag points. Geometry-exact (circles as discs, rotated boxes as quads, filled paths count interior with holes excluded); stroke widths NOT expanded, `padding` not applied — grow the rect instead. |
 
 `HitResult` = `{ item, kind: "rect"|"circle"|"image"|"path"|"line", layer, handle, index }`;
 `item` is the exact object passed to the draw call. Every drawable item
