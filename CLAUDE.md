@@ -85,6 +85,7 @@ pnpm --filter react-pixel-paint dev
 pnpm --filter react-path-showcase dev
 pnpm --filter react-spritesheet dev
 pnpm --filter renderer-server-game-map start
+pnpm --filter renderer-server-path-showcase start
 ```
 
 For example development against local package changes, run `pnpm dev:lib` in one terminal and the example command in another.

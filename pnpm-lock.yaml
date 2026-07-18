@@ -336,6 +336,25 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
+  examples/renderer-server/path-showcase:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@canvas-tile-engine/renderer-server':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-server
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.3
+        version: 25.3.3
+      tsx:
+        specifier: ^4.20.6
+        version: 4.22.4
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+
   examples/vanilla-js-examples/game-map:
     dependencies:
       '@canvas-tile-engine/core':
