@@ -13,18 +13,28 @@ Use this package for native maps, game boards, minimaps, and touch-driven grid U
 Expo:
 
 ```bash
-npx expo install @shopify/react-native-skia
+npx expo install @shopify/react-native-skia react-native-gesture-handler
 npm install @canvas-tile-engine/core @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia
 ```
 
 Bare React Native:
 
 ```bash
-npm install @canvas-tile-engine/core @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia @shopify/react-native-skia
+npm install @canvas-tile-engine/core @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia @shopify/react-native-skia react-native-gesture-handler
 cd ios && pod install
 ```
 
-`@shopify/react-native-skia` must be installed directly in the app because it is a native module.
+`@shopify/react-native-skia` and `react-native-gesture-handler` must be installed directly in the app because they are native modules.
+
+Touch input runs through `react-native-gesture-handler`, so the app root (or any ancestor of the map) must be wrapped in `GestureHandlerRootView`:
+
+```tsx
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+
+export default function App() {
+    return <GestureHandlerRootView style={{ flex: 1 }}>{/* your app */}</GestureHandlerRootView>;
+}
+```
 
 ## Basic Setup
 
@@ -122,14 +132,11 @@ import { Skia } from "@canvas-tile-engine/react-native";
 - `config`, `center`, and `renderer` are read when the native engine is created on first layout.
 - Use `engine.setEventHandlers`, `engine.setBounds`, `engine.setCenter`, `engine.goCenter`, `engine.setScale`, `engine.goScale`, `engine.setScaleLimits`, `zoomIn`, and `zoomOut` for runtime changes.
 - Static helpers record and replay Skia pictures keyed by `cacheKey`.
-- The React Native wrapper owns layout, gesture responder handling, tap detection, and presentation.
+- The React Native wrapper owns layout, touch handling (via react-native-gesture-handler), tap detection, and presentation.
 
-:::warning Maps inside a ScrollView
-An interactive (drag/zoom-enabled) map inside a `ScrollView` is not supported: on React Native's New Architecture a JS responder cannot block the parent's native scroll gesture, so the map and the page end up panning at the same time — and app-level workarounds (`scrollEnabled` toggling, `canCancelContentTouches`) lose the race against the native recognizer. Use one of these layouts instead:
-
-- Keep the map **outside** the scroll area (e.g. pinned above it) and let only the page content scroll.
-- Embed a **non-interactive preview** (no `eventHandlers`): with interactions off the wrapper does not claim the gesture responder, so the page scrolls naturally over the map. Open a fullscreen interactive map on tap.
-  :::
+:::info Maps inside a ScrollView
+Because touch input participates in native gesture arbitration (react-native-gesture-handler), an interactive map inside a `ScrollView` works: while interactions are enabled the map claims the touch stream and the page does not scroll under it; with interactions off (no `eventHandlers`) the gesture yields and the page scrolls naturally over the map. For reliable arbitration, import the `ScrollView` from `react-native-gesture-handler` (not from `react-native`) when embedding a map in it.
+:::
 
 ## Web vs Native
 
@@ -140,4 +147,4 @@ An interactive (drag/zoom-enabled) map inside a `ScrollView` is not supported: o
 | Styling             | `className` / `CSSProperties`       | `ViewStyle`                       |
 | Images              | `HTMLImageElement`                  | `SkImage`                         |
 | Custom draw context | Canvas2D or overlay context         | `SkCanvas`                        |
-| Input               | DOM mouse/touch/wheel               | Native touch responder            |
+| Input               | DOM mouse/touch/wheel               | react-native-gesture-handler      |

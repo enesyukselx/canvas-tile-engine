@@ -10,20 +10,23 @@ mirrors the React web package - same compound components, same
 Expo:
 
 ```bash
-npx expo install @shopify/react-native-skia
+npx expo install @shopify/react-native-skia react-native-gesture-handler
 npm install @canvas-tile-engine/core @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia
 ```
 
 Bare React Native:
 
 ```bash
-npm install @canvas-tile-engine/core @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia @shopify/react-native-skia
+npm install @canvas-tile-engine/core @canvas-tile-engine/react-native @canvas-tile-engine/renderer-skia @shopify/react-native-skia react-native-gesture-handler
 cd ios && pod install
 ```
 
-`@shopify/react-native-skia` must be installed directly in the app (native
-module), but app CODE should import Skia types/values from
-`@canvas-tile-engine/react-native` re-exports instead (see below).
+`@shopify/react-native-skia` and `react-native-gesture-handler` must be
+installed directly in the app (native modules), but app CODE should import
+Skia types/values from `@canvas-tile-engine/react-native` re-exports instead
+(see below). The app root (or any ancestor of the map) MUST be wrapped in
+`GestureHandlerRootView` from react-native-gesture-handler — touch input is
+routed through it; without the root view the map receives no touches.
 
 ## Basic setup
 
@@ -145,10 +148,10 @@ Sprite mechanics are identical across platforms: [sprites.md](sprites.md).
   `View` renders nothing.
 - Writing 2D-context code in `DrawFunction`: the ctx is an `SkCanvas`; use
   `Skia.Paint()` and SkCanvas methods.
-- Putting an interactive (drag/zoom) map inside a `ScrollView`: NOT
-  supported — on RN's New Architecture the JS responder cannot block the
-  parent's native scroll gesture, so both pan at once, and `scrollEnabled`
-  toggling / `canCancelContentTouches` workarounds lose the race. Keep the
-  map outside the scroll area, or embed a non-interactive preview (no
-  `eventHandlers` — the wrapper then doesn't claim the responder and the
-  page scrolls over it) with a fullscreen interactive map behind a tap.
+- Forgetting `GestureHandlerRootView` at the app root: the map silently
+  receives no touch input. Maps inside a `ScrollView` ARE supported: touch
+  runs through react-native-gesture-handler's native arbitration, so an
+  interactive map claims the touch stream (page does not scroll under it)
+  and a non-interactive one (no `eventHandlers`) yields so the page scrolls
+  over it. Import the `ScrollView` from react-native-gesture-handler (not
+  react-native) when embedding a map in one.

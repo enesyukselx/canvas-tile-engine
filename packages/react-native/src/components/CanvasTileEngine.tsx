@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-    PixelRatio,
-    StyleSheet,
-    View,
-    type GestureResponderEvent,
-    type LayoutChangeEvent,
-    type NativeTouchEvent,
-} from "react-native";
+import { PixelRatio, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Gesture, GestureDetector, type GestureTouchEvent, type TouchData } from "react-native-gesture-handler";
 import {
     Canvas,
     createPicture,
@@ -55,20 +49,35 @@ interface TapState {
 // RendererSkia's canvas bounds getter always reports { left: 0, top: 0 } (the
 // host has no way to query the canvas's on-screen position), so clientX/Y must
 // already be canvas-relative for GestureProcessor's `- bounds.left/top` math
-// to land correctly. locationX/Y (relative to the touched view) satisfy that;
-// pageX/Y (screen-relative) would not once the canvas is offset on screen.
-const toPointer = (t: NativeTouchEvent): NormalizedPointer => ({
-    x: t.locationX,
-    y: t.locationY,
-    clientX: t.locationX,
-    clientY: t.locationY,
+// to land correctly. RNGH's TouchData x/y (relative to the handler's view)
+// satisfy that; absoluteX/Y (screen-relative) would not once the canvas is
+// offset on screen.
+const toPointer = (t: TouchData): NormalizedPointer => ({
+    x: t.x,
+    y: t.y,
+    clientX: t.x,
+    clientY: t.y,
 });
+
+// Pointers that remain on screen after this event: on up events some
+// platforms still report the lifting pointer inside `allTouches`, so the
+// changed (lifted) ids are filtered out explicitly.
+const remainingPointers = (e: GestureTouchEvent): NormalizedPointer[] => {
+    const lifted = new Set(e.changedTouches.map((t) => t.id));
+    return e.allTouches.filter((t) => !lifted.has(t.id)).map(toPointer);
+};
 
 /**
  * React Native component that renders a CanvasTileEngine with the Skia renderer.
  * Supports both the imperative API (via the engine handle) and the declarative
  * API (via compound draw components) — identical to `@canvas-tile-engine/react`,
  * only the renderer (and `style` being a `ViewStyle`) differs.
+ *
+ * Touch input runs through react-native-gesture-handler, so the app root (or
+ * any ancestor of this component) must be wrapped in `GestureHandlerRootView`.
+ * Because the gesture participates in native arbitration, the map coexists
+ * with scrollable parents: it claims the touch stream while interactions are
+ * enabled and lets the ScrollView pan when they are not.
  *
  * @example Declarative API with compound components
  * ```tsx
@@ -254,20 +263,40 @@ function CanvasTileEngineBase({
         };
     }, [engine]);
 
-    // ─── Touch → renderer gesture forwarding ───
+    // ─── Touch → renderer gesture forwarding (react-native-gesture-handler) ───
+    //
+    // Two composed RNGH gestures, deliberately avoiding the GestureStateManager:
+    // with Reanimated installed, manager.activate()/fail() (setGestureState)
+    // only works from UI-thread worklets and silently no-ops from runOnJS
+    // callbacks — a library cannot ship reliably workletized code. Instead:
+    //
+    // - A Manual gesture is a pure touch TRANSPORT: raw touches feed the
+    //   renderer's existing dispatchTouch* API on the JS thread. It never
+    //   changes gesture state; whether a gesture's touches are forwarded at
+    //   all is decided in JS on the first touch (claimRef).
+    // - A callback-less Pan "blocker" activates NATIVELY after a tiny
+    //   movement, which is what actually cancels an enclosing ScrollView's
+    //   pan (native arbitration needs a native activation, not JS state
+    //   calls). It runs simultaneous with the transport and is disabled
+    //   whenever no interaction would consume the touches, so scrollable
+    //   parents keep working over non-interactive maps.
 
-    // Number of touches last forwarded to the engine. The responder grant only
-    // fires for the first finger — RN delivers later finger downs/ups via
-    // onResponderStart/onResponderEnd — so the count is tracked to re-dispatch
-    // touchStart/touchEnd whenever it changes, mirroring DOM touchstart/touchend
-    // semantics that GestureProcessor's pinch handling expects.
+    // Number of touches last forwarded to the engine, tracked to re-dispatch
+    // touchStart/touchEnd whenever the finger count changes, mirroring DOM
+    // touchstart/touchend semantics that GestureProcessor's pinch handling
+    // expects.
     const touchCountRef = useRef(0);
+
+    // Whether the current gesture's touches are forwarded to the engine.
+    // Decided once per gesture on the first touch, like the old responder
+    // claim check.
+    const claimRef = useRef(false);
 
     // True once the current gesture has ever had more than one finger down.
     // Kept separately from tapRef because iOS can drop individual touch-start
-    // events (RN then warns "Ended a touch event which was not counted in
-    // trackedTouchCount"), so any single signal of a second finger — start,
-    // end, or move — must permanently disqualify the gesture as a tap.
+    // events, so any single signal of a second finger — start, end, or move —
+    // must permanently disqualify the gesture as a tap. These defenses predate
+    // RNGH but stay until multi-touch reliability is re-verified on device.
     const multiTouchRef = useRef(false);
     // Timestamp of the last multi-touch evidence, for the tap cooldown window.
     const lastMultiTouchAtRef = useRef(0);
@@ -278,55 +307,52 @@ function CanvasTileEngineBase({
         tapRef.current = null;
     }, []);
 
-    const onResponderGrant = useCallback(
-        (e: GestureResponderEvent) => {
-            const pointers = e.nativeEvent.touches.map(toPointer);
-            touchCountRef.current = pointers.length;
-            multiTouchRef.current = false;
-            if (pointers.length > 1) markMultiTouch();
-            rendererRef.current.dispatchTouchStart(pointers);
-            tapRef.current =
-                pointers.length === 1 ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false } : null;
-        },
-        [markMultiTouch],
-    );
+    // Consume touches only while some interaction actually uses them —
+    // otherwise a parent ScrollView must keep receiving the gesture. Checked
+    // per gesture because setEventHandlers can toggle handlers at runtime.
+    // onMouseDown/onMouseUp are not config-gated, and unlike the web there is
+    // no synthetic-mouse fallback, so their presence also claims the touches.
+    const shouldClaimGesture = useCallback(() => {
+        const instance = instanceRef.current;
+        if (!instance) return false;
+        const eventHandlers = instance.getConfig().eventHandlers;
+        if (eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover) return true;
+        return Boolean(callbacksRef.current.onMouseDown || callbacksRef.current.onMouseUp);
+    }, []);
 
-    // Fires for each finger down while we already hold the responder. The first
-    // finger is handled by grant (same touch count → skipped here); additional
-    // fingers re-dispatch touchStart so the engine enters/rebases pinch mode.
-    const onResponderStart = useCallback(
-        (e: GestureResponderEvent) => {
-            const pointers = e.nativeEvent.touches.map(toPointer);
+    const onTouchesDown = useCallback(
+        (e: GestureTouchEvent) => {
+            const pointers = e.allTouches.map(toPointer);
+
+            if (touchCountRef.current === 0) {
+                claimRef.current = shouldClaimGesture();
+                if (!claimRef.current) return;
+                multiTouchRef.current = false;
+                tapRef.current =
+                    pointers.length === 1
+                        ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false }
+                        : null;
+            }
+            if (!claimRef.current) return;
+
             if (pointers.length > 1) markMultiTouch();
             if (pointers.length === touchCountRef.current) return;
             touchCountRef.current = pointers.length;
+            // Additional fingers re-dispatch touchStart so the engine
+            // enters/rebases pinch mode.
             rendererRef.current.dispatchTouchStart(pointers);
         },
-        [markMultiTouch],
+        [markMultiTouch, shouldClaimGesture],
     );
 
-    // Fires for each finger lift. The final lift is left to release/terminate,
-    // which carries the changed pointer for tap detection; only mid-gesture
-    // drops (pinch → drag handoff) are dispatched here.
-    const onResponderEnd = useCallback(
-        (e: GestureResponderEvent) => {
-            const remaining = e.nativeEvent.touches.map(toPointer);
-            // A finger lifting while others remain proves this was a multi-touch gesture.
-            if (remaining.length >= 1) markMultiTouch();
-            if (remaining.length === 0 || remaining.length === touchCountRef.current) return;
-            touchCountRef.current = remaining.length;
-            rendererRef.current.dispatchTouchEnd(remaining);
-        },
-        [markMultiTouch],
-    );
-
-    const onResponderMove = useCallback(
-        (e: GestureResponderEvent) => {
-            const pointers = e.nativeEvent.touches.map(toPointer);
+    const onTouchesMove = useCallback(
+        (e: GestureTouchEvent) => {
+            if (!claimRef.current) return;
+            const pointers = e.allTouches.map(toPointer);
             if (pointers.length > 1) markMultiTouch();
 
             // Safety net: if a finger-count change wasn't delivered via
-            // onResponderStart/End, resync the engine before forwarding moves.
+            // onTouchesDown/Up, resync the engine before forwarding moves.
             if (pointers.length !== touchCountRef.current) {
                 const prev = touchCountRef.current;
                 touchCountRef.current = pointers.length;
@@ -348,75 +374,106 @@ function CanvasTileEngineBase({
         [markMultiTouch],
     );
 
-    const endTouch = useCallback((e: GestureResponderEvent, allowTap: boolean) => {
-        const remaining = e.nativeEvent.touches.map(toPointer);
-        // Suppress the tap paths both during a multi-touch gesture and in the
-        // cooldown window after one: broken iOS touch tracking can release the
-        // responder early and re-grant the still-down finger as a "new"
-        // gesture, whose lift would otherwise look like a clean tap.
-        const suppressTap =
-            multiTouchRef.current || Date.now() - lastMultiTouchAtRef.current < MULTI_TOUCH_TAP_COOLDOWN_MS;
-        // touchEnd is dispatched without the changed pointer: the engine's
-        // touch-end mouseUp/click path would double-fire onClick alongside
-        // dispatchTap below. onMouseUp is raised via dispatchPointerUp instead,
-        // and click is owned solely by this component's tap detection (whose
-        // move threshold tolerates finger jitter the engine's path does not).
-        touchCountRef.current = remaining.length;
-        rendererRef.current.dispatchTouchEnd(remaining);
-        // Withheld whenever taps are suppressed: if iOS dropped the second
-        // finger's start event, the engine never entered pinch mode and would
-        // otherwise treat the final lift as a clean single-pointer release.
-        if (!suppressTap) rendererRef.current.dispatchPointerUp(toPointer(e.nativeEvent));
+    const endTouch = useCallback(
+        (e: GestureTouchEvent, allowTap: boolean) => {
+            if (!claimRef.current) return;
+            const remaining = remainingPointers(e);
+            const changed = e.changedTouches.length > 0 ? toPointer(e.changedTouches[0]) : undefined;
 
-        const tap = tapRef.current;
-        if (allowTap && !suppressTap && tap && !tap.moved && Date.now() - tap.time < TAP_TIME_THRESHOLD) {
-            rendererRef.current.dispatchTap(toPointer(e.nativeEvent));
-        }
-        tapRef.current = null;
-        if (remaining.length === 0) multiTouchRef.current = false;
-    }, []);
+            if (remaining.length > 0) {
+                // A finger lifted while others remain: proves multi-touch, and
+                // the engine leaves/rebases pinch mode.
+                markMultiTouch();
+                if (remaining.length !== touchCountRef.current) {
+                    touchCountRef.current = remaining.length;
+                    rendererRef.current.dispatchTouchEnd(remaining);
+                }
+                return;
+            }
 
-    const onResponderRelease = useCallback((e: GestureResponderEvent) => endTouch(e, true), [endTouch]);
-    const onResponderTerminate = useCallback((e: GestureResponderEvent) => endTouch(e, false), [endTouch]);
+            // Final lift. Suppress the tap paths both during a multi-touch
+            // gesture and in the cooldown window after one: broken iOS touch
+            // tracking can end a gesture early and restart the still-down
+            // finger as a "new" gesture, whose lift would otherwise look like
+            // a clean tap.
+            const suppressTap =
+                multiTouchRef.current || Date.now() - lastMultiTouchAtRef.current < MULTI_TOUCH_TAP_COOLDOWN_MS;
+            // touchEnd is dispatched without the changed pointer: the engine's
+            // touch-end mouseUp/click path would double-fire onClick alongside
+            // dispatchTap below. onMouseUp is raised via dispatchPointerUp
+            // instead, and click is owned solely by this component's tap
+            // detection (whose move threshold tolerates finger jitter the
+            // engine's path does not).
+            touchCountRef.current = 0;
+            rendererRef.current.dispatchTouchEnd([]);
+            // Withheld whenever taps are suppressed: if iOS dropped the second
+            // finger's start event, the engine never entered pinch mode and
+            // would otherwise treat the final lift as a clean single-pointer
+            // release.
+            if (!suppressTap && changed) rendererRef.current.dispatchPointerUp(changed);
 
-    // Claim the responder only while some interaction is actually consumed —
-    // otherwise a parent ScrollView must keep receiving the touches. Checked
-    // per gesture because setEventHandlers can toggle handlers at runtime.
-    // onMouseDown/onMouseUp are not config-gated, and unlike the web there is
-    // no synthetic-mouse fallback, so their presence also claims the responder.
-    const shouldClaimResponder = useCallback(() => {
-        const instance = instanceRef.current;
-        if (!instance) return false;
-        const eventHandlers = instance.getConfig().eventHandlers;
-        if (eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover) return true;
-        return Boolean(callbacksRef.current.onMouseDown || callbacksRef.current.onMouseUp);
-    }, []);
+            const tap = tapRef.current;
+            if (
+                allowTap &&
+                !suppressTap &&
+                changed &&
+                tap &&
+                !tap.moved &&
+                Date.now() - tap.time < TAP_TIME_THRESHOLD
+            ) {
+                rendererRef.current.dispatchTap(changed);
+            }
+            tapRef.current = null;
+            multiTouchRef.current = false;
+        },
+        [markMultiTouch],
+    );
+
+    const onTouchesUp = useCallback((e: GestureTouchEvent) => endTouch(e, true), [endTouch]);
+    const onTouchesCancelled = useCallback((e: GestureTouchEvent) => endTouch(e, false), [endTouch]);
+
+    // Blocker enablement is read at render time; the component re-renders on
+    // every engine frame (picture state), so a runtime setEventHandlers
+    // toggle is picked up on the next painted frame.
+    const interactionsClaimed = shouldClaimGesture();
+
+    // The transport reads live state through refs; runOnJS keeps the
+    // callbacks on the JS thread (the engine is a plain JS object) even when
+    // Reanimated is installed.
+    const gesture = useMemo(() => {
+        const transport = Gesture.Manual()
+            .runOnJS(true)
+            .onTouchesDown(onTouchesDown)
+            .onTouchesMove(onTouchesMove)
+            .onTouchesUp(onTouchesUp)
+            .onTouchesCancelled(onTouchesCancelled);
+        // Callback-less by design: its only job is to activate natively on a
+        // tiny movement, which cancels an enclosing ScrollView's pan. Taps
+        // don't move far enough to activate it — and don't scroll pages
+        // either, so nothing needs blocking for them.
+        const blocker = Gesture.Pan()
+            .enabled(interactionsClaimed)
+            .minDistance(2)
+            .maxPointers(10)
+            .shouldCancelWhenOutside(false);
+        return Gesture.Simultaneous(transport, blocker);
+    }, [interactionsClaimed, onTouchesDown, onTouchesMove, onTouchesUp, onTouchesCancelled]);
 
     return (
         <EngineContext.Provider value={contextValue}>
-            <View
-                style={[styles.fill, style]}
-                onLayout={handleLayout}
-                onStartShouldSetResponder={shouldClaimResponder}
-                onMoveShouldSetResponder={shouldClaimResponder}
-                onResponderGrant={onResponderGrant}
-                onResponderStart={onResponderStart}
-                onResponderEnd={onResponderEnd}
-                onResponderMove={onResponderMove}
-                onResponderRelease={onResponderRelease}
-                onResponderTerminate={onResponderTerminate}
-                onResponderTerminationRequest={() => false}
-            >
-                {size.width > 0 &&
-                    size.height > 0 && (
-                        // pointerEvents="none": the canvas is purely visual — all
-                        // gestures are handled by the wrapper View's responder, so
-                        // the Skia view must never intercept touches itself.
-                        <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
-                            {picture && <Picture picture={picture} />}
-                        </Canvas>
-                    )}
-            </View>
+            <GestureDetector gesture={gesture}>
+                <View style={[styles.fill, style]} onLayout={handleLayout}>
+                    {size.width > 0 &&
+                        size.height > 0 && (
+                            // pointerEvents="none": the canvas is purely visual — all
+                            // gestures are handled by the wrapper's GestureDetector, so
+                            // the Skia view must never intercept touches itself.
+                            <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
+                                {picture && <Picture picture={picture} />}
+                            </Canvas>
+                        )}
+                </View>
+            </GestureDetector>
             {/* Render children (draw components) only after this component's engine exists */}
             {ready && children}
         </EngineContext.Provider>
