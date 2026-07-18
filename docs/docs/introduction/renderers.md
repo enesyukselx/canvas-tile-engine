@@ -88,7 +88,7 @@ interface IDrawAPI<TImage = HTMLImageElement> {
     drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
     drawImage(items: ImageItem<TImage> | ImageItem<TImage>[], layer?: number): DrawHandle;
-    drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle;
+    drawPath(items: PathItem[], layer?: number): DrawHandle;
     drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;

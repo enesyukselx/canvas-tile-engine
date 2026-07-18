@@ -225,8 +225,7 @@ PathItem = { points: Coords[], closed?, fillRule? ("nonzero" default |
 "evenodd"), style?, data? }. PathStyle = LineStyle fields + fillStyle? +
 cornerRadius? (world) / cornerRadiusPx? (px, wins) for tangent-arc corner
 rounding. Fill-only items draw no outline; unstyled items stroke a hairline.
-The legacy `drawPath(Coords[] | Coords[][], style?, layer?)` form is
-deprecated (stroke-only). Line keeps its call-level style argument, and Line
+Line keeps its call-level style argument, and Line
 items accept `data?` now that lines surface in hit results. LineStyle =
 { strokeStyle?, lineWidth? (world), lineWidthPx?, lineDash? (world),
 lineDashPx? }. UNIT RULE (matches Text size/fontPx): plain numbers are world
