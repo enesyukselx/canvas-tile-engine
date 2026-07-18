@@ -40,7 +40,6 @@ export type {
     Line,
     Circle,
     Text,
-    Path,
     PathItem,
     PathStyle,
     ImageItem,
