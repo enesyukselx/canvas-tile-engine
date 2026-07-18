@@ -20,7 +20,9 @@ import {
     resolveRadiusPx,
     resolveCornerRadiusPx,
     traceRoundedPath,
-    type PathTraceTarget,
+    traceCommands,
+    pathCommandsBounds,
+    type CommandTraceTarget,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
@@ -439,7 +441,7 @@ export class SkiaDraw {
      * Adapts an SkPath to the Canvas2D-shaped sink `traceRoundedPath`
      * expects, so corner-arc geometry is byte-identical across renderers.
      */
-    private pathSink(path: SkPath): PathTraceTarget {
+    private pathSink(path: SkPath): CommandTraceTarget {
         return {
             moveTo: (x, y) => void path.moveTo(x, y),
             lineTo: (x, y) => void path.lineTo(x, y),
@@ -450,37 +452,63 @@ export class SkiaDraw {
                 if (!counterclockwise && sweep < 0) sweep += Math.PI * 2;
                 if (counterclockwise && sweep > 0) sweep -= Math.PI * 2;
                 const deg = 180 / Math.PI;
-                path.arcToOval(
-                    Skia.XYWHRect(
-                        x - radius,
-                        y - radius,
-                        radius * 2,
-                        radius * 2,
-                    ),
-                    startAngle * deg,
-                    sweep * deg,
-                    false,
+                const oval = Skia.XYWHRect(
+                    x - radius,
+                    y - radius,
+                    radius * 2,
+                    radius * 2,
                 );
+                const sweepDeg = sweep * deg;
+                // Skia reduces sweeps modulo 360, so a Canvas2D full circle
+                // (sweep exactly 360) would collapse to nothing - split it.
+                if (Math.abs(sweepDeg) >= 360) {
+                    const half = sweepDeg / 2;
+                    path.arcToOval(oval, startAngle * deg, half, false);
+                    path.arcToOval(oval, startAngle * deg + half, half, false);
+                } else {
+                    path.arcToOval(oval, startAngle * deg, sweepDeg, false);
+                }
             },
+            quadraticCurveTo: (cpx, cpy, x, y) => void path.quadTo(cpx, cpy, x, y),
+            bezierCurveTo: (cp1x, cp1y, cp2x, cp2y, x, y) => void path.cubicTo(cp1x, cp1y, cp2x, cp2y, x, y),
             closePath: () => void path.close(),
         };
     }
 
     drawPath(items: PathItem[], layer: number = 1): DrawHandle {
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            for (const item of items) {
-                const points = item.points;
-                if (!points || points.length < 2) continue;
+        // Conservative world bounds per item for culling, computed once:
+        // control-point hull for command paths, vertex bounds for polylines.
+        const itemBounds = items.map((item) => {
+            if (item.commands !== undefined)
+                return pathCommandsBounds(item.commands);
+            const points = item.points;
+            if (!points || points.length < 2) return null;
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            for (const p of points) {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            }
+            return { minX, minY, maxX, maxY };
+        });
 
-                const xs = points.map((p) => p.x);
-                const ys = points.map((p) => p.y);
-                const minX = Math.min(...xs);
-                const maxX = Math.max(...xs);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
-                const centerX = (minX + maxX) / 2;
-                const centerY = (minY + maxY) / 2;
-                const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
+        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+            for (let n = 0; n < items.length; n++) {
+                const item = items[n];
+                const bounds = itemBounds[n];
+                if (!bounds) continue;
+
+                const centerX = (bounds.minX + bounds.maxX) / 2;
+                const centerY = (bounds.minY + bounds.maxY) / 2;
+                const halfExtent =
+                    Math.max(
+                        bounds.maxX - bounds.minX,
+                        bounds.maxY - bounds.minY,
+                    ) / 2;
                 if (
                     !this.isVisible(
                         centerX,
@@ -494,17 +522,29 @@ export class SkiaDraw {
 
                 const style = item.style;
                 const filled = style?.fillStyle !== undefined;
-                const pts = points.map((p) =>
-                    this.transformer.worldToScreen(p.x, p.y),
-                );
 
                 const path = Skia.Path.Make();
-                traceRoundedPath(
-                    this.pathSink(path),
-                    pts,
-                    item.closed === true,
-                    resolveCornerRadiusPx(style, this.camera.scale),
-                );
+                if (item.commands !== undefined) {
+                    // Free-form commands replay natively (curves stay
+                    // curves); world→screen and degrees→radians convert in
+                    // core so all renderers trace identical geometry.
+                    traceCommands(
+                        this.pathSink(path),
+                        item.commands,
+                        (x, y) => this.transformer.worldToScreen(x, y),
+                        this.camera.scale,
+                    );
+                } else {
+                    const pts = item.points!.map((p) =>
+                        this.transformer.worldToScreen(p.x, p.y),
+                    );
+                    traceRoundedPath(
+                        this.pathSink(path),
+                        pts,
+                        item.closed === true,
+                        resolveCornerRadiusPx(style, this.camera.scale),
+                    );
+                }
 
                 if (filled) {
                     path.setFillType(
