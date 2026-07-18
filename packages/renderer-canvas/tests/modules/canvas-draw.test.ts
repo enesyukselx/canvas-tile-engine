@@ -620,3 +620,92 @@ describe("CanvasDraw sizePx and flip", () => {
         expect(images[2].dx).not.toBe(-5);
     });
 });
+
+// Fake 2D context recording native path commands for command replay.
+function makeCommandRecordingCtx() {
+    const calls: Array<{ op: string; args: number[] }> = [];
+    const rec =
+        (op: string) =>
+        (...args: unknown[]) =>
+            calls.push({ op, args: args.filter((a) => typeof a === "number") as number[] });
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        fillStyle: "#000",
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        setLineDash() {},
+        moveTo: rec("moveTo"),
+        lineTo: rec("lineTo"),
+        arc: rec("arc"),
+        quadraticCurveTo: rec("quadraticCurveTo"),
+        bezierCurveTo: rec("bezierCurveTo"),
+        closePath: rec("closePath"),
+        fill: rec("fill"),
+        stroke: rec("stroke"),
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
+}
+
+describe("CanvasDraw command paths", () => {
+    it("replays commands natively with world→screen and degree→radian conversion", () => {
+        const { draw, render } = setup(); // scale 10, worldToScreen(k) centers cells
+        const { ctx, calls } = makeCommandRecordingCtx();
+
+        draw.drawPath(
+            [
+                {
+                    commands: [
+                        { type: "moveTo", x: 0, y: 0 },
+                        { type: "quadraticCurveTo", cpx: 2, cpy: 2, x: 4, y: 0 },
+                        { type: "arc", x: 0, y: 0, radius: 2, startAngle: 0, endAngle: 180 },
+                        { type: "closePath" },
+                    ],
+                    style: { strokeStyle: "#f00" },
+                },
+            ],
+            1,
+        );
+        render(ctx);
+
+        const ops = calls.map((c) => c.op);
+        expect(ops).toEqual(["moveTo", "quadraticCurveTo", "arc", "closePath", "stroke"]);
+        // arc: radius scaled to px (2 * 10), angles in radians
+        const arc = calls[2].args;
+        expect(arc[2]).toBe(20);
+        expect(arc[4]).toBeCloseTo(Math.PI);
+    });
+
+    it("fills multi-subpath commands under the item's fill rule (holes)", () => {
+        const { draw, render } = setup();
+        const { ctx, calls } = makeCommandRecordingCtx();
+
+        draw.drawPath(
+            [
+                {
+                    commands: [
+                        { type: "moveTo", x: 0, y: 0 },
+                        { type: "lineTo", x: 4, y: 0 },
+                        { type: "lineTo", x: 4, y: 4 },
+                        { type: "closePath" },
+                        { type: "moveTo", x: 1, y: 1 },
+                        { type: "lineTo", x: 2, y: 1 },
+                        { type: "lineTo", x: 2, y: 2 },
+                        { type: "closePath" },
+                    ],
+                    fillRule: "evenodd",
+                    style: { fillStyle: "#0f0" },
+                },
+            ],
+            1,
+        );
+        render(ctx);
+
+        const ops = calls.map((c) => c.op);
+        expect(ops.filter((op) => op === "moveTo")).toHaveLength(2);
+        expect(ops).toContain("fill");
+        expect(ops).not.toContain("stroke"); // fill-only
+    });
+});

@@ -7,7 +7,7 @@ export * from "./constants";
 export { gridToSize } from "./utils/gridToSize";
 export { resolveLineWidthPx, resolveLineDashPx, resolveRadiusPx, resolveCornerRadiusPx } from "./utils/strokeStyle";
 export { cornerArc } from "./utils/pathCorners";
-export { traceRoundedPath, type PathTraceTarget } from "./utils/tracePath";
+export { traceRoundedPath, traceCommands, type PathTraceTarget, type CommandTraceTarget } from "./utils/tracePath";
 export { roundedPolyline, roundedRing, ARC_SEGMENT_LENGTH } from "./utils/pathFlatten";
 export { resolveSizePx, resolveSizeWorld } from "./utils/itemSize";
 export { flattenPathCommands, pathCommandsBounds, type Subpath } from "./utils/flattenPath";

@@ -20,6 +20,8 @@ import {
     resolveRadiusPx,
     resolveCornerRadiusPx,
     traceRoundedPath,
+    traceCommands,
+    pathCommandsBounds,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
@@ -332,29 +334,55 @@ export class CanvasDraw {
     }
 
     drawPath(items: PathItem[], layer: number = 1): DrawHandle {
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            for (const item of items) {
-                const points = item.points;
-                if (!points || points.length < 2) continue;
+        // Conservative world bounds per item for culling, computed once:
+        // control-point hull for command paths, vertex bounds for polylines.
+        const itemBounds = items.map((item) => {
+            if (item.commands !== undefined) return pathCommandsBounds(item.commands);
+            const points = item.points;
+            if (!points || points.length < 2) return null;
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            for (const p of points) {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            }
+            return { minX, minY, maxX, maxY };
+        });
 
-                const xs = points.map((p) => p.x);
-                const ys = points.map((p) => p.y);
-                const minX = Math.min(...xs);
-                const maxX = Math.max(...xs);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
-                const centerX = (minX + maxX) / 2;
-                const centerY = (minY + maxY) / 2;
-                const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
+        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            for (let n = 0; n < items.length; n++) {
+                const item = items[n];
+                const bounds = itemBounds[n];
+                if (!bounds) continue;
+
+                const centerX = (bounds.minX + bounds.maxX) / 2;
+                const centerY = (bounds.minY + bounds.maxY) / 2;
+                const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
                 const style = item.style;
                 const filled = style?.fillStyle !== undefined;
-                const pts = points.map((p) => this.transformer.worldToScreen(p.x, p.y));
 
                 ctx.save();
                 ctx.beginPath();
-                traceRoundedPath(ctx, pts, item.closed === true, resolveCornerRadiusPx(style, this.camera.scale));
+                if (item.commands !== undefined) {
+                    // Free-form commands replay natively (curves stay curves);
+                    // degrees→radians and world→screen convert in core so all
+                    // renderers trace identical geometry.
+                    traceCommands(
+                        ctx,
+                        item.commands,
+                        (x, y) => this.transformer.worldToScreen(x, y),
+                        this.camera.scale,
+                    );
+                } else {
+                    const pts = item.points!.map((p) => this.transformer.worldToScreen(p.x, p.y));
+                    traceRoundedPath(ctx, pts, item.closed === true, resolveCornerRadiusPx(style, this.camera.scale));
+                }
 
                 if (filled) {
                     ctx.fillStyle = style!.fillStyle!;

@@ -1,4 +1,4 @@
-import type { Coords } from "../types";
+import type { Coords, PathCommand } from "../types";
 import { cornerArc } from "./pathCorners";
 
 /**
@@ -56,4 +56,65 @@ export function traceRoundedPath(ctx: PathTraceTarget, pts: Coords[], closed: bo
     }
     ctx.lineTo(pts[n - 1].x, pts[n - 1].y);
     if (closed) ctx.closePath();
+}
+
+/**
+ * Full Canvas2D-shaped sink for command replay: {@link PathTraceTarget}
+ * plus the curve methods. DOM and @napi-rs/canvas contexts satisfy it
+ * structurally; Skia adapts via its path builder.
+ */
+export interface CommandTraceTarget extends PathTraceTarget {
+    quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void;
+    bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): void;
+}
+
+/**
+ * Replays a PathCommand list into a Canvas2D-style sink, converting world
+ * coordinates to screen pixels and degrees to radians at this one boundary
+ * so every renderer traces identical geometry. The world→screen transform
+ * is uniform (one scale for both axes), so curves and arcs map exactly.
+ */
+export function traceCommands(
+    ctx: CommandTraceTarget,
+    commands: PathCommand[],
+    worldToScreen: (x: number, y: number) => Coords,
+    scale: number,
+): void {
+    const DEG = Math.PI / 180;
+    for (const cmd of commands) {
+        switch (cmd.type) {
+            case "moveTo": {
+                const p = worldToScreen(cmd.x, cmd.y);
+                ctx.moveTo(p.x, p.y);
+                break;
+            }
+            case "lineTo": {
+                const p = worldToScreen(cmd.x, cmd.y);
+                ctx.lineTo(p.x, p.y);
+                break;
+            }
+            case "arc": {
+                const c = worldToScreen(cmd.x, cmd.y);
+                ctx.arc(c.x, c.y, cmd.radius * scale, cmd.startAngle * DEG, cmd.endAngle * DEG, cmd.ccw === true);
+                break;
+            }
+            case "quadraticCurveTo": {
+                const cp = worldToScreen(cmd.cpx, cmd.cpy);
+                const p = worldToScreen(cmd.x, cmd.y);
+                ctx.quadraticCurveTo(cp.x, cp.y, p.x, p.y);
+                break;
+            }
+            case "bezierCurveTo": {
+                const cp1 = worldToScreen(cmd.cp1x, cmd.cp1y);
+                const cp2 = worldToScreen(cmd.cp2x, cmd.cp2y);
+                const p = worldToScreen(cmd.x, cmd.y);
+                ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, p.x, p.y);
+                break;
+            }
+            case "closePath": {
+                ctx.closePath();
+                break;
+            }
+        }
+    }
 }
