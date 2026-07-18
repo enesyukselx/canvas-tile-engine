@@ -251,6 +251,7 @@ pnpm --filter vanilla-js-game-map dev
 pnpm --filter react-game-map dev
 pnpm --filter react-responsive-game-map dev
 pnpm --filter react-pixel-paint dev
+pnpm --filter react-path-showcase dev
 pnpm --filter react-spritesheet dev
 pnpm --filter renderer-server-game-map start
 ```
