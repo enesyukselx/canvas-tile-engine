@@ -127,7 +127,7 @@ Everything else - hook handle, draw components, layers, culling, camera math, co
 ## Notes
 
 - `config`, `center`, and `renderer` are read when the native engine is created. Remount with a new `key` to apply a new full config or renderer.
-- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.updateCoords`, `engine.goCoords`, `engine.setScale`, `zoomIn`, and `zoomOut` for runtime changes.
+- Use `engine.setEventHandlers`, `engine.setBounds`, `engine.setCenter`, `engine.goCenter`, `engine.setScale`, `zoomIn`, and `zoomOut` for runtime changes.
 - `onDraw` and `DrawFunction` receive a Skia `SkCanvas`.
 - Static draw helpers record and replay Skia pictures, which is useful for thousands of non-changing items.
 

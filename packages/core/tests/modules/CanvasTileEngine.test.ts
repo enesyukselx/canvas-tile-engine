@@ -114,9 +114,9 @@ describe("CanvasTileEngine", () => {
         });
 
         it("keeps the viewport center fixed while zooming", () => {
-            const before = engine.getCenterCoords();
+            const before = engine.getCenter();
             engine.goScale(2, 0);
-            const after = engine.getCenterCoords();
+            const after = engine.getCenter();
             expect(after.x).toBeCloseTo(before.x);
             expect(after.y).toBeCloseTo(before.y);
         });
@@ -185,15 +185,6 @@ describe("CanvasTileEngine", () => {
         it("setCenter and goCenter reject non-finite coordinates", () => {
             expect(() => engine.setCenter({ x: NaN, y: 0 })).toThrow();
             expect(() => engine.goCenter(0, Infinity)).toThrow();
-        });
-
-        it("deprecated aliases delegate to the new methods", () => {
-            engine.updateCoords({ x: 5, y: 6 });
-            expect(engine.getCenterCoords()).toEqual({ x: 5, y: 6 });
-            expect(engine.getCenterCoords()).toEqual(engine.getCenter());
-
-            engine.goCoords(7, 8, 0);
-            expect(engine.getCenter()).toEqual({ x: 7, y: 8 });
         });
     });
 
@@ -309,7 +300,7 @@ describe("CanvasTileEngine", () => {
         // an integer center for pixel-perfect alignment.
         function centerFor(config: CanvasTileEngineConfig, center: Coords): Coords {
             const e = new CanvasTileEngine<Mount>({}, config, createMockRenderer(), center);
-            return e.getCenterCoords();
+            return e.getCenter();
         }
 
         const even = { scale: 15, size: { width: 300, height: 300 }, gridAligned: true }; // 20x20 tiles
@@ -353,7 +344,7 @@ describe("CanvasTileEngine", () => {
             // exactly fill the viewport, i.e. visible world is [-0.5, N-0.5].
             const e = new CanvasTileEngine<Mount>({}, even, createMockRenderer(), { x: 9.5, y: 9.5 });
             expect(e.getVisibleBounds()).toEqual({ minX: -1, maxX: 20, minY: -1, maxY: 20 });
-            expect(e.getCenterCoords()).toEqual({ x: 9.5, y: 9.5 });
+            expect(e.getCenter()).toEqual({ x: 9.5, y: 9.5 });
         });
     });
 

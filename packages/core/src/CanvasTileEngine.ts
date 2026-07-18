@@ -7,7 +7,6 @@ import { HitTester, HitResult, HitTestOptions } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateFitBounds, validateScale } from "./utils/validateConfig";
 import { snapCenterToGrid } from "./utils/viewport";
-import { normalizePathItems } from "./utils/normalizePath";
 import {
     Bounds,
     Coords,
@@ -28,7 +27,6 @@ import {
     Rect,
     Line,
     LineStyle,
-    Path,
     PathItem,
     IRenderer,
     IImageLoader,
@@ -524,14 +522,6 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
-     * Current center of the view in world coordinates.
-     * @deprecated Use {@link getCenter} instead.
-     */
-    getCenterCoords(): Coords {
-        return this.getCenter();
-    }
-
-    /**
      * Get the visible world coordinate bounds of the viewport.
      * Returns floored/ceiled values representing which cells are visible.
      * @returns Visible bounds with min/max coordinates.
@@ -562,14 +552,6 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
-     * Move the view center to new world coordinates instantly.
-     * @deprecated Use {@link setCenter} instead.
-     */
-    updateCoords(newCenter: Coords) {
-        this.setCenter(newCenter);
-    }
-
-    /**
      * Smoothly animate the view center to target world coordinates over the given duration.
      * @param x Target world x.
      * @param y Target world y.
@@ -580,14 +562,6 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     goCenter(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
         validateCoords(x, y);
         this.animationController.animateMoveTo(x, y, durationMs, onComplete);
-    }
-
-    /**
-     * Smoothly animate the view center to target world coordinates.
-     * @deprecated Use {@link goCenter} instead.
-     */
-    goCoords(x: number, y: number, durationMs: number = 500, onComplete?: () => void) {
-        this.goCenter(x, y, durationMs, onComplete);
     }
 
     /**
@@ -819,9 +793,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * testing: filled paths hit on their interior, unfilled paths on the
      * stroke itself.
      *
-     * The legacy `Coords[]` / `Coords[][]` form with a call-level stroke
-     * style is still accepted and normalized into items internally.
-     * @param items Path item(s), or legacy polyline point collections.
+     * @param items Path item(s).
      * @param layer Layer order.
      * @example
      * ```ts
@@ -837,22 +809,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * engine.drawPath({ points: route, style: { strokeStyle: "#3b82f6", lineWidthPx: 4 } });
      * ```
      */
-    drawPath<TData = unknown>(items: PathItem<TData> | Array<PathItem<TData>>, layer?: number): DrawHandle;
-    /**
-     * @deprecated Pass `PathItem` objects instead (`{ points, style }`); this
-     * form only supports call-level stroke styling and no fill or hit data.
-     */
-    drawPath(items: Array<Path> | Path, style?: LineStyle, layer?: number): DrawHandle;
-    drawPath<TData = unknown>(
-        items: PathItem<TData> | Array<PathItem<TData>> | Array<Path> | Path,
-        styleOrLayer?: LineStyle | number,
-        maybeLayer?: number,
-    ): DrawHandle {
-        const legacyStyle = typeof styleOrLayer === "object" ? styleOrLayer : undefined;
-        const layer = typeof styleOrLayer === "number" ? styleOrLayer : (maybeLayer ?? 1);
-        const normalized = normalizePathItems(items, legacyStyle);
-        const handle = this.renderer.getDrawAPI().drawPath(normalized, layer);
-        this.hitTester.register(handle, "path", normalized, layer);
+    drawPath<TData = unknown>(items: PathItem<TData> | Array<PathItem<TData>>, layer: number = 1): DrawHandle {
+        const list = Array.isArray(items) ? items : [items];
+        const handle = this.renderer.getDrawAPI().drawPath(list, layer);
+        this.hitTester.register(handle, "path", list, layer);
         return handle;
     }
 
