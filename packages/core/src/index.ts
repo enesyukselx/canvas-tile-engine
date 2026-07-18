@@ -10,6 +10,7 @@ export { cornerArc } from "./utils/pathCorners";
 export { traceRoundedPath, type PathTraceTarget } from "./utils/tracePath";
 export { roundedPolyline, roundedRing, ARC_SEGMENT_LENGTH } from "./utils/pathFlatten";
 export { resolveSizePx, resolveSizeWorld } from "./utils/itemSize";
+export { flattenPathCommands, pathCommandsBounds, type Subpath } from "./utils/flattenPath";
 export type { CornerArc } from "./utils/pathCorners";
 // Additional core modules
 export { Config } from "./modules/Config";

@@ -505,3 +505,117 @@ describe("HitTester sizePx items", () => {
         expect(ht.hitTestFirst({ x: 203.2, y: 0 })).toBeUndefined();
     });
 });
+
+describe("HitTester command paths", () => {
+    const scaled = () => new HitTester(() => 40);
+
+    // Donut: outer CW square, inner CCW square (opposite winding -> nonzero hole)
+    const donut = [
+        { type: "moveTo", x: 0, y: 0 },
+        { type: "lineTo", x: 10, y: 0 },
+        { type: "lineTo", x: 10, y: 10 },
+        { type: "lineTo", x: 0, y: 10 },
+        { type: "closePath" },
+        { type: "moveTo", x: 3, y: 3 },
+        { type: "lineTo", x: 3, y: 7 },
+        { type: "lineTo", x: 7, y: 7 },
+        { type: "lineTo", x: 7, y: 3 },
+        { type: "closePath" },
+    ] as const;
+
+    it("punches a nonzero hole when the inner ring winds opposite", () => {
+        const ht = scaled();
+        ht.register(handle(1), "path", { commands: [...donut], style: { fillStyle: "red" } }, 1);
+
+        expect(ht.hitTestFirst({ x: 1.5, y: 5 })).toBeDefined(); // ring band
+        expect(ht.hitTestFirst({ x: 5, y: 5 })).toBeUndefined(); // hole center
+        expect(ht.hitTestFirst({ x: 11, y: 5 })).toBeUndefined(); // outside
+    });
+
+    it("punches an evenodd hole regardless of winding direction", () => {
+        // Inner ring wound the SAME direction as the outer
+        const sameDir = [
+            { type: "moveTo", x: 0, y: 0 },
+            { type: "lineTo", x: 10, y: 0 },
+            { type: "lineTo", x: 10, y: 10 },
+            { type: "lineTo", x: 0, y: 10 },
+            { type: "closePath" },
+            { type: "moveTo", x: 3, y: 3 },
+            { type: "lineTo", x: 7, y: 3 },
+            { type: "lineTo", x: 7, y: 7 },
+            { type: "lineTo", x: 3, y: 7 },
+            { type: "closePath" },
+        ] as const;
+        const nonzero = scaled();
+        nonzero.register(handle(1), "path", { commands: [...sameDir], style: { fillStyle: "red" } }, 1);
+        expect(nonzero.hitTestFirst({ x: 5, y: 5 })).toBeDefined(); // nonzero: no hole
+
+        const evenodd = scaled();
+        evenodd.register(
+            handle(1),
+            "path",
+            { commands: [...sameDir], fillRule: "evenodd", style: { fillStyle: "red" } },
+            1,
+        );
+        expect(evenodd.hitTestFirst({ x: 5, y: 5 })).toBeUndefined(); // evenodd: hole
+        expect(evenodd.hitTestFirst({ x: 1.5, y: 5 })).toBeDefined();
+    });
+
+    it("hits a filled circle drawn as an arc command on its interior", () => {
+        const ht = scaled();
+        ht.register(
+            handle(1),
+            "path",
+            {
+                commands: [{ type: "arc", x: 5, y: 5, radius: 3, startAngle: 0, endAngle: 360 }],
+                style: { fillStyle: "red" },
+            },
+            1,
+        );
+        expect(ht.hitTestFirst({ x: 5, y: 5 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 7.8, y: 5 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 8.4, y: 5 })).toBeUndefined();
+    });
+
+    it("hits an unfilled bezier on the stroke, tested against the flattened curve", () => {
+        const ht = scaled();
+        ht.register(
+            handle(1),
+            "path",
+            {
+                commands: [
+                    { type: "moveTo", x: 0, y: 0 },
+                    { type: "bezierCurveTo", cp1x: 0, cp1y: 4, cp2x: 8, cp2y: 4, x: 8, y: 0 },
+                ],
+                style: { strokeStyle: "red", lineWidthPx: 8 },
+            },
+            1,
+        );
+        // Curve apex is at y = 3 (cubic with both control ys at 4)
+        expect(ht.hitTestFirst({ x: 4, y: 3 })).toBeDefined();
+        // The straight chord between endpoints is NOT the curve
+        expect(ht.hitTestFirst({ x: 4, y: 0 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 4, y: 3.5 })).toBeUndefined();
+    });
+
+    it("commands win when both commands and points are set", () => {
+        const ht = scaled();
+        ht.register(
+            handle(1),
+            "path",
+            {
+                commands: [
+                    { type: "moveTo", x: 0, y: 0 },
+                    { type: "lineTo", x: 2, y: 0 },
+                ],
+                points: [
+                    { x: 20, y: 20 },
+                    { x: 22, y: 20 },
+                ],
+            },
+            1,
+        );
+        expect(ht.hitTestFirst({ x: 1, y: 0 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 21, y: 20 })).toBeUndefined();
+    });
+});

@@ -166,25 +166,67 @@ export type PathStyle = {
     /** Dash pattern in screen pixels, independent of zoom. */
     lineDashPx?: number[];
     /** Corner rounding radius in world units, applied at every interior
-     * vertex of `points` (and the closing corners when `closed`). Ignored
-     * when {@link cornerRadiusPx} is set. */
+     * vertex of `points` (and the closing corners when `closed`). `points`
+     * form only — with `commands`, draw arcs explicitly. Ignored when
+     * {@link cornerRadiusPx} is set. */
     cornerRadius?: number;
     /** Corner rounding radius in screen pixels, independent of zoom. */
     cornerRadiusPx?: number;
 };
 
 /**
- * A free-form path drawn through world points.
+ * One drawing command of a free-form path, mirroring the Canvas2D path API.
+ * Coordinates and radii are world units (item space); angles are degrees
+ * (engine convention, like `rotate`) — renderers convert to radians.
+ */
+export type PathCommand =
+    | { type: "moveTo"; x: number; y: number }
+    | { type: "lineTo"; x: number; y: number }
+    /**
+     * Center-based circular arc from `startAngle` to `endAngle` (degrees,
+     * 0 = +x axis, positive angles sweep clockwise in screen space). `ccw`
+     * defaults to false. Like Canvas2D, a line connects the current point to
+     * the arc's start when the subpath is already open.
+     */
+    | {
+          type: "arc";
+          x: number;
+          y: number;
+          radius: number;
+          startAngle: number;
+          endAngle: number;
+          ccw?: boolean;
+      }
+    | { type: "quadraticCurveTo"; cpx: number; cpy: number; x: number; y: number }
+    | { type: "bezierCurveTo"; cp1x: number; cp1y: number; cp2x: number; cp2y: number; x: number; y: number }
+    | { type: "closePath" };
+
+/**
+ * A free-form path: either a `points` polyline or a Canvas2D-style
+ * `commands` list (curves, arcs, multiple subpaths, holes).
  *
  * `points` describes an open polyline; `closed` joins the last point back to
- * the first. Setting `style.fillStyle` fills the shape (the outline is closed
- * implicitly for filling, like Canvas2D `fill()`), and filled paths hit-test
- * against their interior. Unfilled paths hit-test against the stroke itself.
+ * the first. `commands` is fully free-form: each `moveTo` starts a new
+ * subpath, so one item can be an outline plus holes — under the `"evenodd"`
+ * fill rule any overlapping subpath punches a hole; under `"nonzero"` a hole
+ * must wind in the opposite direction of its outer ring.
+ *
+ * Setting `style.fillStyle` fills the shape (open subpaths close implicitly
+ * for filling, like Canvas2D `fill()`), and filled paths hit-test against
+ * their interior. Unfilled paths hit-test against the stroke itself.
  */
 export type PathItem<TData = unknown> = {
+    /**
+     * Free-form command list. Mutually exclusive with {@link points} —
+     * when both are set, `commands` wins.
+     */
+    commands?: PathCommand[];
     /** Polyline vertices in world units (item space: integers are cell centers). */
-    points: Coords[];
-    /** Join the last point back to the first with a closing segment. */
+    points?: Coords[];
+    /**
+     * Join the last point back to the first with a closing segment.
+     * `points` form only — with `commands`, use a `closePath` command.
+     */
     closed?: boolean;
     /**
      * Fill rule used for filling and interior hit testing, mirroring Canvas2D:
