@@ -265,9 +265,7 @@ Paths participate in hit testing: filled paths hit on their interior (under the 
 
 Dash patterns flow continuously around corners, including rounded ones.
 
-:::note Legacy form
-The previous `drawPath(points | points[], style?, layer?)` signature (bare coordinate arrays with a call-level `LineStyle`) still works but is deprecated; it only supports stroking. Prefer `PathItem` objects.
-:::
+
 
 ### `drawGridLines`
 

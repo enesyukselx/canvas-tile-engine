@@ -55,8 +55,6 @@ export interface EngineHandle {
 
     render(): void;
     getCenter(): Coords;
-    /** @deprecated Use {@link getCenter} instead. */
-    getCenterCoords(): Coords;
     getVisibleBounds(): {
         minX: number;
         maxX: number;
@@ -64,11 +62,7 @@ export interface EngineHandle {
         maxY: number;
     };
     setCenter(center: Coords): void;
-    /** @deprecated Use {@link setCenter} instead. */
-    updateCoords(center: Coords): void;
     goCenter(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
-    /** @deprecated Use {@link goCenter} instead. */
-    goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
     getSize(): { width: number; height: number };
     getScale(): number;
     setScale(newScale: number): void;
@@ -99,8 +93,6 @@ export interface EngineHandle {
     drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
     drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle;
-    /** @deprecated Pass `PathItem` objects instead (`{ points, style }`). */
-    drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
     drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
     drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
@@ -173,9 +165,6 @@ export function useCanvasTileEngine(): EngineHandle {
             getCenter() {
                 return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
             },
-            getCenterCoords() {
-                return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
-            },
             getVisibleBounds() {
                 return (
                     instanceRef.current?.getVisibleBounds() ?? {
@@ -189,13 +178,7 @@ export function useCanvasTileEngine(): EngineHandle {
             setCenter(center) {
                 instanceRef.current?.setCenter(center);
             },
-            updateCoords(center) {
-                instanceRef.current?.setCenter(center);
-            },
             goCenter(x, y, durationMs, onComplete) {
-                instanceRef.current?.goCenter(x, y, durationMs, onComplete);
-            },
-            goCoords(x, y, durationMs, onComplete) {
                 instanceRef.current?.goCenter(x, y, durationMs, onComplete);
             },
             getSize() {
@@ -262,15 +245,8 @@ export function useCanvasTileEngine(): EngineHandle {
             drawText(items, layer) {
                 return instanceRef.current?.drawText(items, layer) ?? droppedDraw("drawText");
             },
-            drawPath(
-                items: PathItem | PathItem[] | Coords[] | Coords[][],
-                styleOrLayer?: LineStyle | number,
-                maybeLayer?: number,
-            ) {
-                return (
-                    instanceRef.current?.drawPath(items as never, styleOrLayer as never, maybeLayer as never) ??
-                    droppedDraw("drawPath")
-                );
+            drawPath(items, layer) {
+                return instanceRef.current?.drawPath(items, layer) ?? droppedDraw("drawPath");
             },
             drawImage(items, layer) {
                 return instanceRef.current?.drawImage(items, layer) ?? droppedDraw("drawImage");

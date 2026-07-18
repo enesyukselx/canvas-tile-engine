@@ -147,13 +147,6 @@ export type Line<TData = unknown> = {
     data?: TData;
 };
 
-/**
- * Legacy polyline form: a bare array of world points.
- * @deprecated Use {@link PathItem} (`{ points, style, ... }`) instead; this
- * form only supports call-level stroke styling and no fill or hit data.
- */
-export type Path = Coords[];
-
 /** Per-item styling for {@link PathItem}. Same unit convention as elsewhere:
  * plain values are world units and scale with zoom; `*Px` variants are screen
  * pixels and take precedence over their world counterpart. */

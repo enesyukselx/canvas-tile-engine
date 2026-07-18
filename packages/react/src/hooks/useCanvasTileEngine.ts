@@ -116,9 +116,6 @@ export interface EngineHandle {
     /** Get the current view center in world coordinates */
     getCenter(): Coords;
 
-    /** @deprecated Use {@link getCenter} instead. */
-    getCenterCoords(): Coords;
-
     /** Get visible world coordinate bounds of the viewport */
     getVisibleBounds(): {
         minX: number;
@@ -130,14 +127,8 @@ export interface EngineHandle {
     /** Move the view center instantly */
     setCenter(center: Coords): void;
 
-    /** @deprecated Use {@link setCenter} instead. */
-    updateCoords(center: Coords): void;
-
     /** Animate the view center to target coordinates */
     goCenter(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
-
-    /** @deprecated Use {@link goCenter} instead. */
-    goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void): void;
 
     /** Resize the canvas */
     resize(width: number, height: number, durationMs?: number, onComplete?: () => void): void;
@@ -201,8 +192,6 @@ export interface EngineHandle {
 
     /** Draw free-form paths: open/closed polylines, filled shapes, per-item styling */
     drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle;
-    /** @deprecated Pass `PathItem` objects instead (`{ points, style }`). */
-    drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
 
     /** Draw images */
     drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle;
@@ -328,10 +317,6 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
             },
 
-            getCenterCoords() {
-                return instanceRef.current?.getCenter() ?? { x: 0, y: 0 };
-            },
-
             getVisibleBounds() {
                 return (
                     instanceRef.current?.getVisibleBounds() ?? {
@@ -347,15 +332,7 @@ export function useCanvasTileEngine(): EngineHandle {
                 instanceRef.current?.setCenter(center);
             },
 
-            updateCoords(center: Coords) {
-                instanceRef.current?.setCenter(center);
-            },
-
             goCenter(x: number, y: number, durationMs?: number, onComplete?: () => void) {
-                instanceRef.current?.goCenter(x, y, durationMs, onComplete);
-            },
-
-            goCoords(x: number, y: number, durationMs?: number, onComplete?: () => void) {
                 instanceRef.current?.goCenter(x, y, durationMs, onComplete);
             },
 
@@ -435,15 +412,8 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.drawText(items, layer) ?? droppedDraw("drawText");
             },
 
-            drawPath(
-                items: PathItem | PathItem[] | Coords[] | Coords[][],
-                styleOrLayer?: LineStyle | number,
-                maybeLayer?: number,
-            ) {
-                return (
-                    instanceRef.current?.drawPath(items as never, styleOrLayer as never, maybeLayer as never) ??
-                    droppedDraw("drawPath")
-                );
+            drawPath(items, layer) {
+                return instanceRef.current?.drawPath(items, layer) ?? droppedDraw("drawPath");
             },
 
             drawImage(items, layer) {

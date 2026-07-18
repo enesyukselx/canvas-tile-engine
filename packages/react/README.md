@@ -70,7 +70,7 @@ import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 <CanvasTileEngine engine={engine} config={config} renderer={new RendererWebGL()} />;
 ```
 
-`config`, `center`, and `renderer` are read when the component mounts. Use runtime APIs such as `engine.setBounds`, `engine.setEventHandlers`, `engine.resize`, `engine.updateCoords`, and `engine.goCoords` for live updates, or remount the component with a new `key` to apply a new full config or renderer.
+`config`, `center`, and `renderer` are read when the component mounts. Use runtime APIs such as `engine.setBounds`, `engine.setEventHandlers`, `engine.resize`, `engine.setCenter`, and `engine.goCenter` for live updates, or remount the component with a new `key` to apply a new full config or renderer.
 
 ## Components
 

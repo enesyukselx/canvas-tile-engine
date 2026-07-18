@@ -149,7 +149,7 @@ and semantics: [drawing.md](drawing.md).
 | `drawImage(items: ImageItem \| ImageItem[], layer?)` | 1 |
 | `drawText(items: Text \| Text[], layer?)` | 2 |
 | `drawLine(items: Line \| Line[], style?: LineStyle, layer?)` | 1 |
-| `drawPath(items: PathItem \| PathItem[], layer?)` — legacy `(Path \| Path[], style?, layer?)` deprecated | 1 |
+| `drawPath(items: PathItem \| PathItem[], layer?)` | 1 |
 | `drawGridLines(cellSize: number, lineWidth = 1, strokeStyle = "black", layer = 0)` | 0 |
 | `drawStaticRect(items: Rect[], cacheKey: string, layer?)` | 1 |
 | `drawStaticCircle(items: Circle[], cacheKey: string, layer?)` | 1 |
@@ -282,7 +282,7 @@ Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`,
 `GestureProcessor`, `AnimationController`.
 
 Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `DrawObject`, `Rect`,
-`Circle`, `Text`, `Line`, `Path`, `ImageItem<TImage>`, `SpriteRect`,
+`Circle`, `Text`, `Line`, `PathItem`, `PathStyle`, `ImageItem<TImage>`, `SpriteRect`,
 `SpriteSheetOptions`, `SpriteAnimation`, `EventHandlers`, `ZoomMode`,
 `DrawHandle`, `LineStyle`, `TextAlign`, `TextBaseline`, `IRenderer`,
 `IDrawAPI`, `IImageLoader`, `ICamera`, `RendererDependencies`, plus all

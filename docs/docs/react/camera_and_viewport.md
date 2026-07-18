@@ -92,7 +92,6 @@ const logPosition = () => {
 ```
 
 :::note Renamed APIs
-`goCenter`, `setCenter`, and `getCenter` were previously named `goCoords`, `updateCoords`, and `getCenterCoords`. The old names still work as deprecated aliases and will be removed in a future major version.
 :::
 
 #### `getVisibleBounds()`

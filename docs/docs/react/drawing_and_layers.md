@@ -189,7 +189,6 @@ Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `
 | Prop    | Type                     | Default      | Description                                                       |
 | :------ | :----------------------- | :----------- | :---------------------------------------------------------------- |
 | `items` | `PathItem \| PathItem[]` | **Required** | Path definitions.                                                 |
-| `style` | `LineStyle`              | -            | **Deprecated** — only applies to the legacy bare-`Coords[]` form. |
 | `layer` | `number`                 | `1`          | Rendering layer.                                                  |
 
 **`PathItem`:** `{ points, closed?, fillRule?, style?, data? }` — see the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full property and `PathStyle` tables. Filled paths hit-test on their interior, unfilled ones on the stroke itself.
@@ -235,7 +234,7 @@ Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `
 />;
 ```
 
-Keep `items` referentially stable (`useMemo`/state) — a new array identity re-registers the draw callback. The legacy bare `Coords[]` / `Coords[][]` items form with the `style` prop still works but is deprecated.
+Keep `items` referentially stable (`useMemo`/state) — a new array identity re-registers the draw callback.
 
 ### `<GridLines>`
 

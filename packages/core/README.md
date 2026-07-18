@@ -105,8 +105,8 @@ Official renderers:
 | API                                                 | Purpose                                                               |
 | --------------------------------------------------- | --------------------------------------------------------------------- |
 | `engine.render()`                                   | Render the current scene.                                             |
-| `engine.updateCoords({ x, y })`                     | Move the camera center immediately.                                   |
-| `engine.goCoords(x, y, durationMs)`                 | Animate the camera center.                                            |
+| `engine.setCenter({ x, y })`                        | Move the camera center immediately.                                   |
+| `engine.goCenter(x, y, durationMs)`                 | Animate the camera center.                                            |
 | `engine.setScale(scale)` / `zoomIn()` / `zoomOut()` | Control zoom programmatically.                                        |
 | `engine.getVisibleBounds()`                         | Read the visible world bounds for culling, lazy loading, or UI state. |
 | `engine.setBounds(bounds)`                          | Clamp camera movement.                                                |
