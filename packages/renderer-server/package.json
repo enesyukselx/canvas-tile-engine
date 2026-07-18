@@ -1,6 +1,6 @@
 {
     "name": "@canvas-tile-engine/renderer-server",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Headless server-side (Node.js) renderer for Canvas Tile Engine — draws maps to a PNG/Buffer with no browser",
     "author": "Enes Yüksel",
     "license": "MIT",

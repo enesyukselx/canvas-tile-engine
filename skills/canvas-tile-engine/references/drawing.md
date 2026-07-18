@@ -120,10 +120,15 @@ Image keeps its aspect-fit `size` box.
 
 ### Circle
 
-Same as Rect minus `rotate`/`radius`. `size` is the diameter in world units.
+Same as Rect minus `rotate`/`radius`. `size` is the diameter in world units;
+`sizePx` is a fixed screen-pixel diameter that wins over `size` (the marker
+pattern, fontPx analog — station dots that stay readable at any zoom).
+`sizePx` is IGNORED by `drawStaticCircle` (caches replay at a recorded
+scale); hit testing follows whichever the renderer draws.
 
 ```ts
 engine.drawCircle({ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }, 1);
+engine.drawCircle({ x: 4, y: 0, sizePx: 12, style: { fillStyle: "#f43f5e" } }, 2); // 12px at any zoom
 ```
 
 ### Text
@@ -166,6 +171,9 @@ composites ABOVE all GPU primitives regardless of layer (see
     img: TImage;          // HTMLImageElement (web) / SkImage (RN) / napi Image (server)
     sprite?: { x: number; y: number; w: number; h: number };
                           // optional source rect in image pixels (spritesheet frame)
+    sizePx?: number;      // fixed screen-pixel size, wins over size; IGNORED by drawStaticImage
+    flipX?: boolean;      // horizontal mirror (true mirror - rotation can't produce it)
+    flipY?: boolean;      // vertical mirror; both combine with rotate/sprite, work in statics
     opacity?: number;     // 0..1, default 1 - ghost/preview placements
 }
 ```
@@ -189,23 +197,65 @@ engine.drawLine(
     1,
 );
 
-// Path: polyline through points (Path = Coords[]; pass Path or Path[])
+// Path: PathItem objects — open polylines, closed outlines, filled shapes
 engine.drawPath(
-    [{ x: 0, y: 0 }, { x: 2, y: 1 }, { x: 4, y: 0 }],
-    { strokeStyle: "#a78bfa", lineWidthPx: 2 },
+    {
+        points: [{ x: 0, y: 0 }, { x: 2, y: 1 }, { x: 4, y: 0 }],
+        style: { strokeStyle: "#a78bfa", lineWidthPx: 2 },
+    },
     1,
 );
 
+// Filled zone: closed rounds every corner; fillStyle closes implicitly for
+// filling (Canvas2D fill() semantics) and makes the interior hit-testable.
+engine.drawPath({
+    points: zoneOutline,
+    closed: true,
+    fillRule: "nonzero", // or "evenodd"; matters on self-intersecting outlines
+    style: { fillStyle: "#22c55e55", strokeStyle: "#166534", lineWidthPx: 2, cornerRadius: 0.5 },
+    data: { id: "zone-a" },
+}, 1);
+
 // Dashed (e.g. ferry routes, planned segments): lineDash is world units,
-// lineDashPx is screen px and wins. Pattern flows around Path corners.
-engine.drawPath(route, { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] }, 1);
+// lineDashPx is screen px and wins. Pattern flows around corners, rounded ones too.
+engine.drawPath({ points: route, style: { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] } }, 1);
 ```
 
-Note the style object is a separate second argument for Line/Path (not per
-item). LineStyle = { strokeStyle?, lineWidth? (world), lineWidthPx?,
-lineDash? (world), lineDashPx? }. UNIT RULE (matches Text size/fontPx):
-plain numbers are world units and scale with zoom; *Px variants are screen
-pixels and take precedence. GridLines lineWidth stays px by design.
+PathItem = { commands?: PathCommand[], points?: Coords[], closed?,
+fillRule? ("nonzero" default | "evenodd"), style?, data? } — exactly one of
+commands/points (commands wins if both). PathCommand mirrors Canvas2D:
+moveTo | lineTo | arc (center, radius, startAngle/endAngle in DEGREES,
+ccw?) | quadraticCurveTo | bezierCurveTo | closePath; world units. Each
+moveTo starts a subpath, so one item can carry holes: evenodd — any
+overlapping subpath punches a hole; nonzero — the inner ring must wind
+opposite the outer. Hit testing matches (holes not clickable, curves hit on
+the curve, not the chord). closed/cornerRadius apply to the points form
+only — with commands, use closePath / explicit arcs.
+
+```ts
+// Curved line + holed plaza
+engine.drawPath({ commands: [
+    { type: "moveTo", x: 0, y: 10 },
+    { type: "quadraticCurveTo", cpx: 10, cpy: 10, x: 10, y: 0 },
+], style: { strokeStyle: "#e11d48", lineWidthPx: 4 } });
+engine.drawPath({ commands: [
+    { type: "moveTo", x: 0, y: 0 }, { type: "lineTo", x: 10, y: 0 },
+    { type: "lineTo", x: 10, y: 10 }, { type: "lineTo", x: 0, y: 10 },
+    { type: "closePath" },
+    { type: "arc", x: 5, y: 5, radius: 2, startAngle: 0, endAngle: 360, ccw: true },
+], style: { fillStyle: "#94a3b833" } });
+```
+ PathStyle = LineStyle fields + fillStyle? +
+cornerRadius? (world) / cornerRadiusPx? (px, wins) for tangent-arc corner
+rounding. Fill-only items draw no outline; unstyled items stroke a hairline.
+Line keeps its call-level style argument, and Line
+items accept `data?` now that lines surface in hit results. LineStyle =
+{ strokeStyle?, lineWidth? (world), lineWidthPx?, lineDash? (world),
+lineDashPx? }. UNIT RULE (matches Text size/fontPx): plain numbers are world
+units and scale with zoom; *Px variants are screen pixels and take
+precedence. GridLines lineWidth stays px by design. Path fills are exact on
+every renderer, both fill rules and self-intersecting outlines included
+(WebGL uses a two-pass stencil-then-cover fill).
 
 ### Grid lines
 

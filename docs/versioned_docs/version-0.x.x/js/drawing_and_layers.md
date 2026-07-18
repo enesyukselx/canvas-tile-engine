@@ -54,6 +54,7 @@ drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 | :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `x`, `y` | `number`             | **Required**                       | World coordinates of the center/origin.                                                                                                                 |
 | `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                                                    |
+| `sizePx` | `number`             | -                                  | Fixed diameter in screen pixels, independent of zoom — marker-style dots (only for `drawCircle`, analog of Text's `fontPx`). Wins over `size`. Ignored by `drawStaticCircle`.  |
 | `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                                            |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                           |
 | `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
@@ -187,17 +188,7 @@ engine.drawLine(
 );
 ```
 
-### `drawPath`
-
-Draw a continuous line through multiple points. Supports a single path (array of points) or an array of paths.
-
-```typescript
-drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle
-```
-
-**Path:** An array of `{ x, y }` coordinates.
-
-**`LineStyle`** (shared by `drawLine` and `drawPath`):
+**`LineStyle`** (used by `drawLine`):
 
 | Property      | Unit  | Description                                                             |
 | :------------ | :---- | :---------------------------------------------------------------------- |
@@ -207,45 +198,120 @@ drawPath(items: Path | Path[], style?: LineStyle, layer?: number): DrawHandle
 | `lineDash`    | world | Dash pattern anchored to the world; dashes scale with zoom.             |
 | `lineDashPx`  | px    | Zoom-independent dash pattern; wins over `lineDash`.                    |
 
-Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat). Along a `Path`, the pattern flows continuously around corners.
+Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat).
+
+Lines participate in hit testing: a click/tap within half the stroke width of a segment hits it (with a minimum tap width for hairlines). An optional `data` field on each line carries through to hit results.
+
+### `drawPath`
+
+Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `PathItem` owns its geometry and style.
+
+```typescript
+drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle
+```
+
+**`PathItem` properties:**
+
+| Property   | Type                      | Default     | Description                                                                                 |
+| :--------- | :------------------------ | :---------- | :------------------------------------------------------------------------------------------ |
+| `commands` | `PathCommand[]`           | -           | Free-form Canvas2D-style command list (below). Wins over `points` when both are set.        |
+| `points`   | `Coords[]`                | -           | Polyline vertices in world units. One of `commands`/`points` is required.                   |
+| `closed`   | `boolean`                 | `false`     | Join the last point back to the first (`points` form only — use a `closePath` command otherwise). |
+| `fillRule` | `"nonzero" \| "evenodd"`  | `"nonzero"` | Canvas2D fill rule; the difference shows on self-intersecting outlines.                     |
+| `style`    | `PathStyle`               | -           | Per-item styling (below).                                                                   |
+| `data`     | `TData`                   | -           | App data carried through to hit results; never read by the engine.                          |
+
+**`PathStyle`** extends the `LineStyle` fields above with:
+
+| Property         | Unit  | Description                                                                             |
+| :--------------- | :---- | :-------------------------------------------------------------------------------------- |
+| `fillStyle`      | -     | Fill color. Setting it makes the path a filled shape (the outline closes implicitly for filling, like Canvas2D `fill()`). |
+| `cornerRadius`   | world | Rounds every corner with a tangent arc; scales with zoom.                               |
+| `cornerRadiusPx` | px    | Zoom-independent corner rounding; wins over `cornerRadius`.                             |
 
 ```typescript
 // A ferry route: 3px dashed line at every zoom level
 engine.drawPath(
-    ferryPoints,
-    { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] },
+    { points: ferryPoints, style: { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] } },
+    1,
+);
+
+// A filled zone with a rounded outline, identifiable in hit results
+engine.drawPath(
+    {
+        points: [
+            { x: 0, y: 0 },
+            { x: 4, y: 0 },
+            { x: 4, y: 3 },
+            { x: 0, y: 3 },
+        ],
+        closed: true,
+        style: { fillStyle: "#22c55e55", strokeStyle: "#166534", lineWidthPx: 2, cornerRadius: 0.5 },
+        data: { id: "zone-a" },
+    },
+    1,
+);
+
+// Multiple items, each with its own style
+engine.drawPath(
+    [
+        { points: routeA, style: { strokeStyle: "#219ebc", lineWidthPx: 2 } },
+        { points: routeB, style: { strokeStyle: "green", lineWidthPx: 1 } },
+    ],
     1,
 );
 ```
+
+#### Free-form commands: curves, arcs, and holes
+
+`commands` mirrors the Canvas2D path API. Coordinates and radii are world units; angles are **degrees** (like `rotate`).
 
 ```typescript
-// Single path
-engine.drawPath(
-    [
-        { x: 0, y: 0 },
-        { x: 5, y: 0 },
-        { x: 5, y: 5 },
-    ],
-    { strokeStyle: "#219ebc", lineWidthPx: 2 },
-    1,
-);
-
-// Multiple paths
-engine.drawPath(
-    [
-        [
-            { x: 0, y: 0 },
-            { x: 5, y: 5 },
-        ],
-        [
-            { x: 10, y: 0 },
-            { x: 15, y: 5 },
-        ],
-    ],
-    { strokeStyle: "green", lineWidthPx: 1 },
-    1,
-);
+type PathCommand =
+    | { type: "moveTo"; x: number; y: number }
+    | { type: "lineTo"; x: number; y: number }
+    | { type: "arc"; x: number; y: number; radius: number; startAngle: number; endAngle: number; ccw?: boolean }
+    | { type: "quadraticCurveTo"; cpx: number; cpy: number; x: number; y: number }
+    | { type: "bezierCurveTo"; cp1x: number; cp1y: number; cp2x: number; cp2y: number; x: number; y: number }
+    | { type: "closePath" };
 ```
+
+Each `moveTo` starts a new subpath, so one item can be an outline plus holes. Under `"evenodd"` any overlapping subpath punches a hole; under `"nonzero"` (default) a hole must wind in the opposite direction of its outer ring — exactly Canvas2D `fill()` semantics, on every renderer.
+
+```typescript
+// A curved metro line
+engine.drawPath({
+    commands: [
+        { type: "moveTo", x: 0, y: 10 },
+        { type: "lineTo", x: 6, y: 10 },
+        { type: "quadraticCurveTo", cpx: 10, cpy: 10, x: 10, y: 6 },
+        { type: "lineTo", x: 10, y: 0 },
+    ],
+    style: { strokeStyle: "#e11d48", lineWidthPx: 4 },
+});
+
+// A plaza with a hole (fountain): outer ring CW, inner ring CCW
+engine.drawPath({
+    commands: [
+        { type: "moveTo", x: 0, y: 0 },
+        { type: "lineTo", x: 10, y: 0 },
+        { type: "lineTo", x: 10, y: 10 },
+        { type: "lineTo", x: 0, y: 10 },
+        { type: "closePath" },
+        { type: "arc", x: 5, y: 5, radius: 2, startAngle: 0, endAngle: 360, ccw: true },
+    ],
+    style: { fillStyle: "#94a3b833" },
+    data: { id: "plaza" },
+});
+```
+
+Hit testing follows the same geometry: the hole is not clickable, curves hit on the actual curve (not the chord). `cornerRadius` applies to the `points` form only — with `commands`, draw arcs explicitly.
+
+Paths participate in hit testing: filled paths hit on their interior (under the item's `fillRule`), unfilled paths hit on the stroke itself — within half the stroke width, with a minimum tap width so hairlines stay tappable.
+
+Dash patterns flow continuously around corners, including rounded ones.
+
+
 
 ### `drawGridLines`
 
@@ -372,6 +438,9 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 | `x`, `y`  | `number`           | **Required**                       | World coordinates.                                                                                               |
 | `img`     | `HTMLImageElement` | **Required**                       | The loaded image object.                                                                                         |
 | `size`    | `number`           | `1`                                | Size in grid units (maintains aspect ratio).                                                                     |
+| `sizePx`  | `number`           | -                                  | Fixed size in screen pixels, independent of zoom — marker-style images. Wins over `size`. Ignored by `drawStaticImage`.  |
+| `flipX`   | `boolean`          | `false`                            | Mirror horizontally (a true mirror — no rotation can produce it). Combines with `rotate` and `sprite`.           |
+| `flipY`   | `boolean`          | `false`                            | Mirror vertically.                                                                                               |
 | `rotate`  | `number`           | `0`                                | Rotation angle in degrees (0 = no rotation, positive = clockwise).                                               |
 | `origin`  | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                    |
 | `sprite`  | `SpriteRect`       | -                                  | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
@@ -389,6 +458,12 @@ engine.drawImage({ x: 5, y: 3, size: 1, img: arrow, rotate: 90 }, 2);
 
 // Ghost preview: semi-transparent placement indicator
 engine.drawImage({ x: 7, y: 3, size: 1.5, img, opacity: 0.5 }, 3);
+
+// Marker: always 24px on screen, regardless of zoom
+engine.drawImage({ x: 9, y: 3, sizePx: 24, img }, 3);
+
+// Mirrored sprite: one right-facing image serves both directions
+engine.drawImage({ x: 11, y: 3, size: 1, img, flipX: true }, 2);
 
 // Multiple images
 engine.drawImage(

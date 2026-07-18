@@ -53,13 +53,21 @@ otherwise fire on release.
 
 ```ts
 engine.onCoordsChange = (center: Coords) => {};
-// Fires on ANY camera movement: drag, wheel/pinch, updateCoords, goCoords,
+// Fires on ANY camera movement: drag, wheel/pinch, setCenter, goCenter,
 // setBounds clamping, resize re-centering. The primary hook for syncing
 // minimaps, URL state, or coordinate readouts.
 
 engine.onZoom = (scale: number) => {};
 // Fires on ANY scale change: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
-// and preserve-viewport responsive resizes (the resize changes the scale).
+// setScaleLimits clamping the current scale into a new range, and
+// preserve-viewport responsive resizes (the resize changes the scale).
+
+engine.onWheel = (coords, mouse, client, wheel) => {};
+// Fires for wheel (desktop) and pinch (touch) zoom gestures — requires
+// eventHandlers.zoom, and fires even when the scale is clamped at a limit.
+// coords/mouse/client are the standard payload (pinch: the pinch midpoint);
+// wheel = { deltaY, direction: "in" | "out", source: "wheel" | "pinch" }
+// (deltaY < 0 = zoom in; for pinch it is the factor-equivalent wheel delta).
 
 engine.onResize = () => {};
 // Fires after manual resize() or an observed wrapper resize.
@@ -278,7 +286,7 @@ window.addEventListener("keyup", (e) => {
 ```
 
 The engine binds no keyboard events itself - wire `keydown`/`keyup` yourself
-and translate them into camera calls (`goCoords`, `zoomIn`, ...) or
+and translate them into camera calls (`goCenter`, `zoomIn`, ...) or
 `setEventHandlers` mode flips.
 
 ## Best practices

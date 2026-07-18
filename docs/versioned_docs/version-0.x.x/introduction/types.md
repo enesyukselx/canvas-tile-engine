@@ -7,7 +7,7 @@ sidebar_position: 5
 Core types are exported from `@canvas-tile-engine/core` and re-exported by the React packages where useful.
 
 ```ts
-import type { Rect, Circle, Text, Line, Path, ImageItem, Coords } from "@canvas-tile-engine/core";
+import type { Rect, Circle, Text, Line, PathItem, PathStyle, ImageItem, Coords } from "@canvas-tile-engine/core";
 import type { EngineHandle } from "@canvas-tile-engine/react";
 ```
 
@@ -79,7 +79,14 @@ type Line = {
     to: Coords;
 };
 
-type Path = Coords[];
+type PathItem<TData = unknown> = {
+    commands?: PathCommand[]; // free-form Canvas2D-style commands (curves, arcs, holes)
+    points?: Coords[]; // polyline vertices in world units (one of the two required)
+    closed?: boolean; // join the last point back to the first (points form)
+    fillRule?: "nonzero" | "evenodd"; // fill rule, default "nonzero"
+    style?: PathStyle; // per-item fill/stroke/dash/corner styling
+    data?: TData; // app data, returned on hitTest results
+};
 
 type LineStyle = {
     strokeStyle?: string;
@@ -90,7 +97,7 @@ type LineStyle = {
 };
 ```
 
-`Path` represents a polyline. Pass `Path[]` to draw multiple polylines in one call. `drawLine` and `drawPath` take a `LineStyle` as their second argument; dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around a `Path`'s corners.
+`PathItem` describes a free-form path (open polyline, closed outline, or filled shape); `PathStyle` extends the `LineStyle` fields with `fillStyle` and `cornerRadius`/`cornerRadiusPx`. `drawLine` takes a `LineStyle` as its second argument; dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around path corners.
 
 ### `ImageItem<TImage>`
 
@@ -199,10 +206,10 @@ Common methods:
 
 ```ts
 engine.render();
-engine.getCenterCoords();
+engine.getCenter();
 engine.getVisibleBounds();
-engine.updateCoords({ x: 0, y: 0 });
-engine.goCoords(10, 10, 500);
+engine.setCenter({ x: 0, y: 0 });
+engine.goCenter(10, 10, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
 engine.zoomIn();

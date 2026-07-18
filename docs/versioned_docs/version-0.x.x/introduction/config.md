@@ -25,8 +25,8 @@ const config: CanvasTileEngineConfig = {
 | :-- | :-- | :-- | :-- |
 | `scale` | `number` | Required | Initial pixels per world unit. |
 | `size` | `{ width, height, ... }` | Required | Initial logical viewport size in pixels. |
-| `minScale` | `number` | `scale * 0.5` | Minimum zoom scale. |
-| `maxScale` | `number` | `scale * 2` | Maximum zoom scale. |
+| `minScale` | `number` | `scale * 0.5` | Minimum zoom scale. Adjustable at runtime with `engine.setScaleLimits(min, max)`. |
+| `maxScale` | `number` | `scale * 2` | Maximum zoom scale. Adjustable at runtime with `engine.setScaleLimits(min, max)`. |
 | `backgroundColor` | `string` | `"#ffffff"` | Frame background color. |
 | `gridAligned` | `boolean` | `false` | Snaps the initial center to the nearest grid-aligned value for pixel-perfect alignment: half-integers (x.5) for even tile counts, integers for odd. Integers are cell centers (cell `k` spans `[k-0.5, k+0.5]`); integer ties snap down so a center given as `N/2` lands on a 0-based board's true center `(N-1)/2`. |
 | `responsive` | `"preserve-scale" \| "preserve-viewport" \| false` | `false` | Enables container-driven resizing in browser renderers. |

@@ -121,7 +121,7 @@ engine.onMouseLeave = () => {
 
 ### `onCoordsChange`
 
-Fires after camera movement: drag, wheel/pinch zoom, `updateCoords`, `goCoords`, `setBounds` clamping, or resize-centered updates.
+Fires after camera movement: drag, wheel/pinch zoom, `setCenter`, `goCenter`, `setBounds` clamping, or resize-centered updates.
 
 ```ts
 engine.onCoordsChange = (center) => {
@@ -132,11 +132,29 @@ engine.onCoordsChange = (center) => {
 
 ### `onZoom`
 
-Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut`.
+Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping the current scale into a new range.
 
 ```ts
 engine.onZoom = (scale) => {
     zoomLabel.textContent = `${Math.round(scale)} px / cell`;
+};
+```
+
+### `onWheel`
+
+Fires for wheel (desktop) and pinch (touch) zoom gestures. Requires `eventHandlers.zoom`. Unlike `onZoom`, which reports the resulting scale (including programmatic changes), `onWheel` reports the input gesture itself with its position — and it still fires when the scale is clamped at a limit.
+
+The first three arguments are the standard coordinate payload (for pinch they describe the pinch midpoint). The fourth describes the gesture:
+
+| Property    | Type                   | Description                                                                                              |
+| :---------- | :--------------------- | :------------------------------------------------------------------------------------------------------- |
+| `deltaY`    | `number`               | Vertical wheel delta (negative = zoom in). For pinch: the wheel delta that would produce the same factor. |
+| `direction` | `"in" \| "out"`        | Zoom direction implied by the gesture.                                                                    |
+| `source`    | `"wheel" \| "pinch"`   | Input source.                                                                                             |
+
+```ts
+engine.onWheel = (coords, mouse, client, wheel) => {
+    console.log(`${wheel.source} zoom ${wheel.direction} at`, coords.snapped);
 };
 ```
 
@@ -281,8 +299,8 @@ window.addEventListener("keyup", (event) => {
 ## Hit Testing
 
 `hitTest` / `hitTestFirst` answer "which item is under this point?" for rect,
-circle, and image items - no more hand-written lookup maps or manual 0.5-cell
-offset math. Pass the `coords.raw` value from any event callback; origin
+circle, image, path, and line items - no more hand-written lookup maps or
+manual 0.5-cell offset math. Pass the `coords.raw` value from any event callback; origin
 anchoring, image aspect fit, and rotation are handled internally.
 
 ```ts
@@ -311,10 +329,39 @@ Each result is `{ item, kind, layer, handle, index }`, ordered by visual
 priority: higher layer first, then later registration, then later item within
 a draw call - the item you see on top comes first.
 
+### Region queries (marquee selection)
+
+`hitTestRect` returns every item whose geometry intersects (default) or lies
+fully inside a world rectangle — the box-selection query:
+
+```ts
+let dragStart = null;
+engine.onMouseDown = (coords) => (dragStart = coords.raw);
+engine.onMouseUp = (coords) => {
+    if (!dragStart) return;
+    const hits = engine.hitTestRect(
+        { minX: dragStart.x, minY: dragStart.y, maxX: coords.raw.x, maxY: coords.raw.y },
+        { mode: "contain" }, // only items fully inside the box
+    );
+    selectAll(hits.map((h) => h.item.data));
+    dragStart = null;
+};
+```
+
+Corners may be passed in any order (a drag can travel in any direction).
+`mode: "intersect"` (default) counts any overlap; `"contain"` requires full
+enclosure — the usual choice for seat/unit selection. Region tests run on
+item geometry (stroke widths are not expanded), circles test exactly rather
+than by bounding box, and filled paths count interior overlap with holes
+excluded.
+
 Semantics to know:
 
-- Works for `drawRect` / `drawCircle` / `drawImage` and their `drawStatic*`
-  variants. Line, Path, and Text items are not hit-testable.
+- Works for `drawRect` / `drawCircle` / `drawImage` (and their `drawStatic*`
+  variants), plus `drawPath` and `drawLine`. Filled paths hit on their
+  interior (under the item's `fillRule`); unfilled paths and lines hit
+  within half the stroke width of the geometry, with a minimum tap width so
+  hairlines stay tappable. Text items are not hit-testable.
 - Every drawable item accepts an optional `data` field. The engine never
   reads it - it is carried through to `hit.item.data` so you can identify
   what was hit. The `TData` type parameter on `hitTest<TData>` /
@@ -391,8 +438,8 @@ Always pair the `onMouseDown` override with resets in **both** `onMouseUp` and
 Events often drive camera or viewport updates.
 
 ```ts
-engine.updateCoords({ x: 10, y: 10 });
-engine.goCoords(0, 0, 500);
+engine.setCenter({ x: 10, y: 10 });
+engine.goCenter(0, 0, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
 engine.zoomIn();
