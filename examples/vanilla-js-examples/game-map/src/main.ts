@@ -197,7 +197,7 @@ miniMap.onCoordsChange = (coords) => {
     isSyncing = true;
     inputX.value = Math.round(coords.x).toString();
     inputY.value = Math.round(coords.y).toString();
-    mainMap.updateCoords(coords);
+    mainMap.setCenter(coords);
 
     isSyncing = false;
 };
@@ -210,7 +210,7 @@ mainMap.onCoordsChange = (coords) => {
     inputX.value = Math.round(coords.x).toString();
     inputY.value = Math.round(coords.y).toString();
     isSyncing = true;
-    miniMap.updateCoords(coords);
+    miniMap.setCenter(coords);
 
     isSyncing = false;
 };
@@ -332,7 +332,7 @@ goToCoordsBtn.addEventListener("click", () => {
         alert("Please enter valid numbers for X and Y.");
         return;
     }
-    mainMap.goCoords(x, y, 500);
+    mainMap.goCenter(x, y, 500);
 });
 
 // Initial drawing of items and rendering of maps

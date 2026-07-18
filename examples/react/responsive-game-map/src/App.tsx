@@ -155,7 +155,7 @@ export default function App() {
                     onClick={(coords) => {
                         if (scale < MINI_MAP_SCALE_THRESHOLD) {
                             map.setScale(50);
-                            map.updateCoords({
+                            map.setCenter({
                                 x: coords.snapped.x,
                                 y: coords.snapped.y,
                             });

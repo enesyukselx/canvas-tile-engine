@@ -185,7 +185,7 @@ export default function App() {
         setInputY(Math.round(coords.y).toString());
 
         isSyncingRef.current = true;
-        miniMap.updateCoords(coords);
+        miniMap.setCenter(coords);
         isSyncingRef.current = false;
     };
 
@@ -196,7 +196,7 @@ export default function App() {
         isSyncingRef.current = true;
         setInputX(Math.round(coords.x).toString());
         setInputY(Math.round(coords.y).toString());
-        mainMap.updateCoords(coords);
+        mainMap.setCenter(coords);
         isSyncingRef.current = false;
     };
 
@@ -241,7 +241,7 @@ export default function App() {
             return;
         }
         setIsNavigating(true);
-        mainMap.goCoords(x, y, 500, () => {
+        mainMap.goCenter(x, y, 500, () => {
             setIsNavigating(false);
         });
     };
