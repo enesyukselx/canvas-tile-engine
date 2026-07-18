@@ -1,5 +1,6 @@
-import { Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathItem, Rect } from "../types";
-import { distanceToPolyline, pointInRing } from "../utils/pathGeometry";
+import { Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathCommand, PathItem, Rect } from "../types";
+import { distanceToPolyline, pointInRing, pointInRings } from "../utils/pathGeometry";
+import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
 import { resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { resolveSizeWorld } from "../utils/itemSize";
@@ -288,7 +289,50 @@ export class HitTester {
      * the outline, so unfilled paths are tappable on the stroke itself and
      * filled edges stay forgiving.
      */
+    /**
+     * Flattened-subpath cache for command paths, re-flattened when the
+     * camera scale drifts beyond 2x of the cached bucket (the polyline's
+     * deviation from the true curve stays far below hit tolerances inside
+     * that window, and hover-frequency queries stay cheap).
+     */
+    private flattenCache = new WeakMap<PathItem, { scale: number; subpaths: Subpath[] }>();
+
+    private commandSubpaths(item: PathItem & { commands: PathCommand[] }): Subpath[] {
+        const scale = this.getScale();
+        const cached = this.flattenCache.get(item);
+        if (cached && scale >= cached.scale / 2 && scale <= cached.scale * 2) return cached.subpaths;
+        const subpaths = flattenPathCommands(item.commands, ARC_SEGMENT_LENGTH / scale);
+        this.flattenCache.set(item, { scale, subpaths });
+        return subpaths;
+    }
+
+    /** Command paths: hit-test the same flattened geometry WebGL draws. */
+    private testCommandPath(point: Coords, item: PathItem & { commands: PathCommand[] }, padding: number): boolean {
+        const subpaths = this.commandSubpaths(item);
+        if (subpaths.length === 0) return false;
+
+        const filled = item.style?.fillStyle !== undefined;
+        if (
+            filled &&
+            pointInRings(
+                point,
+                subpaths.map((sub) => sub.points),
+                item.fillRule,
+            )
+        )
+            return true;
+
+        const threshold = this.strokeHalfWorld(item.style) + padding;
+        for (const sub of subpaths) {
+            if (distanceToPolyline(point, sub.points, sub.closed) <= threshold) return true;
+        }
+        return false;
+    }
+
     private testPath(point: Coords, item: PathItem, padding: number): boolean {
+        if (item.commands !== undefined) {
+            return this.testCommandPath(point, item as PathItem & { commands: PathCommand[] }, padding);
+        }
         const points = item.points;
         if (!points || points.length < 2) return false;
 

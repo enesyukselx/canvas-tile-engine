@@ -363,50 +363,30 @@ export class GLRenderer {
     }
 
     /**
-     * Fill a closed outline (implicitly closed ring of CSS-pixel points)
-     * under an exact nonzero or even-odd fill rule via two-pass
+     * Fill one or more closed outlines (implicitly closed rings of CSS-pixel
+     * points) under an exact nonzero or even-odd fill rule via two-pass
      * stencil-then-cover — the same result Canvas2D `fill()` produces,
-     * including self-intersecting outlines, with no triangulation library:
+     * including self-intersecting outlines and multi-subpath holes, with no
+     * triangulation library:
      *
-     * 1. A triangle fan from `ring[0]` over every edge writes each pixel's
+     * 1. Per ring, a triangle fan from its first vertex writes each pixel's
      *    winding into the stencil buffer (color writes off): INCR/DECR by
-     *    triangle facing for nonzero, INVERT for even-odd parity.
+     *    triangle facing for nonzero, INVERT for even-odd parity. Winding
+     *    accumulates ACROSS rings, so an opposite-wound (nonzero) or
+     *    overlapping (even-odd) inner ring punches a hole.
      * 2. A bounding-box quad paints the fill color wherever the stencil
      *    matches the rule, zeroing the stencil as it covers so the next
      *    fill starts clean. Each covered pixel is painted exactly once, so
      *    translucent fills show no self-overlap seams.
      */
-    fillPath(ring: Coords[], color: RGBA, evenOdd: boolean) {
-        const n = ring.length;
-        if (n < 3) return;
+    fillPath(rings: Coords[][], color: RGBA, evenOdd: boolean) {
         const gl = this.gl;
 
-        // Fan triangles (anchor, v[i], v[i+1]); edges touching the anchor
-        // form zero-area triangles elsewhere and contribute no winding.
-        const fanVerts = (n - 2) * 3;
-        const fan = new Float32Array(fanVerts * LINE_FLOATS_PER_VERTEX);
-        const anchor = ring[0];
-        let o = 0;
         let minX = Infinity;
         let minY = Infinity;
         let maxX = -Infinity;
         let maxY = -Infinity;
-        for (const p of ring) {
-            if (p.x < minX) minX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y > maxY) maxY = p.y;
-        }
-        for (let i = 1; i < n - 1; i++) {
-            for (const p of [anchor, ring[i], ring[i + 1]]) {
-                fan[o++] = p.x;
-                fan[o++] = p.y;
-                fan[o++] = color[0];
-                fan[o++] = color[1];
-                fan[o++] = color[2];
-                fan[o++] = color[3];
-            }
-        }
+        let anyRing = false;
 
         // Pass 1: winding → stencil, color writes off.
         gl.enable(gl.STENCIL_TEST);
@@ -418,7 +398,41 @@ export class GLRenderer {
             gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
             gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP);
         }
-        this.flatTriangles(fan, fanVerts);
+
+        for (const ring of rings) {
+            const n = ring.length;
+            if (n < 3) continue;
+            anyRing = true;
+            for (const p of ring) {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            }
+            // Fan triangles (anchor, v[i], v[i+1]); edges touching the anchor
+            // form zero-area triangles elsewhere and contribute no winding.
+            const fanVerts = (n - 2) * 3;
+            const fan = new Float32Array(fanVerts * LINE_FLOATS_PER_VERTEX);
+            const anchor = ring[0];
+            let o = 0;
+            for (let i = 1; i < n - 1; i++) {
+                for (const p of [anchor, ring[i], ring[i + 1]]) {
+                    fan[o++] = p.x;
+                    fan[o++] = p.y;
+                    fan[o++] = color[0];
+                    fan[o++] = color[1];
+                    fan[o++] = color[2];
+                    fan[o++] = color[3];
+                }
+            }
+            this.flatTriangles(fan, fanVerts);
+        }
+
+        if (!anyRing) {
+            gl.colorMask(true, true, true, true);
+            gl.disable(gl.STENCIL_TEST);
+            return;
+        }
 
         // Pass 2: cover the bbox where the stencil matches the rule.
         gl.colorMask(true, true, true, true);
@@ -427,7 +441,7 @@ export class GLRenderer {
         gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
 
         const quad = new Float32Array(6 * LINE_FLOATS_PER_VERTEX);
-        o = 0;
+        let o = 0;
         for (const [x, y] of [
             [minX, minY],
             [maxX, minY],

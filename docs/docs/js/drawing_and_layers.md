@@ -214,8 +214,9 @@ drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle
 
 | Property   | Type                      | Default     | Description                                                                                 |
 | :--------- | :------------------------ | :---------- | :------------------------------------------------------------------------------------------ |
-| `points`   | `Coords[]`                | -           | **Required.** Polyline vertices in world units.                                             |
-| `closed`   | `boolean`                 | `false`     | Join the last point back to the first with a closing segment.                               |
+| `commands` | `PathCommand[]`           | -           | Free-form Canvas2D-style command list (below). Wins over `points` when both are set.        |
+| `points`   | `Coords[]`                | -           | Polyline vertices in world units. One of `commands`/`points` is required.                   |
+| `closed`   | `boolean`                 | `false`     | Join the last point back to the first (`points` form only — use a `closePath` command otherwise). |
 | `fillRule` | `"nonzero" \| "evenodd"`  | `"nonzero"` | Canvas2D fill rule; the difference shows on self-intersecting outlines.                     |
 | `style`    | `PathStyle`               | -           | Per-item styling (below).                                                                   |
 | `data`     | `TData`                   | -           | App data carried through to hit results; never read by the engine.                          |
@@ -260,6 +261,51 @@ engine.drawPath(
     1,
 );
 ```
+
+#### Free-form commands: curves, arcs, and holes
+
+`commands` mirrors the Canvas2D path API. Coordinates and radii are world units; angles are **degrees** (like `rotate`).
+
+```typescript
+type PathCommand =
+    | { type: "moveTo"; x: number; y: number }
+    | { type: "lineTo"; x: number; y: number }
+    | { type: "arc"; x: number; y: number; radius: number; startAngle: number; endAngle: number; ccw?: boolean }
+    | { type: "quadraticCurveTo"; cpx: number; cpy: number; x: number; y: number }
+    | { type: "bezierCurveTo"; cp1x: number; cp1y: number; cp2x: number; cp2y: number; x: number; y: number }
+    | { type: "closePath" };
+```
+
+Each `moveTo` starts a new subpath, so one item can be an outline plus holes. Under `"evenodd"` any overlapping subpath punches a hole; under `"nonzero"` (default) a hole must wind in the opposite direction of its outer ring — exactly Canvas2D `fill()` semantics, on every renderer.
+
+```typescript
+// A curved metro line
+engine.drawPath({
+    commands: [
+        { type: "moveTo", x: 0, y: 10 },
+        { type: "lineTo", x: 6, y: 10 },
+        { type: "quadraticCurveTo", cpx: 10, cpy: 10, x: 10, y: 6 },
+        { type: "lineTo", x: 10, y: 0 },
+    ],
+    style: { strokeStyle: "#e11d48", lineWidthPx: 4 },
+});
+
+// A plaza with a hole (fountain): outer ring CW, inner ring CCW
+engine.drawPath({
+    commands: [
+        { type: "moveTo", x: 0, y: 0 },
+        { type: "lineTo", x: 10, y: 0 },
+        { type: "lineTo", x: 10, y: 10 },
+        { type: "lineTo", x: 0, y: 10 },
+        { type: "closePath" },
+        { type: "arc", x: 5, y: 5, radius: 2, startAngle: 0, endAngle: 360, ccw: true },
+    ],
+    style: { fillStyle: "#94a3b833" },
+    data: { id: "plaza" },
+});
+```
+
+Hit testing follows the same geometry: the hole is not clickable, curves hit on the actual curve (not the chord). `cornerRadius` applies to the `points` form only — with `commands`, draw arcs explicitly.
 
 Paths participate in hit testing: filled paths hit on their interior (under the item's `fillRule`), unfilled paths hit on the stroke itself — within half the stroke width, with a minimum tap width so hairlines stay tappable.
 

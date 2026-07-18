@@ -221,8 +221,31 @@ engine.drawPath({
 engine.drawPath({ points: route, style: { strokeStyle: "#0ea5e9", lineWidthPx: 3, lineDashPx: [8, 4] } }, 1);
 ```
 
-PathItem = { points: Coords[], closed?, fillRule? ("nonzero" default |
-"evenodd"), style?, data? }. PathStyle = LineStyle fields + fillStyle? +
+PathItem = { commands?: PathCommand[], points?: Coords[], closed?,
+fillRule? ("nonzero" default | "evenodd"), style?, data? } — exactly one of
+commands/points (commands wins if both). PathCommand mirrors Canvas2D:
+moveTo | lineTo | arc (center, radius, startAngle/endAngle in DEGREES,
+ccw?) | quadraticCurveTo | bezierCurveTo | closePath; world units. Each
+moveTo starts a subpath, so one item can carry holes: evenodd — any
+overlapping subpath punches a hole; nonzero — the inner ring must wind
+opposite the outer. Hit testing matches (holes not clickable, curves hit on
+the curve, not the chord). closed/cornerRadius apply to the points form
+only — with commands, use closePath / explicit arcs.
+
+```ts
+// Curved line + holed plaza
+engine.drawPath({ commands: [
+    { type: "moveTo", x: 0, y: 10 },
+    { type: "quadraticCurveTo", cpx: 10, cpy: 10, x: 10, y: 0 },
+], style: { strokeStyle: "#e11d48", lineWidthPx: 4 } });
+engine.drawPath({ commands: [
+    { type: "moveTo", x: 0, y: 0 }, { type: "lineTo", x: 10, y: 0 },
+    { type: "lineTo", x: 10, y: 10 }, { type: "lineTo", x: 0, y: 10 },
+    { type: "closePath" },
+    { type: "arc", x: 5, y: 5, radius: 2, startAngle: 0, endAngle: 360, ccw: true },
+], style: { fillStyle: "#94a3b833" } });
+```
+ PathStyle = LineStyle fields + fillStyle? +
 cornerRadius? (world) / cornerRadiusPx? (px, wins) for tangent-arc corner
 rounding. Fill-only items draw no outline; unstyled items stroke a hairline.
 Line keeps its call-level style argument, and Line

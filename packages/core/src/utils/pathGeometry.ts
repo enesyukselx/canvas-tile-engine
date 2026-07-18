@@ -36,6 +36,26 @@ export function distanceToPolyline(p: Coords, points: Coords[], closed: boolean)
     return Math.sqrt(best);
 }
 
+/** Signed winding and raw crossing count of a rightward ray from `p`
+ * against the ring `points` (implicitly closed). */
+function ringCrossings(p: Coords, points: Coords[]): { winding: number; crossings: number } {
+    let winding = 0;
+    let crossings = 0;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const a = points[j];
+        const b = points[i];
+        // Half-open y-interval test so a vertex on the ray counts once.
+        if (b.y > p.y !== a.y > p.y) {
+            const cross = ((a.x - b.x) * (p.y - b.y)) / (a.y - b.y) + b.x;
+            if (p.x < cross) {
+                crossings++;
+                winding += a.y > b.y ? 1 : -1;
+            }
+        }
+    }
+    return { winding, crossings };
+}
+
 /**
  * Whether `p` lies inside the ring `points` (implicitly closed) under the
  * given fill rule, mirroring Canvas2D `isPointInPath`: `"nonzero"` counts
@@ -45,19 +65,25 @@ export function distanceToPolyline(p: Coords, points: Coords[], closed: boolean)
  */
 export function pointInRing(p: Coords, points: Coords[], fillRule: "nonzero" | "evenodd" = "nonzero"): boolean {
     if (points.length < 3) return false;
+    const { winding, crossings } = ringCrossings(p, points);
+    return fillRule === "evenodd" ? crossings % 2 === 1 : winding !== 0;
+}
+
+/**
+ * Multi-ring variant of {@link pointInRing}: winding/crossings accumulate
+ * across ALL rings before the rule applies, so holes behave like Canvas2D
+ * fill — an evenodd overlap punches a hole, and a nonzero hole requires the
+ * inner ring to wind opposite its outer ring. Rings close implicitly (open
+ * subpaths close for filling, like Canvas2D `fill()`).
+ */
+export function pointInRings(p: Coords, rings: Coords[][], fillRule: "nonzero" | "evenodd" = "nonzero"): boolean {
     let winding = 0;
-    let odd = false;
-    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-        const a = points[j];
-        const b = points[i];
-        // Half-open y-interval test so a vertex on the ray counts once.
-        if (b.y > p.y !== a.y > p.y) {
-            const cross = ((a.x - b.x) * (p.y - b.y)) / (a.y - b.y) + b.x;
-            if (p.x < cross) {
-                odd = !odd;
-                winding += a.y > b.y ? 1 : -1;
-            }
-        }
+    let crossings = 0;
+    for (const ring of rings) {
+        if (ring.length < 3) continue;
+        const c = ringCrossings(p, ring);
+        winding += c.winding;
+        crossings += c.crossings;
     }
-    return fillRule === "evenodd" ? odd : winding !== 0;
+    return fillRule === "evenodd" ? crossings % 2 === 1 : winding !== 0;
 }

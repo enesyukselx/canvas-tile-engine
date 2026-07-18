@@ -1,0 +1,75 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    overflow: hidden;
+    background: #0f172a;
+    font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        sans-serif;
+}
+
+.hud {
+    position: fixed;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+}
+
+.hud.top-right {
+    top: 12px;
+    right: 12px;
+}
+
+.hud.bottom-left {
+    bottom: 12px;
+    left: 12px;
+    max-width: min(90vw, 520px);
+}
+
+.renderer-toggle {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font: inherit;
+    font-weight: 700;
+    color: #f8fafc;
+    cursor: pointer;
+}
+
+.renderer-toggle.webgl {
+    background: #7c3aed;
+}
+
+.renderer-toggle.canvas {
+    background: #0f766e;
+}
+
+.hit-panel {
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid #334155;
+    color: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 14px;
+    line-height: 1.5;
+}
+
+.hit-panel .kind {
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+.hit-panel .muted {
+    color: #64748b;
+}
