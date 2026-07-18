@@ -15,6 +15,7 @@ import {
     Text,
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
+    resolveSizeWorld,
     resolveLineDashPx,
     resolveRadiusPx,
     resolveCornerRadiusPx,
@@ -223,11 +224,20 @@ export class CanvasDraw {
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
+                  )
                 : list;
 
             ctx.save();
@@ -235,7 +245,8 @@ export class CanvasDraw {
             let lastStrokeStyle: string | undefined;
 
             for (const item of visibleItems) {
-                const size = item.size ?? 1;
+                // sizePx wins over size, resolved against the live scale
+                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = {
                     mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
@@ -244,10 +255,10 @@ export class CanvasDraw {
                 const style = item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
+                const pxSize = sizeWorld * this.camera.scale;
                 const radius = pxSize / 2;
                 const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
 
@@ -392,15 +403,25 @@ export class CanvasDraw {
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
+                  )
                 : list;
 
             for (const item of visibleItems) {
-                const size = item.size ?? 1;
+                // sizePx wins over size, resolved against the live scale
+                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = {
                     mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
                     x: item.origin?.x ?? 0.5,
@@ -408,10 +429,10 @@ export class CanvasDraw {
                 };
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
+                const pxSize = sizeWorld * this.camera.scale;
 
                 // preserve aspect (of the sprite frame when one is set)
                 const srcW = item.sprite?.w ?? item.img.width;
@@ -432,15 +453,20 @@ export class CanvasDraw {
 
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
+                const flipX = item.flipX === true;
+                const flipY = item.flipY === true;
 
                 const opacity = item.opacity ?? 1;
 
-                if (rotationDeg !== 0) {
+                if (rotationDeg !== 0 || flipX || flipY) {
                     const centerX = offsetX + drawW / 2;
                     const centerY = offsetY + drawH / 2;
                     ctx.save();
                     ctx.translate(centerX, centerY);
-                    ctx.rotate(rotation);
+                    if (rotationDeg !== 0) ctx.rotate(rotation);
+                    // Innermost transform: the image is mirrored first, then
+                    // the mirrored image rotates.
+                    if (flipX || flipY) ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
                     this.blitImage(ctx, item.img, item.sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
                     ctx.restore();
                 } else {
@@ -848,6 +874,8 @@ export class CanvasDraw {
             const opacity = (item as { opacity?: number }).opacity ?? 1;
             const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
+            const flipX = (item as { flipX?: boolean }).flipX === true;
+            const flipY = (item as { flipY?: boolean }).flipY === true;
             const srcW = sprite?.w ?? img.width;
             const srcH = sprite?.h ?? img.height;
             const aspect = srcW / srcH;
@@ -861,12 +889,15 @@ export class CanvasDraw {
             const imgX = x + (pxSize - drawW) / 2;
             const imgY = y + (pxSize - drawH) / 2;
 
-            if (rotationDeg !== 0) {
+            if (rotationDeg !== 0 || flipX || flipY) {
                 const centerX = imgX + drawW / 2;
                 const centerY = imgY + drawH / 2;
                 ctx.save();
                 ctx.translate(centerX, centerY);
-                ctx.rotate(rotation);
+                if (rotationDeg !== 0) ctx.rotate(rotation);
+                // Flip is scale-independent, so unlike sizePx it is honored
+                // in static caches too (mirrored first, rotation second).
+                if (flipX || flipY) ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
                 this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
                 ctx.restore();
             } else {

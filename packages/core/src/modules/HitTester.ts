@@ -2,6 +2,7 @@ import { Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathItem, Rect 
 import { distanceToPolyline, pointInRing } from "../utils/pathGeometry";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
 import { resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
+import { resolveSizeWorld } from "../utils/itemSize";
 import { SpatialIndex } from "./SpatialIndex";
 
 /** Primitive kinds that participate in hit testing. */
@@ -48,8 +49,13 @@ type HitEntry = {
     items: HitItem[];
     /** Registration order; later registrations draw on top within a layer. */
     seq: number;
-    /** Largest item size, for safe spatial query padding. */
+    /** Largest world-unit item size, for safe spatial query padding. */
     maxSize: number;
+    /** Largest `sizePx`; its world extent depends on the scale at query time. */
+    maxSizePx: number;
+    /** Static draw calls replay at a recorded scale, so `sizePx` is ignored
+     * for them — the hit box must match what is actually drawn. */
+    ignoreSizePx?: boolean;
     /** Call-level stroke style (line entries only; path items carry their own). */
     style?: LineStyle;
     /** Lazy R-Tree over item anchors, built on the first query of a large entry. */
@@ -97,17 +103,36 @@ export class HitTester {
      */
     constructor(private getScale: () => number = () => 1) {}
 
-    register(handle: DrawHandle, kind: HitKind, items: HitItem | HitItem[], layer: number, style?: LineStyle): void {
+    register(
+        handle: DrawHandle,
+        kind: HitKind,
+        items: HitItem | HitItem[],
+        layer: number,
+        opts?: { style?: LineStyle; ignoreSizePx?: boolean },
+    ): void {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
+        let maxSizePx = 0;
         if (kind !== "path" && kind !== "line") {
             for (const item of list) {
                 const rect = item as Rect;
                 const extent = Math.max(rect.size ?? 1, rect.width ?? 0, rect.height ?? 0);
                 if (extent > maxSize) maxSize = extent;
+                const sizePx = (item as Circle).sizePx ?? 0;
+                if (sizePx > maxSizePx) maxSizePx = sizePx;
             }
         }
-        this.entries.set(handle.id, { handle, kind, layer, items: list, seq: this.nextSeq++, maxSize, style });
+        this.entries.set(handle.id, {
+            handle,
+            kind,
+            layer,
+            items: list,
+            seq: this.nextSeq++,
+            maxSize,
+            maxSizePx,
+            ignoreSizePx: opts?.ignoreSizePx,
+            style: opts?.style,
+        });
     }
 
     remove(handle: DrawHandle): void {
@@ -140,8 +165,11 @@ export class HitTester {
                 this.ensureIndex(entry);
                 // The index stores anchor-centered boxes; origin modes shift the
                 // drawn box by up to half a cell (or half the item size), so pad
-                // the query enough to never miss an edge candidate.
-                const pad = 0.5 + entry.maxSize + padding;
+                // the query enough to never miss an edge candidate. sizePx
+                // extents are scale-dependent (they grow as the camera zooms
+                // out), so they join the pad at query time, never cached.
+                const sizePxPad = entry.ignoreSizePx ? 0 : entry.maxSizePx / this.getScale();
+                const pad = 0.5 + entry.maxSize + sizePxPad + padding;
                 const candidates = entry.index!.query(point.x - pad, point.y - pad, point.x + pad, point.y + pad);
                 for (const item of candidates) {
                     if (!this.testItem(point, item, entry, padding)) continue;
@@ -190,8 +218,16 @@ export class HitTester {
     }
 
     /** World-space box the item is drawn into, mirroring the renderers' math. */
-    private boxFor(item: BoxedItem, kind: HitKind): { left: number; top: number; w: number; h: number } {
-        const size = item.size ?? 1;
+    private boxFor(
+        item: BoxedItem,
+        kind: HitKind,
+        useSizePx: boolean,
+    ): { left: number; top: number; w: number; h: number } {
+        // Circles/images may be pixel-sized (sizePx wins over size); rects and
+        // static entries stay world-sized. Resolved per query because a sizePx
+        // item's world box changes with the camera scale.
+        const size =
+            useSizePx && kind !== "rect" ? resolveSizeWorld(item as Circle, this.getScale()) : (item.size ?? 1);
         // Only rects support per-axis dimensions; circle stays size (diameter)
         // and image keeps its aspect-fit size box below.
         const rect = item as Rect;
@@ -284,7 +320,7 @@ export class HitTester {
         if (kind === "path") return this.testPath(point, item as PathItem, padding);
         if (kind === "line") return this.testLine(point, item as Line, entry.style, padding);
 
-        const box = this.boxFor(item as BoxedItem, kind);
+        const box = this.boxFor(item as BoxedItem, kind, !entry.ignoreSizePx);
 
         if (kind === "circle") {
             const cx = box.left + box.w / 2;

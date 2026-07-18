@@ -386,8 +386,7 @@ describe("HitTester lines", () => {
     it("hits segments within half the stroke width and carries data", () => {
         const ht = new HitTester(() => 40);
         ht.register(handle(1), "line", [{ from: { x: 0, y: 0 }, to: { x: 3, y: 0 }, data: { id: "edge" } }], 1, {
-            strokeStyle: "blue",
-            lineWidthPx: 8,
+            style: { strokeStyle: "blue", lineWidthPx: 8 },
         });
 
         const hit = ht.hitTestFirst<{ id: string }>({ x: 1.5, y: 0.05 });
@@ -448,5 +447,61 @@ describe("HitTester rounded corners", () => {
         // A point on the arc (45deg around the corner center) hits.
         const onArc = { x: 1 - Math.SQRT1_2, y: 1 - Math.SQRT1_2 };
         expect(ht.hitTestFirst(onArc)).toBeDefined();
+    });
+});
+
+describe("HitTester sizePx items", () => {
+    it("hits a pixel-sized circle inside its scale-converted disc", () => {
+        // 24px marker at scale 40 -> 0.6 world diameter, radius 0.3
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "circle", { x: 5, y: 5, size: 2, sizePx: 24 }, 1);
+
+        expect(ht.hitTestFirst({ x: 5.25, y: 5 })).toBeDefined();
+        // Inside the world-size disc (size 2 -> r=1) but outside the sizePx disc
+        expect(ht.hitTestFirst({ x: 5.6, y: 5 })).toBeUndefined();
+    });
+
+    it("grows the world hit box as the camera zooms out", () => {
+        // Same 24px marker at scale 10 -> 2.4 world diameter, radius 1.2
+        const ht = new HitTester(() => 10);
+        ht.register(handle(1), "circle", { x: 5, y: 5, sizePx: 24 }, 1);
+
+        expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 6.3, y: 5 })).toBeUndefined();
+    });
+
+    it("uses the sizePx box for images (aspect-fit included)", () => {
+        const ht = new HitTester(() => 40);
+        const wideImg = { width: 100, height: 50 };
+        // 40px box at scale 40 -> 1 world unit; aspect 2 -> drawn 1 x 0.5
+        ht.register(handle(1), "image", { x: 0, y: 0, size: 3, sizePx: 40, img: wideImg }, 1);
+
+        expect(ht.hitTestFirst({ x: 0.45, y: 0 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 0, y: 0.3 })).toBeUndefined(); // above the fitted box
+        expect(ht.hitTestFirst({ x: 1.2, y: 0 })).toBeUndefined(); // world-size box would reach here
+    });
+
+    it("ignores sizePx for static entries, matching the drawn geometry", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "circle", { x: 5, y: 5, size: 2, sizePx: 24 }, 1, { ignoreSizePx: true });
+
+        // Static caches draw the world size (r=1), not the 24px marker (r=0.3)
+        expect(ht.hitTestFirst({ x: 5.6, y: 5 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeUndefined();
+    });
+
+    it("pads spatial-index queries by the scale-converted max sizePx", () => {
+        // Zoomed far out: 30px markers at scale 5 span 6 world units, far
+        // beyond the default anchor pad. 600 items forces the R-Tree path.
+        const ht = new HitTester(() => 5);
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i * 20, y: 0, sizePx: 30 }));
+        ht.register(handle(1), "circle", items, 1);
+
+        // 2.9 world units from the anchor at (200, 0): inside the 3-unit
+        // radius but only reachable if the query pad accounts for sizePx.
+        const hit = ht.hitTestFirst({ x: 202.9, y: 0 });
+        expect(hit).toBeDefined();
+        expect(hit?.index).toBe(10);
+        expect(ht.hitTestFirst({ x: 203.2, y: 0 })).toBeUndefined();
     });
 });

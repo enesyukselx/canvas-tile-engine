@@ -47,3 +47,38 @@ describe("WebGLDraw image opacity", () => {
         expect(drawn.map((i) => i.alpha)).toEqual([0.5, 1, 0.25]);
     });
 });
+
+describe("WebGLDraw image flip (texcoord swap)", () => {
+    it("swaps u texcoords for flipX and v texcoords for flipY", () => {
+        const { draw, render } = setup();
+        const { gl, drawn } = makeRecordingGL();
+        const img = { width: 100, height: 100 } as unknown as HTMLImageElement;
+
+        draw.drawImage(
+            [
+                { x: 1, y: 1, size: 1, img, flipX: true },
+                { x: 3, y: 1, size: 1, img, flipY: true },
+                { x: 5, y: 1, size: 1, img, flipX: true, sprite: { x: 0, y: 0, w: 50, h: 100 } },
+            ],
+            1,
+        );
+        render(gl);
+
+        expect(drawn[0]).toMatchObject({ u0: 1, u1: 0 });
+        expect(drawn[1]).toMatchObject({ v0: 1, v1: 0 });
+        // Sprite frame texcoords swap within the frame's range
+        expect(drawn[2]).toMatchObject({ u0: 0.5, u1: 0 });
+    });
+
+    it("sizePx wins over size for the drawn pixel box", () => {
+        const { draw, render } = setup(); // scale 10
+        const { gl, drawn } = makeRecordingGL();
+        const img = { width: 100, height: 100 } as unknown as HTMLImageElement;
+
+        draw.drawImage([{ x: 2, y: 2, size: 3, sizePx: 20, img }], 1);
+        render(gl);
+
+        expect(drawn[0].w).toBe(20);
+        expect(drawn[0].h).toBe(20);
+    });
+});

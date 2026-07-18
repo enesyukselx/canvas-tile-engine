@@ -715,7 +715,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
         const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
-        this.hitTester.register(handle, "rect", items, layer);
+        this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true });
         return handle;
     }
 
@@ -729,7 +729,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
         const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
-        this.hitTester.register(handle, "circle", items, layer);
+        this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true });
         return handle;
     }
 
@@ -744,7 +744,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
         const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
-        this.hitTester.register(handle, "image", items, layer);
+        this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true });
         return handle;
     }
 
@@ -766,7 +766,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
         const handle = this.renderer.getDrawAPI().drawLine(items, style, layer);
-        this.hitTester.register(handle, "line", items, layer, style);
+        this.hitTester.register(handle, "line", items, layer, { style });
         return handle;
     }
 

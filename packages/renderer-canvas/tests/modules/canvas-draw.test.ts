@@ -520,3 +520,103 @@ describe("CanvasDraw path items", () => {
         expect(ops.filter((op) => op === "beginPath")).toHaveLength(2);
     });
 });
+
+// Fake 2D context recording arcs and image transforms.
+function makeMarkerRecordingCtx() {
+    const arcs: Array<{ x: number; y: number; r: number }> = [];
+    const scales: Array<{ x: number; y: number }> = [];
+    const images: Array<{ dx: number; dy: number; dw: number; dh: number }> = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        fillStyle: "#000",
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        translate() {},
+        rotate() {},
+        scale(x: number, y: number) {
+            scales.push({ x, y });
+        },
+        arc(x: number, y: number, r: number) {
+            arcs.push({ x, y, r });
+        },
+        moveTo() {},
+        lineTo() {},
+        fill() {},
+        stroke() {},
+        drawImage(_img: unknown, dx: number, dy: number, dw: number, dh: number) {
+            images.push({ dx, dy, dw, dh });
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, arcs, scales, images };
+}
+
+describe("CanvasDraw sizePx and flip", () => {
+    it("draws a sizePx circle at fixed pixel size regardless of scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, arcs } = makeMarkerRecordingCtx();
+
+        draw.drawCircle(
+            [
+                { x: 2, y: 2, size: 2, sizePx: 24, style: { fillStyle: "#f00" } }, // sizePx wins
+                { x: 4, y: 4, size: 2, style: { fillStyle: "#f00" } }, // world size
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(arcs.map((a) => a.r)).toEqual([12, 10]);
+    });
+
+    it("keeps far-out sizePx markers visible (world extent grows as scale drops)", () => {
+        const { draw, render } = setupAtScale(2); // 100px viewport = 50 world units wide
+        const { ctx, arcs } = makeMarkerRecordingCtx();
+
+        // Anchor at x=60 is ~10 world units past the right edge, but a 60px
+        // marker spans 30 world units at scale 2 — its left half is visible.
+        draw.drawCircle([{ x: 60, y: 10, sizePx: 60, style: { fillStyle: "#f00" } }], 1);
+        render(ctx);
+
+        expect(arcs).toHaveLength(1);
+        expect(arcs[0].r).toBe(30);
+    });
+
+    it("draws a sizePx image in its pixel box", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, images } = makeMarkerRecordingCtx();
+        const img = { width: 100, height: 100 } as unknown as HTMLImageElement;
+
+        draw.drawImage([{ x: 2, y: 2, size: 3, sizePx: 20, img }], 1);
+        render(ctx);
+
+        expect(images).toHaveLength(1);
+        expect(images[0].dw).toBe(20);
+        expect(images[0].dh).toBe(20);
+    });
+
+    it("mirrors flipped images via a negative scale around the center", () => {
+        const { draw, render } = setup();
+        const { ctx, scales, images } = makeMarkerRecordingCtx();
+        const img = { width: 100, height: 100 } as unknown as HTMLImageElement;
+
+        draw.drawImage(
+            [
+                { x: 1, y: 1, size: 1, img, flipX: true },
+                { x: 3, y: 1, size: 1, img, flipY: true },
+                { x: 5, y: 1, size: 1, img }, // no flip: no scale call
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(scales).toEqual([
+            { x: -1, y: 1 },
+            { x: 1, y: -1 },
+        ]);
+        // Flipped items draw centered at the origin of the transformed frame
+        expect(images[0].dx).toBe(-5);
+        expect(images[2].dx).not.toBe(-5);
+    });
+});
