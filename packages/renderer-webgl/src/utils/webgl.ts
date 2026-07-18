@@ -61,6 +61,9 @@ export function getWebGLContext(canvas: HTMLCanvasElement): WebGLRenderingContex
         antialias: true,
         premultipliedAlpha: false,
         preserveDrawingBuffer: false,
+        // Path fills use two-pass stencil-then-cover winding (exact
+        // nonzero/evenodd fill rules, matching Canvas2D).
+        stencil: true,
     };
 
     const gl =

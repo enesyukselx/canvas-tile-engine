@@ -1,3 +1,4 @@
+import type { Coords } from "@canvas-tile-engine/core";
 import { RGBA } from "../../utils/color";
 import {
     LINE_FRAGMENT_SHADER,
@@ -204,7 +205,9 @@ export class GLRenderer {
     clear(color: RGBA) {
         const gl = this.gl;
         gl.clearColor(color[0], color[1], color[2], color[3]);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        // Stencil is zeroed by each fillPath cover pass; clearing it here
+        // too keeps a failed/interrupted frame from leaking winding bits.
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     }
 
     // ─── Shapes ───
@@ -332,6 +335,117 @@ export class GLRenderer {
 
         this.disableAttrib(this.line.a_position);
         this.disableAttrib(this.line.a_color);
+    }
+
+    // ─── Path fills ───
+
+    /**
+     * Raw flat-color triangle draw, interleaved as [x, y, r, g, b, a].
+     * Reuses the line pipeline's program (positions + colors, no instancing).
+     */
+    private flatTriangles(data: Float32Array, vertexCount: number) {
+        if (vertexCount === 0) return;
+        const gl = this.gl;
+
+        gl.useProgram(this.line.program);
+        gl.uniform2f(this.line.u_resolution, this.cssWidth, this.cssHeight);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+
+        const stride = LINE_FLOATS_PER_VERTEX * 4;
+        this.enableAttrib(this.line.a_position, 2, stride, 0);
+        this.enableAttrib(this.line.a_color, 4, stride, 2 * 4);
+
+        gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+
+        this.disableAttrib(this.line.a_position);
+        this.disableAttrib(this.line.a_color);
+    }
+
+    /**
+     * Fill a closed outline (implicitly closed ring of CSS-pixel points)
+     * under an exact nonzero or even-odd fill rule via two-pass
+     * stencil-then-cover — the same result Canvas2D `fill()` produces,
+     * including self-intersecting outlines, with no triangulation library:
+     *
+     * 1. A triangle fan from `ring[0]` over every edge writes each pixel's
+     *    winding into the stencil buffer (color writes off): INCR/DECR by
+     *    triangle facing for nonzero, INVERT for even-odd parity.
+     * 2. A bounding-box quad paints the fill color wherever the stencil
+     *    matches the rule, zeroing the stencil as it covers so the next
+     *    fill starts clean. Each covered pixel is painted exactly once, so
+     *    translucent fills show no self-overlap seams.
+     */
+    fillPath(ring: Coords[], color: RGBA, evenOdd: boolean) {
+        const n = ring.length;
+        if (n < 3) return;
+        const gl = this.gl;
+
+        // Fan triangles (anchor, v[i], v[i+1]); edges touching the anchor
+        // form zero-area triangles elsewhere and contribute no winding.
+        const fanVerts = (n - 2) * 3;
+        const fan = new Float32Array(fanVerts * LINE_FLOATS_PER_VERTEX);
+        const anchor = ring[0];
+        let o = 0;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const p of ring) {
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+        }
+        for (let i = 1; i < n - 1; i++) {
+            for (const p of [anchor, ring[i], ring[i + 1]]) {
+                fan[o++] = p.x;
+                fan[o++] = p.y;
+                fan[o++] = color[0];
+                fan[o++] = color[1];
+                fan[o++] = color[2];
+                fan[o++] = color[3];
+            }
+        }
+
+        // Pass 1: winding → stencil, color writes off.
+        gl.enable(gl.STENCIL_TEST);
+        gl.colorMask(false, false, false, false);
+        gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+        if (evenOdd) {
+            gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
+        } else {
+            gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
+            gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP);
+        }
+        this.flatTriangles(fan, fanVerts);
+
+        // Pass 2: cover the bbox where the stencil matches the rule.
+        gl.colorMask(true, true, true, true);
+        if (evenOdd) gl.stencilFunc(gl.EQUAL, 1, 0x01);
+        else gl.stencilFunc(gl.NOTEQUAL, 0, 0xff);
+        gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
+
+        const quad = new Float32Array(6 * LINE_FLOATS_PER_VERTEX);
+        o = 0;
+        for (const [x, y] of [
+            [minX, minY],
+            [maxX, minY],
+            [minX, maxY],
+            [minX, maxY],
+            [maxX, minY],
+            [maxX, maxY],
+        ]) {
+            quad[o++] = x;
+            quad[o++] = y;
+            quad[o++] = color[0];
+            quad[o++] = color[1];
+            quad[o++] = color[2];
+            quad[o++] = color[3];
+        }
+        this.flatTriangles(quad, 6);
+
+        gl.disable(gl.STENCIL_TEST);
     }
 
     // ─── Images ───

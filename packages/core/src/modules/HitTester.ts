@@ -1,13 +1,16 @@
-import { Circle, Coords, DrawHandle, ImageItem, Rect } from "../types";
+import { Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathItem, Rect } from "../types";
+import { distanceToPolyline, pointInRing } from "../utils/pathGeometry";
+import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
+import { resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { SpatialIndex } from "./SpatialIndex";
 
 /** Primitive kinds that participate in hit testing. */
-export type HitKind = "rect" | "circle" | "image";
+export type HitKind = "rect" | "circle" | "image" | "path" | "line";
 
 /** A single hit returned by `hitTest`, ordered by visual priority. */
 export type HitResult<TImage = unknown, TData = unknown> = {
     /** The original item object passed to the draw call. */
-    item: Rect<TData> | Circle<TData> | ImageItem<TImage, TData>;
+    item: Rect<TData> | Circle<TData> | ImageItem<TImage, TData> | PathItem<TData> | Line<TData>;
     /** Which primitive kind the item was drawn as. */
     kind: HitKind;
     /** Layer the item is drawn on. */
@@ -35,7 +38,8 @@ export type HitTestOptions = {
     paddingPx?: number;
 };
 
-type HitItem = Rect | Circle | ImageItem<unknown>;
+type HitItem = Rect | Circle | ImageItem<unknown> | PathItem | Line;
+type BoxedItem = Rect | Circle | ImageItem<unknown>;
 
 type HitEntry = {
     handle: DrawHandle;
@@ -46,14 +50,21 @@ type HitEntry = {
     seq: number;
     /** Largest item size, for safe spatial query padding. */
     maxSize: number;
+    /** Call-level stroke style (line entries only; path items carry their own). */
+    style?: LineStyle;
     /** Lazy R-Tree over item anchors, built on the first query of a large entry. */
-    index?: SpatialIndex<HitItem> | null;
+    index?: SpatialIndex<BoxedItem> | null;
     /** Item object -> position in `items`, built alongside the lazy index. */
     indexMap?: Map<HitItem, number>;
 };
 
 // Same threshold the renderers use for culling: linear scan is faster below it.
 const SPATIAL_INDEX_THRESHOLD = 500;
+
+// Stroke hit tests treat the line as at least this wide (screen pixels), so
+// hairline strokes stay tappable at any zoom without the caller needing
+// `paddingPx` for the common case.
+const MIN_STROKE_HIT_WIDTH_PX = 8;
 
 /**
  * Core-side registry answering "which item is under this world point?".
@@ -79,15 +90,24 @@ export class HitTester {
     private entries = new Map<symbol, HitEntry>();
     private nextSeq = 0;
 
-    register(handle: DrawHandle, kind: HitKind, items: HitItem | HitItem[], layer: number): void {
+    /**
+     * Live camera scale accessor. The registry's geometry is world-space and
+     * scale-free, but screen-pixel style values (`lineWidthPx`, future
+     * `sizePx`) must resolve against the current scale at query time.
+     */
+    constructor(private getScale: () => number = () => 1) {}
+
+    register(handle: DrawHandle, kind: HitKind, items: HitItem | HitItem[], layer: number, style?: LineStyle): void {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
-        for (const item of list) {
-            const rect = item as Rect;
-            const extent = Math.max(item.size ?? 1, rect.width ?? 0, rect.height ?? 0);
-            if (extent > maxSize) maxSize = extent;
+        if (kind !== "path" && kind !== "line") {
+            for (const item of list) {
+                const rect = item as Rect;
+                const extent = Math.max(rect.size ?? 1, rect.width ?? 0, rect.height ?? 0);
+                if (extent > maxSize) maxSize = extent;
+            }
         }
-        this.entries.set(handle.id, { handle, kind, layer, items: list, seq: this.nextSeq++, maxSize });
+        this.entries.set(handle.id, { handle, kind, layer, items: list, seq: this.nextSeq++, maxSize, style });
     }
 
     remove(handle: DrawHandle): void {
@@ -112,7 +132,11 @@ export class HitTester {
         for (const entry of this.entries.values()) {
             if (opts?.layer !== undefined && entry.layer !== opts.layer) continue;
 
-            if (entry.items.length > SPATIAL_INDEX_THRESHOLD) {
+            // Paths and lines have no single anchor point for the R-Tree;
+            // they always linear-scan (typically few, geometry-heavy items).
+            const indexable = entry.kind !== "path" && entry.kind !== "line";
+
+            if (indexable && entry.items.length > SPATIAL_INDEX_THRESHOLD) {
                 this.ensureIndex(entry);
                 // The index stores anchor-centered boxes; origin modes shift the
                 // drawn box by up to half a cell (or half the item size), so pad
@@ -120,7 +144,7 @@ export class HitTester {
                 const pad = 0.5 + entry.maxSize + padding;
                 const candidates = entry.index!.query(point.x - pad, point.y - pad, point.x + pad, point.y + pad);
                 for (const item of candidates) {
-                    if (!this.testItem(point, item, entry.kind, padding)) continue;
+                    if (!this.testItem(point, item, entry, padding)) continue;
                     results.push({
                         item,
                         kind: entry.kind,
@@ -133,7 +157,7 @@ export class HitTester {
             } else {
                 for (let i = 0; i < entry.items.length; i++) {
                     const item = entry.items[i];
-                    if (!this.testItem(point, item, entry.kind, padding)) continue;
+                    if (!this.testItem(point, item, entry, padding)) continue;
                     results.push({
                         item,
                         kind: entry.kind,
@@ -160,12 +184,13 @@ export class HitTester {
 
     private ensureIndex(entry: HitEntry): void {
         if (entry.index !== undefined) return;
-        entry.index = SpatialIndex.fromArray(entry.items);
+        // Only anchor-positioned kinds reach here (see `indexable` in hitTest).
+        entry.index = SpatialIndex.fromArray(entry.items as BoxedItem[]);
         entry.indexMap = new Map(entry.items.map((item, i) => [item, i]));
     }
 
     /** World-space box the item is drawn into, mirroring the renderers' math. */
-    private boxFor(item: HitItem, kind: HitKind): { left: number; top: number; w: number; h: number } {
+    private boxFor(item: BoxedItem, kind: HitKind): { left: number; top: number; w: number; h: number } {
         const size = item.size ?? 1;
         // Only rects support per-axis dimensions; circle stays size (diameter)
         // and image keeps its aspect-fit size box below.
@@ -209,8 +234,57 @@ export class HitTester {
         return { w, h };
     }
 
-    private testItem(point: Coords, item: HitItem, kind: HitKind, padding: number): boolean {
-        const box = this.boxFor(item, kind);
+    /**
+     * Effective half stroke width in world units for stroke-distance tests.
+     * Resolved against the live scale because widths may be screen-pixel
+     * (`lineWidthPx`), with a minimum tap width so hairlines stay hittable.
+     */
+    private strokeHalfWorld(style: LineStyle | PathItem["style"]): number {
+        const scale = this.getScale();
+        const widthPx = Math.max(resolveLineWidthPx(style, scale), MIN_STROKE_HIT_WIDTH_PX);
+        return widthPx / scale / 2;
+    }
+
+    /**
+     * Filled paths (fillStyle set) hit on their interior under the item's
+     * fill rule, treating the outline as implicitly closed like Canvas2D
+     * `fill()`. All paths additionally hit within half the stroke width of
+     * the outline, so unfilled paths are tappable on the stroke itself and
+     * filled edges stay forgiving.
+     */
+    private testPath(point: Coords, item: PathItem, padding: number): boolean {
+        const points = item.points;
+        if (!points || points.length < 2) return false;
+
+        // Test against the same rounded outline the renderers draw: corner
+        // radii resolve to screen pixels, so convert to world units with the
+        // live scale and flatten at the renderers' sampling density.
+        const scale = this.getScale();
+        const radiusWorld = resolveCornerRadiusPx(item.style, scale) / scale;
+        const outline =
+            radiusWorld > 0
+                ? item.closed === true
+                    ? roundedRing(points, radiusWorld, ARC_SEGMENT_LENGTH / scale)
+                    : roundedPolyline(points, radiusWorld, ARC_SEGMENT_LENGTH / scale)
+                : points;
+
+        const filled = item.style?.fillStyle !== undefined;
+        if (filled && pointInRing(point, outline, item.fillRule)) return true;
+        const closed = filled || item.closed === true;
+        return distanceToPolyline(point, outline, closed) <= this.strokeHalfWorld(item.style) + padding;
+    }
+
+    private testLine(point: Coords, item: Line, style: LineStyle | undefined, padding: number): boolean {
+        const threshold = this.strokeHalfWorld(style) + padding;
+        return distanceToPolyline(point, [item.from, item.to], false) <= threshold;
+    }
+
+    private testItem(point: Coords, item: HitItem, entry: HitEntry, padding: number): boolean {
+        const kind = entry.kind;
+        if (kind === "path") return this.testPath(point, item as PathItem, padding);
+        if (kind === "line") return this.testLine(point, item as Line, entry.style, padding);
+
+        const box = this.boxFor(item as BoxedItem, kind);
 
         if (kind === "circle") {
             const cx = box.left + box.w / 2;

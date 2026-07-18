@@ -18,6 +18,8 @@ import type {
     Line,
     Circle,
     Path,
+    PathItem,
+    PathStyle,
     Text,
     ImageItem,
 } from "@canvas-tile-engine/core";
@@ -43,6 +45,8 @@ export type {
     Circle,
     Text,
     Path,
+    PathItem,
+    PathStyle,
     ImageItem,
 };
 

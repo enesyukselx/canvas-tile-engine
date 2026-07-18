@@ -128,7 +128,7 @@ array identity re-registers the callback and rebuilds the spatial index for
 | `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`                                                                                        |
 | `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`                                                                                                  |
 | `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`                                                                             |
-| `<CanvasTileEngine.Path>`         | `items: Path \| Path[]`, `style?: LineStyle`, `layer = 1`                                                                             |
+| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]` (legacy `Coords[]` + `style` deprecated), `layer = 1`                                                 |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
 | `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
 | `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |

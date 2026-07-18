@@ -109,7 +109,7 @@ import {
 } from "@canvas-tile-engine/react-native";
 import type {
     EngineHandle, SkiaEngine, CanvasTileEngineConfig, Coords, Rect, Circle,
-    Text, Line, Path, ImageItem, SpriteRect,
+    Text, Line, Path, PathItem, PathStyle, ImageItem, SpriteRect,
     SkCanvas, SkImage, SkPaint, SkFont, SkPath, SkRect, SkPoint, SkRRect, SkiaImageItem,
 } from "@canvas-tile-engine/react-native";
 ```

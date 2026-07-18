@@ -15,6 +15,7 @@ import type {
     Text,
     LineStyle,
     DrawTransform,
+    PathItem,
 } from "@canvas-tile-engine/core";
 import type { SkiaMount, SkCanvas, SkImage } from "@canvas-tile-engine/renderer-skia";
 
@@ -97,6 +98,8 @@ export interface EngineHandle {
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
     drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
     drawText(items: Text | Text[], layer?: number): DrawHandle;
+    drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle;
+    /** @deprecated Pass `PathItem` objects instead (`{ points, style }`). */
     drawPath(items: Coords[] | Coords[][], style?: LineStyle, layer?: number): DrawHandle;
     drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
     drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
@@ -108,7 +111,7 @@ export interface EngineHandle {
     removeDrawHandle(handle: DrawHandle): void;
 
     /**
-     * All rect/circle/image items under a world point, highest visual
+     * All rect/circle/image/path/line items under a world point, highest visual
      * priority first. Pass `coords.raw` from event callbacks. Empty before
      * mount.
      */
@@ -259,8 +262,15 @@ export function useCanvasTileEngine(): EngineHandle {
             drawText(items, layer) {
                 return instanceRef.current?.drawText(items, layer) ?? droppedDraw("drawText");
             },
-            drawPath(items, style, layer) {
-                return instanceRef.current?.drawPath(items, style, layer) ?? droppedDraw("drawPath");
+            drawPath(
+                items: PathItem | PathItem[] | Coords[] | Coords[][],
+                styleOrLayer?: LineStyle | number,
+                maybeLayer?: number,
+            ) {
+                return (
+                    instanceRef.current?.drawPath(items as never, styleOrLayer as never, maybeLayer as never) ??
+                    droppedDraw("drawPath")
+                );
             },
             drawImage(items, layer) {
                 return instanceRef.current?.drawImage(items, layer) ?? droppedDraw("drawImage");

@@ -41,6 +41,8 @@ export type {
     Circle,
     Text,
     Path,
+    PathItem,
+    PathStyle,
     ImageItem,
 } from "./types";
 export type { EngineHandle } from "./hooks/useCanvasTileEngine";

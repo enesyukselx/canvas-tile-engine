@@ -110,8 +110,74 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size"> &
         textBaseline?: TextBaseline;
     };
 };
-export type Line = {
+export type Line<TData = unknown> = {
     from: Coords;
     to: Coords;
+    /**
+     * Arbitrary app data attached to the segment. Never read by the engine or
+     * renderers; carried through so `hitTest` results can identify the item
+     * without relying on array positions.
+     */
+    data?: TData;
 };
+
+/**
+ * Legacy polyline form: a bare array of world points.
+ * @deprecated Use {@link PathItem} (`{ points, style, ... }`) instead; this
+ * form only supports call-level stroke styling and no fill or hit data.
+ */
 export type Path = Coords[];
+
+/** Per-item styling for {@link PathItem}. Same unit convention as elsewhere:
+ * plain values are world units and scale with zoom; `*Px` variants are screen
+ * pixels and take precedence over their world counterpart. */
+export type PathStyle = {
+    /** Fill color. Setting it makes the path a filled shape: the outline is
+     * implicitly closed for filling and hit testing covers the interior. */
+    fillStyle?: string;
+    strokeStyle?: string;
+    /** Stroke width in world units; scales with zoom. Ignored when
+     * {@link lineWidthPx} is set. Default: 1px hairline. */
+    lineWidth?: number;
+    /** Stroke width in screen pixels, independent of zoom. */
+    lineWidthPx?: number;
+    /** Dash pattern in world units (anchored to the world, scales with zoom).
+     * Ignored when {@link lineDashPx} is set. Omit for a solid line. */
+    lineDash?: number[];
+    /** Dash pattern in screen pixels, independent of zoom. */
+    lineDashPx?: number[];
+    /** Corner rounding radius in world units, applied at every interior
+     * vertex of `points` (and the closing corners when `closed`). Ignored
+     * when {@link cornerRadiusPx} is set. */
+    cornerRadius?: number;
+    /** Corner rounding radius in screen pixels, independent of zoom. */
+    cornerRadiusPx?: number;
+};
+
+/**
+ * A free-form path drawn through world points.
+ *
+ * `points` describes an open polyline; `closed` joins the last point back to
+ * the first. Setting `style.fillStyle` fills the shape (the outline is closed
+ * implicitly for filling, like Canvas2D `fill()`), and filled paths hit-test
+ * against their interior. Unfilled paths hit-test against the stroke itself.
+ */
+export type PathItem<TData = unknown> = {
+    /** Polyline vertices in world units (item space: integers are cell centers). */
+    points: Coords[];
+    /** Join the last point back to the first with a closing segment. */
+    closed?: boolean;
+    /**
+     * Fill rule used for filling and interior hit testing, mirroring Canvas2D:
+     * `"nonzero"` (default) counts winding, `"evenodd"` alternates — the
+     * difference shows on self-intersecting outlines (e.g. a star polygon).
+     */
+    fillRule?: "nonzero" | "evenodd";
+    style?: PathStyle;
+    /**
+     * Arbitrary app data attached to the item. Never read by the engine or
+     * renderers; carried through so `hitTest` results can identify the item
+     * without relying on array positions.
+     */
+    data?: TData;
+};

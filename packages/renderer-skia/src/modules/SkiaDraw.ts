@@ -8,7 +8,7 @@ import {
     ICamera,
     ImageItem,
     Line,
-    Path,
+    PathItem,
     Rect,
     SpatialIndex,
     Text,
@@ -16,10 +16,14 @@ import {
     resolveLineWidthPx,
     resolveLineDashPx,
     resolveRadiusPx,
+    resolveCornerRadiusPx,
+    traceRoundedPath,
+    type PathTraceTarget,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type { LineStyle } from "@canvas-tile-engine/core";
 import {
+    FillType,
     matchFont,
     PaintStyle,
     Skia,
@@ -29,6 +33,7 @@ import {
     type SkFont,
     type SkImage,
     type SkPaint,
+    type SkPath,
     type SkPicture,
     type SkRect,
 } from "@shopify/react-native-skia";
@@ -410,30 +415,43 @@ export class SkiaDraw {
         });
     }
 
-    drawPath(
-        items: Array<Path> | Path,
-        style?: LineStyle,
-        layer: number = 1,
-    ): DrawHandle {
-        const list = Array.isArray(items[0])
-            ? (items as Array<Coords[]>)
-            : [items as Coords[]];
-
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            this.strokePaint.setColor(
-                this.color(style?.strokeStyle ?? "#000000"),
-            );
-            this.strokePaint.setStrokeWidth(
-                resolveLineWidthPx(style, this.camera.scale),
-            );
-            const dash = resolveLineDashPx(style, this.camera.scale);
-            if (dash)
-                this.strokePaint.setPathEffect(
-                    Skia.PathEffect.MakeDash(dash, 0),
+    /**
+     * Adapts an SkPath to the Canvas2D-shaped sink `traceRoundedPath`
+     * expects, so corner-arc geometry is byte-identical across renderers.
+     */
+    private pathSink(path: SkPath): PathTraceTarget {
+        return {
+            moveTo: (x, y) => void path.moveTo(x, y),
+            lineTo: (x, y) => void path.lineTo(x, y),
+            arc: (x, y, radius, startAngle, endAngle, counterclockwise) => {
+                // Canvas2D arc semantics -> Skia oval sweep: positive sweep
+                // is clockwise (increasing angle) in both, y-down.
+                let sweep = endAngle - startAngle;
+                if (!counterclockwise && sweep < 0) sweep += Math.PI * 2;
+                if (counterclockwise && sweep > 0) sweep -= Math.PI * 2;
+                const deg = 180 / Math.PI;
+                path.arcToOval(
+                    Skia.XYWHRect(
+                        x - radius,
+                        y - radius,
+                        radius * 2,
+                        radius * 2,
+                    ),
+                    startAngle * deg,
+                    sweep * deg,
+                    false,
                 );
+            },
+            closePath: () => void path.close(),
+        };
+    }
 
-            for (const points of list) {
-                if (points.length < 2) continue;
+    drawPath(items: PathItem[], layer: number = 1): DrawHandle {
+        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+            for (const item of items) {
+                const points = item.points;
+                if (!points || points.length < 2) continue;
+
                 const xs = points.map((p) => p.x);
                 const ys = points.map((p) => p.y);
                 const minX = Math.min(...xs);
@@ -454,22 +472,47 @@ export class SkiaDraw {
                 )
                     continue;
 
-                const path = Skia.Path.Make();
-                const first = this.transformer.worldToScreen(
-                    points[0].x,
-                    points[0].y,
+                const style = item.style;
+                const filled = style?.fillStyle !== undefined;
+                const pts = points.map((p) =>
+                    this.transformer.worldToScreen(p.x, p.y),
                 );
-                path.moveTo(first.x, first.y);
-                for (let i = 1; i < points.length; i++) {
-                    const p = this.transformer.worldToScreen(
-                        points[i].x,
-                        points[i].y,
+
+                const path = Skia.Path.Make();
+                traceRoundedPath(
+                    this.pathSink(path),
+                    pts,
+                    item.closed === true,
+                    resolveCornerRadiusPx(style, this.camera.scale),
+                );
+
+                if (filled) {
+                    path.setFillType(
+                        item.fillRule === "evenodd"
+                            ? FillType.EvenOdd
+                            : FillType.Winding,
                     );
-                    path.lineTo(p.x, p.y);
+                    this.fillPaint.setColor(this.color(style!.fillStyle!));
+                    canvas.drawPath(path, this.fillPaint);
                 }
-                canvas.drawPath(path, this.strokePaint);
+                // A fill-only item draws no outline; everything else strokes
+                // (defaulting to a hairline, matching the legacy behavior).
+                if (style?.strokeStyle !== undefined || !filled) {
+                    this.strokePaint.setColor(
+                        this.color(style?.strokeStyle ?? "#000000"),
+                    );
+                    this.strokePaint.setStrokeWidth(
+                        resolveLineWidthPx(style, this.camera.scale),
+                    );
+                    const dash = resolveLineDashPx(style, this.camera.scale);
+                    if (dash)
+                        this.strokePaint.setPathEffect(
+                            Skia.PathEffect.MakeDash(dash, 0),
+                        );
+                    canvas.drawPath(path, this.strokePaint);
+                    if (dash) this.strokePaint.setPathEffect(null);
+                }
             }
-            if (dash) this.strokePaint.setPathEffect(null);
         });
     }
 

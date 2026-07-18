@@ -183,48 +183,58 @@ Draw straight lines between two points.
 
 ### `<Path>`
 
-Draw continuous lines through multiple points.
+Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `PathItem` owns its geometry and style.
 
-| Prop    | Type             | Default      | Description      |
-| :------ | :--------------- | :----------- | :--------------- |
-| `items` | `Path \| Path[]` | **Required** | Points array.    |
-| `style` | `LineStyle`      | -            | Path style.      |
-| `layer` | `number`         | `1`          | Rendering layer. |
+| Prop    | Type                     | Default      | Description                                                       |
+| :------ | :----------------------- | :----------- | :---------------------------------------------------------------- |
+| `items` | `PathItem \| PathItem[]` | **Required** | Path definitions.                                                 |
+| `style` | `LineStyle`              | -            | **Deprecated** — only applies to the legacy bare-`Coords[]` form. |
+| `layer` | `number`                 | `1`          | Rendering layer.                                                  |
 
-**Path:** An array of `{ x, y }` coordinates.
+**`PathItem`:** `{ points, closed?, fillRule?, style?, data? }` — see the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full property and `PathStyle` tables. Filled paths hit-test on their interior, unfilled ones on the stroke itself.
 
 ```tsx
 {
-    /* Single path */
+    /* Open route line */
 }
 <CanvasTileEngine.Path
-    items={[
-        { x: 0, y: 0 },
-        { x: 5, y: 0 },
-        { x: 5, y: 5 },
-    ]}
-    style={{ strokeStyle: "#219ebc", lineWidthPx: 2 }}
+    items={{
+        points: [
+            { x: 0, y: 0 },
+            { x: 5, y: 0 },
+            { x: 5, y: 5 },
+        ],
+        style: { strokeStyle: "#219ebc", lineWidthPx: 2 },
+    }}
     layer={1}
 />;
 
 {
-    /* Multiple paths */
+    /* Filled zone with a rounded outline and hit-test data */
+}
+<CanvasTileEngine.Path
+    items={{
+        points: zoneOutline,
+        closed: true,
+        style: { fillStyle: "#22c55e55", strokeStyle: "#166534", lineWidthPx: 2, cornerRadius: 0.5 },
+        data: { id: "zone-a" },
+    }}
+    layer={1}
+/>;
+
+{
+    /* Multiple items, each with its own style */
 }
 <CanvasTileEngine.Path
     items={[
-        [
-            { x: 0, y: 0 },
-            { x: 5, y: 5 },
-        ],
-        [
-            { x: 10, y: 0 },
-            { x: 15, y: 5 },
-        ],
+        { points: routeA, style: { strokeStyle: "#219ebc", lineWidthPx: 2 } },
+        { points: routeB, style: { strokeStyle: "green", lineWidthPx: 1 } },
     ]}
-    style={{ strokeStyle: "green", lineWidthPx: 1 }}
     layer={1}
 />;
 ```
+
+Keep `items` referentially stable (`useMemo`/state) — a new array identity re-registers the draw callback. The legacy bare `Coords[]` / `Coords[][]` items form with the `style` prop still works but is deprecated.
 
 ### `<GridLines>`
 

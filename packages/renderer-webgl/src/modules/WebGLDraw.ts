@@ -8,13 +8,16 @@ import {
     ICamera,
     ImageItem,
     Line,
-    Path,
+    PathItem,
     Rect,
     SpatialIndex,
     Text,
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveLineDashPx,
+    resolveCornerRadiusPx,
+    roundedPolyline,
+    roundedRing,
     resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
@@ -289,17 +292,14 @@ export class WebGLDraw {
         });
     }
 
-    drawPath(items: Array<Path> | Path, style?: LineStyle, layer: number = 1): DrawHandle {
-        const list = Array.isArray(items[0]) ? (items as Array<Coords[]>) : [items as Coords[]];
-
+    drawPath(items: PathItem[], layer: number = 1): DrawHandle {
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
-            const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
-            const lineWidth = resolveLineWidthPx(style, this.camera.scale);
-            const dash = resolveLineDashPx(style, this.camera.scale);
             const lines: LineInstance[] = [];
 
-            for (const points of list) {
-                if (points.length < 2) continue;
+            for (const item of items) {
+                const points = item.points;
+                if (!points || points.length < 2) continue;
+
                 const xs = points.map((p) => p.x);
                 const ys = points.map((p) => p.y);
                 const minX = Math.min(...xs);
@@ -311,14 +311,39 @@ export class WebGLDraw {
                 const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-                let prev = this.transformer.worldToScreen(points[0].x, points[0].y);
-                // The dash phase carries across joints so the pattern flows
-                // continuously along the polyline, like a single ctx subpath.
-                let phase = 0;
-                for (let i = 1; i < points.length; i++) {
-                    const curr = this.transformer.worldToScreen(points[i].x, points[i].y);
-                    phase = this.pushSegment(lines, prev, curr, color, lineWidth, dash, phase);
-                    prev = curr;
+                const style = item.style;
+                const filled = style?.fillStyle !== undefined;
+                const closed = item.closed === true;
+                const radiusPx = resolveCornerRadiusPx(style, this.camera.scale);
+                const pts = points.map((p) => this.transformer.worldToScreen(p.x, p.y));
+                // Corner rounding flattens into a denser polyline, so dash
+                // tessellation and triangulation run over it unchanged. Closed
+                // outlines round every vertex; open ones only interior joints.
+                const outline = closed ? roundedRing(pts, radiusPx) : roundedPolyline(pts, radiusPx);
+
+                if (filled && points.length >= 3) {
+                    // Like Canvas2D fill(), the outline closes implicitly.
+                    // Stencil-then-cover fill: exact nonzero/evenodd winding
+                    // (self-intersecting outlines included), same result as
+                    // the Canvas2D/Skia renderers.
+                    const color = this.colorParser.parse(style!.fillStyle!);
+                    gl.fillPath(outline, color, item.fillRule === "evenodd");
+                }
+
+                if (style?.strokeStyle !== undefined || !filled) {
+                    const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
+                    const lineWidth = resolveLineWidthPx(style, this.camera.scale);
+                    const dash = resolveLineDashPx(style, this.camera.scale);
+
+                    // The dash phase carries across joints so the pattern
+                    // flows continuously, like a single ctx subpath.
+                    let phase = 0;
+                    for (let i = 1; i < outline.length; i++) {
+                        phase = this.pushSegment(lines, outline[i - 1], outline[i], color, lineWidth, dash, phase);
+                    }
+                    if (closed && outline.length > 2) {
+                        this.pushSegment(lines, outline[outline.length - 1], outline[0], color, lineWidth, dash, phase);
+                    }
                 }
             }
 
