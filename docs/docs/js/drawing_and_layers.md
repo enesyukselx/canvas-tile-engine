@@ -54,6 +54,7 @@ drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
 | :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `x`, `y` | `number`             | **Required**                       | World coordinates of the center/origin.                                                                                                                 |
 | `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                                                    |
+| `sizePx` | `number`             | -                                  | Fixed diameter in screen pixels, independent of zoom — marker-style dots (only for `drawCircle`, analog of Text's `fontPx`). Wins over `size`. Ignored by `drawStaticCircle`.  |
 | `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                                            |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                           |
 | `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
@@ -393,6 +394,9 @@ drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
 | `x`, `y`  | `number`           | **Required**                       | World coordinates.                                                                                               |
 | `img`     | `HTMLImageElement` | **Required**                       | The loaded image object.                                                                                         |
 | `size`    | `number`           | `1`                                | Size in grid units (maintains aspect ratio).                                                                     |
+| `sizePx`  | `number`           | -                                  | Fixed size in screen pixels, independent of zoom — marker-style images. Wins over `size`. Ignored by `drawStaticImage`.  |
+| `flipX`   | `boolean`          | `false`                            | Mirror horizontally (a true mirror — no rotation can produce it). Combines with `rotate` and `sprite`.           |
+| `flipY`   | `boolean`          | `false`                            | Mirror vertically.                                                                                               |
 | `rotate`  | `number`           | `0`                                | Rotation angle in degrees (0 = no rotation, positive = clockwise).                                               |
 | `origin`  | `object`           | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                    |
 | `sprite`  | `SpriteRect`       | -                                  | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
@@ -410,6 +414,12 @@ engine.drawImage({ x: 5, y: 3, size: 1, img: arrow, rotate: 90 }, 2);
 
 // Ghost preview: semi-transparent placement indicator
 engine.drawImage({ x: 7, y: 3, size: 1.5, img, opacity: 0.5 }, 3);
+
+// Marker: always 24px on screen, regardless of zoom
+engine.drawImage({ x: 9, y: 3, sizePx: 24, img }, 3);
+
+// Mirrored sprite: one right-facing image serves both directions
+engine.drawImage({ x: 11, y: 3, size: 1, img, flipX: true }, 2);
 
 // Multiple images
 engine.drawImage(

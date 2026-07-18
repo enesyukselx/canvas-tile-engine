@@ -120,10 +120,15 @@ Image keeps its aspect-fit `size` box.
 
 ### Circle
 
-Same as Rect minus `rotate`/`radius`. `size` is the diameter in world units.
+Same as Rect minus `rotate`/`radius`. `size` is the diameter in world units;
+`sizePx` is a fixed screen-pixel diameter that wins over `size` (the marker
+pattern, fontPx analog — station dots that stay readable at any zoom).
+`sizePx` is IGNORED by `drawStaticCircle` (caches replay at a recorded
+scale); hit testing follows whichever the renderer draws.
 
 ```ts
 engine.drawCircle({ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }, 1);
+engine.drawCircle({ x: 4, y: 0, sizePx: 12, style: { fillStyle: "#f43f5e" } }, 2); // 12px at any zoom
 ```
 
 ### Text
@@ -166,6 +171,9 @@ composites ABOVE all GPU primitives regardless of layer (see
     img: TImage;          // HTMLImageElement (web) / SkImage (RN) / napi Image (server)
     sprite?: { x: number; y: number; w: number; h: number };
                           // optional source rect in image pixels (spritesheet frame)
+    sizePx?: number;      // fixed screen-pixel size, wins over size; IGNORED by drawStaticImage
+    flipX?: boolean;      // horizontal mirror (true mirror - rotation can't produce it)
+    flipY?: boolean;      // vertical mirror; both combine with rotate/sprite, work in statics
     opacity?: number;     // 0..1, default 1 - ghost/preview placements
 }
 ```

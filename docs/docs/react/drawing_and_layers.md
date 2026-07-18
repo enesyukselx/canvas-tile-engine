@@ -51,6 +51,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                                                  |
 | `size`   | `number`             | `1`                                | Size in grid units.                                                                                                                                 |
+| `sizePx` | `number`             | -                                  | Fixed diameter in screen pixels, independent of zoom — marker dots (only for `Circle`, analog of Text's `fontPx`). Wins over `size`. Ignored by `StaticCircle`.      |
 | `style`  | `object`             | `{}`                               | Styling options.                                                                                                                                    |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                       |
 | `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
@@ -372,6 +373,9 @@ Draw images scaled to world units.
 | `img`     | `HTMLImageElement` | The loaded image object.                                                                                           |
 | `x`, `y`  | `number`           | World coordinates.                                                                                                 |
 | `size`    | `number`           | Size in grid units (maintains aspect ratio).                                                                       |
+| `sizePx`  | `number`           | Fixed size in screen pixels, independent of zoom — marker-style images. Wins over `size`. Ignored by `StaticImage`. |
+| `flipX`   | `boolean`          | Mirror horizontally (a true mirror — no rotation can produce it). Combines with `rotate` and `sprite`.              |
+| `flipY`   | `boolean`          | Mirror vertically.                                                                                                  |
 | `rotate`  | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise).                                                 |
 | `sprite`  | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
 | `opacity` | `number`           | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements.                       |
