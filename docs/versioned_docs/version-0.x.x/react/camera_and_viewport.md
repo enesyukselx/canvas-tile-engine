@@ -33,7 +33,7 @@ Access camera methods through the engine handle when `engine.isReady` is `true`.
 
 ### Moving the Camera
 
-#### `goCoords(x, y, duration?)`
+#### `goCenter(x, y, duration?)`
 
 Smoothly animates the camera to a new position.
 
@@ -43,13 +43,13 @@ function MapWithNavigation() {
 
     const goToBase = () => {
         if (engine.isReady) {
-            engine.goCoords(0, 0, 1000); // Pan to origin over 1 second
+            engine.goCenter(0, 0, 1000); // Pan to origin over 1 second
         }
     };
 
     const goToMarker = () => {
         if (engine.isReady) {
-            engine.goCoords(50, 50, 500); // Pan to (50, 50) over 500ms
+            engine.goCenter(50, 50, 500); // Pan to (50, 50) over 500ms
         }
     };
 
@@ -66,30 +66,33 @@ function MapWithNavigation() {
 }
 ```
 
-#### `updateCoords(center)`
+#### `setCenter(center)`
 
 Instantly jumps to a position without animation.
 
 ```tsx
 const jumpToPosition = (x: number, y: number) => {
     if (engine.isReady) {
-        engine.updateCoords({ x, y });
+        engine.setCenter({ x, y });
     }
 };
 ```
 
-#### `getCenterCoords()`
+#### `getCenter()`
 
 Returns the current center coordinates of the view.
 
 ```tsx
 const logPosition = () => {
     if (engine.isReady) {
-        const center = engine.getCenterCoords();
+        const center = engine.getCenter();
         console.log("Current position:", center); // { x: 5.5, y: 10.2 }
     }
 };
 ```
+
+:::note Renamed APIs
+:::
 
 #### `getVisibleBounds()`
 
@@ -189,7 +192,7 @@ const logScale = () => {
 
 ### `setScale(scale)`
 
-Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds.
+Sets the zoom level directly. The value is clamped to `minScale` and `maxScale` bounds, and the change is anchored at the viewport center (matching `goScale`/`zoomIn`/`zoomOut`).
 
 | Parameter | Type     | Description                                    |
 | :-------- | :------- | :--------------------------------------------- |
@@ -205,7 +208,7 @@ const setZoom = (scale: number) => {
 
 ### `goScale(scale, duration?, onComplete?)`
 
-Smoothly animates the zoom level to a target value, like `goCoords` does for position. The zoom is anchored at the viewport center (matching `zoomIn`/`zoomOut`), and the target is clamped to `minScale` and `maxScale` bounds.
+Smoothly animates the zoom level to a target value, like `goCenter` does for position. The zoom is anchored at the viewport center (matching `zoomIn`/`zoomOut`), and the target is clamped to `minScale` and `maxScale` bounds.
 
 | Parameter    | Type       | Default      | Description                                    |
 | :----------- | :--------- | :----------- | :--------------------------------------------- |
@@ -218,8 +221,45 @@ const zoomToDetail = () => {
     // Smoothly zoom to 100 pixels per grid unit over 1 second
     engine.goScale(100, 1000);
 
-    // Combine with goCoords for a fly-to effect
-    engine.goCoords(15, 20, 1000);
+    // Combine with goCenter for a fly-to effect
+    engine.goCenter(15, 20, 1000);
+};
+```
+
+### `setScaleLimits(minScale, maxScale)`
+
+Updates the `minScale` and `maxScale` limits at runtime. All zooming (gestures, `setScale`, `goScale`, `zoomIn`, `zoomOut`) clamps to the new range, and the current scale is clamped into it immediately (firing `onZoom` if it changes).
+
+| Parameter  | Type     | Description                                 |
+| :--------- | :------- | :------------------------------------------ |
+| `minScale` | `number` | New minimum zoom level. Must be positive.   |
+| `maxScale` | `number` | New maximum zoom level. Must be >= minScale. |
+
+```tsx
+const allowDeepZoom = () => {
+    // Allow zooming between 10 and 200 pixels per grid unit
+    engine.setScaleLimits(10, 200);
+};
+```
+
+### `fitBounds(bounds, options?)`
+
+Fits a world-space rectangle into the viewport: centers the view on the rectangle and picks the largest scale that keeps the whole (padded) area visible, clamped to the scale limits. Animated by default. Not related to `setBounds`, which restricts camera movement.
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `bounds` | `{ minX, maxX, minY, maxY }` | Rectangle to fit. Every edge must be finite. |
+| `options.padding` | `number` | Extra world-unit margin on every side. Default `0`. |
+| `options.durationMs` | `number` | Animation duration in ms. Default `500`; `0` = instant. |
+| `options.onComplete` | `function` | Called when the fit completes. |
+
+```tsx
+const showWholeBoard = () => {
+    engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+};
+
+const zoomToSelection = (selection: { minX: number; maxX: number; minY: number; maxY: number }) => {
+    engine.fitBounds(selection, { padding: 0.5, durationMs: 300 });
 };
 ```
 

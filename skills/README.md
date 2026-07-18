@@ -69,7 +69,7 @@ repository root lists it as a marketplace entry.
 
 ## Versioning
 
-Written against `@canvas-tile-engine/core@0.8.x` and the renderer/binding
+Written against `@canvas-tile-engine/core@0.9.x` and the renderer/binding
 packages published alongside it. The plugin manifest omits a `version` field,
 so every commit to this repository is picked up as a new version. If a future
 major release changes the API, update the reference files from the docs at

@@ -51,6 +51,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                                                  |
 | `size`   | `number`             | `1`                                | Size in grid units.                                                                                                                                 |
+| `sizePx` | `number`             | -                                  | Fixed diameter in screen pixels, independent of zoom — marker dots (only for `Circle`, analog of Text's `fontPx`). Wins over `size`. Ignored by `StaticCircle`.      |
 | `style`  | `object`             | `{}`                               | Styling options.                                                                                                                                    |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                       |
 | `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
@@ -183,48 +184,57 @@ Draw straight lines between two points.
 
 ### `<Path>`
 
-Draw continuous lines through multiple points.
+Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `PathItem` owns its geometry and style.
 
-| Prop    | Type             | Default      | Description      |
-| :------ | :--------------- | :----------- | :--------------- |
-| `items` | `Path \| Path[]` | **Required** | Points array.    |
-| `style` | `LineStyle`      | -            | Path style.      |
-| `layer` | `number`         | `1`          | Rendering layer. |
+| Prop    | Type                     | Default      | Description                                                       |
+| :------ | :----------------------- | :----------- | :---------------------------------------------------------------- |
+| `items` | `PathItem \| PathItem[]` | **Required** | Path definitions.                                                 |
+| `layer` | `number`                 | `1`          | Rendering layer.                                                  |
 
-**Path:** An array of `{ x, y }` coordinates.
+**`PathItem`:** `{ commands?, points?, closed?, fillRule?, style?, data? }` — `commands` is a Canvas2D-style command list (curves, arcs, multiple subpaths, holes); `points` is the polyline form. See the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full `PathCommand`, property, and `PathStyle` tables. Filled paths hit-test on their interior (holes excluded), unfilled ones on the stroke itself.
 
 ```tsx
 {
-    /* Single path */
+    /* Open route line */
 }
 <CanvasTileEngine.Path
-    items={[
-        { x: 0, y: 0 },
-        { x: 5, y: 0 },
-        { x: 5, y: 5 },
-    ]}
-    style={{ strokeStyle: "#219ebc", lineWidthPx: 2 }}
+    items={{
+        points: [
+            { x: 0, y: 0 },
+            { x: 5, y: 0 },
+            { x: 5, y: 5 },
+        ],
+        style: { strokeStyle: "#219ebc", lineWidthPx: 2 },
+    }}
     layer={1}
 />;
 
 {
-    /* Multiple paths */
+    /* Filled zone with a rounded outline and hit-test data */
+}
+<CanvasTileEngine.Path
+    items={{
+        points: zoneOutline,
+        closed: true,
+        style: { fillStyle: "#22c55e55", strokeStyle: "#166534", lineWidthPx: 2, cornerRadius: 0.5 },
+        data: { id: "zone-a" },
+    }}
+    layer={1}
+/>;
+
+{
+    /* Multiple items, each with its own style */
 }
 <CanvasTileEngine.Path
     items={[
-        [
-            { x: 0, y: 0 },
-            { x: 5, y: 5 },
-        ],
-        [
-            { x: 10, y: 0 },
-            { x: 15, y: 5 },
-        ],
+        { points: routeA, style: { strokeStyle: "#219ebc", lineWidthPx: 2 } },
+        { points: routeB, style: { strokeStyle: "green", lineWidthPx: 1 } },
     ]}
-    style={{ strokeStyle: "green", lineWidthPx: 1 }}
     layer={1}
 />;
 ```
+
+Keep `items` referentially stable (`useMemo`/state) — a new array identity re-registers the draw callback.
 
 ### `<GridLines>`
 
@@ -362,6 +372,9 @@ Draw images scaled to world units.
 | `img`     | `HTMLImageElement` | The loaded image object.                                                                                           |
 | `x`, `y`  | `number`           | World coordinates.                                                                                                 |
 | `size`    | `number`           | Size in grid units (maintains aspect ratio).                                                                       |
+| `sizePx`  | `number`           | Fixed size in screen pixels, independent of zoom — marker-style images. Wins over `size`. Ignored by `StaticImage`. |
+| `flipX`   | `boolean`          | Mirror horizontally (a true mirror — no rotation can produce it). Combines with `rotate` and `sprite`.              |
+| `flipY`   | `boolean`          | Mirror vertically.                                                                                                  |
 | `rotate`  | `number`           | Rotation angle in degrees (0 = no rotation, positive = clockwise).                                                 |
 | `sprite`  | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
 | `opacity` | `number`           | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements.                       |

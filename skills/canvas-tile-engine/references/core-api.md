@@ -114,24 +114,26 @@ after mount.
 
 | Signature | Notes |
 | :-- | :-- |
-| `render(): void` | Paint one frame. Needed after initial draw registration and after data mutation. Camera changes (drag/zoom/goCoords/...) render automatically. |
+| `render(): void` | Paint one frame. Needed after initial draw registration and after data mutation. Camera changes (drag/zoom/goCenter/...) render automatically. |
 | `destroy(): void` | Cancel animations, remove listeners/observers. Call on teardown (React does this on unmount). |
 
 ### Camera and viewport
 
 | Signature | Notes |
 | :-- | :-- |
-| `getCenterCoords(): Coords` | Current world center. |
-| `updateCoords(center: Coords): void` | Jump to a new center instantly. Throws on non-finite values. |
-| `goCoords(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
+| `getCenter(): Coords` | Current world center. |
+| `setCenter(center: Coords): void` | Jump to a new center instantly. Throws on non-finite values. |
+| `goCenter(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
 | `getScale(): number` | Current scale (px per world unit). |
-| `setScale(n): void` | Set scale directly, clamped to min/max. |
+| `setScale(n): void` | Set scale directly, clamped to min/max. Anchored at the viewport center. |
 | `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
 | `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
+| `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Throws on non-positive/non-finite values or `minScale > maxScale`. |
 | `getSize(): { width, height }` | Current logical canvas size in px. |
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
 | `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |
 | `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
+| `fitBounds(bounds, opts?): void` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. |
 | `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. |
 | `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |
 
@@ -147,7 +149,7 @@ and semantics: [drawing.md](drawing.md).
 | `drawImage(items: ImageItem \| ImageItem[], layer?)` | 1 |
 | `drawText(items: Text \| Text[], layer?)` | 2 |
 | `drawLine(items: Line \| Line[], style?: LineStyle, layer?)` | 1 |
-| `drawPath(items: Path \| Path[], style?: LineStyle, layer?)` | 1 |
+| `drawPath(items: PathItem \| PathItem[], layer?)` | 1 |
 | `drawGridLines(cellSize: number, lineWidth = 1, strokeStyle = "black", layer = 0)` | 0 |
 | `drawStaticRect(items: Rect[], cacheKey: string, layer?)` | 1 |
 | `drawStaticCircle(items: Circle[], cacheKey: string, layer?)` | 1 |
@@ -167,10 +169,11 @@ and semantics: [drawing.md](drawing.md).
 
 | Signature | Notes |
 | :-- | :-- |
-| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image items under a world point, highest visual priority first (higher layer, later registration, later item). |
+| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image/path/line items under a world point, highest visual priority first (higher layer, later registration, later item). |
 | `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Topmost item only. |
+| `hitTestRect<TData>(rect: Bounds, opts?: { layer?: number; mode?: "intersect" \| "contain" }): HitResult<TImage, TData>[]` | Marquee/box selection: every item intersecting (default) or fully inside (`"contain"`) a world rectangle. Corners in any order, built from `coords.raw` drag points. Geometry-exact (circles as discs, rotated boxes as quads, filled paths count interior with holes excluded); stroke widths NOT expanded, `padding` not applied — grow the rect instead. |
 
-`HitResult` = `{ item, kind: "rect"|"circle"|"image", layer, handle, index }`;
+`HitResult` = `{ item, kind: "rect"|"circle"|"image"|"path"|"line", layer, handle, index }`;
 `item` is the exact object passed to the draw call. Every drawable item
 accepts an optional `data?: TData` field the engine never reads - attach app
 data there and read it back as `hit.item.data`. The `TData` type parameter
@@ -179,8 +182,11 @@ types that field (assertion only, no runtime check). Prefer `data` over
 goes stale when a filtered/re-ordered array is re-drawn. Pass `coords.raw`
 from event callbacks; origin anchoring, non-square Rect `width`/`height`,
 image aspect fit, and rotation are handled internally - the hit box is always
-the drawn box. Covers `drawStatic*` variants too; Line/Path/Text are NOT
-hit-testable. Position mutations require re-registration to be reflected
+the drawn box. Covers `drawStatic*` variants too. Paths and lines: filled
+paths hit on their interior (item `fillRule`); unfilled paths and lines hit
+within half the stroke width (resolved against the live scale, min 8px tap
+width so hairlines stay tappable). Text is NOT hit-testable. Position
+mutations require re-registration to be reflected
 (same rule as rendering). 500+ item draw calls are queried via a spatial
 index - hover-frequency use is fine at scale.
 
@@ -210,6 +216,8 @@ engine.onMouseUp    = (coords, mouse, client) => {};
 engine.onMouseLeave = (coords, mouse, client) => {};
 engine.onCoordsChange = (center: Coords) => {};       // any camera movement
 engine.onZoom       = (scale: number) => {};          // any scale change
+engine.onWheel      = (coords, mouse, client, wheel) => {}; // wheel/pinch zoom
+                                       // gesture; wheel = { deltaY, direction, source }
 engine.onResize     = () => {};
 engine.onDraw       = (ctx, coords, config, transform) => {}; // after each frame,
                                        // same signature as addDrawFunction (drawing.md)
@@ -275,7 +283,7 @@ Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`,
 `GestureProcessor`, `AnimationController`.
 
 Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `DrawObject`, `Rect`,
-`Circle`, `Text`, `Line`, `Path`, `ImageItem<TImage>`, `SpriteRect`,
+`Circle`, `Text`, `Line`, `PathItem`, `PathStyle`, `ImageItem<TImage>`, `SpriteRect`,
 `SpriteSheetOptions`, `SpriteAnimation`, `EventHandlers`, `ZoomMode`,
 `DrawHandle`, `LineStyle`, `TextAlign`, `TextBaseline`, `IRenderer`,
 `IDrawAPI`, `IImageLoader`, `ICamera`, `RendererDependencies`, plus all
@@ -288,6 +296,6 @@ renderer authors; app code normally only needs `CanvasTileEngine`,
 ## Validation errors
 
 `scale` must be a positive finite number and coordinates finite numbers;
-`setScale`, `goScale`, `updateCoords`, and `goCoords` throw
+`setScale`, `goScale`, `setCenter`, and `goCenter` throw
 `ConfigValidationError` otherwise. Config normalization fills every optional field with the defaults
 listed above.

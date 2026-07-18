@@ -146,15 +146,19 @@ Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
     config={config}
     onCoordsChange={setCenter}
     onZoom={setScale}
+    onWheel={(coords, mouse, client, wheel) =>
+        console.log(wheel.source, wheel.direction)
+    }
     onResize={() => console.log(engine.getSize())}
 />
 ```
 
-| Prop             | Description                                                                                 |
-| :--------------- | :------------------------------------------------------------------------------------------ |
-| `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes. |
-| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, or `zoomOut` changes the scale.  |
-| `onResize`       | Fires after manual or observed resize.                                                      |
+| Prop             | Description                                                                                                                                   |
+| :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes.                                                   |
+| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping changes the scale.                         |
+| `onWheel`        | Fires for wheel/pinch zoom gestures with the standard coordinate payload plus `{ deltaY, direction, source }`. Requires `eventHandlers.zoom`. |
+| `onResize`       | Fires after manual or observed resize.                                                                                                        |
 
 ## Painting Example
 
@@ -297,8 +301,8 @@ useEffect(() => {
 The hook handle exposes the same camera controls as the core engine.
 
 ```tsx
-engine.updateCoords({ x: 10, y: 10 });
-engine.goCoords(0, 0, 500);
+engine.setCenter({ x: 10, y: 10 });
+engine.goCenter(0, 0, 500);
 engine.setScale(64);
 engine.goScale(64, 500);
 engine.zoomIn();
@@ -310,8 +314,9 @@ engine.setBounds({ minX: 0, maxX: 100, minY: 0, maxY: 100 });
 ## Hit Testing
 
 `engine.hitTest` / `engine.hitTestFirst` answer "which item is under this
-point?" for rect, circle, and image items - including items drawn by the
-declarative components, which register through the same engine. Pass
+point?" for rect, circle, image, path, and line items - including items
+drawn by the declarative components, which register through the same
+engine. Pass
 `coords.raw` from any event prop; origin anchoring, image aspect fit, and
 rotation are handled internally. Before the engine mounts the methods
 return an empty result, so no null checks are needed.
@@ -346,9 +351,15 @@ function StationMap() {
 ```
 
 Results are `{ item, kind, layer, handle, index }`, ordered by visual
-priority (higher layer, then later registration, then later item). Line,
-Path, and Text are not hit-testable, and - like rendering - position
-mutations require re-registration to be reflected.
+priority (higher layer, then later registration, then later item). Filled
+paths hit on their interior; unfilled paths and lines hit within half the
+stroke width of the geometry (with a minimum tap width for hairlines). Text
+is not hit-testable, and - like rendering - position mutations require
+re-registration to be reflected.
+
+For box selection, `engine.hitTestRect(rect, { mode })` returns every item
+intersecting (default) or fully inside (`"contain"`) a world rectangle —
+build the corners from drag-start/end `coords.raw` values (any order works).
 
 Every drawable item accepts an optional `data` field the engine never reads;
 use it to identify hits instead of `hit.index`, which goes stale when you
