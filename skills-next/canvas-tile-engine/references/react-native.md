@@ -59,6 +59,27 @@ export function NativeMap() {
 }
 ```
 
+## Grid-sized boards (gridToSize on native)
+
+On native the measured layout overrides `config.size`, so `gridToSize`'s
+pixel output goes into `style` (the layout then measures to exactly that),
+with the cell size derived from the screen:
+
+```tsx
+const { width } = useWindowDimensions(); // NOT Dimensions.get (no re-render)
+const cellSize = Math.floor(width / COLUMNS); // floor keeps 1px lines crisp
+const { size, scale, center } = gridToSize({ columns: COLUMNS, rows: ROWS, cellSize });
+
+<CanvasTileEngine style={{ width: size.width, height: size.height }}
+    config={{ ...baseConfig, scale, size }} center={center} ... />
+```
+
+`config`/`center` are read once at engine creation — remount with
+`key={width}` if the window size can change while mounted. Alternative for
+fluid layouts: `style={{ flex: 1 }}` + `engine.fitBounds(boardRect,
+{ durationMs: 0 })` once ready (re-run in `onResize`); contain-fit shows
+extra world on the loose axis when aspect ratios differ.
+
 ## Platform differences vs React web
 
 | Concern | React Native behavior |

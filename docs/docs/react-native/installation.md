@@ -69,6 +69,56 @@ export function NativeMap() {
 
 The native component measures its wrapping `View` with `onLayout`. `config.size` is used as an initial placeholder and is overridden by the measured layout size.
 
+## Grid-Sized Boards
+
+On the web, `gridToSize` computes a pixel `size` for the config and the canvas is created at exactly that size. On native the measured layout wins instead — so put the computed pixels into `style`, and derive the cell size from the screen so the board fills the width on every device:
+
+```tsx
+import { useWindowDimensions } from "react-native";
+import { gridToSize } from "@canvas-tile-engine/react-native";
+
+const COLUMNS = 8;
+const ROWS = 8;
+
+export function Board() {
+    const engine = useCanvasTileEngine();
+    const { width } = useWindowDimensions();
+    // Full-width board; subtract any horizontal padding your layout adds.
+    // Math.floor keeps 1px grid lines crisp on non-integer cell sizes.
+    const cellSize = Math.floor(width / COLUMNS);
+
+    const { size, scale, center } = gridToSize({ columns: COLUMNS, rows: ROWS, cellSize });
+
+    return (
+        <CanvasTileEngine
+            engine={engine}
+            renderer={new RendererSkia()}
+            // The layout size is what the engine actually measures.
+            style={{ width: size.width, height: size.height }}
+            config={{ ...baseConfig, scale, size }}
+            center={center}
+        />
+    );
+}
+```
+
+Two things to know:
+
+- `config` and `center` are read once when the engine is created. If the window size can change while the board is mounted (rotation, foldables), remount with `key={width}` so the new cell size applies — or skip fixed sizing entirely and use the fit approach below.
+- Prefer `useWindowDimensions` over `Dimensions.get`: the hook re-renders on window changes, `Dimensions.get` reads once.
+
+**Alternative: fit the board to whatever space you have.** Keep the layout fluid (`style={{ flex: 1 }}`) and let [`fitBounds`](../js/camera_and_viewport.md) size the camera instead — better when the map area is dynamic:
+
+```tsx
+useEffect(() => {
+    if (!engine.isReady) return;
+    // Cells 0..7 span -0.5..7.5 in corner space
+    engine.fitBounds({ minX: -0.5, maxX: 7.5, minY: -0.5, maxY: 7.5 }, { durationMs: 0 });
+}, [engine.isReady]);
+```
+
+Re-run it in `onResize` and the fit survives layout changes. Note `fitBounds` is a uniform-scale contain fit: if the viewport's aspect ratio differs from the board's, the loose axis shows extra world beyond the rectangle.
+
 ## Draw Components
 
 The same compound components are available:
