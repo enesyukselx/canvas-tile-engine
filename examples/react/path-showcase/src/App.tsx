@@ -22,7 +22,10 @@ export default function App() {
     const [useWebGL, setUseWebGL] = useState(false);
     // Renderer is read once at mount, so the toggle remounts via `key` —
     // carrying the current camera over so both renderers show the same frame.
-    const [view, setView] = useState({ center: INITIAL_CENTER, scale: config.scale });
+    const [view, setView] = useState({
+        center: INITIAL_CENTER,
+        scale: config.scale,
+    });
     const [hit, setHit] = useState<string | null>(null);
 
     const toggleRenderer = () => {
@@ -59,7 +62,11 @@ export default function App() {
                 <CanvasTileEngine.Path items={pathItems} layer={1} />
                 <CanvasTileEngine.Line
                     items={lineItems}
-                    style={{ strokeStyle: "#f472b6", lineWidthPx: 4, lineDash: [0.4, 0.2] }}
+                    style={{
+                        strokeStyle: "#f472b6",
+                        lineWidthPx: 4,
+                        lineDash: [0.4, 0.2],
+                    }}
                     layer={1}
                 />
                 <CanvasTileEngine.Text items={labelItems} layer={2} />
