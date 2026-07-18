@@ -329,6 +329,32 @@ Each result is `{ item, kind, layer, handle, index }`, ordered by visual
 priority: higher layer first, then later registration, then later item within
 a draw call - the item you see on top comes first.
 
+### Region queries (marquee selection)
+
+`hitTestRect` returns every item whose geometry intersects (default) or lies
+fully inside a world rectangle — the box-selection query:
+
+```ts
+let dragStart = null;
+engine.onMouseDown = (coords) => (dragStart = coords.raw);
+engine.onMouseUp = (coords) => {
+    if (!dragStart) return;
+    const hits = engine.hitTestRect(
+        { minX: dragStart.x, minY: dragStart.y, maxX: coords.raw.x, maxY: coords.raw.y },
+        { mode: "contain" }, // only items fully inside the box
+    );
+    selectAll(hits.map((h) => h.item.data));
+    dragStart = null;
+};
+```
+
+Corners may be passed in any order (a drag can travel in any direction).
+`mode: "intersect"` (default) counts any overlap; `"contain"` requires full
+enclosure — the usual choice for seat/unit selection. Region tests run on
+item geometry (stroke widths are not expanded), circles test exactly rather
+than by bounding box, and filled paths count interior overlap with holes
+excluded.
+
 Semantics to know:
 
 - Works for `drawRect` / `drawCircle` / `drawImage` (and their `drawStatic*`

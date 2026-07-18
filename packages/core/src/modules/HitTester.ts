@@ -1,5 +1,13 @@
 import { Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathCommand, PathItem, Rect } from "../types";
-import { distanceToPolyline, pointInRing, pointInRings } from "../utils/pathGeometry";
+import {
+    distanceToPolyline,
+    pointInRect,
+    pointInRing,
+    pointInRings,
+    ringIntersectsRect,
+    segmentIntersectsRect,
+    type RectRegion,
+} from "../utils/pathGeometry";
 import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
 import { resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
@@ -38,6 +46,17 @@ export type HitTestOptions = {
      * `padding`. Negative values are treated as 0.
      */
     paddingPx?: number;
+};
+
+export type HitTestRectOptions = {
+    /** Only test items drawn on this layer. */
+    layer?: number;
+    /**
+     * `"intersect"` (default): any overlap with the rectangle counts.
+     * `"contain"`: the item's full geometry must lie inside the rectangle —
+     * the usual choice for marquee seat/unit selection.
+     */
+    mode?: "intersect" | "contain";
 };
 
 type HitItem = Rect | Circle | ImageItem<unknown> | PathItem | Line;
@@ -357,6 +376,156 @@ export class HitTester {
     private testLine(point: Coords, item: Line, style: LineStyle | undefined, padding: number): boolean {
         const threshold = this.strokeHalfWorld(style) + padding;
         return distanceToPolyline(point, [item.from, item.to], false) <= threshold;
+    }
+
+    /**
+     * All items whose geometry intersects (default) or lies fully inside the
+     * world rectangle, in the same visual-priority order as `hitTest`.
+     * Region tests run on item GEOMETRY — stroke widths are not expanded
+     * (unlike point tests, which must keep thin strokes tappable).
+     */
+    hitTestRect<TData = unknown>(rect: RectRegion, opts?: HitTestRectOptions): HitResult<unknown, TData>[] {
+        const mode = opts?.mode ?? "intersect";
+        const results: Array<HitResult & { seq: number }> = [];
+
+        for (const entry of this.entries.values()) {
+            if (opts?.layer !== undefined && entry.layer !== opts.layer) continue;
+
+            const indexable = entry.kind !== "path" && entry.kind !== "line";
+            if (indexable && entry.items.length > SPATIAL_INDEX_THRESHOLD) {
+                this.ensureIndex(entry);
+                // Same conservative anchor padding as the point query.
+                const pad = 0.5 + entry.maxSize + (entry.ignoreSizePx ? 0 : entry.maxSizePx / this.getScale());
+                const candidates = entry.index!.query(
+                    rect.minX - pad,
+                    rect.minY - pad,
+                    rect.maxX + pad,
+                    rect.maxY + pad,
+                );
+                for (const item of candidates) {
+                    if (!this.testItemRect(rect, item, entry, mode)) continue;
+                    results.push({
+                        item,
+                        kind: entry.kind,
+                        layer: entry.layer,
+                        handle: entry.handle,
+                        index: entry.indexMap!.get(item)!,
+                        seq: entry.seq,
+                    });
+                }
+            } else {
+                for (let i = 0; i < entry.items.length; i++) {
+                    const item = entry.items[i];
+                    if (!this.testItemRect(rect, item, entry, mode)) continue;
+                    results.push({
+                        item,
+                        kind: entry.kind,
+                        layer: entry.layer,
+                        handle: entry.handle,
+                        index: i,
+                        seq: entry.seq,
+                    });
+                }
+            }
+        }
+
+        results.sort((a, b) => b.layer - a.layer || b.seq - a.seq || b.index - a.index);
+        return results.map(({ seq: _seq, ...hit }) => hit) as HitResult<unknown, TData>[];
+    }
+
+    /** Corners of the drawn box in world space, rotation applied. */
+    private boxCorners(item: BoxedItem, kind: HitKind, useSizePx: boolean): Coords[] {
+        const box = this.boxFor(item, kind, useSizePx);
+        const corners = [
+            { x: box.left, y: box.top },
+            { x: box.left + box.w, y: box.top },
+            { x: box.left + box.w, y: box.top + box.h },
+            { x: box.left, y: box.top + box.h },
+        ];
+        const rotate = (item as Rect).rotate ?? 0;
+        if (rotate === 0) return corners;
+        const cx = box.left + box.w / 2;
+        const cy = box.top + box.h / 2;
+        const rad = (rotate * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        return corners.map((c) => ({
+            x: cx + (c.x - cx) * cos - (c.y - cy) * sin,
+            y: cy + (c.x - cx) * sin + (c.y - cy) * cos,
+        }));
+    }
+
+    /** The path's world geometry as flattened subpaths (shared with testPath). */
+    private pathSubpaths(item: PathItem): Subpath[] {
+        if (item.commands !== undefined) {
+            return this.commandSubpaths(item as PathItem & { commands: PathCommand[] });
+        }
+        const points = item.points;
+        if (!points || points.length < 2) return [];
+        const scale = this.getScale();
+        const radiusWorld = resolveCornerRadiusPx(item.style, scale) / scale;
+        const closed = item.closed === true;
+        const outline =
+            radiusWorld > 0
+                ? closed
+                    ? roundedRing(points, radiusWorld, ARC_SEGMENT_LENGTH / scale)
+                    : roundedPolyline(points, radiusWorld, ARC_SEGMENT_LENGTH / scale)
+                : points;
+        return [{ points: outline, closed }];
+    }
+
+    private testItemRect(rect: RectRegion, item: HitItem, entry: HitEntry, mode: "intersect" | "contain"): boolean {
+        const kind = entry.kind;
+
+        if (kind === "line") {
+            const line = item as Line;
+            if (mode === "contain") return pointInRect(line.from, rect) && pointInRect(line.to, rect);
+            return segmentIntersectsRect(line.from, line.to, rect);
+        }
+
+        if (kind === "path") {
+            const pathItem = item as PathItem;
+            const subpaths = this.pathSubpaths(pathItem);
+            if (subpaths.length === 0) return false;
+            if (mode === "contain") {
+                return subpaths.every((sub) => sub.points.every((p) => pointInRect(p, rect)));
+            }
+            const filled = pathItem.style?.fillStyle !== undefined;
+            for (const sub of subpaths) {
+                if (ringIntersectsRect(sub.points, rect, sub.closed || filled)) return true;
+            }
+            // No outline touch: the rectangle may still sit fully inside a
+            // filled region. A corner check via pointInRings respects holes —
+            // a rectangle inside a hole is a miss.
+            return (
+                filled &&
+                pointInRings(
+                    { x: rect.minX, y: rect.minY },
+                    subpaths.map((sub) => sub.points),
+                    pathItem.fillRule,
+                )
+            );
+        }
+
+        if (kind === "circle") {
+            const box = this.boxFor(item as BoxedItem, kind, !entry.ignoreSizePx);
+            const cx = box.left + box.w / 2;
+            const cy = box.top + box.h / 2;
+            const r = box.w / 2;
+            if (mode === "contain") {
+                return cx - r >= rect.minX && cx + r <= rect.maxX && cy - r >= rect.minY && cy + r <= rect.maxY;
+            }
+            const dx = cx - Math.min(Math.max(cx, rect.minX), rect.maxX);
+            const dy = cy - Math.min(Math.max(cy, rect.minY), rect.maxY);
+            return dx * dx + dy * dy <= r * r;
+        }
+
+        // rect / image: the (possibly rotated) drawn box as a convex quad
+        const corners = this.boxCorners(item as BoxedItem, kind, !entry.ignoreSizePx);
+        if (mode === "contain") return corners.every((c) => pointInRect(c, rect));
+        // Outline touch covers partial overlap and quad-inside-rect; the
+        // remaining case is the rectangle fully inside the quad.
+        return ringIntersectsRect(corners, rect) || pointInRing({ x: rect.minX, y: rect.minY }, corners);
     }
 
     private testItem(point: Coords, item: HitItem, entry: HitEntry, padding: number): boolean {

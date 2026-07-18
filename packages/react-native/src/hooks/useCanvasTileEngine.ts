@@ -4,11 +4,13 @@ import type {
     CanvasTileEngineConfig,
     Circle,
     Coords,
+    Bounds,
     DrawHandle,
     EventHandlers,
     FitBoundsOptions,
     HitResult,
     HitTestOptions,
+    HitTestRectOptions,
     ImageItem,
     Line,
     Rect,
@@ -110,6 +112,13 @@ export interface EngineHandle {
     hitTest<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData>[];
     /** The topmost item under a world point, or undefined. */
     hitTestFirst<TData = unknown>(point: Coords, opts?: HitTestOptions): HitResult<SkImage, TData> | undefined;
+
+    /**
+     * All items whose geometry intersects (default) or lies fully inside a
+     * world rectangle — marquee/box selection. Corners may be in any order;
+     * build them from event `coords.raw` values. Empty before mount.
+     */
+    hitTestRect<TData = unknown>(rect: Bounds, opts?: HitTestRectOptions): HitResult<SkImage, TData>[];
 
     readonly images: SkiaEngine["images"] | undefined;
     /** Decode and cache an image from a URI, resolving to a Skia `SkImage`. */
@@ -280,6 +289,9 @@ export function useCanvasTileEngine(): EngineHandle {
 
             hitTestFirst<TData>(point: Coords, opts?: HitTestOptions) {
                 return instanceRef.current?.hitTestFirst<TData>(point, opts);
+            },
+            hitTestRect<TData>(rect: Bounds, opts?: HitTestRectOptions) {
+                return instanceRef.current?.hitTestRect<TData>(rect, opts) ?? [];
             },
 
             loadImage(src, retry) {

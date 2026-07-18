@@ -619,3 +619,88 @@ describe("HitTester command paths", () => {
         expect(ht.hitTestFirst({ x: 21, y: 20 })).toBeUndefined();
     });
 });
+
+describe("HitTester rect queries", () => {
+    it("intersect catches overlap, contain requires full enclosure", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", { x: 2, y: 2, size: 1, data: { id: "a" } }, 1);
+        // box spans [1.5, 2.5]^2
+
+        expect(ht.hitTestRect({ minX: 2.4, minY: 2.4, maxX: 4, maxY: 4 })).toHaveLength(1);
+        expect(ht.hitTestRect({ minX: 2.4, minY: 2.4, maxX: 4, maxY: 4 }, { mode: "contain" })).toHaveLength(0);
+        expect(ht.hitTestRect({ minX: 1, minY: 1, maxX: 3, maxY: 3 }, { mode: "contain" })).toHaveLength(1);
+        expect(ht.hitTestRect({ minX: 2.6, minY: 2.6, maxX: 4, maxY: 4 })).toHaveLength(0);
+    });
+
+    it("detects a query rect fully inside a big item", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", { x: 5, y: 5, size: 10 }, 1);
+
+        expect(ht.hitTestRect({ minX: 4.8, minY: 4.8, maxX: 5.2, maxY: 5.2 })).toHaveLength(1);
+    });
+
+    it("tests circles exactly, not by bounding box", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "circle", { x: 0, y: 0, size: 2 }, 1);
+        // radius 1: the corner region near (0.9, 0.9) is inside the bbox but outside the disc
+
+        expect(ht.hitTestRect({ minX: 0.8, minY: 0.8, maxX: 2, maxY: 2 })).toHaveLength(0);
+        expect(ht.hitTestRect({ minX: 0.6, minY: 0.6, maxX: 2, maxY: 2 })).toHaveLength(1);
+    });
+
+    it("respects rotation on rect corners", () => {
+        const ht = new HitTester();
+        // size 1 at origin rotated 45°: reaches ±0.707 on the axes, not the (0.45, 0.45) corner
+        ht.register(handle(1), "rect", { x: 0, y: 0, size: 1, rotate: 45 }, 1);
+
+        expect(ht.hitTestRect({ minX: 0.6, minY: -0.05, maxX: 1, maxY: 0.05 })).toHaveLength(1);
+        expect(ht.hitTestRect({ minX: 0.44, minY: 0.44, maxX: 1, maxY: 1 })).toHaveLength(0);
+    });
+
+    it("excludes holes: a rect inside a filled path's hole is a miss", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(
+            handle(1),
+            "path",
+            {
+                commands: [
+                    { type: "moveTo", x: 0, y: 0 },
+                    { type: "lineTo", x: 10, y: 0 },
+                    { type: "lineTo", x: 10, y: 10 },
+                    { type: "lineTo", x: 0, y: 10 },
+                    { type: "closePath" },
+                    { type: "moveTo", x: 7, y: 3 },
+                    { type: "lineTo", x: 3, y: 3 },
+                    { type: "lineTo", x: 3, y: 7 },
+                    { type: "lineTo", x: 7, y: 7 },
+                    { type: "closePath" },
+                ],
+                style: { fillStyle: "red" },
+            },
+            1,
+        );
+
+        expect(ht.hitTestRect({ minX: 4, minY: 4, maxX: 6, maxY: 6 })).toHaveLength(0); // inside the hole
+        expect(ht.hitTestRect({ minX: 0.5, minY: 4, maxX: 2, maxY: 6 })).toHaveLength(1); // in the band
+        expect(ht.hitTestRect({ minX: 2, minY: 2, maxX: 8, maxY: 8 })).toHaveLength(1); // straddles the hole ring
+    });
+
+    it("handles lines and contain mode on them", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "line", { from: { x: 0, y: 0 }, to: { x: 4, y: 4 } }, 1);
+
+        expect(ht.hitTestRect({ minX: 1, minY: 1, maxX: 3, maxY: 3 })).toHaveLength(1); // crosses through
+        expect(ht.hitTestRect({ minX: 1, minY: 1, maxX: 3, maxY: 3 }, { mode: "contain" })).toHaveLength(0);
+        expect(ht.hitTestRect({ minX: -1, minY: -1, maxX: 5, maxY: 5 }, { mode: "contain" })).toHaveLength(1);
+        expect(ht.hitTestRect({ minX: 3, minY: 0, maxX: 4, maxY: 1 })).toHaveLength(0); // near but off the diagonal
+    });
+
+    it("selects a range out of a large indexed set", () => {
+        const ht = new HitTester();
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i * 2, y: 0, size: 1, data: { i } }));
+        ht.register(handle(1), "circle", items, 1);
+
+        const hits = ht.hitTestRect<{ i: number }>({ minX: 100, minY: -1, maxX: 110, maxY: 1 });
+        expect(hits.map((h) => h.item.data?.i).sort((a, b) => a! - b!)).toEqual([50, 51, 52, 53, 54, 55]);
+    });
+});
