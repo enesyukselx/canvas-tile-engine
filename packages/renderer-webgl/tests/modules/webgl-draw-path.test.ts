@@ -7,11 +7,11 @@ import type { GLRenderer, LineInstance } from "../../src/modules/gl/GLRenderer";
 
 // Fake GL renderer recording stencil-cover fills and line instances.
 function makeRecordingGL() {
-    const fills: Array<{ ring: Coords[]; color: RGBA; evenOdd: boolean }> = [];
+    const fills: Array<{ rings: Coords[][]; color: RGBA; evenOdd: boolean }> = [];
     const lines: LineInstance[] = [];
     const gl = {
-        fillPath(ring: Coords[], color: RGBA, evenOdd: boolean) {
-            fills.push({ ring, color, evenOdd });
+        fillPath(rings: Coords[][], color: RGBA, evenOdd: boolean) {
+            fills.push({ rings, color, evenOdd });
         },
         drawLines(items: LineInstance[]) {
             lines.push(...items);
@@ -55,7 +55,8 @@ describe("WebGLDraw path items", () => {
         render(gl);
 
         expect(fills).toHaveLength(2);
-        expect(fills[0].ring).toHaveLength(4);
+        expect(fills[0].rings).toHaveLength(1);
+        expect(fills[0].rings[0]).toHaveLength(4);
         expect(fills[0].evenOdd).toBe(false);
         expect(fills[1].evenOdd).toBe(true);
         expect(lines).toHaveLength(0);
@@ -105,6 +106,97 @@ describe("WebGLDraw path items", () => {
         render(gl);
 
         // The rounded ring has more vertices than the source square
-        expect(fills[0].ring.length).toBeGreaterThan(4);
+        expect(fills[0].rings[0].length).toBeGreaterThan(4);
+    });
+});
+
+describe("WebGLDraw command paths", () => {
+    it("fills multi-subpath commands as one stencil call with all rings", () => {
+        const { draw, render } = setup();
+        const { gl, fills } = makeRecordingGL();
+
+        draw.drawPath(
+            [
+                {
+                    commands: [
+                        { type: "moveTo", x: 0, y: 0 },
+                        { type: "lineTo", x: 8, y: 0 },
+                        { type: "lineTo", x: 8, y: 8 },
+                        { type: "closePath" },
+                        { type: "moveTo", x: 2, y: 2 },
+                        { type: "lineTo", x: 4, y: 2 },
+                        { type: "lineTo", x: 4, y: 4 },
+                        { type: "closePath" },
+                    ],
+                    fillRule: "evenodd",
+                    style: { fillStyle: "#f00" },
+                },
+            ],
+            1,
+        );
+        render(gl);
+
+        expect(fills).toHaveLength(1);
+        expect(fills[0].rings).toHaveLength(2);
+        expect(fills[0].evenOdd).toBe(true);
+    });
+
+    it("strokes flattened curves as dense segments, closing closed subpaths only", () => {
+        const { draw, render } = setup();
+        const { gl, lines } = makeRecordingGL();
+
+        draw.drawPath(
+            [
+                {
+                    commands: [
+                        { type: "moveTo", x: 0, y: 0 },
+                        { type: "bezierCurveTo", cp1x: 0, cp1y: 4, cp2x: 8, cp2y: 4, x: 8, y: 0 },
+                    ],
+                    style: { strokeStyle: "#f00" },
+                },
+            ],
+            1,
+        );
+        render(gl);
+
+        // A flattened cubic is many short segments, not one chord
+        expect(lines.length).toBeGreaterThan(8);
+    });
+
+    it("re-flattens when the camera scale drifts beyond the 2x bucket", () => {
+        const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera & { scale: number };
+        const transformer = new CoordinateTransformer(camera);
+        const layers = new Layer();
+        const draw = new WebGLDraw(layers, transformer, camera);
+        const config = { size: { width: 2000, height: 2000 }, scale: 10 } as never;
+        const ctx = { save() {}, restore() {} } as unknown as CanvasRenderingContext2D;
+        const render = (gl: GLRenderer) =>
+            layers.drawAll({ gl, ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
+
+        draw.drawPath(
+            [
+                {
+                    commands: [{ type: "arc", x: 10, y: 10, radius: 5, startAngle: 0, endAngle: 360 }],
+                    style: { strokeStyle: "#f00" },
+                },
+            ],
+            1,
+        );
+
+        const low = makeRecordingGL();
+        render(low.gl);
+        const lowCount = low.lines.length;
+
+        // Within the bucket: same flattening reused
+        camera.scale = 15;
+        const mid = makeRecordingGL();
+        render(mid.gl);
+        expect(mid.lines.length).toBe(lowCount);
+
+        // Beyond 2x: re-flattened at the finer scale -> denser outline
+        camera.scale = 100;
+        const high = makeRecordingGL();
+        render(high.gl);
+        expect(high.lines.length).toBeGreaterThan(lowCount * 2);
     });
 });

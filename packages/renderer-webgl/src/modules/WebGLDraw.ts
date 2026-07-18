@@ -17,6 +17,10 @@ import {
     resolveSizeWorld,
     resolveLineDashPx,
     resolveCornerRadiusPx,
+    flattenPathCommands,
+    pathCommandsBounds,
+    ARC_SEGMENT_LENGTH,
+    type Subpath,
     roundedPolyline,
     roundedRing,
     resolveRadiusPx,
@@ -304,41 +308,85 @@ export class WebGLDraw {
     }
 
     drawPath(items: PathItem[], layer: number = 1): DrawHandle {
+        // Conservative world bounds per item for culling, computed once:
+        // control-point hull for command paths, vertex bounds for polylines.
+        const itemBounds = items.map((item) => {
+            if (item.commands !== undefined) return pathCommandsBounds(item.commands);
+            const points = item.points;
+            if (!points || points.length < 2) return null;
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            for (const p of points) {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            }
+            return { minX, minY, maxX, maxY };
+        });
+
+        // WebGL has no native curves: command paths flatten in world space,
+        // cached per scale bucket and re-flattened only when the camera
+        // scale drifts beyond 2x — sampling stays near the on-screen pixel
+        // density without per-frame CPU cost, and faceting never shows on
+        // deep zoom.
+        const flatCache: Array<{ scale: number; subpaths: Subpath[] } | null> = items.map(() => null);
+        const subpathsFor = (n: number, item: PathItem): Subpath[] => {
+            const scale = this.camera.scale;
+            const cached = flatCache[n];
+            if (cached && scale >= cached.scale / 2 && scale <= cached.scale * 2) return cached.subpaths;
+            const subpaths = flattenPathCommands(item.commands!, ARC_SEGMENT_LENGTH / scale);
+            flatCache[n] = { scale, subpaths };
+            return subpaths;
+        };
+
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const lines: LineInstance[] = [];
 
-            for (const item of items) {
-                const points = item.points;
-                if (!points || points.length < 2) continue;
+            for (let n = 0; n < items.length; n++) {
+                const item = items[n];
+                const bounds = itemBounds[n];
+                if (!bounds) continue;
 
-                const xs = points.map((p) => p.x);
-                const ys = points.map((p) => p.y);
-                const minX = Math.min(...xs);
-                const maxX = Math.max(...xs);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
-                const centerX = (minX + maxX) / 2;
-                const centerY = (minY + maxY) / 2;
-                const halfExtent = Math.max(maxX - minX, maxY - minY) / 2;
+                const centerX = (bounds.minX + bounds.maxX) / 2;
+                const centerY = (bounds.minY + bounds.maxY) / 2;
+                const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
                 const style = item.style;
                 const filled = style?.fillStyle !== undefined;
-                const closed = item.closed === true;
-                const radiusPx = resolveCornerRadiusPx(style, this.camera.scale);
-                const pts = points.map((p) => this.transformer.worldToScreen(p.x, p.y));
-                // Corner rounding flattens into a denser polyline, so dash
-                // tessellation and triangulation run over it unchanged. Closed
-                // outlines round every vertex; open ones only interior joints.
-                const outline = closed ? roundedRing(pts, radiusPx) : roundedPolyline(pts, radiusPx);
 
-                if (filled && points.length >= 3) {
-                    // Like Canvas2D fill(), the outline closes implicitly.
-                    // Stencil-then-cover fill: exact nonzero/evenodd winding
-                    // (self-intersecting outlines included), same result as
-                    // the Canvas2D/Skia renderers.
+                // Screen-space subpaths: flattened commands, or the (possibly
+                // corner-rounded) points polyline as a single subpath.
+                let subpaths: Array<{ points: Coords[]; closed: boolean }>;
+                if (item.commands !== undefined) {
+                    subpaths = subpathsFor(n, item).map((sub) => ({
+                        points: sub.points.map((p) => this.transformer.worldToScreen(p.x, p.y)),
+                        closed: sub.closed,
+                    }));
+                } else {
+                    const closed = item.closed === true;
+                    const radiusPx = resolveCornerRadiusPx(style, this.camera.scale);
+                    const pts = item.points!.map((p) => this.transformer.worldToScreen(p.x, p.y));
+                    // Corner rounding flattens into a denser polyline, so dash
+                    // tessellation and fills run over it unchanged. Closed
+                    // outlines round every vertex; open ones interior joints.
+                    const outline = closed ? roundedRing(pts, radiusPx) : roundedPolyline(pts, radiusPx);
+                    subpaths = [{ points: outline, closed }];
+                }
+
+                if (filled) {
+                    // Like Canvas2D fill(), open subpaths close implicitly.
+                    // Multi-ring stencil-then-cover: winding accumulates
+                    // across subpaths, so holes match Canvas2D/Skia exactly.
                     const color = this.colorParser.parse(style!.fillStyle!);
-                    gl.fillPath(outline, color, item.fillRule === "evenodd");
+                    gl.fillPath(
+                        subpaths.map((sub) => sub.points),
+                        color,
+                        item.fillRule === "evenodd",
+                    );
                 }
 
                 if (style?.strokeStyle !== undefined || !filled) {
@@ -346,14 +394,18 @@ export class WebGLDraw {
                     const lineWidth = resolveLineWidthPx(style, this.camera.scale);
                     const dash = resolveLineDashPx(style, this.camera.scale);
 
-                    // The dash phase carries across joints so the pattern
-                    // flows continuously, like a single ctx subpath.
-                    let phase = 0;
-                    for (let i = 1; i < outline.length; i++) {
-                        phase = this.pushSegment(lines, outline[i - 1], outline[i], color, lineWidth, dash, phase);
-                    }
-                    if (closed && outline.length > 2) {
-                        this.pushSegment(lines, outline[outline.length - 1], outline[0], color, lineWidth, dash, phase);
+                    for (const sub of subpaths) {
+                        const pts = sub.points;
+                        // The dash phase carries across joints so the pattern
+                        // flows continuously within a subpath, resetting at
+                        // the next one — like ctx subpaths.
+                        let phase = 0;
+                        for (let i = 1; i < pts.length; i++) {
+                            phase = this.pushSegment(lines, pts[i - 1], pts[i], color, lineWidth, dash, phase);
+                        }
+                        if (sub.closed && pts.length > 2) {
+                            this.pushSegment(lines, pts[pts.length - 1], pts[0], color, lineWidth, dash, phase);
+                        }
                     }
                 }
             }
