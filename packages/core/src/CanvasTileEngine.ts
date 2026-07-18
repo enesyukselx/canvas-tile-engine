@@ -3,7 +3,7 @@ import { Config } from "./modules/Config";
 import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
-import { HitTester, HitResult, HitTestOptions } from "./modules/HitTester";
+import { HitTester, HitResult, HitTestOptions, HitTestRectOptions } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateFitBounds, validateScale } from "./utils/validateConfig";
 import { snapCenterToGrid } from "./utils/viewport";
@@ -961,6 +961,33 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Fold `paddingPx` into the world-unit `padding` using the current scale;
      * the HitTester itself is scale-unaware.
      */
+    /**
+     * All items whose geometry intersects (default) or lies fully inside a
+     * world rectangle — the marquee/box-selection query. Corners may be
+     * passed in any order (a drag can travel in any direction); build them
+     * from event `coords.raw` values, like `hitTest`. Region tests run on
+     * item GEOMETRY — stroke widths are not expanded — and filled paths
+     * count interior overlap with holes excluded.
+     * @example
+     * ```ts
+     * // Marquee selection between drag start and end (raw coords)
+     * const hits = engine.hitTestRect(
+     *     { minX: start.x, minY: start.y, maxX: end.x, maxY: end.y },
+     *     { layer: 2, mode: "contain" },
+     * );
+     * select(hits.map((h) => h.item.data));
+     * ```
+     */
+    hitTestRect<TData = unknown>(rect: Bounds, opts?: HitTestRectOptions): HitResult<TImage, TData>[] {
+        const region = {
+            minX: Math.min(rect.minX, rect.maxX) - DEFAULT_VALUES.CELL_CENTER_OFFSET,
+            maxX: Math.max(rect.minX, rect.maxX) - DEFAULT_VALUES.CELL_CENTER_OFFSET,
+            minY: Math.min(rect.minY, rect.maxY) - DEFAULT_VALUES.CELL_CENTER_OFFSET,
+            maxY: Math.max(rect.minY, rect.maxY) - DEFAULT_VALUES.CELL_CENTER_OFFSET,
+        };
+        return this.hitTester.hitTestRect<TData>(region, opts) as HitResult<TImage, TData>[];
+    }
+
     private resolveHitOptions(opts?: HitTestOptions): HitTestOptions | undefined {
         if (!opts || opts.paddingPx === undefined) return opts;
         const { paddingPx, ...rest } = opts;

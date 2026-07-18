@@ -87,3 +87,53 @@ export function pointInRings(p: Coords, rings: Coords[][], fillRule: "nonzero" |
     }
     return fillRule === "evenodd" ? crossings % 2 === 1 : winding !== 0;
 }
+
+/** Axis-aligned world rectangle used by region queries. */
+export interface RectRegion {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+}
+
+export function pointInRect(p: Coords, r: RectRegion): boolean {
+    return p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY && p.y <= r.maxY;
+}
+
+/** Whether the segment `a`-`b` touches the rectangle (endpoints included). */
+export function segmentIntersectsRect(a: Coords, b: Coords, r: RectRegion): boolean {
+    if (pointInRect(a, r) || pointInRect(b, r)) return true;
+    // Liang-Barsky style clipping: track the parameter window [t0, t1] of the
+    // segment against each slab; the window surviving all four means overlap.
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    let t0 = 0;
+    let t1 = 1;
+    const clip = (p: number, q: number): boolean => {
+        if (p === 0) return q >= 0;
+        const t = q / p;
+        if (p < 0) {
+            if (t > t1) return false;
+            if (t > t0) t0 = t;
+        } else {
+            if (t < t0) return false;
+            if (t < t1) t1 = t;
+        }
+        return true;
+    };
+    return clip(-dx, a.x - r.minX) && clip(dx, r.maxX - a.x) && clip(-dy, a.y - r.minY) && clip(dy, r.maxY - a.y);
+}
+
+/**
+ * Whether the (implicitly closed) ring's OUTLINE touches the rectangle.
+ * Interior overlap is the caller's concern: pair with `pointInRing(s)` on a
+ * rect corner for filled shapes, so holes stay excluded correctly.
+ */
+export function ringIntersectsRect(ring: Coords[], r: RectRegion, closed: boolean = true): boolean {
+    if (ring.length === 1) return pointInRect(ring[0], r);
+    const last = closed ? ring.length : ring.length - 1;
+    for (let i = 0; i < last; i++) {
+        if (segmentIntersectsRect(ring[i], ring[(i + 1) % ring.length], r)) return true;
+    }
+    return false;
+}
