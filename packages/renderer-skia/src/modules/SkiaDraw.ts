@@ -14,6 +14,8 @@ import {
     Text,
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
+    resolveSizePx,
+    resolveSizeWorld,
     resolveLineDashPx,
     resolveRadiusPx,
     resolveCornerRadiusPx,
@@ -232,44 +234,62 @@ export class SkiaDraw {
         const spatialIndex = useSpatialIndex
             ? SpatialIndex.fromArray(list)
             : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce(
+            (max, item) => Math.max(max, item.sizePx ?? 0),
+            0,
+        );
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
-                      bounds.minX,
-                      bounds.minY,
-                      bounds.maxX,
-                      bounds.maxY,
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
                   )
                 : list;
 
             for (const item of visibleItems) {
-                const size = item.size ?? 1;
+                // sizePx wins over size, resolved against the live scale
+                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
 
                 if (
                     !spatialIndex &&
-                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                    !this.isVisible(
+                        item.x,
+                        item.y,
+                        sizeWorld / 2,
+                        topLeft,
+                        config,
+                    )
                 )
                     continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintCircle(canvas, item, pos, this.camera.scale);
+                this.paintCircle(canvas, item, pos, this.camera.scale, true);
             }
         });
     }
 
-    /** Paint a single circle at a resolved position; `cellSize` is the pixel size of one world cell. */
+    /** Paint a single circle at a resolved position; `cellSize` is the pixel
+     * size of one world cell. `useSizePx` is false on the static picture
+     * path, which records at a fixed scale where pixel sizing cannot hold. */
     private paintCircle(
         canvas: SkCanvas,
         item: Circle,
         pos: Coords,
         cellSize: number,
+        useSizePx: boolean,
     ) {
-        const size = item.size ?? 1;
         const origin = this.resolveOrigin(item.origin);
         const style = item.style;
-        const pxSize = size * cellSize;
+        const pxSize = useSizePx
+            ? resolveSizePx(item, cellSize)
+            : (item.size ?? 1) * cellSize;
         const radius = pxSize / 2;
         const { x: drawX, y: drawY } = this.computeOriginOffset(
             pos,
@@ -526,41 +546,57 @@ export class SkiaDraw {
         const spatialIndex = useSpatialIndex
             ? SpatialIndex.fromArray(list)
             : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce(
+            (max, item) => Math.max(max, item.sizePx ?? 0),
+            0,
+        );
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
-                      bounds.minX,
-                      bounds.minY,
-                      bounds.maxX,
-                      bounds.maxY,
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
                   )
                 : list;
 
             for (const item of visibleItems) {
-                const size = item.size ?? 1;
+                // sizePx wins over size, resolved against the live scale
+                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
 
                 if (
                     !spatialIndex &&
-                    !this.isVisible(item.x, item.y, size / 2, topLeft, config)
+                    !this.isVisible(
+                        item.x,
+                        item.y,
+                        sizeWorld / 2,
+                        topLeft,
+                        config,
+                    )
                 )
                     continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintImage(canvas, item, pos, this.camera.scale);
+                this.paintImage(canvas, item, pos, this.camera.scale, true);
             }
         });
     }
 
-    /** Paint a single image at a resolved position; `cellSize` is the pixel size of one world cell. */
+    /** Paint a single image at a resolved position; `cellSize` is the pixel
+     * size of one world cell. `useSizePx` is false on the static picture
+     * path, which records at a fixed scale where pixel sizing cannot hold. */
     private paintImage(
         canvas: SkCanvas,
         item: ImageItem<SkImage>,
         pos: Coords,
         cellSize: number,
+        useSizePx: boolean,
     ) {
-        const size = item.size ?? 1;
         const origin = this.resolveOrigin(item.origin);
 
         const img = item.img;
@@ -568,7 +604,9 @@ export class SkiaDraw {
         const imgH = img.height();
         if (!imgW || !imgH) return;
 
-        const pxSize = size * cellSize;
+        const pxSize = useSizePx
+            ? resolveSizePx(item, cellSize)
+            : (item.size ?? 1) * cellSize;
 
         // Spritesheet source rect; defaults to the whole image
         const srcX = item.sprite?.x ?? 0;
@@ -596,8 +634,19 @@ export class SkiaDraw {
 
         const cx = offsetX + drawW / 2;
         const cy = offsetY + drawH / 2;
+        const flipX = item.flipX === true;
+        const flipY = item.flipY === true;
         const count =
             rotation !== 0 ? this.withRotation(canvas, rotation, cx, cy) : -1;
+        // Mirror around the draw box center (image first, rotation second —
+        // the flip is the innermost transform, matching the 2D renderers).
+        // Flip is scale-independent, so static pictures honor it too.
+        const flipCount = flipX || flipY ? canvas.save() : -1;
+        if (flipX || flipY) {
+            canvas.translate(cx, cy);
+            canvas.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+            canvas.translate(-cx, -cy);
+        }
 
         const src = Skia.XYWHRect(srcX, srcY, srcW, srcH);
         const dest = Skia.XYWHRect(offsetX, offsetY, drawW, drawH);
@@ -608,6 +657,7 @@ export class SkiaDraw {
         canvas.drawImageRect(img, src, dest, this.imagePaint);
         if (opacity !== 1) this.imagePaint.setAlphaf(1);
 
+        if (flipCount !== -1) canvas.restoreToCount(flipCount);
         if (count !== -1) canvas.restoreToCount(count);
     }
 
@@ -688,7 +738,7 @@ export class SkiaDraw {
             items,
             layer,
             (canvas, item, pos, cellSize) =>
-                this.paintCircle(canvas, item, pos, cellSize),
+                this.paintCircle(canvas, item, pos, cellSize, false),
         );
     }
 
@@ -702,7 +752,7 @@ export class SkiaDraw {
             items,
             layer,
             (canvas, item, pos, cellSize) =>
-                this.paintImage(canvas, item, pos, cellSize),
+                this.paintImage(canvas, item, pos, cellSize, false),
         );
     }
 
