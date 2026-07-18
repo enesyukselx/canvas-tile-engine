@@ -80,8 +80,9 @@ type Line = {
 };
 
 type PathItem<TData = unknown> = {
-    points: Coords[]; // polyline vertices in world units
-    closed?: boolean; // join the last point back to the first
+    commands?: PathCommand[]; // free-form Canvas2D-style commands (curves, arcs, holes)
+    points?: Coords[]; // polyline vertices in world units (one of the two required)
+    closed?: boolean; // join the last point back to the first (points form)
     fillRule?: "nonzero" | "evenodd"; // fill rule, default "nonzero"
     style?: PathStyle; // per-item fill/stroke/dash/corner styling
     data?: TData; // app data, returned on hitTest results

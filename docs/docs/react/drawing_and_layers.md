@@ -191,7 +191,7 @@ Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `
 | `items` | `PathItem \| PathItem[]` | **Required** | Path definitions.                                                 |
 | `layer` | `number`                 | `1`          | Rendering layer.                                                  |
 
-**`PathItem`:** `{ points, closed?, fillRule?, style?, data? }` — see the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full property and `PathStyle` tables. Filled paths hit-test on their interior, unfilled ones on the stroke itself.
+**`PathItem`:** `{ commands?, points?, closed?, fillRule?, style?, data? }` — `commands` is a Canvas2D-style command list (curves, arcs, multiple subpaths, holes); `points` is the polyline form. See the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full `PathCommand`, property, and `PathStyle` tables. Filled paths hit-test on their interior (holes excluded), unfilled ones on the stroke itself.
 
 ```tsx
 {
