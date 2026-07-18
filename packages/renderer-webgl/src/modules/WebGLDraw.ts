@@ -14,6 +14,7 @@ import {
     Text,
     VISIBILITY_BUFFER,
     resolveLineWidthPx,
+    resolveSizeWorld,
     resolveLineDashPx,
     resolveCornerRadiusPx,
     roundedPolyline,
@@ -165,25 +166,35 @@ export class WebGLDraw {
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
+                  )
                 : list;
 
             const shapes: ShapeInstance[] = [];
             const lines: LineInstance[] = [];
 
             for (const item of visibleItems) {
-                const size = item.size ?? 1;
+                // sizePx wins over size, resolved against the live scale
+                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = this.resolveOrigin(item.origin);
                 const style = item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
+                const pxSize = sizeWorld * this.camera.scale;
                 const radius = pxSize / 2;
                 const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
                 const cx = drawX + radius;
@@ -356,26 +367,36 @@ export class WebGLDraw {
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = this.getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
+                  )
                 : list;
 
             const images: ImageInstance[] = [];
 
             for (const item of visibleItems) {
-                const size = item.size ?? 1;
+                // sizePx wins over size, resolved against the live scale
+                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = this.resolveOrigin(item.origin);
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, size / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
 
                 const texture = gl.getTexture(item.img);
                 if (!texture) continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxSize = size * this.camera.scale;
+                const pxSize = sizeWorld * this.camera.scale;
 
                 // Spritesheet source rect; defaults to the whole image
                 const sprite = item.sprite;
@@ -410,6 +431,18 @@ export class WebGLDraw {
                     instance.v0 = sprite.y / item.img.height;
                     instance.u1 = (sprite.x + sprite.w) / item.img.width;
                     instance.v1 = (sprite.y + sprite.h) / item.img.height;
+                }
+
+                // Mirroring = swapped texcoords; no vertex transform needed.
+                if (item.flipX === true) {
+                    const u0 = instance.u0 ?? 0;
+                    instance.u0 = instance.u1 ?? 1;
+                    instance.u1 = u0;
+                }
+                if (item.flipY === true) {
+                    const v0 = instance.v0 ?? 0;
+                    instance.v0 = instance.v1 ?? 1;
+                    instance.v1 = v0;
                 }
 
                 images.push(instance);
@@ -459,11 +492,20 @@ export class WebGLDraw {
     }
 
     drawStaticCircle(items: Array<Circle>, _cacheKey: string, layer: number = 1): DrawHandle {
-        return this.drawCircle(items, layer);
+        // sizePx is stripped even though WebGL redraws statics dynamically:
+        // static draws must render identically across renderers (the cached
+        // ones replay at a recorded scale), and hit boxes ignore it too.
+        return this.drawCircle(
+            items.map(({ sizePx: _sizePx, ...rest }) => rest),
+            layer,
+        );
     }
 
     drawStaticImage(items: Array<ImageItem>, _cacheKey: string, layer: number = 1): DrawHandle {
-        return this.drawImage(items, layer);
+        return this.drawImage(
+            items.map(({ sizePx: _sizePx, ...rest }) => rest),
+            layer,
+        );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
