@@ -26,7 +26,14 @@ import {
     resolveRadiusPx,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import type { LineStyle } from "@canvas-tile-engine/core";
+import type {
+    LineStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    RendererDrawOptions,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+} from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
 import { Layer } from "./Layer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
@@ -101,8 +108,13 @@ export class WebGLDraw {
         });
     }
 
-    drawRect(items: Array<Rect> | Rect, layer: number = 1): DrawHandle {
+    drawRect(
+        items: Array<Rect> | Rect,
+        layer: number = 1,
+        options?: RendererDrawOptions<Rect, ShapeDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -121,7 +133,8 @@ export class WebGLDraw {
                 const w = item.width ?? size;
                 const h = item.height ?? size;
                 const origin = this.resolveOrigin(item.origin);
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
 
                 if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
 
@@ -165,8 +178,13 @@ export class WebGLDraw {
         });
     }
 
-    drawCircle(items: Array<Circle> | Circle, layer: number = 1): DrawHandle {
+    drawCircle(
+        items: Array<Circle> | Circle,
+        layer: number = 1,
+        options?: RendererDrawOptions<Circle, ShapeDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -193,7 +211,8 @@ export class WebGLDraw {
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = this.resolveOrigin(item.origin);
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
 
                 if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
 
@@ -233,8 +252,14 @@ export class WebGLDraw {
         });
     }
 
-    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
+    drawLine(
+        items: Array<Line> | Line,
+        style?: LineStyle,
+        layer: number = 1,
+        options?: RendererDrawOptions<Line, LineDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
@@ -248,18 +273,32 @@ export class WebGLDraw {
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
+                let itemColor = color;
+                let itemDash = dash;
+                const deco = styleOf?.(item);
+                if (deco) {
+                    const merged = { ...style, ...deco };
+                    itemColor = this.colorParser.parse(merged.strokeStyle ?? "#000");
+                    itemDash = resolveLineDashPx(merged, this.camera.scale);
+                }
+
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
                 // Each Line item is its own subpath: the dash phase restarts.
-                this.pushSegment(lines, a, b, color, lineWidth, dash, 0);
+                this.pushSegment(lines, a, b, itemColor, lineWidth, itemDash, 0);
             }
 
             gl.drawLines(lines);
         });
     }
 
-    drawText(items: Array<Text> | Text, layer: number = 2): DrawHandle {
+    drawText(
+        items: Array<Text> | Text,
+        layer: number = 2,
+        options?: RendererDrawOptions<Text, TextDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -274,7 +313,8 @@ export class WebGLDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
@@ -307,7 +347,12 @@ export class WebGLDraw {
         });
     }
 
-    drawPath(items: PathItem[], layer: number = 1): DrawHandle {
+    drawPath(
+        items: PathItem[],
+        layer: number = 1,
+        options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
+    ): DrawHandle {
+        const styleOf = options?.styleOf;
         // Conservative world bounds per item for culling, computed once:
         // control-point hull for command paths, vertex bounds for polylines.
         const itemBounds = items.map((item) => {
@@ -355,7 +400,8 @@ export class WebGLDraw {
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
                 const filled = style?.fillStyle !== undefined;
 
                 // Screen-space subpaths: flattened commands, or the (possibly
