@@ -709,3 +709,127 @@ describe("CanvasDraw command paths", () => {
         expect(ops).not.toContain("stroke"); // fill-only
     });
 });
+
+describe("styleOf paint-time decoration", () => {
+    // Records the ctx style active at every fill()/stroke() call, so tests can
+    // assert which style each item was actually painted with.
+    function makeStyleRecordingCtx() {
+        const fills: string[] = [];
+        const strokes: string[] = [];
+        const ctx = {
+            lineWidth: 1,
+            globalAlpha: 1,
+            fillStyle: "#000",
+            strokeStyle: "#000",
+            save() {},
+            restore() {},
+            beginPath() {},
+            rect() {},
+            arc() {},
+            moveTo() {},
+            lineTo() {},
+            closePath() {},
+            translate() {},
+            rotate() {},
+            setLineDash() {},
+            fill() {
+                fills.push(String(ctx.fillStyle));
+            },
+            stroke() {
+                strokes.push(String(ctx.strokeStyle));
+            },
+        };
+        return { ctx: ctx as unknown as CanvasRenderingContext2D, fills, strokes };
+    }
+
+    it("resolves styleOf against live external state on every frame", () => {
+        const { draw, render } = setup();
+        const { ctx, fills } = makeStyleRecordingCtx();
+
+        const selected = new Set<number>();
+        const items = [
+            { x: 1, y: 1, size: 1, style: { fillStyle: "#00f" }, data: { id: 0 } },
+            { x: 3, y: 3, size: 1, style: { fillStyle: "#00f" }, data: { id: 1 } },
+        ];
+        draw.drawRect(items, 1, {
+            styleOf: (item) => (selected.has((item.data as { id: number }).id) ? { fillStyle: "#f00" } : undefined),
+        });
+
+        render(ctx);
+        expect(fills).toEqual(["#00f", "#00f"]);
+
+        // Selection changes without any re-registration: the same registration
+        // must paint differently on the next frame.
+        selected.add(1);
+        fills.length = 0;
+        render(ctx);
+        expect(fills).toEqual(["#00f", "#f00"]);
+    });
+
+    it("overlays the decoration on the item's own style instead of replacing it", () => {
+        const { draw, render } = setup();
+        const { ctx, fills, strokes } = makeStyleRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { fillStyle: "#00f", strokeStyle: "#0f0" } }], 1, {
+            styleOf: () => ({ fillStyle: "#f00" }),
+        });
+        render(ctx);
+
+        expect(fills).toEqual(["#f00"]);
+        expect(strokes).toEqual(["#0f0"]); // untouched base field survives
+    });
+
+    it("decorates circles and text through the same path", () => {
+        const { draw, render } = setup();
+        const { ctx, fills } = makeStyleRecordingCtx();
+
+        draw.drawCircle([{ x: 1, y: 1, size: 1, style: { fillStyle: "#00f" } }], 1, {
+            styleOf: () => ({ fillStyle: "#f00" }),
+        });
+        render(ctx);
+        expect(fills).toEqual(["#f00"]);
+    });
+
+    it("strokes decorated lines individually while the rest stay batched", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeStyleRecordingCtx();
+
+        const items = [
+            { from: { x: 0, y: 0 }, to: { x: 2, y: 2 }, data: { id: 0 } },
+            { from: { x: 1, y: 0 }, to: { x: 3, y: 2 }, data: { id: 1 } },
+        ];
+        draw.drawLine(items, { strokeStyle: "#123" }, 1, {
+            styleOf: (item) => ((item.data as { id: number }).id === 1 ? { strokeStyle: "#f00" } : undefined),
+        });
+        render(ctx);
+
+        // First stroke is the batched pass with the call-level style, then the
+        // decorated item strokes on its own.
+        expect(strokes).toEqual(["#123", "#f00"]);
+    });
+
+    it("decorates paths at paint time, including the fill toggle staying visual-only", () => {
+        const { draw, render } = setup();
+        const { ctx, fills, strokes } = makeStyleRecordingCtx();
+
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 2, y: 0 },
+                        { x: 2, y: 2 },
+                    ],
+                    closed: true,
+                    style: { fillStyle: "#00f", strokeStyle: "#0f0" },
+                },
+            ],
+            1,
+            { styleOf: () => ({ fillStyle: "#f00" }) },
+        );
+        render(ctx);
+
+        expect(fills).toEqual(["#f00"]);
+        expect(strokes).toEqual(["#0f0"]);
+    });
+});
