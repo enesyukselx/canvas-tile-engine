@@ -1,0 +1,8 @@
+Map: "orthogonal-outside" — from the official Tiled examples
+     https://github.com/mapeditor/tiled (examples/orthogonal-outside.tmx),
+     authored by Thorbjorn Lindeijer. Converted to the JSON map format (.tmj)
+     without content changes.
+
+Tileset: buch-outdoor.png — "Outdoor tiles, again" by Buch
+     https://opengameart.org/content/outdoor-tiles-again
+     License: CC0 (public domain)
