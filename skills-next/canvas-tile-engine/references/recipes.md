@@ -12,7 +12,7 @@ Pannable/zoomable world with terrain, units, hover highlight, and selection.
 ```
 
 ```ts
-import { CanvasTileEngine, type DrawHandle } from "@canvas-tile-engine/core";
+import { CanvasTileEngine } from "@canvas-tile-engine/core";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 
 const engine = new CanvasTileEngine(
@@ -37,29 +37,26 @@ engine.drawRect(terrainTiles, 1); // big array - culling handles it
 engine.drawCircle(unitMarkers, 2);
 engine.drawText(placeLabels, 3);
 
-let hover: DrawHandle | undefined;
+// Registration ids: the same id replaces the previous draw call, so these
+// handlers are idempotent with no handle bookkeeping (core >= 0.10).
 engine.onHover = (c) => {
-    if (hover) engine.removeDrawHandle(hover);
-    hover = engine.drawRect(
+    engine.drawRect(
         { x: c.snapped.x, y: c.snapped.y, size: 1, style: { strokeStyle: "#38bdf8", lineWidthPx: 2 } },
         10,
+        { id: "hover" },
     );
     engine.render();
 };
 engine.onMouseLeave = () => {
-    if (hover) {
-        engine.removeDrawHandle(hover);
-        hover = undefined;
-        engine.render();
-    }
+    engine.drawRect([], 10, { id: "hover" }); // replace with nothing
+    engine.render();
 };
 
-let selection: DrawHandle | undefined;
 engine.onClick = (c) => {
-    if (selection) engine.removeDrawHandle(selection);
-    selection = engine.drawRect(
+    engine.drawRect(
         { x: c.snapped.x, y: c.snapped.y, size: 1, style: { fillStyle: "rgba(34,197,94,0.3)" } },
         10,
+        { id: "selection" },
     );
     engine.render();
     onTileSelected(c.snapped);

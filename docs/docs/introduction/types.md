@@ -134,6 +134,16 @@ type ImageItem<TImage = HTMLImageElement> = {
 
 `sprite` crops a sub-rectangle from a spritesheet image before drawing.
 
+### `DrawOptions`
+
+```ts
+type DrawOptions = {
+    id?: string;
+};
+```
+
+Optional last parameter of every draw method. `id` gives the registration a stable identity: re-registering with the same id replaces the previous registration (draw callback plus hit-test entries) instead of accumulating. Ids share one namespace across draw kinds and layers; static draw methods use their `cacheKey` as the id instead.
+
 ## Sprite Helpers
 
 ```ts

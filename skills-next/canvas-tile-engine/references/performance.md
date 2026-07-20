@@ -66,8 +66,9 @@ an offscreen canvas once, then blit the visible region per frame.
 
 - Use when the item set is static AND mostly visible (minimaps, fixed-zoom
   overviews). Do not use for content that changes.
-- Invalidation is manual: `clearStaticCache(cacheKey)` after data changes,
-  then re-register the draw call.
+- Invalidation (core >= 0.10): re-register with the same `cacheKey` - it
+  replaces the old registration and rebuilds the cache. On older cores it is
+  manual: `clearStaticCache(cacheKey)` after data changes, then re-register.
 - Offscreen dimension cap: 16384px. World extent * scale beyond that falls
   back safely.
 
@@ -84,7 +85,8 @@ an offscreen canvas once, then blit the visible region per frame.
 2. Stable arrays (React: `useMemo`/state; vanilla: keep the same array and
    mutate for animation).
 3. Static caches for minimap/overview layers; `cacheKey` per dataset.
-4. Transient visuals (hover/selection) on their own layer or a single
+4. Transient visuals (hover/selection) on their own layer with a registration
+   id (`drawRect(items, layer, { id: "hover" })`, core >= 0.10) or a single
    swapped `DrawHandle` - never accumulate handles per mouse move.
 5. `SpriteAnimator` for frame animation (fps-gated repaints) instead of a
    60fps `requestAnimationFrame` loop.

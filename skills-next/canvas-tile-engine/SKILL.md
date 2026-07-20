@@ -56,11 +56,17 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    It registers a persistent draw callback on a layer and returns a
    `DrawHandle`. The callback re-runs on every frame. Call `engine.render()`
    once after registering draws; pan/zoom re-render automatically.
-3. **Repeat registration accumulates.** Calling `drawRect` again does not
-   replace the previous call - both stay registered. To update content:
-   remove the old handle (`removeDrawHandle`), or `clearLayer(n)` then
-   redraw, or mutate the item objects you already passed and call `render()`
-   (items are held by reference - mutation is the cheapest animation path).
+3. **Repeat registration accumulates - unless you pass an id.** Calling
+   `drawRect` again does not replace the previous call by default - both stay
+   registered. To update content, prefer `drawRect(items, layer, { id: "x" })`:
+   re-registering with the same id atomically replaces the previous
+   registration (draw callback + hit-test entries). Ids share one namespace
+   across draw kinds and layers; static draws use their `cacheKey` as the id.
+   Alternatives: remove the old handle (`removeDrawHandle`), `clearLayer(n)`
+   then redraw, or mutate the item objects you already passed and call
+   `render()` (items are held by reference - mutation is the cheapest
+   animation path, but position/size mutation confuses culling and hit
+   caches; re-register for geometry changes).
 4. **Layers are z-order.** Lower layer numbers draw first (underneath).
    Defaults: grid lines 0, shapes/images 1, text 2. Any integer works.
 5. **All interaction is opt-in.** Every `eventHandlers` flag defaults to
@@ -174,9 +180,13 @@ const png = await renderToBuffer({
 - **Paint tools must disable drag**: while a pointer-paint mode is active,
   call `engine.setEventHandlers({ drag: false, hover: true })`, otherwise
   dragging pans the camera while painting.
-- **Static caches never auto-invalidate**: `drawStatic*` snapshots items into
-  an offscreen canvas keyed by `cacheKey`. Changing item data requires
-  `clearStaticCache(cacheKey)` + re-register.
+- **Static caches invalidate on same-key re-register** (core >= 0.10):
+  `drawStatic*` snapshots items into an offscreen canvas keyed by `cacheKey`,
+  and the `cacheKey` doubles as the registration id - calling again with the
+  same key replaces the old registration and rebuilds the cache. Removing the
+  registration (`removeDrawHandle`/`clearLayer`/`clearAll`) also drops the
+  cache. On older versions nothing auto-invalidates: changing item data
+  requires `clearStaticCache(cacheKey)` + `clearLayer` + re-register.
 - **Do not roll your own culling, spatial index, pan/zoom math, or DPR
   handling** - the engine does all of it.
 

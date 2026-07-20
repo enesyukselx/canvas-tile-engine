@@ -355,6 +355,22 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
+  examples/vanilla-js-examples/draw-id:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-canvas
+    devDependencies:
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.1
+        version: 8.1.4(@types/node@25.3.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)
+
   examples/vanilla-js-examples/game-map:
     dependencies:
       '@canvas-tile-engine/core':
@@ -11720,6 +11736,21 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.3.3
       esbuild: 0.27.0
+      fsevents: 2.3.3
+      jiti: 2.7.0
+      terser: 5.48.0
+      tsx: 4.22.4
+
+  vite@8.1.4(@types/node@25.3.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4):
+    dependencies:
+      lightningcss: 1.32.0
+      picomatch: 4.0.5
+      postcss: 8.5.18
+      rolldown: 1.1.5
+      tinyglobby: 0.2.17
+    optionalDependencies:
+      '@types/node': 25.3.3
+      esbuild: 0.28.1
       fsevents: 2.3.3
       jiti: 2.7.0
       terser: 5.48.0
