@@ -294,9 +294,7 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                 layers.push({ kind: "tiles", name, opacity, cells, properties: propsToRecord(layer.properties) });
             } else if (layer.type === "objectgroup") {
                 if (opacity !== 1) {
-                    warnings.push(
-                        `layer "${name}": object-layer opacity is not supported; objects draw fully opaque.`,
-                    );
+                    warnings.push(`layer "${name}": object-layer opacity is not supported; objects draw fully opaque.`);
                 }
                 const objects: TiledObject[] = [];
                 for (const o of layer.objects ?? []) {

@@ -48,9 +48,7 @@ export function decodeLayerData(layer: TmjLayer, expectedLength: number): Uint32
         if (compression === "zlib") bytes = unzlibSync(bytes);
         else if (compression === "gzip") bytes = gunzipSync(bytes);
         else if (compression !== "") {
-            throw new Error(
-                `@canvas-tile-engine/tiled: layer "${name}" uses unknown compression "${compression}".`,
-            );
+            throw new Error(`@canvas-tile-engine/tiled: layer "${name}" uses unknown compression "${compression}".`);
         }
         if (bytes.byteLength % 4 !== 0) {
             throw new Error(`@canvas-tile-engine/tiled: layer "${name}" data is not a whole number of 32-bit GIDs.`);

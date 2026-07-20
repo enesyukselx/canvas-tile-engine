@@ -44,9 +44,9 @@ describe("decodeLayerData", () => {
     });
 
     it("rejects zstd with an actionable message", () => {
-        expect(() =>
-            decodeLayerData(layer({ data: "AAAA", encoding: "base64", compression: "zstd" }), 1),
-        ).toThrow(/zstd.*Re-export/s);
+        expect(() => decodeLayerData(layer({ data: "AAAA", encoding: "base64", compression: "zstd" }), 1)).toThrow(
+            /zstd.*Re-export/s,
+        );
     });
 
     it("rejects chunked (infinite) layers", () => {
