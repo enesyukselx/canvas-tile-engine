@@ -1,0 +1,111 @@
+{
+    "type": "map",
+    "version": "1.10",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "infinite": false,
+    "width": 12,
+    "height": 8,
+    "tilewidth": 16,
+    "tileheight": 16,
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "image": "terrain.png",
+            "imagewidth": 64,
+            "imageheight": 32,
+            "tilewidth": 16,
+            "tileheight": 16,
+            "columns": 4,
+            "tilecount": 8,
+            "tiles": [
+                {
+                    "id": 2,
+                    "animation": [
+                        { "tileid": 2, "duration": 400 },
+                        { "tileid": 3, "duration": 400 }
+                    ]
+                }
+            ]
+        }
+    ],
+    "layers": [
+        {
+            "type": "tilelayer",
+            "name": "ground",
+            "width": 12,
+            "height": 8,
+            "visible": true,
+            "opacity": 1,
+            "data": [
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 8, 3, 3, 3, 1,
+                1, 1, 1, 1, 1, 1, 1, 8, 3, 3, 3, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+            ]
+        },
+        {
+            "type": "tilelayer",
+            "name": "decor",
+            "width": 12,
+            "height": 8,
+            "visible": true,
+            "opacity": 1,
+            "data": [
+                0, 0, 0, 0, 0, 6, 6, 0, 0, 0, 0, 0,
+                0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 2147483653, 0, 0, 0, 7, 0, 0, 0, 5, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        },
+        {
+            "type": "objectgroup",
+            "name": "meta",
+            "visible": true,
+            "opacity": 1,
+            "objects": [
+                {
+                    "id": 1,
+                    "name": "spawn",
+                    "class": "zone",
+                    "x": 16,
+                    "y": 80,
+                    "width": 32,
+                    "height": 32,
+                    "visible": true,
+                    "properties": [{ "name": "team", "type": "string", "value": "blue" }]
+                },
+                {
+                    "id": 2,
+                    "name": "route",
+                    "class": "path",
+                    "x": 8,
+                    "y": 72,
+                    "visible": true,
+                    "polyline": [
+                        { "x": 0, "y": 0 },
+                        { "x": 176, "y": 0 }
+                    ]
+                },
+                {
+                    "id": 3,
+                    "name": "pond",
+                    "class": "poi",
+                    "x": 152,
+                    "y": 32,
+                    "visible": true,
+                    "point": true
+                }
+            ]
+        }
+    ]
+}
