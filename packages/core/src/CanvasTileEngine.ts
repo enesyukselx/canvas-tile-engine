@@ -33,6 +33,16 @@ import {
     DrawHandle,
     DrawOptions,
     DrawTransform,
+    RectDrawOptions,
+    CircleDrawOptions,
+    TextDrawOptions,
+    LineDrawOptions,
+    PathDrawOptions,
+    StyleOf,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
 } from "./types";
 
 /**
@@ -716,12 +726,22 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
-     * @param options Optional `id`: re-registering with the same id replaces
-     * the previous registration instead of accumulating alongside it.
+     * @param options Optional `id` (re-registering with the same id replaces
+     * the previous registration) and `styleOf` (paint-time decoration: the
+     * returned fields overlay the item's `style` each frame without
+     * re-registering — mutate your state and call `render()`).
      */
-    drawRect(items: Rect | Array<Rect>, layer: number = 1, options?: DrawOptions): DrawHandle {
+    drawRect<TData = unknown>(
+        items: Rect<TData> | Array<Rect<TData>>,
+        layer: number = 1,
+        options?: RectDrawOptions<TData>,
+    ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawRect(items, layer);
+        // TData only narrows the callback's item type for callers; renderers
+        // hand back items from this same registration, so widening is safe.
+        const handle = this.renderer
+            .getDrawAPI()
+            .drawRect(items, layer, { styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined });
         this.hitTester.register(handle, "rect", items, layer);
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -798,12 +818,22 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param items Line segments.
      * @param style Line style overrides.
      * @param layer Layer order.
-     * @param options Optional `id`: re-registering with the same id replaces
-     * the previous registration instead of accumulating alongside it.
+     * @param options Optional `id` (re-registering with the same id replaces
+     * the previous registration) and `styleOf` (paint-time decoration overlaid
+     * on the call-level `style` per item — also the way to give individual
+     * lines their own color). Decorations cannot change `lineWidth`: the
+     * hit-test area derives from the registration-time stroke width.
      */
-    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1, options?: DrawOptions): DrawHandle {
+    drawLine<TData = unknown>(
+        items: Array<Line<TData>> | Line<TData>,
+        style?: LineStyle,
+        layer: number = 1,
+        options?: LineDrawOptions<TData>,
+    ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawLine(items, style, layer);
+        const handle = this.renderer.getDrawAPI().drawLine(items, style, layer, {
+            styleOf: options?.styleOf as StyleOf<Line, LineDecorationStyle> | undefined,
+        });
         this.hitTester.register(handle, "line", items, layer, { style });
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -813,12 +843,20 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Draw one or many circles sized in world units.
      * @param items Circle definitions.
      * @param layer Layer order.
-     * @param options Optional `id`: re-registering with the same id replaces
-     * the previous registration instead of accumulating alongside it.
+     * @param options Optional `id` (re-registering with the same id replaces
+     * the previous registration) and `styleOf` (paint-time decoration: the
+     * returned fields overlay the item's `style` each frame without
+     * re-registering — mutate your state and call `render()`).
      */
-    drawCircle(items: Circle | Array<Circle>, layer: number = 1, options?: DrawOptions): DrawHandle {
+    drawCircle<TData = unknown>(
+        items: Circle<TData> | Array<Circle<TData>>,
+        layer: number = 1,
+        options?: CircleDrawOptions<TData>,
+    ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawCircle(items, layer);
+        const handle = this.renderer.getDrawAPI().drawCircle(items, layer, {
+            styleOf: options?.styleOf as StyleOf<Circle, ShapeDecorationStyle> | undefined,
+        });
         this.hitTester.register(handle, "circle", items, layer);
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -850,9 +888,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * ]);
      * ```
      */
-    drawText(items: Array<Text> | Text, layer: number = 2, options?: DrawOptions): DrawHandle {
+    drawText<TData = unknown>(
+        items: Array<Text<TData>> | Text<TData>,
+        layer: number = 2,
+        options?: TextDrawOptions<TData>,
+    ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawText(items, layer);
+        const handle = this.renderer
+            .getDrawAPI()
+            .drawText(items, layer, { styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined });
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -888,11 +932,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     drawPath<TData = unknown>(
         items: PathItem<TData> | Array<PathItem<TData>>,
         layer: number = 1,
-        options?: DrawOptions,
+        options?: PathDrawOptions<TData>,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
         const list = Array.isArray(items) ? items : [items];
-        const handle = this.renderer.getDrawAPI().drawPath(list, layer);
+        const handle = this.renderer.getDrawAPI().drawPath(list, layer, {
+            styleOf: options?.styleOf as StyleOf<PathItem, PathDecorationStyle> | undefined,
+        });
         this.hitTester.register(handle, "path", list, layer);
         this.trackDrawId(options?.id, handle);
         return handle;

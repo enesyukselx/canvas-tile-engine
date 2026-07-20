@@ -585,4 +585,86 @@ describe("CanvasTileEngine", () => {
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(fn);
         });
     });
+
+    describe("styleOf paint-time decoration", () => {
+        function createEngineWithDrawAPI() {
+            let seq = 0;
+            const drawAPI = {
+                drawRect: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`rect-${seq++}`),
+                    layer,
+                })),
+                drawCircle: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`circle-${seq++}`),
+                    layer,
+                })),
+                drawText: vi.fn((_items: unknown, layer: number = 2, _options?: unknown) => ({
+                    id: Symbol(`text-${seq++}`),
+                    layer,
+                })),
+                drawLine: vi.fn((_items: unknown, _style: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`line-${seq++}`),
+                    layer,
+                })),
+                drawPath: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`path-${seq++}`),
+                    layer,
+                })),
+                removeDrawHandle: vi.fn(),
+                clearLayer: vi.fn(),
+                clearAll: vi.fn(),
+                clearStaticCache: vi.fn(),
+            };
+            const renderer = createMockRenderer();
+            (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
+            return { e: new CanvasTileEngine<Mount>({}, baseConfig, renderer), drawAPI };
+        }
+
+        it("threads styleOf through to the renderer draw API on every draw kind", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const shape = () => ({ fillStyle: "#f00" });
+            const text = () => ({ fillStyle: "#f00" });
+            const line = () => ({ strokeStyle: "#f00" });
+            const path = () => ({ fillStyle: "#f00" });
+
+            e.drawRect({ x: 1, y: 1, size: 1 }, 1, { styleOf: shape });
+            expect(drawAPI.drawRect.mock.calls[0][2]).toEqual({ styleOf: shape });
+
+            e.drawCircle({ x: 1, y: 1, size: 1 }, 1, { styleOf: shape });
+            expect(drawAPI.drawCircle.mock.calls[0][2]).toEqual({ styleOf: shape });
+
+            e.drawText({ x: 1, y: 1, text: "a" }, 2, { styleOf: text });
+            expect(drawAPI.drawText.mock.calls[0][2]).toEqual({ styleOf: text });
+
+            e.drawLine({ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }, undefined, 1, { styleOf: line });
+            expect(drawAPI.drawLine.mock.calls[0][3]).toEqual({ styleOf: line });
+
+            e.drawPath(
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 1, y: 1 },
+                    ],
+                },
+                1,
+                { styleOf: path },
+            );
+            expect(drawAPI.drawPath.mock.calls[0][2]).toEqual({ styleOf: path });
+        });
+
+        it("registers hit-test geometry regardless of styleOf", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { styleOf: () => ({ fillStyle: "#f00" }) });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+        });
+
+        it("composes with id-based replace", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const first = e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "tiles", styleOf: () => undefined });
+            e.drawRect({ x: 5, y: 5, size: 1 }, 1, { id: "tiles" });
+
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledTimes(1);
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
+        });
+    });
 });
