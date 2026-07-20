@@ -31,6 +31,7 @@ import {
     IRenderer,
     IImageLoader,
     DrawHandle,
+    DrawOptions,
     DrawTransform,
 } from "./types";
 
@@ -45,6 +46,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     private renderer: IRenderer<TMount, TImage>;
     private animationController: AnimationController;
     private hitTester = new HitTester(() => this.camera.scale);
+    /** Registrations tracked by user-facing id (static draws: their cacheKey). */
+    private drawIds = new Map<string, { handle: DrawHandle; cacheKey?: string }>();
+    private drawIdByHandle = new Map<symbol, string>();
 
     public canvasWrapper: TMount;
     /**
@@ -371,6 +375,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.animationController.cancelAll();
         this.renderer.destroy();
         this.hitTester.clear();
+        this.drawIds.clear();
+        this.drawIdByHandle.clear();
     }
 
     /** Render a frame using the active renderer. */
@@ -667,14 +673,57 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     // ─── Draw helpers ───────────
 
     /**
+     * Tear down the registration previously stored under `id`, if any:
+     * draw callback, hit-test entries, and (for static draws) the offscreen
+     * cache. Runs before the replacement is registered so the new call sees
+     * clean state.
+     */
+    private replacePreviousDraw(id: string | undefined) {
+        if (id === undefined) return;
+        const prev = this.drawIds.get(id);
+        if (!prev) return;
+        this.drawIds.delete(id);
+        this.drawIdByHandle.delete(prev.handle.id);
+        this.renderer.getDrawAPI().removeDrawHandle(prev.handle);
+        this.hitTester.remove(prev.handle);
+        if (prev.cacheKey !== undefined) this.renderer.getDrawAPI().clearStaticCache(prev.cacheKey);
+    }
+
+    private trackDrawId(id: string | undefined, handle: DrawHandle, cacheKey?: string) {
+        if (id === undefined) return;
+        this.drawIds.set(id, { handle, cacheKey });
+        this.drawIdByHandle.set(handle.id, id);
+    }
+
+    /**
+     * Drop the id bookkeeping for a handle removed through `removeDrawHandle`
+     * (or in bulk via `clearLayer`/`clearAll`), so the id can be reused.
+     */
+    private untrackDrawHandle(handle: DrawHandle) {
+        const id = this.drawIdByHandle.get(handle.id);
+        if (id === undefined) return;
+        this.drawIdByHandle.delete(handle.id);
+        const entry = this.drawIds.get(id);
+        this.drawIds.delete(id);
+        // A removed static registration leaves its offscreen cache orphaned —
+        // and silently stale if the same cacheKey is later re-registered with
+        // different items — so drop the cache with the registration.
+        if (entry?.cacheKey !== undefined) this.renderer.getDrawAPI().clearStaticCache(entry.cacheKey);
+    }
+
+    /**
      * Draw one or many rectangles in world space.
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      */
-    drawRect(items: Rect | Array<Rect>, layer: number = 1): DrawHandle {
+    drawRect(items: Rect | Array<Rect>, layer: number = 1, options?: DrawOptions): DrawHandle {
+        this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawRect(items, layer);
         this.hitTester.register(handle, "rect", items, layer);
+        this.trackDrawId(options?.id, handle);
         return handle;
     }
 
@@ -684,12 +733,16 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Ideal for large static datasets like mini-maps where items don't change.
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Array of rectangle definitions.
-     * @param cacheKey Unique key for this cache (e.g., "minimap-items").
+     * @param cacheKey Unique key for this cache (e.g., "minimap-items"). Also
+     * acts as the registration id: calling again with the same key replaces
+     * the previous registration and invalidates its cache.
      * @param layer Layer order (lower draws first).
      */
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
+        this.replacePreviousDraw(cacheKey);
         const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
         this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true });
+        this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
     }
 
@@ -698,12 +751,16 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
      * Ideal for large static datasets like mini-maps where items don't change.
      * @param items Array of circle definitions.
-     * @param cacheKey Unique key for this cache (e.g., "minimap-circles").
+     * @param cacheKey Unique key for this cache (e.g., "minimap-circles"). Also
+     * acts as the registration id: calling again with the same key replaces
+     * the previous registration and invalidates its cache.
      * @param layer Layer order (lower draws first).
      */
     drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
+        this.replacePreviousDraw(cacheKey);
         const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
         this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true });
+        this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
     }
 
@@ -713,12 +770,16 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Ideal for large static datasets like terrain tiles or static decorations.
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Array of image definitions with HTMLImageElement.
-     * @param cacheKey Unique key for this cache (e.g., "terrain-cache").
+     * @param cacheKey Unique key for this cache (e.g., "terrain-cache"). Also
+     * acts as the registration id: calling again with the same key replaces
+     * the previous registration and invalidates its cache.
      * @param layer Layer order (lower draws first).
      */
     drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
+        this.replacePreviousDraw(cacheKey);
         const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
         this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true });
+        this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
     }
 
@@ -737,10 +798,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param items Line segments.
      * @param style Line style overrides.
      * @param layer Layer order.
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      */
-    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
+    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1, options?: DrawOptions): DrawHandle {
+        this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawLine(items, style, layer);
         this.hitTester.register(handle, "line", items, layer, { style });
+        this.trackDrawId(options?.id, handle);
         return handle;
     }
 
@@ -748,10 +813,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Draw one or many circles sized in world units.
      * @param items Circle definitions.
      * @param layer Layer order.
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      */
-    drawCircle(items: Circle | Array<Circle>, layer: number = 1): DrawHandle {
+    drawCircle(items: Circle | Array<Circle>, layer: number = 1, options?: DrawOptions): DrawHandle {
+        this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawCircle(items, layer);
         this.hitTester.register(handle, "circle", items, layer);
+        this.trackDrawId(options?.id, handle);
         return handle;
     }
 
@@ -759,6 +828,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Draw one or many texts at world positions.
      * @param items Text definitions with position, text, size, and style.
      * @param layer Layer order.
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      * @example
      * ```ts
      * engine.drawText({
@@ -779,8 +850,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * ]);
      * ```
      */
-    drawText(items: Array<Text> | Text, layer: number = 2): DrawHandle {
-        return this.renderer.getDrawAPI().drawText(items, layer);
+    drawText(items: Array<Text> | Text, layer: number = 2, options?: DrawOptions): DrawHandle {
+        this.replacePreviousDraw(options?.id);
+        const handle = this.renderer.getDrawAPI().drawText(items, layer);
+        this.trackDrawId(options?.id, handle);
+        return handle;
     }
 
     /**
@@ -795,6 +869,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      *
      * @param items Path item(s).
      * @param layer Layer order.
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      * @example
      * ```ts
      * // Filled shape with a rounded outline
@@ -809,10 +885,16 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * engine.drawPath({ points: route, style: { strokeStyle: "#3b82f6", lineWidthPx: 4 } });
      * ```
      */
-    drawPath<TData = unknown>(items: PathItem<TData> | Array<PathItem<TData>>, layer: number = 1): DrawHandle {
+    drawPath<TData = unknown>(
+        items: PathItem<TData> | Array<PathItem<TData>>,
+        layer: number = 1,
+        options?: DrawOptions,
+    ): DrawHandle {
+        this.replacePreviousDraw(options?.id);
         const list = Array.isArray(items) ? items : [items];
         const handle = this.renderer.getDrawAPI().drawPath(list, layer);
         this.hitTester.register(handle, "path", list, layer);
+        this.trackDrawId(options?.id, handle);
         return handle;
     }
 
@@ -821,16 +903,26 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Image definitions.
      * @param layer Layer order.
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      */
-    drawImage(items: Array<ImageItem<TImage>> | ImageItem<TImage>, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem<TImage>> | ImageItem<TImage>,
+        layer: number = 1,
+        options?: DrawOptions,
+    ): DrawHandle {
+        this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawImage(items, layer);
         this.hitTester.register(handle, "image", items, layer);
+        this.trackDrawId(options?.id, handle);
         return handle;
     }
 
     /**
      * Draw grid lines at specified cell size.
      * @param cellSize Size of each grid cell in world units.
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      * @example
      * ```ts
      * engine.drawGridLines(50);
@@ -841,8 +933,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         lineWidth: number = 1,
         strokeStyle: string = "black",
         layer: number = 0,
+        options?: DrawOptions,
     ): DrawHandle {
-        return this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+        this.replacePreviousDraw(options?.id);
+        const handle = this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+        this.trackDrawId(options?.id, handle);
+        return handle;
     }
 
     /**
@@ -852,6 +948,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * a `transform` helper — use `transform.worldToScreen(x, y)` to position
      * drawing at world coordinates instead of deriving the pixel math by hand.
      * @param layer Layer index (default 1).
+     * @param options Optional `id`: re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it.
      * @returns DrawHandle for removal.
      * @example
      * ```ts
@@ -866,8 +964,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer: number = 1,
+        options?: DrawOptions,
     ): DrawHandle {
-        return this.renderer.getDrawAPI().addDrawFunction(fn, layer);
+        this.replacePreviousDraw(options?.id);
+        const handle = this.renderer.getDrawAPI().addDrawFunction(fn, layer);
+        this.trackDrawId(options?.id, handle);
+        return handle;
     }
 
     /**
@@ -877,6 +979,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     removeDrawHandle(handle: DrawHandle) {
         this.renderer.getDrawAPI().removeDrawHandle(handle);
         this.hitTester.remove(handle);
+        this.untrackDrawHandle(handle);
     }
 
     /**
@@ -893,6 +996,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     clearLayer(layer: number) {
         this.renderer.getDrawAPI().clearLayer(layer);
         this.hitTester.clearLayer(layer);
+        for (const [id, entry] of this.drawIds) {
+            if (entry.handle.layer !== layer) continue;
+            this.drawIds.delete(id);
+            this.drawIdByHandle.delete(entry.handle.id);
+            if (entry.cacheKey !== undefined) this.renderer.getDrawAPI().clearStaticCache(entry.cacheKey);
+        }
     }
 
     /**
@@ -906,7 +1015,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     clearAll() {
         this.renderer.getDrawAPI().clearAll();
+        // Every static cache is orphaned once all callbacks are gone; dropping
+        // them prevents stale reuse when the same cacheKey is registered again.
+        this.renderer.getDrawAPI().clearStaticCache();
         this.hitTester.clear();
+        this.drawIds.clear();
+        this.drawIdByHandle.clear();
     }
 
     // ─── Hit testing ───────────

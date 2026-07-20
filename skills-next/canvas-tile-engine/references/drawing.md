@@ -8,27 +8,40 @@ units; the engine converts to pixels using the current camera scale.
 - `drawX(...)` registers a persistent callback on a layer and returns a
   `DrawHandle`. Nothing paints until `engine.render()` runs.
 - Callbacks re-run every frame (pan, zoom, resize, explicit `render()`).
-- Registering again ADDS another callback - it does not replace. Three ways
-  to update content:
+- Registering again ADDS another callback - it does not replace, unless you
+  pass a registration id. Four ways to update content:
 
 ```ts
-// A. Handle swap (best for one changing thing, e.g. hover highlight)
+// A. Registration id (core >= 0.10; PREFERRED for state-driven redraws).
+// Same id -> the previous registration (callback + hit entries) is replaced
+// atomically. Idempotent: safe to call from any state-change handler.
+engine.drawRect(seatRects, 1, { id: "seats" });
+engine.drawRect(newSeatRects, 1, { id: "seats" }); // replaces, no accumulation
+engine.render();
+
+// B. Handle swap (one changing thing on older cores, e.g. hover highlight)
 let handle = engine.drawRect(rectA, 5);
 engine.removeDrawHandle(handle);
 handle = engine.drawRect(rectB, 5);
 engine.render();
 
-// B. Layer swap (best for a whole dynamic layer)
+// C. Layer swap (wipe a whole layer regardless of what registered on it)
 engine.clearLayer(2);
 engine.drawRect(newRects, 2);
 engine.render();
 
-// C. Mutation (best for animation; items are held by reference)
+// D. Mutation (best for animation; items are held by reference)
 const item = { x: 0, y: 0, size: 1, style: { fillStyle: "red" } };
 engine.drawRect(item, 1);
 item.x += 1;        // mutate the same object
 engine.render();    // repaint shows the new position
 ```
+
+Ids share one namespace across draw kinds and layers (a `drawCircle` with an
+existing rect's id replaces the rect; a reused id on another layer moves the
+registration). A replaced registration re-enters at the end of its layer's
+draw order. Static draws (`drawStatic*`) take no `id` - their `cacheKey`
+plays the same role.
 
 ## Layers
 
@@ -286,9 +299,13 @@ When to use:
 
 Rules:
 
-- The cache does NOT observe item changes. After editing the dataset:
-  `engine.clearStaticCache("minimap-items")`, remove the old handle or clear
-  the layer, re-register, `render()`.
+- The cache does NOT observe item mutations, but the `cacheKey` acts as the
+  registration id (core >= 0.10): re-calling `drawStatic*` with the same key
+  replaces the old registration AND rebuilds the cache - after editing the
+  dataset just re-register and `render()`. Removing the registration
+  (`removeDrawHandle`/`clearLayer`/`clearAll`) drops the cache too. On older
+  cores invalidation is fully manual: `clearStaticCache(key)` + remove the
+  old handle or clear the layer + re-register.
 - `sprite` frames are frozen at build time on the static path - no animation.
 - On the WebGL renderer `drawStatic*` are aliases of the dynamic path
   (batched GPU drawing is already cheap) and `clearStaticCache` is a no-op

@@ -44,9 +44,11 @@ You can use any number for a layer. They are sorted automatically at render time
 Draw basic geometric shapes. You can pass a single object or an array of objects for batch rendering.
 
 ```typescript
-drawRect(items: Rect | Rect[], layer?: number): DrawHandle
-drawCircle(items: Circle | Circle[], layer?: number): DrawHandle
+drawRect(items: Rect | Rect[], layer?: number, options?: DrawOptions): DrawHandle
+drawCircle(items: Circle | Circle[], layer?: number, options?: DrawOptions): DrawHandle
 ```
+
+Every draw method accepts an optional `options` object as its last parameter. Its single field, `id`, gives the registration a stable identity: calling a draw method again with the same `id` **replaces** the previous registration instead of accumulating alongside it. See [Replacing with a registration id](#replacing-with-a-registration-id-optionsid).
 
 **Rect / Circle Properties:**
 
@@ -159,7 +161,7 @@ engine.drawRect(
 Draw a straight line between two points. Supports single object or array of objects.
 
 ```typescript
-drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle
+drawLine(items: Line | Line[], style?: LineStyle, layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **Line Properties:**
@@ -207,7 +209,7 @@ Lines participate in hit testing: a click/tap within half the stroke width of a 
 Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `PathItem` owns its geometry and style.
 
 ```typescript
-drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle
+drawPath(items: PathItem | PathItem[], layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **`PathItem` properties:**
@@ -318,15 +320,16 @@ Dash patterns flow continuously around corners, including rounded ones.
 Draw grid lines at specified intervals. This is useful for creating grid overlays on your map.
 
 ```typescript
-drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle
+drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number, options?: DrawOptions): DrawHandle
 ```
 
-| Parameter     | Type     | Default   | Description                            |
-| :------------ | :------- | :-------- | :------------------------------------- |
-| `cellSize`    | `number` | -         | Size of each grid cell in world units. |
-| `lineWidth`   | `number` | `1`       | Width of grid lines in pixels.         |
-| `strokeStyle` | `string` | `"black"` | Color of the grid lines.               |
-| `layer`       | `number` | `0`       | Rendering layer.                       |
+| Parameter     | Type          | Default   | Description                                       |
+| :------------ | :------------ | :-------- | :------------------------------------------------ |
+| `cellSize`    | `number`      | -         | Size of each grid cell in world units.            |
+| `lineWidth`   | `number`      | `1`       | Width of grid lines in pixels.                    |
+| `strokeStyle` | `string`      | `"black"` | Color of the grid lines.                          |
+| `layer`       | `number`      | `0`       | Rendering layer.                                  |
+| `options`     | `DrawOptions` | -         | Optional `id` for replace-on-re-register.         |
 
 ```typescript
 // Draw a basic grid with 1-unit cells
@@ -348,7 +351,7 @@ engine.drawGridLines(50, 2, "rgba(0, 0, 0, 0.5)", 0); // Coarse grid
 Render text at world coordinates. Supports single object or array of objects. Text size scales with zoom.
 
 ```typescript
-drawText(items: Text | Text[], layer?: number): DrawHandle
+drawText(items: Text | Text[], layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **Text Properties:**
@@ -428,7 +431,7 @@ engine.drawText(
 Draw an image scaled to world units. Supports single object or array of objects.
 
 ```typescript
-drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle
+drawImage(items: ImageItem | ImageItem[], layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **ImageItem Properties:**
@@ -508,7 +511,7 @@ Everything you pass to `ctx` is pixels. `worldToScreen` is for drawing (world in
 :::
 
 :::tip
-`addDrawFunction()` also returns a draw handle. You can remove the registered callback later via `engine.removeDrawHandle(handle)` (see "Clearing Layers").
+`addDrawFunction()` also returns a draw handle and accepts `options.id` as its last parameter. You can remove the registered callback later via `engine.removeDrawHandle(handle)`, or re-register with the same `id` to replace it (see "Clearing Layers").
 :::
 
 ### Renderer Hook (`onDraw`)
@@ -621,16 +624,18 @@ engine.clearStaticCache();
 
 ### Cache Keys
 
-The cache key (second parameter) identifies each pre-rendered cache. Using the same key reuses the existing cache; using a different key creates a new one.
+The cache key (second parameter) identifies each pre-rendered cache **and** acts as the registration id: calling a static draw method again with the same key replaces the previous registration and invalidates its cache, so the new items are pre-rendered from scratch. Different keys create independent caches.
 
 ```typescript
 // These use separate caches
 engine.drawStaticRect(villages, "villages", 1);
 engine.drawStaticRect(cities, "cities", 1);
 
-// This reuses the "villages" cache (no re-render)
-engine.drawStaticRect(villages, "villages", 1);
+// Same key -> replaces the "villages" registration and rebuilds its cache
+engine.drawStaticRect(updatedVillages, "villages", 1);
 ```
+
+Removing a static registration (`removeDrawHandle`, `clearLayer`, `clearAll`) also drops its offscreen cache, so a later registration under the same key always renders fresh content.
 
 :::warning Memory Usage
 Each static cache creates an offscreen canvas sized to fit all items. For 100k items spread across a large world, this can consume significant memory. Use static caching only when the performance benefit justifies it.
@@ -677,10 +682,9 @@ const miniMapRects = allItems.map((item) => ({
 }));
 miniMap.drawStaticRect(miniMapRects, "minimap-items", 1);
 
-// When items change, clear and redraw
+// When items change, re-register under the same key: the previous
+// registration is replaced and its cache rebuilt automatically
 function updateMiniMap() {
-    miniMap.clearStaticCache("minimap-items");
-    miniMap.clearLayer(1);
     miniMap.drawStaticRect(updatedItems, "minimap-items", 1);
     miniMap.render();
 }
@@ -688,7 +692,33 @@ function updateMiniMap() {
 
 ## Clearing Layers
 
-When your scene content changes dynamically (e.g., objects change color, get added or removed), you need to clear the layer before redrawing. Without clearing, new draw calls accumulate on top of existing ones.
+When your scene content changes dynamically (e.g., objects change color, get added or removed), the previous registration has to go away before you redraw. Without that, draw calls accumulate on top of existing ones — every frame pays for every stale registration, and `hitTest` starts returning duplicates. There are three tools, from most to least targeted: a registration `id` (replace automatically), a `DrawHandle` (remove one call), and `clearLayer`/`clearAll` (remove in bulk).
+
+### Replacing with a Registration Id (`options.id`)
+
+Every draw method accepts an optional `id` as its last parameter. Re-registering with the same id atomically replaces the previous registration — the old draw callback and its hit-test entries are removed before the new one is added. This makes redraw code idempotent: calling it N times is always correct, with no handle bookkeeping.
+
+```typescript
+function redraw() {
+    engine.drawRect(
+        seats.map((s) => ({
+            x: s.x,
+            y: s.y,
+            size: 0.9,
+            style: { fillStyle: s.selected ? "blue" : "green" },
+        })),
+        1,
+        { id: "seats" }, // same id -> replaces the previous "seats" registration
+    );
+    engine.render();
+}
+```
+
+Ids share a single namespace across draw kinds and layers: registering `drawCircle(..., { id: "marker" })` after `drawRect(..., { id: "marker" })` replaces the rect, and reusing an id on another layer moves the registration there. Static draw methods don't take an `id` — their `cacheKey` plays the same role (see [Cache Keys](#cache-keys)).
+
+:::note
+Within a layer, a replaced registration re-enters at the end of the draw order. If you rely on registration order between draw calls sharing a layer, give them separate layers instead.
+:::
 
 ### Remove a Single Draw Call (`DrawHandle`)
 
@@ -760,7 +790,7 @@ engine.render();
 :::tip
 If your scene is **static** (objects don't change), you only need to call `drawX()` once at startup. The engine will re-render the same layer content when the camera moves.
 
-If your scene is **dynamic** (objects change state), use `clearLayer()` + `drawX()` + `render()` pattern.
+If your scene is **dynamic** (objects change state), register with an `id` and re-call `drawX(items, layer, { id })` + `render()` on every change. Reach for `clearLayer()` when you want to wipe a whole layer regardless of what registered on it.
 :::
 
 **Static Scene Example (Map):**
@@ -781,7 +811,6 @@ engine.onCoordsChange = () => {
 
 ```typescript
 function redraw() {
-    engine.clearLayer(1); // Clear old seats
     engine.drawRect(
         seats.map((s) => ({
             x: s.x,
@@ -790,6 +819,7 @@ function redraw() {
             style: { fillStyle: s.selected ? "blue" : "green" },
         })),
         1,
+        { id: "seats" }, // replaces the previous registration
     );
     engine.render();
 }
@@ -798,10 +828,12 @@ engine.onClick = (coords) => {
     const seat = findSeat(coords.snapped.x, coords.snapped.y);
     if (seat) {
         seat.selected = !seat.selected;
-        redraw(); // Clear + Draw + Render
+        redraw(); // Draw (replace) + Render
     }
 };
 ```
+
+Prefer `options.id` for this pattern; `clearLayer(1)` before redrawing also works, but removes *everything* on the layer, not just this registration.
 
 ## Rendering
 

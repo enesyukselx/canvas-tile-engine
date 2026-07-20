@@ -362,6 +362,7 @@ describe("CanvasTileEngine", () => {
                 removeDrawHandle: vi.fn(),
                 clearLayer: vi.fn(),
                 clearAll: vi.fn(),
+                clearStaticCache: vi.fn(),
             };
             const renderer = createMockRenderer();
             (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
@@ -448,6 +449,140 @@ describe("CanvasTileEngine", () => {
             // 0.3 world + 0.4px / scale 2 = 0.5 -> effective radius 0.75 covers 0.7
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3, paddingPx: 0.4 })).toBeDefined();
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3 })).toBeUndefined();
+        });
+    });
+
+    describe("id-based draw registration replace", () => {
+        function createEngineWithDrawAPI() {
+            let seq = 0;
+            const drawAPI = {
+                addDrawFunction: (_fn: unknown, layer: number = 1) => ({ id: Symbol(`fn-${seq++}`), layer }),
+                drawRect: (_items: unknown, layer: number = 1) => ({ id: Symbol(`rect-${seq++}`), layer }),
+                drawCircle: (_items: unknown, layer: number = 1) => ({ id: Symbol(`circle-${seq++}`), layer }),
+                drawStaticRect: (_items: unknown, _key: string, layer: number = 1) => ({
+                    id: Symbol(`static-${seq++}`),
+                    layer,
+                }),
+                drawGridLines: (_cellSize: number, _style: unknown, layer: number = 0) => ({
+                    id: Symbol(`grid-${seq++}`),
+                    layer,
+                }),
+                removeDrawHandle: vi.fn(),
+                clearLayer: vi.fn(),
+                clearAll: vi.fn(),
+                clearStaticCache: vi.fn(),
+            };
+            const renderer = createMockRenderer();
+            (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
+            return { e: new CanvasTileEngine<Mount>({}, baseConfig, renderer), drawAPI };
+        }
+
+        it("replaces the previous registration when the same id is reused", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const first = e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "seats" });
+            e.drawRect({ x: 5, y: 5, size: 1 }, 1, { id: "seats" });
+
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledTimes(1);
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+            expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeDefined();
+        });
+
+        it("accumulates as before when no id is given", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1);
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1);
+
+            expect(drawAPI.removeDrawHandle).not.toHaveBeenCalled();
+            expect(e.hitTest({ x: 2.5, y: 2.5 })).toHaveLength(2);
+        });
+
+        it("shares one id namespace across draw kinds and layers", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const rect = e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "marker" });
+            e.drawCircle({ x: 7, y: 7, size: 1 }, 4, { id: "marker" });
+
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(rect);
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+            const hit = e.hitTestFirst({ x: 7.5, y: 7.5 });
+            expect(hit!.kind).toBe("circle");
+            expect(hit!.layer).toBe(4);
+        });
+
+        it("frees the id when its handle is removed manually", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const h = e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "seats" });
+            e.removeDrawHandle(h);
+            drawAPI.removeDrawHandle.mockClear();
+
+            e.drawRect({ x: 5, y: 5, size: 1 }, 1, { id: "seats" });
+            // A fresh registration: nothing stale left to replace
+            expect(drawAPI.removeDrawHandle).not.toHaveBeenCalled();
+            expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeDefined();
+        });
+
+        it("frees ids on clearLayer, leaving other layers tracked", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "a" });
+            const kept = e.drawRect({ x: 3, y: 3, size: 1 }, 2, { id: "b" });
+            e.clearLayer(1);
+
+            e.drawRect({ x: 5, y: 5, size: 1 }, 1, { id: "a" });
+            expect(drawAPI.removeDrawHandle).not.toHaveBeenCalled();
+
+            e.drawRect({ x: 6, y: 6, size: 1 }, 2, { id: "b" });
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(kept);
+        });
+
+        it("replaces static draws on the same cacheKey and invalidates the cache", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const first = e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0);
+            e.drawStaticRect([{ x: 4, y: 4, size: 1 }], "terrain", 0);
+
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
+            expect(drawAPI.clearStaticCache).toHaveBeenCalledWith("terrain");
+            expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeUndefined();
+            expect(e.hitTestFirst({ x: 4.5, y: 4.5 })).toBeDefined();
+        });
+
+        it("drops the static cache when the registration is removed by handle", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const h = e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0);
+            e.removeDrawHandle(h);
+            expect(drawAPI.clearStaticCache).toHaveBeenCalledWith("terrain");
+        });
+
+        it("drops static caches on clearLayer for registrations on that layer", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0);
+            e.drawStaticRect([{ x: 2, y: 2, size: 1 }], "props", 3);
+            e.clearLayer(0);
+
+            expect(drawAPI.clearStaticCache).toHaveBeenCalledWith("terrain");
+            expect(drawAPI.clearStaticCache).not.toHaveBeenCalledWith("props");
+        });
+
+        it("clears all static caches and the id registry on clearAll", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0);
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "seats" });
+            e.clearAll();
+
+            expect(drawAPI.clearStaticCache).toHaveBeenCalledWith();
+            drawAPI.removeDrawHandle.mockClear();
+            e.drawRect({ x: 5, y: 5, size: 1 }, 1, { id: "seats" });
+            expect(drawAPI.removeDrawHandle).not.toHaveBeenCalled();
+        });
+
+        it("tracks ids for grid lines and custom draw functions", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const grid = e.drawGridLines(5, 1, "black", 0, { id: "grid" });
+            e.drawGridLines(10, 1, "black", 0, { id: "grid" });
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(grid);
+
+            const fn = e.addDrawFunction(() => {}, 1, { id: "hud" });
+            e.addDrawFunction(() => {}, 1, { id: "hud" });
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(fn);
         });
     });
 });

@@ -165,6 +165,22 @@ export interface DrawHandle {
 }
 
 /**
+ * Options accepted by the engine draw helpers (`drawRect`, `drawCircle`, ...).
+ */
+export interface DrawOptions {
+    /**
+     * Stable identity for this registration. Calling any draw method again
+     * with the same id atomically replaces the previous registration: the old
+     * draw callback and its hit-test entries are removed (and, for static
+     * draws, the offscreen cache is invalidated) before the new one is added.
+     * Ids share a single namespace across draw kinds and layers; static draw
+     * helpers use their `cacheKey` as the id. Without an id, every call adds
+     * a new registration (remove with the returned handle or `clearLayer`).
+     */
+    id?: string;
+}
+
+/**
  * Platform-agnostic image loader interface.
  * Each renderer implements this with platform-specific image handling.
  */
