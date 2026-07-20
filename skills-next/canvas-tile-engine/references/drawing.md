@@ -9,28 +9,40 @@ units; the engine converts to pixels using the current camera scale.
   `DrawHandle`. Nothing paints until `engine.render()` runs.
 - Callbacks re-run every frame (pan, zoom, resize, explicit `render()`).
 - Registering again ADDS another callback - it does not replace, unless you
-  pass a registration id. Four ways to update content:
+  pass a registration id. Five ways to update content:
 
 ```ts
-// A. Registration id (core >= 0.10; PREFERRED for state-driven redraws).
+// A. styleOf (core >= 0.10; PREFERRED when only APPEARANCE changes -
+// selection, hover, highlight). Runs per item every frame at paint time;
+// returned fields overlay the item's own style. Reads external state live:
+// no new array, no re-registration, no spatial index rebuild.
+const selected = new Set<string>();
+engine.drawRect(seatRects, 1, {
+    id: "seats",
+    styleOf: (s) => (selected.has(s.data.id) ? { fillStyle: "blue" } : undefined),
+});
+selected.add("A1");
+engine.render(); // repaint alone shows the selection
+
+// B. Registration id (core >= 0.10; PREFERRED when GEOMETRY changes).
 // Same id -> the previous registration (callback + hit entries) is replaced
 // atomically. Idempotent: safe to call from any state-change handler.
 engine.drawRect(seatRects, 1, { id: "seats" });
 engine.drawRect(newSeatRects, 1, { id: "seats" }); // replaces, no accumulation
 engine.render();
 
-// B. Handle swap (one changing thing on older cores, e.g. hover highlight)
+// C. Handle swap (one changing thing on older cores, e.g. hover highlight)
 let handle = engine.drawRect(rectA, 5);
 engine.removeDrawHandle(handle);
 handle = engine.drawRect(rectB, 5);
 engine.render();
 
-// C. Layer swap (wipe a whole layer regardless of what registered on it)
+// D. Layer swap (wipe a whole layer regardless of what registered on it)
 engine.clearLayer(2);
 engine.drawRect(newRects, 2);
 engine.render();
 
-// D. Mutation (best for animation; items are held by reference)
+// E. Mutation (best for animation; items are held by reference)
 const item = { x: 0, y: 0, size: 1, style: { fillStyle: "red" } };
 engine.drawRect(item, 1);
 item.x += 1;        // mutate the same object
@@ -42,6 +54,16 @@ existing rect's id replaces the rect; a reused id on another layer moves the
 registration). A replaced registration re-enters at the end of its layer's
 draw order. Static draws (`drawStatic*`) take no `id` - their `cacheKey`
 plays the same role.
+
+`styleOf` details: available on dynamic `drawRect`/`drawCircle`/`drawText`/
+`drawLine`/`drawPath` (not statics, not `drawImage`). Identify items via
+`item.data`; return `undefined` for undecorated items (the common case). For
+`drawLine` the decoration overlays the call-level `style` per item - the way
+to give individual lines their own color. Type-enforced limits: Line and
+Path decorations exclude `lineWidth`/`lineWidthPx` (Path also `cornerRadius`/
+`cornerRadiusPx`) because hit-test geometry resolves at registration time;
+relatedly, decorating an unfilled path with `fillStyle` paints a fill but hit
+testing still targets the stroke.
 
 ## Layers
 

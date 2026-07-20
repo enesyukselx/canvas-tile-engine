@@ -144,6 +144,19 @@ type DrawOptions = {
 
 Optional last parameter of every draw method. `id` gives the registration a stable identity: re-registering with the same id replaces the previous registration (draw callback plus hit-test entries) instead of accumulating. Ids share one namespace across draw kinds and layers; static draw methods use their `cacheKey` as the id instead.
 
+### `StyleOf` and Decoration Styles
+
+```ts
+type StyleOf<TItem, TStyle> = (item: TItem) => TStyle | undefined;
+
+type ShapeDecorationStyle = NonNullable<DrawObject["style"]>; // Rect / Circle
+type TextDecorationStyle = NonNullable<Text["style"]>;
+type LineDecorationStyle = Omit<LineStyle, "lineWidth" | "lineWidthPx">;
+type PathDecorationStyle = Omit<PathStyle, "lineWidth" | "lineWidthPx" | "cornerRadius" | "cornerRadiusPx">;
+```
+
+The dynamic draw methods additionally accept `styleOf` in their options (`RectDrawOptions`, `CircleDrawOptions`, `TextDrawOptions`, `LineDrawOptions`, `PathDrawOptions` — each extends `DrawOptions`). The callback runs per item on every frame at paint time; returned fields overlay the item's own `style` for that frame, `undefined` leaves it untouched. Line and path decorations exclude stroke width (and corner radius), because those feed hit-test geometry resolved at registration time.
+
 ## Sprite Helpers
 
 ```ts

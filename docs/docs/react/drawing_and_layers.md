@@ -39,11 +39,12 @@ Layers control the Z-order of your content. Lower numbers draw first (background
 
 Draw basic geometric shapes. Pass a single object or an array for batch rendering.
 
-| Prop    | Type                 | Default      | Description                         |
-| :------ | :------------------- | :----------- | :---------------------------------- |
-| `items` | `Rect \| Rect[]`     | **Required** | Shape definitions (for `<Rect>`).   |
-| `items` | `Circle \| Circle[]` | **Required** | Shape definitions (for `<Circle>`). |
-| `layer` | `number`             | `1`          | Rendering layer.                    |
+| Prop      | Type                           | Default      | Description                                                                                          |
+| :-------- | :----------------------------- | :----------- | :--------------------------------------------------------------------------------------------------- |
+| `items`   | `Rect \| Rect[]`               | **Required** | Shape definitions (for `<Rect>`).                                                                    |
+| `items`   | `Circle \| Circle[]`           | **Required** | Shape definitions (for `<Circle>`).                                                                  |
+| `layer`   | `number`                       | `1`          | Rendering layer.                                                                                     |
+| `styleOf` | `(item) => style \| undefined` | -            | Paint-time decoration for selection/hover; see [Styling by State](#styling-by-state-styleof). |
 
 **Rect / Circle Properties:**
 
@@ -151,11 +152,11 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 
 Draw straight lines between two points.
 
-| Prop    | Type             | Default      | Description       |
-| :------ | :--------------- | :----------- | :---------------- |
-| `items` | `Line \| Line[]` | **Required** | Line definitions. |
-| `style` | `LineStyle`      | -            | Line style.       |
-| `layer` | `number`         | `1`          | Rendering layer.  |
+| Prop      | Type                           | Default      | Description                                                                                                      |
+| :-------- | :----------------------------- | :----------- | :--------------------------------------------------------------------------------------------------------------- |
+| `items`   | `Line \| Line[]`               | **Required** | Line definitions.                                                                                                |
+| `style`   | `LineStyle`                    | -            | Line style (shared by all items).                                                                                |
+| `styleOf` | `(item) => style \| undefined` | -            | Per-item decoration overlaid on `style` (color/dash only); see [Styling by State](#styling-by-state-styleof). |
 
 **Line Properties:** `{ from: { x, y }, to: { x, y } }`
 
@@ -186,10 +187,11 @@ Draw straight lines between two points.
 
 Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `PathItem` owns its geometry and style.
 
-| Prop    | Type                     | Default      | Description                                                       |
-| :------ | :----------------------- | :----------- | :---------------------------------------------------------------- |
-| `items` | `PathItem \| PathItem[]` | **Required** | Path definitions.                                                 |
-| `layer` | `number`                 | `1`          | Rendering layer.                                                  |
+| Prop      | Type                           | Default      | Description                                                                                                             |
+| :-------- | :----------------------------- | :----------- | :---------------------------------------------------------------------------------------------------------------------- |
+| `items`   | `PathItem \| PathItem[]`       | **Required** | Path definitions.                                                                                                       |
+| `layer`   | `number`                       | `1`          | Rendering layer.                                                                                                        |
+| `styleOf` | `(item) => style \| undefined` | -            | Paint-time decoration (no stroke width / corner radius); see [Styling by State](#styling-by-state-styleof).      |
 
 **`PathItem`:** `{ commands?, points?, closed?, fillRule?, style?, data? }` — `commands` is a Canvas2D-style command list (curves, arcs, multiple subpaths, holes); `points` is the polyline form. See the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full `PathCommand`, property, and `PathStyle` tables. Filled paths hit-test on their interior (holes excluded), unfilled ones on the stroke itself.
 
@@ -234,7 +236,7 @@ Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `
 />;
 ```
 
-Keep `items` referentially stable (`useMemo`/state) — a new array identity re-registers the draw callback.
+Keep `items` referentially stable (`useMemo`/state) — a new array identity re-registers the draw callback. Appearance-only changes (selection, hover) belong in `styleOf`, which never re-registers.
 
 ### `<GridLines>`
 
@@ -271,10 +273,11 @@ Draw grid lines at specified intervals.
 
 Render text at world coordinates. Text size scales with zoom.
 
-| Prop    | Type             | Default      | Description       |
-| :------ | :--------------- | :----------- | :---------------- |
-| `items` | `Text \| Text[]` | **Required** | Text definitions. |
-| `layer` | `number`         | `2`          | Rendering layer.  |
+| Prop      | Type                           | Default      | Description                                                                                          |
+| :-------- | :----------------------------- | :----------- | :--------------------------------------------------------------------------------------------------- |
+| `items`   | `Text \| Text[]`               | **Required** | Text definitions.                                                                                    |
+| `layer`   | `number`                       | `2`          | Rendering layer.                                                                                     |
+| `styleOf` | `(item) => style \| undefined` | -            | Paint-time decoration for selection/hover; see [Styling by State](#styling-by-state-styleof). |
 
 **Text Properties:**
 
@@ -561,21 +564,26 @@ Static components automatically:
 Each static cache creates an offscreen canvas sized to fit all items. Use static caching only when the performance benefit justifies the memory cost.
 :::
 
-## Dynamic Content
+## Styling by State (`styleOf`)
 
-React's declarative nature handles dynamic content automatically. When your data changes, the components re-render:
+Selection, hover, and highlight state should not go through `items`. Deriving a styled copy of the array on every state change gives each change a new array identity, which re-registers the draw callback and rebuilds the spatial index — for items whose geometry never moved. At 50k+ items that is real per-click cost.
+
+The `styleOf` prop moves that styling to paint time. It runs per item on every frame; the returned fields overlay the item's own `style` (`undefined` leaves the item as-is):
 
 ```tsx
-function DynamicScene({ seats }) {
+function SeatMap({ seats }) {
     const engine = useCanvasTileEngine();
+    const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 
+    // Geometry only — does not depend on selection, so it never re-registers.
     const seatRects = useMemo(
         () =>
             seats.map((s) => ({
                 x: s.x,
                 y: s.y,
                 size: 0.9,
-                style: { fillStyle: s.selected ? "blue" : "green" },
+                style: { fillStyle: "green" },
+                data: { id: s.id },
             })),
         [seats],
     );
@@ -585,17 +593,39 @@ function DynamicScene({ seats }) {
             engine={engine}
             config={config}
             renderer={new RendererCanvas()}
+            onClick={(coords) => {
+                const hit = engine.hitTestFirst<{ id: string }>(coords.raw);
+                if (hit) setSelected((prev) => toggle(prev, hit.data.id));
+            }}
         >
             <CanvasTileEngine.GridLines cellSize={1} />
-            <CanvasTileEngine.Rect items={seatRects} layer={1} />
+            <CanvasTileEngine.Rect
+                items={seatRects}
+                layer={1}
+                styleOf={(seat) => (selected.has(seat.data.id) ? { fillStyle: "blue" } : undefined)}
+            />
         </CanvasTileEngine>
     );
 }
 ```
 
+`styleOf` is read through a ref inside the component, so — unlike `items` — its identity may change on every render at no cost. An inline arrow is fine; no `useCallback` needed. When the closure captures new state (the updated `selected` set), the component just repaints.
+
+The two props now split cleanly:
+
+- `items` changed → geometry changed → re-register (keep it stable with `useMemo`/state).
+- `styleOf` changed → appearance changed → repaint only, zero rebuild.
+
+Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths) — those feed hit-test geometry resolved at registration time, and the types enforce it. Static components (`<StaticRect>` etc.) do not take `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply.
+
+## Dynamic Content
+
+When geometry actually changes (items added, removed, or moved), React's declarative nature handles it: give `items` a new identity and the component re-registers the draw callback.
+
 :::tip Performance
 
 - Use `useMemo` for computed items arrays to avoid unnecessary re-renders
+- Route selection/hover styling through `styleOf`, not through derived `items` arrays
 - For truly static content, use `<StaticRect>`, `<StaticCircle>`, or `<StaticImage>`
 - The engine automatically batches renders when multiple components update in the same frame
   :::
