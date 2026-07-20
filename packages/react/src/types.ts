@@ -14,12 +14,16 @@ import type {
     onDrawCallback,
     Rect,
     Line,
+    LineStyle,
     Circle,
     PathItem,
     PathStyle,
+    PathCommand,
     Text,
     ImageItem,
     IRenderer,
+    DrawHandle,
+    WheelInfo,
 } from "@canvas-tile-engine/core";
 import type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
@@ -39,12 +43,16 @@ export type {
     onDrawCallback,
     Rect,
     Line,
+    LineStyle,
     Circle,
     Text,
     PathItem,
     PathStyle,
+    PathCommand,
     ImageItem,
     IRenderer,
+    DrawHandle,
+    WheelInfo,
 };
 
 /**

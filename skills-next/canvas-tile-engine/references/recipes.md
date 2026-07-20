@@ -74,9 +74,8 @@ Two engines; the minimap uses a static cache and mirrors the main camera.
 
 ```tsx
 import { useMemo } from "react";
-import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { CanvasTileEngine, useCanvasTileEngine, type Rect } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
-import type { Rect } from "@canvas-tile-engine/core";
 
 export function MapWithMinimap({ world }: { world: Rect[] }) {
     const main = useCanvasTileEngine();
@@ -129,9 +128,8 @@ Fixed board, no pan/zoom, click-drag painting.
 
 ```tsx
 import { useCallback, useMemo, useState } from "react";
-import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { CanvasTileEngine, useCanvasTileEngine, gridToSize, type Rect } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
-import { gridToSize, type Rect } from "@canvas-tile-engine/core";
 
 // Board center: cells 0..N-1 are centered at (N-1)/2 (integers are cell
 // centers). gridToSize returns it; it MUST be passed or the board renders
