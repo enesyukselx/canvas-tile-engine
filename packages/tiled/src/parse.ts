@@ -175,7 +175,10 @@ function normalizeObject(
             const abs = rotateAround({ x: o.x + p.x, y: o.y + p.y }, anchorPx, rotation);
             return pxPointToWorld(abs, tileSize);
         });
-        shape = { kind: o.polygon !== undefined ? "polygon" : "polyline", points };
+        shape = {
+            kind: o.polygon !== undefined ? "polygon" : "polyline",
+            points,
+        };
     } else {
         // Plain rectangle (top-left anchored; rotation around the anchor).
         const w = o.width ?? 0;
@@ -291,7 +294,13 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                     if (properties) cell.properties = properties;
                     cells.push(cell);
                 }
-                layers.push({ kind: "tiles", name, opacity, cells, properties: propsToRecord(layer.properties) });
+                layers.push({
+                    kind: "tiles",
+                    name,
+                    opacity,
+                    cells,
+                    properties: propsToRecord(layer.properties),
+                });
             } else if (layer.type === "objectgroup") {
                 if (opacity !== 1) {
                     warnings.push(`layer "${name}": object-layer opacity is not supported; objects draw fully opaque.`);
@@ -301,7 +310,13 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                     const normalized = normalizeObject(o, tileSize, tilesets, warnings);
                     if (normalized) objects.push(normalized);
                 }
-                layers.push({ kind: "objects", name, opacity, objects, properties: propsToRecord(layer.properties) });
+                layers.push({
+                    kind: "objects",
+                    name,
+                    opacity,
+                    objects,
+                    properties: propsToRecord(layer.properties),
+                });
             } else {
                 warnings.push(`layer "${name}": unknown layer type "${layer.type}"; skipped.`);
             }
@@ -331,9 +346,9 @@ export const tiledPxToWorld = pxToWorld;
  */
 export function tiledMapBounds(map: TiledMap): Bounds {
     return {
-        minX: -0.5,
-        minY: -0.5,
-        maxX: map.columns - 0.5,
-        maxY: map.rows - 0.5,
+        minX: 0,
+        minY: 0,
+        maxX: map.columns,
+        maxY: map.rows,
     };
 }
