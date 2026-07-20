@@ -742,7 +742,7 @@ Because `styleOf` resolves at paint time, it reads external state **live**. A se
 engine.onClick = (coords) => {
     const hit = engine.hitTestFirst(coords.raw);
     if (!hit) return;
-    selected.add(hit.data.id);
+    selected.add(hit.item.data.id);
     engine.render(); // no re-registration, no index rebuild
 };
 ```

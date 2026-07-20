@@ -595,7 +595,7 @@ function SeatMap({ seats }) {
             renderer={new RendererCanvas()}
             onClick={(coords) => {
                 const hit = engine.hitTestFirst<{ id: string }>(coords.raw);
-                if (hit) setSelected((prev) => toggle(prev, hit.data.id));
+                if (hit) setSelected((prev) => toggle(prev, hit.item.data.id));
             }}
         >
             <CanvasTileEngine.GridLines cellSize={1} />
