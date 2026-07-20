@@ -340,9 +340,11 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
 export const tiledPxToWorld = pxToWorld;
 
 /**
- * The map's world extents in corner space — cell 0 starts at -0.5 because
- * integers are cell centers. Feed it to `config.bounds`/`engine.setBounds`
- * to keep the camera on the map, and to `engine.fitBounds` to frame it.
+ * The map's world extents in RAW corner space — the space the bounds APIs
+ * and event `coords.raw` use, where cell k spans [k, k+1] (item space with
+ * its cell-centered integers is for item coordinates only). Feed it to
+ * `config.bounds`/`engine.setBounds` to keep the camera on the map, or to
+ * `engine.fitBounds` to frame it.
  */
 export function tiledMapBounds(map: TiledMap): Bounds {
     return {

@@ -170,9 +170,9 @@ describe("parseTiledMap — layer tree", () => {
 });
 
 describe("tiledMapBounds", () => {
-    it("returns the corner-space extents of the map", async () => {
+    it("returns the raw corner-space extents of the map (cell k spans [k, k+1])", async () => {
         const map = await parseTiledMap(baseMap({ width: 40, height: 24, layers: [] }));
-        expect(tiledMapBounds(map)).toEqual({ minX: -0.5, minY: -0.5, maxX: 39.5, maxY: 23.5 });
+        expect(tiledMapBounds(map)).toEqual({ minX: 0, minY: 0, maxX: 40, maxY: 24 });
     });
 });
 

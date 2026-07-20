@@ -20,8 +20,10 @@ engine.render();
 
 - Tiled layers land on engine layers `layerOffset + index` in map order
   (default offset 0).
-- Camera: `tiledMapBounds(map)` → corner-space extents (`minX/minY = -0.5`)
-  for `config.bounds`/`setBounds` (no panning off the map) and
+- Camera: `tiledMapBounds(map)` → RAW corner-space extents
+  (`[0, columns] x [0, rows]` — the space bounds APIs and `coords.raw`
+  use; do NOT use item-space -0.5 values, they shift the clamp by half a
+  cell) for `config.bounds`/`setBounds` (no panning off the map) and
   `fitBounds` (zoom-to-fit). Zoom limits: fit scale =
   `min(viewportW / map.columns, viewportH / map.rows)` as `minScale`, a
   multiple of the cell pixel size as `maxScale`.

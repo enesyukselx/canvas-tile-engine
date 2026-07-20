@@ -32,7 +32,7 @@ Tiled layers occupy engine layers `0, 1, 2, ...` in map order (shift with `layer
 
 ## Camera Setup
 
-`tiledMapBounds(map)` returns the map's world extents in corner space (cell 0 starts at `-0.5` because integers are cell centers). Wire it into the camera so users cannot pan off the map, and derive zoom limits from your cell size:
+`tiledMapBounds(map)` returns the map's extents in **raw corner space** — the space the bounds APIs use, where cell `k` spans `[k, k + 1]`, so the map is `[0, columns] x [0, rows]`. (Item space with its cell-centered integers is for item coordinates only.) Wire it into the camera so users cannot pan off the map, and derive zoom limits from your cell size:
 
 ```typescript
 import { tiledMapBounds } from "@canvas-tile-engine/tiled";
