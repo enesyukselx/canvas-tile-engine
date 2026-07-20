@@ -24,6 +24,16 @@ import type {
     IRenderer,
     DrawHandle,
     WheelInfo,
+    StyleOf,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    RectDrawOptions,
+    CircleDrawOptions,
+    TextDrawOptions,
+    LineDrawOptions,
+    PathDrawOptions,
 } from "@canvas-tile-engine/core";
 import type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
@@ -53,6 +63,16 @@ export type {
     IRenderer,
     DrawHandle,
     WheelInfo,
+    StyleOf,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    RectDrawOptions,
+    CircleDrawOptions,
+    TextDrawOptions,
+    LineDrawOptions,
+    PathDrawOptions,
 };
 
 /**
