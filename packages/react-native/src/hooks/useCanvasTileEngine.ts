@@ -16,6 +16,11 @@ import type {
     Rect,
     Text,
     LineStyle,
+    RectDrawOptions,
+    CircleDrawOptions,
+    TextDrawOptions,
+    LineDrawOptions,
+    PathDrawOptions,
     DrawTransform,
     PathItem,
 } from "@canvas-tile-engine/core";
@@ -88,13 +93,34 @@ export interface EngineHandle {
         ) => void,
         layer?: number,
     ): DrawHandle;
-    drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
+    drawRect<TData = unknown>(
+        items: Rect<TData> | Rect<TData>[],
+        layer?: number,
+        options?: RectDrawOptions<TData>,
+    ): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
-    drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
+    drawCircle<TData = unknown>(
+        items: Circle<TData> | Circle<TData>[],
+        layer?: number,
+        options?: CircleDrawOptions<TData>,
+    ): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
-    drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
-    drawText(items: Text | Text[], layer?: number): DrawHandle;
-    drawPath(items: PathItem | PathItem[], layer?: number): DrawHandle;
+    drawLine<TData = unknown>(
+        items: Line<TData> | Line<TData>[],
+        style?: LineStyle,
+        layer?: number,
+        options?: LineDrawOptions<TData>,
+    ): DrawHandle;
+    drawText<TData = unknown>(
+        items: Text<TData> | Text<TData>[],
+        layer?: number,
+        options?: TextDrawOptions<TData>,
+    ): DrawHandle;
+    drawPath<TData = unknown>(
+        items: PathItem<TData> | PathItem<TData>[],
+        layer?: number,
+        options?: PathDrawOptions<TData>,
+    ): DrawHandle;
     drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
     drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
@@ -236,26 +262,26 @@ export function useCanvasTileEngine(): EngineHandle {
                     ) ?? droppedDraw("addDrawFunction")
                 );
             },
-            drawRect(items, layer) {
-                return instanceRef.current?.drawRect(items, layer) ?? droppedDraw("drawRect");
+            drawRect(items, layer, options) {
+                return instanceRef.current?.drawRect(items, layer, options) ?? droppedDraw("drawRect");
             },
             drawStaticRect(items, cacheKey, layer) {
                 return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? droppedDraw("drawStaticRect");
             },
-            drawCircle(items, layer) {
-                return instanceRef.current?.drawCircle(items, layer) ?? droppedDraw("drawCircle");
+            drawCircle(items, layer, options) {
+                return instanceRef.current?.drawCircle(items, layer, options) ?? droppedDraw("drawCircle");
             },
             drawStaticCircle(items, cacheKey, layer) {
                 return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? droppedDraw("drawStaticCircle");
             },
-            drawLine(items, style, layer) {
-                return instanceRef.current?.drawLine(items, style, layer) ?? droppedDraw("drawLine");
+            drawLine(items, style, layer, options) {
+                return instanceRef.current?.drawLine(items, style, layer, options) ?? droppedDraw("drawLine");
             },
-            drawText(items, layer) {
-                return instanceRef.current?.drawText(items, layer) ?? droppedDraw("drawText");
+            drawText(items, layer, options) {
+                return instanceRef.current?.drawText(items, layer, options) ?? droppedDraw("drawText");
             },
-            drawPath(items, layer) {
-                return instanceRef.current?.drawPath(items, layer) ?? droppedDraw("drawPath");
+            drawPath(items, layer, options) {
+                return instanceRef.current?.drawPath(items, layer, options) ?? droppedDraw("drawPath");
             },
             drawImage(items, layer) {
                 return instanceRef.current?.drawImage(items, layer) ?? droppedDraw("drawImage");

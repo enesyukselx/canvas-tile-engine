@@ -24,7 +24,14 @@ import {
     pathCommandsBounds,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import type { LineStyle } from "@canvas-tile-engine/core";
+import type {
+    LineStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    RendererDrawOptions,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+} from "@canvas-tile-engine/core";
 import { Layer } from "./Layer";
 import { applyLineWidth } from "../utils/canvas";
 
@@ -110,8 +117,13 @@ export class CanvasDraw {
         });
     }
 
-    drawRect(items: Array<Rect> | Rect, layer: number = 1): DrawHandle {
+    drawRect(
+        items: Array<Rect> | Rect,
+        layer: number = 1,
+        options?: RendererDrawOptions<Rect, ShapeDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
@@ -136,7 +148,8 @@ export class CanvasDraw {
                     x: item.origin?.x ?? 0.5,
                     y: item.origin?.y ?? 0.5,
                 };
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
                 if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
@@ -189,8 +202,14 @@ export class CanvasDraw {
         });
     }
 
-    drawLine(items: Array<Line> | Line, style?: LineStyle, layer: number = 1): DrawHandle {
+    drawLine(
+        items: Array<Line> | Line,
+        style?: LineStyle,
+        layer: number = 1,
+        options?: RendererDrawOptions<Line, LineDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
@@ -200,12 +219,22 @@ export class CanvasDraw {
             const dash = resolveLineDashPx(style, this.camera.scale);
             if (dash) ctx.setLineDash(dash);
 
+            // Decorated items leave the batched path (which strokes once with
+            // the call-level style) and stroke individually after it.
+            let decorated: Array<{ item: Line; deco: LineDecorationStyle }> | null = null;
+
             ctx.beginPath();
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+
+                const deco = styleOf?.(item);
+                if (deco) {
+                    (decorated ??= []).push({ item, deco });
+                    continue;
+                }
 
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
@@ -215,13 +244,33 @@ export class CanvasDraw {
             }
             ctx.stroke();
 
+            if (decorated) {
+                for (const { item, deco } of decorated) {
+                    const merged = { ...style, ...deco };
+                    ctx.strokeStyle = merged.strokeStyle ?? "#000000";
+                    ctx.setLineDash(resolveLineDashPx(merged, this.camera.scale) ?? []);
+
+                    const a = this.transformer.worldToScreen(item.from.x, item.from.y);
+                    const b = this.transformer.worldToScreen(item.to.x, item.to.y);
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.stroke();
+                }
+            }
+
             resetAlpha?.();
             ctx.restore();
         });
     }
 
-    drawCircle(items: Array<Circle> | Circle, layer: number = 1): DrawHandle {
+    drawCircle(
+        items: Array<Circle> | Circle,
+        layer: number = 1,
+        options?: RendererDrawOptions<Circle, ShapeDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
@@ -254,7 +303,8 @@ export class CanvasDraw {
                     x: item.origin?.x ?? 0.5,
                     y: item.origin?.y ?? 0.5,
                 };
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
                 if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
@@ -282,8 +332,13 @@ export class CanvasDraw {
         });
     }
 
-    drawText(items: Array<Text> | Text, layer: number = 2): DrawHandle {
+    drawText(
+        items: Array<Text> | Text,
+        layer: number = 2,
+        options?: RendererDrawOptions<Text, TextDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
@@ -299,7 +354,8 @@ export class CanvasDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
@@ -333,7 +389,12 @@ export class CanvasDraw {
         });
     }
 
-    drawPath(items: PathItem[], layer: number = 1): DrawHandle {
+    drawPath(
+        items: PathItem[],
+        layer: number = 1,
+        options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
+    ): DrawHandle {
+        const styleOf = options?.styleOf;
         // Conservative world bounds per item for culling, computed once:
         // control-point hull for command paths, vertex bounds for polylines.
         const itemBounds = items.map((item) => {
@@ -364,7 +425,8 @@ export class CanvasDraw {
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
                 const filled = style?.fillStyle !== undefined;
 
                 ctx.save();

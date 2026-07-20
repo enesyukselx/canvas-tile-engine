@@ -12,7 +12,7 @@ import {
     onWheelCallback,
     onZoomCallback,
 } from "./callback";
-import { Circle, ImageItem, Line, PathItem, Rect, Text } from "./draw-object";
+import { Circle, DrawObject, ImageItem, Line, PathItem, PathStyle, Rect, Text } from "./draw-object";
 import { CanvasTileEngineConfig } from "./config";
 
 export type Coords = {
@@ -140,15 +140,36 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
     ): DrawHandle;
-    drawRect(items: Rect | Rect[], layer?: number): DrawHandle;
-    drawCircle(items: Circle | Circle[], layer?: number): DrawHandle;
-    drawLine(items: Line | Line[], style?: LineStyle, layer?: number): DrawHandle;
-    drawText(items: Text | Text[], layer?: number): DrawHandle;
+    drawRect(
+        items: Rect | Rect[],
+        layer?: number,
+        options?: RendererDrawOptions<Rect, ShapeDecorationStyle>,
+    ): DrawHandle;
+    drawCircle(
+        items: Circle | Circle[],
+        layer?: number,
+        options?: RendererDrawOptions<Circle, ShapeDecorationStyle>,
+    ): DrawHandle;
+    drawLine(
+        items: Line | Line[],
+        style?: LineStyle,
+        layer?: number,
+        options?: RendererDrawOptions<Line, LineDecorationStyle>,
+    ): DrawHandle;
+    drawText(
+        items: Text | Text[],
+        layer?: number,
+        options?: RendererDrawOptions<Text, TextDecorationStyle>,
+    ): DrawHandle;
     drawImage(items: ImageItem<TImage> | ImageItem<TImage>[], layer?: number): DrawHandle;
     /** Receives fully normalized items: the engine converts every accepted
      * `drawPath` input (including the legacy `Coords[]` forms) before
      * delegating, so renderers only implement the item form. */
-    drawPath(items: PathItem[], layer?: number): DrawHandle;
+    drawPath(
+        items: PathItem[],
+        layer?: number,
+        options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
+    ): DrawHandle;
     drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
@@ -165,6 +186,48 @@ export interface DrawHandle {
 }
 
 /**
+ * Paint-time decoration callback. Runs for each item on every frame; the
+ * returned fields overlay the item's own `style` for that frame only
+ * (`undefined` leaves the item untouched). Because it runs at paint time it
+ * reads external state live: mutate a selection set and call `render()` —
+ * the items are never re-registered and the spatial index never rebuilds.
+ *
+ * Identify items through `item.data` (the same convention as `hitTest`
+ * results); most items should return `undefined`.
+ */
+export type StyleOf<TItem, TStyle> = (item: TItem) => TStyle | undefined;
+
+/**
+ * Paint-time options the engine threads into a renderer's `IDrawAPI` draw
+ * methods. Only `styleOf` reaches renderers — registration concerns (`id`)
+ * are resolved in the engine.
+ */
+export interface RendererDrawOptions<TItem, TStyle> {
+    styleOf?: StyleOf<TItem, TStyle>;
+}
+
+/** Decoration fields for `Rect`/`Circle` — the full shape style (stroke width
+ * does not feed shape hit testing, so nothing needs to be excluded). */
+export type ShapeDecorationStyle = NonNullable<DrawObject["style"]>;
+
+/** Decoration fields for `Text` — the full text style. */
+export type TextDecorationStyle = NonNullable<Text["style"]>;
+
+/**
+ * Decoration fields for `Line`. Excludes `lineWidth`/`lineWidthPx`: a line's
+ * hit-test area is derived from its stroke width at registration time, so a
+ * paint-time decoration must not change it.
+ */
+export type LineDecorationStyle = Omit<LineStyle, "lineWidth" | "lineWidthPx">;
+
+/**
+ * Decoration fields for `PathItem`. Excludes stroke width and corner radius:
+ * both feed hit-test geometry resolved at registration time, so a paint-time
+ * decoration must not change them.
+ */
+export type PathDecorationStyle = Omit<PathStyle, "lineWidth" | "lineWidthPx" | "cornerRadius" | "cornerRadiusPx">;
+
+/**
  * Options accepted by the engine draw helpers (`drawRect`, `drawCircle`, ...).
  */
 export interface DrawOptions {
@@ -178,6 +241,45 @@ export interface DrawOptions {
      * a new registration (remove with the returned handle or `clearLayer`).
      */
     id?: string;
+}
+
+/** Options for {@link CanvasTileEngine.drawRect}. */
+export interface RectDrawOptions<TData = unknown> extends DrawOptions {
+    /** Paint-time decoration; see {@link StyleOf}. */
+    styleOf?: StyleOf<Rect<TData>, ShapeDecorationStyle>;
+}
+
+/** Options for {@link CanvasTileEngine.drawCircle}. */
+export interface CircleDrawOptions<TData = unknown> extends DrawOptions {
+    /** Paint-time decoration; see {@link StyleOf}. */
+    styleOf?: StyleOf<Circle<TData>, ShapeDecorationStyle>;
+}
+
+/** Options for {@link CanvasTileEngine.drawText}. */
+export interface TextDrawOptions<TData = unknown> extends DrawOptions {
+    /** Paint-time decoration; see {@link StyleOf}. */
+    styleOf?: StyleOf<Text<TData>, TextDecorationStyle>;
+}
+
+/**
+ * Options for {@link CanvasTileEngine.drawLine}. `styleOf` overlays the
+ * call-level `style` per item, which also makes it the way to give individual
+ * lines their own color.
+ */
+export interface LineDrawOptions<TData = unknown> extends DrawOptions {
+    /** Paint-time decoration; see {@link StyleOf}. */
+    styleOf?: StyleOf<Line<TData>, LineDecorationStyle>;
+}
+
+/** Options for {@link CanvasTileEngine.drawPath}. */
+export interface PathDrawOptions<TData = unknown> extends DrawOptions {
+    /**
+     * Paint-time decoration; see {@link StyleOf}. Note: hit testing keeps the
+     * registration-time semantics — decorating an unfilled path with a
+     * `fillStyle` paints a fill but does not switch hit testing from
+     * stroke to interior.
+     */
+    styleOf?: StyleOf<PathItem<TData>, PathDecorationStyle>;
 }
 
 /**

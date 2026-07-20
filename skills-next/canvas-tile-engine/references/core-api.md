@@ -140,13 +140,22 @@ after mount.
 ### Draw methods
 
 All return a `DrawHandle` (`{ id: symbol, layer: number }`) and accept an
-optional `options?: DrawOptions` (`{ id?: string }`) last parameter (core >=
-0.10): re-registering with the same `id` atomically replaces the previous
-registration (draw callback + hit-test entries) instead of accumulating. Ids
-share one namespace across draw kinds and layers; a replaced registration
-re-enters at the end of its layer's draw order. Static draws take no `id` -
-their `cacheKey` is the id. Full item shapes and semantics:
-[drawing.md](drawing.md).
+optional `options?` last parameter (core >= 0.10) with two fields:
+
+- `id?: string` - re-registering with the same `id` atomically replaces the
+  previous registration (draw callback + hit-test entries) instead of
+  accumulating. Ids share one namespace across draw kinds and layers; a
+  replaced registration re-enters at the end of its layer's draw order.
+  Static draws take no `id` - their `cacheKey` is the id.
+- `styleOf?: (item) => partialStyle | undefined` (dynamic `drawRect`,
+  `drawCircle`, `drawText`, `drawLine`, `drawPath` only) - paint-time
+  decoration: runs per item every frame; returned fields overlay the item's
+  own `style` for that frame. Reads external state live (mutate a selection
+  set + `render()`, nothing re-registers). Line/path decorations exclude
+  `lineWidth`/`lineWidthPx` (and `cornerRadius*` for paths) - hit-test
+  geometry is registration-time. Not available on statics or `drawImage`.
+
+Full item shapes and semantics: [drawing.md](drawing.md).
 
 | Signature | Default layer |
 | :-- | :-- |

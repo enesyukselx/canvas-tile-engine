@@ -692,7 +692,7 @@ function updateMiniMap() {
 
 ## Clearing Layers
 
-When your scene content changes dynamically (e.g., objects change color, get added or removed), the previous registration has to go away before you redraw. Without that, draw calls accumulate on top of existing ones — every frame pays for every stale registration, and `hitTest` starts returning duplicates. There are three tools, from most to least targeted: a registration `id` (replace automatically), a `DrawHandle` (remove one call), and `clearLayer`/`clearAll` (remove in bulk).
+When your scene's **geometry** changes (objects get added, removed, or moved), the previous registration has to go away before you redraw. Without that, draw calls accumulate on top of existing ones — every frame pays for every stale registration, and `hitTest` starts returning duplicates. There are three tools, from most to least targeted: a registration `id` (replace automatically), a `DrawHandle` (remove one call), and `clearLayer`/`clearAll` (remove in bulk). When only the **appearance** changes (selection, hover), nothing needs to be cleared at all — see [Styling by State](#styling-by-state-optionsstyleof).
 
 ### Replacing with a Registration Id (`options.id`)
 
@@ -719,6 +719,43 @@ Ids share a single namespace across draw kinds and layers: registering `drawCirc
 :::note
 Within a layer, a replaced registration re-enters at the end of the draw order. If you rely on registration order between draw calls sharing a layer, give them separate layers instead.
 :::
+
+### Styling by State (`options.styleOf`)
+
+Re-registering is the right tool when **geometry** changes (items added, removed, or moved). When only the **appearance** changes — selection, hover, a highlight filter — re-registering makes the engine rebuild its spatial index and hit-test entries for items whose positions never moved. At 50k+ items that is real per-click cost.
+
+`styleOf` removes it. The dynamic draw methods (`drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`) accept a `styleOf` callback that runs per item on every frame, at paint time. The fields it returns overlay the item's own `style` for that frame; returning `undefined` leaves the item untouched:
+
+```typescript
+const selected = new Set<number>();
+
+engine.drawRect(seats, 1, {
+    id: "seats",
+    styleOf: (seat) => (selected.has(seat.data.id) ? { fillStyle: "blue" } : undefined),
+});
+engine.render();
+```
+
+Because `styleOf` resolves at paint time, it reads external state **live**. A selection change is now just:
+
+```typescript
+engine.onClick = (coords) => {
+    const hit = engine.hitTestFirst(coords.raw);
+    if (!hit) return;
+    selected.add(hit.item.data.id);
+    engine.render(); // no re-registration, no index rebuild
+};
+```
+
+The items array is registered once and never touched again — no `map` copy, no spatial index rebuild, no hit-test re-registration. The registration `id` is still useful alongside it for actual geometry changes.
+
+Rules of thumb:
+
+- Identify items through `item.data` (the same convention as `hitTest` results); most items should return `undefined`.
+- The returned object **overlays** the item's `style` — return only the fields that change (`{ fillStyle: "blue" }` keeps the item's stroke).
+- Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths): those feed hit-test geometry resolved at registration time, and the types enforce it. A width change is a geometry change — re-register for that.
+- For `drawLine`, `styleOf` overlays the call-level `style` per item, which also makes it the way to give individual lines their own color.
+- Static draw methods do not support `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply. Changing styles is dynamic content.
 
 ### Remove a Single Draw Call (`DrawHandle`)
 
@@ -779,18 +816,18 @@ engine.render();
 
 ### When to Clear?
 
-| Scenario                | Clear Needed? | Example                  |
-| :---------------------- | :------------ | :----------------------- |
-| Camera pan/zoom         | ❌ No         | User drags the map       |
-| Object color changes    | ✅ Yes        | Seat selection in cinema |
-| Object added/removed    | ✅ Yes        | Placing a tower          |
-| Object position changes | ✅ Yes        | Moving a unit            |
-| Loading new level       | ✅ Yes        | Game level transition    |
+| Scenario                | Clear Needed?              | Example                  |
+| :---------------------- | :------------------------- | :----------------------- |
+| Camera pan/zoom         | ❌ No                      | User drags the map       |
+| Object color changes    | ❌ No — use `styleOf`      | Seat selection in cinema |
+| Object added/removed    | ✅ Yes — re-register (`id`) | Placing a tower          |
+| Object position changes | ✅ Yes — re-register (`id`) | Moving a unit            |
+| Loading new level       | ✅ Yes                     | Game level transition    |
 
 :::tip
 If your scene is **static** (objects don't change), you only need to call `drawX()` once at startup. The engine will re-render the same layer content when the camera moves.
 
-If your scene is **dynamic** (objects change state), register with an `id` and re-call `drawX(items, layer, { id })` + `render()` on every change. Reach for `clearLayer()` when you want to wipe a whole layer regardless of what registered on it.
+If your scene is **dynamic**, split the changes: appearance-only changes (selection, hover, highlight) go through `styleOf` + `render()` — no re-registration at all. Geometry changes (add/remove/move) register with an `id` and re-call `drawX(items, layer, { id })` + `render()`. Reach for `clearLayer()` when you want to wipe a whole layer regardless of what registered on it.
 :::
 
 **Static Scene Example (Map):**
@@ -810,30 +847,35 @@ engine.onCoordsChange = () => {
 **Dynamic Scene Example (Cinema Seats):**
 
 ```typescript
-function redraw() {
-    engine.drawRect(
-        seats.map((s) => ({
-            x: s.x,
-            y: s.y,
-            size: 0.9,
-            style: { fillStyle: s.selected ? "blue" : "green" },
-        })),
-        1,
-        { id: "seats" }, // replaces the previous registration
-    );
-    engine.render();
-}
+const selected = new Set<string>();
+
+// Register once: geometry and base styles never change.
+engine.drawRect(
+    seats.map((s) => ({
+        x: s.x,
+        y: s.y,
+        size: 0.9,
+        style: { fillStyle: "green" },
+        data: { id: s.id },
+    })),
+    1,
+    {
+        id: "seats",
+        styleOf: (seat) => (selected.has(seat.data.id) ? { fillStyle: "blue" } : undefined),
+    },
+);
+engine.render();
 
 engine.onClick = (coords) => {
     const seat = findSeat(coords.snapped.x, coords.snapped.y);
     if (seat) {
-        seat.selected = !seat.selected;
-        redraw(); // Draw (replace) + Render
+        selected.has(seat.id) ? selected.delete(seat.id) : selected.add(seat.id);
+        engine.render(); // styleOf reads the set live — nothing re-registers
     }
 };
 ```
 
-Prefer `options.id` for this pattern; `clearLayer(1)` before redrawing also works, but removes *everything* on the layer, not just this registration.
+If seats were added or removed, that would be a geometry change: re-call `drawRect(..., { id: "seats" })` with the new array and the `id` replaces the old registration. `clearLayer(1)` before redrawing also works, but removes *everything* on the layer, not just this registration.
 
 ## Rendering
 

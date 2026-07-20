@@ -65,6 +65,19 @@ engine.onClick = (c) => {
 engine.render();
 ```
 
+To tint the registered items themselves (multi-select over the dataset)
+instead of overlaying a cell, register once with `styleOf` and mutate a set
+(see [drawing.md](drawing.md)):
+
+```ts
+const selected = new Set<string>();
+engine.drawRect(terrainTiles, 1, {
+    id: "terrain",
+    styleOf: (t) => (selected.has(t.data.id) ? { fillStyle: "#22c55e" } : undefined),
+});
+// on click: selected.add(id); engine.render(); - nothing re-registers
+```
+
 ## 2. Main map + synced minimap (React)
 
 Two engines; the minimap uses a static cache and mirrors the main camera.

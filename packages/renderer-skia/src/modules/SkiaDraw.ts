@@ -25,7 +25,15 @@ import {
     type CommandTraceTarget,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import type { LineStyle } from "@canvas-tile-engine/core";
+import type {
+    LineStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    RendererDrawOptions,
+    ShapeDecorationStyle,
+    StyleOf,
+    TextDecorationStyle,
+} from "@canvas-tile-engine/core";
 import {
     FillType,
     matchFont,
@@ -140,8 +148,13 @@ export class SkiaDraw {
         });
     }
 
-    drawRect(items: Array<Rect> | Rect, layer: number = 1): DrawHandle {
+    drawRect(
+        items: Array<Rect> | Rect,
+        layer: number = 1,
+        options?: RendererDrawOptions<Rect, ShapeDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex
@@ -171,21 +184,25 @@ export class SkiaDraw {
                     continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintRect(canvas, item, pos, this.camera.scale);
+                this.paintRect(canvas, item, pos, this.camera.scale, styleOf);
             }
         });
     }
 
-    /** Paint a single rect at a resolved position; `cellSize` is the pixel size of one world cell. */
+    /** Paint a single rect at a resolved position; `cellSize` is the pixel
+     * size of one world cell. `styleOf` is dynamic-path only — the static
+     * picture path records without decorations. */
     private paintRect(
         canvas: SkCanvas,
         item: Rect,
         pos: Coords,
         cellSize: number,
+        styleOf?: StyleOf<Rect, ShapeDecorationStyle>,
     ) {
         const size = item.size ?? 1;
         const origin = this.resolveOrigin(item.origin);
-        const style = item.style;
+        const deco = styleOf?.(item);
+        const style = deco ? { ...item.style, ...deco } : item.style;
         const pxW = (item.width ?? size) * cellSize;
         const pxH = (item.height ?? size) * cellSize;
         const { x: drawX, y: drawY } = this.computeOriginOffset(
@@ -229,8 +246,13 @@ export class SkiaDraw {
         if (count !== -1) canvas.restoreToCount(count);
     }
 
-    drawCircle(items: Array<Circle> | Circle, layer: number = 1): DrawHandle {
+    drawCircle(
+        items: Array<Circle> | Circle,
+        layer: number = 1,
+        options?: RendererDrawOptions<Circle, ShapeDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex
@@ -272,23 +294,26 @@ export class SkiaDraw {
                     continue;
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintCircle(canvas, item, pos, this.camera.scale, true);
+                this.paintCircle(canvas, item, pos, this.camera.scale, true, styleOf);
             }
         });
     }
 
     /** Paint a single circle at a resolved position; `cellSize` is the pixel
      * size of one world cell. `useSizePx` is false on the static picture
-     * path, which records at a fixed scale where pixel sizing cannot hold. */
+     * path, which records at a fixed scale where pixel sizing cannot hold.
+     * `styleOf` is dynamic-path only — static pictures record undecorated. */
     private paintCircle(
         canvas: SkCanvas,
         item: Circle,
         pos: Coords,
         cellSize: number,
         useSizePx: boolean,
+        styleOf?: StyleOf<Circle, ShapeDecorationStyle>,
     ) {
         const origin = this.resolveOrigin(item.origin);
-        const style = item.style;
+        const deco = styleOf?.(item);
+        const style = deco ? { ...item.style, ...deco } : item.style;
         const pxSize = useSizePx
             ? resolveSizePx(item, cellSize)
             : (item.size ?? 1) * cellSize;
@@ -320,21 +345,20 @@ export class SkiaDraw {
         items: Array<Line> | Line,
         style?: LineStyle,
         layer: number = 1,
+        options?: RendererDrawOptions<Line, LineDecorationStyle>,
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            this.strokePaint.setColor(
-                this.color(style?.strokeStyle ?? "#000000"),
-            );
+            const baseColor = this.color(style?.strokeStyle ?? "#000000");
+            this.strokePaint.setColor(baseColor);
             this.strokePaint.setStrokeWidth(
                 resolveLineWidthPx(style, this.camera.scale),
             );
             const dash = resolveLineDashPx(style, this.camera.scale);
-            if (dash)
-                this.strokePaint.setPathEffect(
-                    Skia.PathEffect.MakeDash(dash, 0),
-                );
+            const baseDash = dash ? Skia.PathEffect.MakeDash(dash, 0) : null;
+            if (baseDash) this.strokePaint.setPathEffect(baseDash);
 
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
@@ -360,14 +384,43 @@ export class SkiaDraw {
                     item.from.y,
                 );
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
+
+                const deco = styleOf?.(item);
+                if (deco) {
+                    // Decorated item: repaint with the merged style, then
+                    // restore the shared paint for the rest of the batch.
+                    const merged = { ...style, ...deco };
+                    this.strokePaint.setColor(
+                        this.color(merged.strokeStyle ?? "#000000"),
+                    );
+                    const mergedDash = resolveLineDashPx(
+                        merged,
+                        this.camera.scale,
+                    );
+                    this.strokePaint.setPathEffect(
+                        mergedDash
+                            ? Skia.PathEffect.MakeDash(mergedDash, 0)
+                            : null,
+                    );
+                    canvas.drawLine(a.x, a.y, b.x, b.y, this.strokePaint);
+                    this.strokePaint.setColor(baseColor);
+                    this.strokePaint.setPathEffect(baseDash);
+                    continue;
+                }
+
                 canvas.drawLine(a.x, a.y, b.x, b.y, this.strokePaint);
             }
-            if (dash) this.strokePaint.setPathEffect(null);
+            if (baseDash) this.strokePaint.setPathEffect(null);
         });
     }
 
-    drawText(items: Array<Text> | Text, layer: number = 2): DrawHandle {
+    drawText(
+        items: Array<Text> | Text,
+        layer: number = 2,
+        options?: RendererDrawOptions<Text, TextDecorationStyle>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const styleOf = options?.styleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex
@@ -387,7 +440,8 @@ export class SkiaDraw {
 
             for (const item of visibleItems) {
                 const size = item.size ?? 1;
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
                 const extentWorld =
@@ -475,7 +529,12 @@ export class SkiaDraw {
         };
     }
 
-    drawPath(items: PathItem[], layer: number = 1): DrawHandle {
+    drawPath(
+        items: PathItem[],
+        layer: number = 1,
+        options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
+    ): DrawHandle {
+        const styleOf = options?.styleOf;
         // Conservative world bounds per item for culling, computed once:
         // control-point hull for command paths, vertex bounds for polylines.
         const itemBounds = items.map((item) => {
@@ -520,7 +579,8 @@ export class SkiaDraw {
                 )
                     continue;
 
-                const style = item.style;
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
                 const filled = style?.fillStyle !== undefined;
 
                 const path = Skia.Path.Make();

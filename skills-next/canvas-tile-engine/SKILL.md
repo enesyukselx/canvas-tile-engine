@@ -67,12 +67,22 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    `render()` (items are held by reference - mutation is the cheapest
    animation path, but position/size mutation confuses culling and hit
    caches; re-register for geometry changes).
-4. **Layers are z-order.** Lower layer numbers draw first (underneath).
+4. **Appearance-only changes never need re-registration - use `styleOf`.**
+   Selection/hover/highlight is decoration, not geometry. The dynamic draw
+   methods (`drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`)
+   accept `styleOf: (item) => partialStyle | undefined` in their options; it
+   runs per item every frame at paint time and its returned fields overlay
+   the item's own `style`. It reads external state live: mutate a selection
+   set and call `render()` - no new array, no re-register, no spatial index
+   rebuild. Identify items via `item.data`. Line/path decorations cannot
+   change `lineWidth`/`cornerRadius` (hit-test geometry, type-enforced);
+   statics do not support `styleOf` (caches replay a recorded image).
+5. **Layers are z-order.** Lower layer numbers draw first (underneath).
    Defaults: grid lines 0, shapes/images 1, text 2. Any integer works.
-5. **All interaction is opt-in.** Every `eventHandlers` flag defaults to
+6. **All interaction is opt-in.** Every `eventHandlers` flag defaults to
    `false`. A map that should pan/zoom/click MUST set
    `eventHandlers: { drag: true, zoom: true, click: true }` explicitly.
-6. **Culling is automatic.** Off-viewport items are skipped, and above 500
+7. **Culling is automatic.** Off-viewport items are skipped, and above 500
    items an R-tree spatial index kicks in. You can pass 100k items to a draw
    call; do not write your own visibility filtering.
 

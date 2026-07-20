@@ -25,6 +25,16 @@ import type {
     ImageItem,
     DrawHandle,
     WheelInfo,
+    StyleOf,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    RectDrawOptions,
+    CircleDrawOptions,
+    TextDrawOptions,
+    LineDrawOptions,
+    PathDrawOptions,
 } from "@canvas-tile-engine/core";
 import type { RendererSkia } from "@canvas-tile-engine/renderer-skia";
 import type { EngineHandle } from "./hooks/useCanvasTileEngine";
@@ -54,6 +64,16 @@ export type {
     ImageItem,
     DrawHandle,
     WheelInfo,
+    StyleOf,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    RectDrawOptions,
+    CircleDrawOptions,
+    TextDrawOptions,
+    LineDrawOptions,
+    PathDrawOptions,
 };
 
 /**

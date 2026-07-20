@@ -119,16 +119,19 @@ Common behavior: registers its draw call on mount / when props change,
 removes its handle on unmount, and batches repaints through a single
 `requestAnimationFrame`. `items` props are compared BY REFERENCE - a new
 array identity re-registers the callback and rebuilds the spatial index for
-500+ items. Keep items in `useMemo` or state, never inline literals.
+500+ items. Keep items in `useMemo` or state, never inline literals. The
+`styleOf` prop is the exception: it is read through a ref, so its identity
+may change every render at no cost (inline arrows are fine) and a change
+only repaints.
 
 | Component                         | Props (defaults)                                                                                                                      |
 | :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
-| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`                                                                                                  |
-| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`                                                                                              |
+| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`                                                                                      |
+| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`                                                                                  |
 | `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`                                                                                        |
-| `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`                                                                                                  |
-| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`                                                                             |
-| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`                                                                                          |
+| `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`, `styleOf?`                                                                                      |
+| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`                                                                 |
+| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`                                                                              |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
 | `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
 | `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |
@@ -161,6 +164,29 @@ call is needed, unlike the core API.
     }}
 </CanvasTileEngine.DrawFunction>
 ```
+
+## Styling by state (`styleOf`)
+
+Selection/hover/highlight must NOT go through derived `items` arrays (the
+classic `useMemo(() => items.map(...), [items, selected])` re-registers and
+rebuilds the spatial index on every selection change). Pass `styleOf`
+instead - it runs per item at paint time and overlays the item's own style:
+
+```tsx
+const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+
+<CanvasTileEngine.Rect
+    items={seatRects} // geometry only; stable, never re-registers
+    layer={1}
+    styleOf={(s) => (selected.has(s.data.id) ? { fillStyle: "blue" } : undefined)}
+/>;
+```
+
+Contract: `items` changed = geometry changed = re-register (memoize it);
+`styleOf` changed = appearance changed = repaint only. Identify items via
+`item.data`. Line/Path decorations exclude `lineWidth*` (Path also
+`cornerRadius*`) - hit-test geometry is registration-time. Statics take no
+`styleOf`.
 
 ## Updating drawn data
 
@@ -209,6 +235,8 @@ const items = useMemo(() => (img ? [{ x: 0, y: 0, size: 2, img }] : []), [img]);
 
 - Inline `items={[...]}` literal: re-registers every render. Use
   `useMemo`/state.
+- Selection/hover styling derived into `items` (`useMemo` keyed on the
+  selection): re-registers + index rebuild per click. Use `styleOf`.
 - Expecting `config`/`center`/`renderer` prop changes to apply: they will not;
   remount with `key` or use runtime APIs.
 - Imperative drawing without gating on `engine.isReady`: drops the call
