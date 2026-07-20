@@ -31,18 +31,25 @@ export type {
     DrawObject,
     EventHandlers,
     onClickCallback,
+    onRightClickCallback,
     onHoverCallback,
     onMouseDownCallback,
     onMouseUpCallback,
     onMouseLeaveCallback,
+    onWheelCallback,
+    onZoomCallback,
     onDrawCallback,
+    WheelInfo,
     Rect,
     Line,
+    LineStyle,
     Circle,
     Text,
     PathItem,
     PathStyle,
+    PathCommand,
     ImageItem,
+    DrawHandle,
 } from "./types";
 export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
@@ -50,6 +57,7 @@ export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 export {
     CanvasTileEngine as CanvasTileEngineCore,
     gridToSize,
+    pathCommandsBounds,
     SpriteSheet,
     SpriteAnimator,
 } from "@canvas-tile-engine/core";

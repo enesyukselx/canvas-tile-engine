@@ -16,11 +16,15 @@ import type {
     onDrawCallback,
     Rect,
     Line,
+    LineStyle,
     Circle,
     PathItem,
     PathStyle,
+    PathCommand,
     Text,
     ImageItem,
+    DrawHandle,
+    WheelInfo,
 } from "@canvas-tile-engine/core";
 import type { RendererSkia } from "@canvas-tile-engine/renderer-skia";
 import type { EngineHandle } from "./hooks/useCanvasTileEngine";
@@ -41,11 +45,15 @@ export type {
     onDrawCallback,
     Rect,
     Line,
+    LineStyle,
     Circle,
     Text,
     PathItem,
     PathStyle,
+    PathCommand,
     ImageItem,
+    DrawHandle,
+    WheelInfo,
 };
 
 /**

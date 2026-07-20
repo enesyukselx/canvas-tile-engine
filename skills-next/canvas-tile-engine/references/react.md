@@ -139,6 +139,13 @@ array identity re-registers the callback and rebuilds the spatial index for
 Item shapes are identical to the core draw API: [drawing.md](drawing.md).
 Sprite semantics: [sprites.md](sprites.md).
 
+All the types and helpers these components and handles use are re-exported from
+`@canvas-tile-engine/react` — import them from the binding instead of reaching
+into `@canvas-tile-engine/core`. That includes the draw-object types (`Rect`,
+`Circle`, `Text`, `Line`, `LineStyle`, `ImageItem`, `PathItem`, `PathStyle`,
+`PathCommand`, `Coords`), the imperative `DrawHandle`, every `on*Callback`
+type plus `WheelInfo`, and the `gridToSize` / `pathCommandsBounds` helpers.
+
 Static components clear their cache automatically when `items` gets a new
 array identity (or when `cacheKey` changes) — no manual `clearStaticCache`
 call is needed, unlike the core API.
@@ -163,7 +170,7 @@ swaps the drawn content automatically.
 ```tsx
 const [tiles, setTiles] = useState<Rect[]>([]);
 
-const paint = (coords: ProcessedClick) =>
+const paint: onClickCallback = (coords) =>
     setTiles((prev) => [
         ...prev,
         {
@@ -174,7 +181,7 @@ const paint = (coords: ProcessedClick) =>
         },
     ]);
 
-<CanvasTileEngine engine={engine} config={config} renderer={renderer} onClick={(coords) => paint(coords)}>
+<CanvasTileEngine engine={engine} config={config} renderer={renderer} onClick={paint}>
     <CanvasTileEngine.Rect items={tiles} layer={1} />
 </CanvasTileEngine>;
 ```

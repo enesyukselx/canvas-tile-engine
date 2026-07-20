@@ -4,11 +4,14 @@ sidebar_position: 5
 
 # Types Reference
 
-Core types are exported from `@canvas-tile-engine/core` and re-exported by the React packages where useful.
+These types are defined in `@canvas-tile-engine/core` and re-exported by the `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native` bindings (which also add `EngineHandle`). Import them from whichever package your app already depends on — a React or React Native app does not need a direct `core` dependency for types.
 
 ```ts
+// Vanilla / server: import from core
 import type { Rect, Circle, Text, Line, PathItem, PathStyle, ImageItem, Coords } from "@canvas-tile-engine/core";
-import type { EngineHandle } from "@canvas-tile-engine/react";
+
+// React / React Native: import the same types (plus EngineHandle) from the binding
+import type { Rect, PathItem, PathCommand, LineStyle, DrawHandle, EngineHandle } from "@canvas-tile-engine/react";
 ```
 
 ## Draw Objects
@@ -176,6 +179,25 @@ type onZoomCallback = (scale: number) => void;
 ```
 
 `coords.raw` is the exact world coordinate. `coords.snapped` is floored to the grid cell.
+
+### `onWheelCallback` And `WheelInfo`
+
+Fires for wheel (desktop) and pinch (touch) zoom gestures (requires `eventHandlers.zoom`). The first three arguments match the pointer callbacks; a fourth describes the gesture:
+
+```ts
+type onWheelCallback = (
+    coords: { raw: Coords; snapped: Coords },
+    mouse: { raw: Coords; snapped: Coords },
+    client: { raw: Coords; snapped: Coords },
+    wheel: WheelInfo,
+) => void;
+
+type WheelInfo = {
+    deltaY: number; // negative = zoom in; synthesized for pinch
+    direction: "in" | "out";
+    source: "wheel" | "pinch";
+};
+```
 
 ### `onDrawCallback`
 
