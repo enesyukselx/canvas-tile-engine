@@ -1,4 +1,4 @@
-export { parseTiledMap, tilesetSpriteRect, tiledPxToWorld, type ParseTiledMapOptions } from "./parse";
+export { parseTiledMap, tilesetSpriteRect, tiledPxToWorld, tiledMapBounds, type ParseTiledMapOptions } from "./parse";
 export {
     tileLayerToItems,
     objectLayerToItems,

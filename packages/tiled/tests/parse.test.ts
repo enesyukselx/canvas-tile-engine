@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTiledMap } from "../src/parse";
+import { parseTiledMap, tiledMapBounds } from "../src/parse";
 import { GID_FLIP_H } from "../src/gid";
 import type { TmjMap, TiledTileLayerData, TiledObjectLayerData } from "../src/types";
 
@@ -166,6 +166,13 @@ describe("parseTiledMap — layer tree", () => {
         expect(map.layers[0].name).toBe("a");
         expect(map.layers[0].opacity).toBe(0.25);
         expect(map.warnings.some((w) => w.includes("image layers"))).toBe(true);
+    });
+});
+
+describe("tiledMapBounds", () => {
+    it("returns the corner-space extents of the map", async () => {
+        const map = await parseTiledMap(baseMap({ width: 40, height: 24, layers: [] }));
+        expect(tiledMapBounds(map)).toEqual({ minX: -0.5, minY: -0.5, maxX: 39.5, maxY: 23.5 });
     });
 });
 

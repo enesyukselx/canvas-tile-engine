@@ -1,4 +1,4 @@
-import type { Coords, SpriteRect } from "@canvas-tile-engine/core";
+import type { Bounds, Coords, SpriteRect } from "@canvas-tile-engine/core";
 import { decodeGid } from "./gid";
 import { decodeLayerData } from "./decode";
 import { pxPointToWorld, pxToWorld, rotateAround } from "./coords";
@@ -323,3 +323,17 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
 /** Item-space world position of a Tiled pixel coordinate — exposed for apps
  * that store extra pixel-space data in custom properties. */
 export const tiledPxToWorld = pxToWorld;
+
+/**
+ * The map's world extents in corner space — cell 0 starts at -0.5 because
+ * integers are cell centers. Feed it to `config.bounds`/`engine.setBounds`
+ * to keep the camera on the map, and to `engine.fitBounds` to frame it.
+ */
+export function tiledMapBounds(map: TiledMap): Bounds {
+    return {
+        minX: -0.5,
+        minY: -0.5,
+        maxX: map.columns - 0.5,
+        maxY: map.rows - 0.5,
+    };
+}

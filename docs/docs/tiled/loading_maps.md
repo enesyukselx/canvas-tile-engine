@@ -30,6 +30,27 @@ engine.render();
 
 Tiled layers occupy engine layers `0, 1, 2, ...` in map order (shift with `layerOffset`). Re-mounting the same map replaces the previous registrations — mounts use namespaced registration ids internally.
 
+## Camera Setup
+
+`tiledMapBounds(map)` returns the map's world extents in corner space (cell 0 starts at `-0.5` because integers are cell centers). Wire it into the camera so users cannot pan off the map, and derive zoom limits from your cell size:
+
+```typescript
+import { tiledMapBounds } from "@canvas-tile-engine/tiled";
+
+const CELL = 32;
+const { center, ...size } = gridToSize({ columns: map.columns, rows: map.rows, cellSize: CELL });
+
+const config = {
+    ...size,
+    bounds: tiledMapBounds(map), // camera stays on the map
+    minScale: CELL,              // when the viewport shows the whole map at CELL px/cell,
+    maxScale: CELL * 4,          // CELL is the fit scale; allow up to 4x zoom-in
+    // ...
+};
+```
+
+If your viewport is smaller than the full map, pick `minScale` as the fit scale instead: `Math.min(viewportWidth / map.columns, viewportHeight / map.rows)`. The same bounds also work with `engine.fitBounds(tiledMapBounds(map))` for a zoom-to-fit action, and `engine.setBounds(...)` if you mount a different map at runtime.
+
 ## What Maps Are Supported
 
 | Feature | Supported | Notes |

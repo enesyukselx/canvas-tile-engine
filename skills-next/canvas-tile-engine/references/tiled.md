@@ -20,6 +20,11 @@ engine.render();
 
 - Tiled layers land on engine layers `layerOffset + index` in map order
   (default offset 0).
+- Camera: `tiledMapBounds(map)` → corner-space extents (`minX/minY = -0.5`)
+  for `config.bounds`/`setBounds` (no panning off the map) and
+  `fitBounds` (zoom-to-fit). Zoom limits: fit scale =
+  `min(viewportW / map.columns, viewportH / map.rows)` as `minScale`, a
+  multiple of the cell pixel size as `maxScale`.
 - Mount uses `tiled:`-namespaced registration ids: re-mounting REPLACES, it
   never accumulates.
 - Tile layers draw through static caches (pass `dynamic: true` to opt out);

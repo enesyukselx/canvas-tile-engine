@@ -8,6 +8,7 @@ import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 import {
     mountTiledMap,
     parseTiledMap,
+    tiledMapBounds,
     type TiledObjectData,
 } from "@canvas-tile-engine/tiled";
 
@@ -20,14 +21,21 @@ const json = await (await fetch("/maps/outside.tmj")).json();
 const map = await parseTiledMap(json);
 if (map.warnings.length > 0) console.warn("[tiled]", map.warnings);
 
+const CELL = 32;
 const { center: center, ...config } = gridToSize({
     columns: map.columns,
     rows: map.rows,
-    cellSize: 32,
+    cellSize: CELL,
 });
 
 const CONFIG: CanvasTileEngineConfig = {
     ...config,
+    // The viewport shows the whole map at CELL px per cell, so CELL is the
+    // fit-the-map scale: no zooming out past the full map, up to 4x in.
+    minScale: CELL,
+    maxScale: CELL * 4,
+    // Corner-space map extents: the camera can never pan off the map.
+    bounds: tiledMapBounds(map),
     gridAligned: true,
     responsive: "preserve-viewport",
     backgroundColor: "#1a1a24",
