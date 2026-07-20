@@ -32,6 +32,7 @@ here, check the installed package's `.d.ts` files before using it.
 | React web app | add `@canvas-tile-engine/react` | [react](references/react.md) |
 | React Native app | `@canvas-tile-engine/core` + `@canvas-tile-engine/react-native` + `@canvas-tile-engine/renderer-skia` + `@shopify/react-native-skia` | [react-native](references/react-native.md) |
 | Server-side images (OG images, thumbnails, snapshots) | `@canvas-tile-engine/core` + `@canvas-tile-engine/renderer-server` | [server](references/server.md) |
+| Maps authored in the Tiled editor (.tmj) | add `@canvas-tile-engine/tiled` | [tiled](references/tiled.md) |
 
 `RendererCanvas` and `RendererWebGL` are drop-in swaps of each other: change
 `new RendererCanvas()` to `new RendererWebGL()` and nothing else. Default to
@@ -211,6 +212,7 @@ const png = await renderToBuffer({
 | [references/react-native.md](references/react-native.md) | RN component, Skia types, layout sizing, touch behavior, custom Skia drawing, platform differences. |
 | [references/server.md](references/server.md) | `renderToBuffer`, low-level `RendererServer`, fonts, output formats, differences from browser renderers. |
 | [references/sprites.md](references/sprites.md) | `sprite` source rects, `SpriteSheet`, `SpriteAnimator`, the React `<Sprite>` component. |
+| [references/tiled.md](references/tiled.md) | `@canvas-tile-engine/tiled`: parseTiledMap/mountTiledMap, supported .tmj subset, object hit testing, tile animations, pure mappers. |
 | [references/performance.md](references/performance.md) | Renderer choice, culling/spatial index internals, static caches, WebGL specifics (`invalidateTexture`, overlay layering caveat). |
 | [references/recipes.md](references/recipes.md) | Complete end-to-end builds: game map, minimap sync, pixel painter, RN board, OG-image endpoint, responsive fullscreen map. |
 

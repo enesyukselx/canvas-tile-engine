@@ -428,6 +428,25 @@ importers:
         specifier: ^8.1.1
         version: 8.1.4(@types/node@25.3.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)
 
+  examples/vanilla-js-examples/tiled-map:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:*
+        version: link:../../../packages/renderer-canvas
+      '@canvas-tile-engine/tiled':
+        specifier: workspace:*
+        version: link:../../../packages/tiled
+    devDependencies:
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.1
+        version: 8.1.4(@types/node@25.3.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)
+
   packages/core:
     dependencies:
       rbush:
@@ -528,6 +547,19 @@ importers:
       '@canvas-tile-engine/core':
         specifier: workspace:^
         version: link:../core
+
+  packages/tiled:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:^
+        version: link:../core
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.3
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.3
+        version: 25.3.3
 
 packages:
 
@@ -3911,6 +3943,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   fill-range@7.1.1:
     resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
@@ -9606,6 +9641,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
+
+  fflate@0.8.3: {}
 
   fill-range@7.1.1:
     dependencies:
