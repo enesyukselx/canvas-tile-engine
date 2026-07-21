@@ -213,51 +213,56 @@ export class CanvasDraw {
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             ctx.save();
-            if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+            const baseStroke = style?.strokeStyle ?? "#000000";
+            ctx.strokeStyle = baseStroke;
 
             const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
-            const dash = resolveLineDashPx(style, this.camera.scale);
-            if (dash) ctx.setLineDash(dash);
+            const baseDash = resolveLineDashPx(style, this.camera.scale);
+            if (baseDash) ctx.setLineDash(baseDash);
 
-            // Decorated items leave the batched path (which strokes once with
-            // the call-level style) and stroke individually after it.
-            let decorated: Array<{ item: Line; deco: LineDecorationStyle }> | null = null;
+            // Contiguous batching keeps the array's paint order (later items
+            // draw on top): undecorated runs share one stroke; a decorated
+            // item flushes the open run, strokes on its own with the merged
+            // style, and the next run starts fresh.
+            let open = false;
+            const flush = () => {
+                if (!open) return;
+                ctx.stroke();
+                open = false;
+            };
 
-            ctx.beginPath();
             for (const item of list) {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
-                const deco = styleOf?.(item);
-                if (deco) {
-                    (decorated ??= []).push({ item, deco });
-                    continue;
-                }
-
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
 
-                ctx.moveTo(a.x, a.y);
-                ctx.lineTo(b.x, b.y);
-            }
-            ctx.stroke();
-
-            if (decorated) {
-                for (const { item, deco } of decorated) {
+                const deco = styleOf?.(item);
+                if (deco) {
+                    flush();
                     const merged = { ...style, ...deco };
                     ctx.strokeStyle = merged.strokeStyle ?? "#000000";
                     ctx.setLineDash(resolveLineDashPx(merged, this.camera.scale) ?? []);
-
-                    const a = this.transformer.worldToScreen(item.from.x, item.from.y);
-                    const b = this.transformer.worldToScreen(item.to.x, item.to.y);
                     ctx.beginPath();
                     ctx.moveTo(a.x, a.y);
                     ctx.lineTo(b.x, b.y);
                     ctx.stroke();
+                    ctx.strokeStyle = baseStroke;
+                    ctx.setLineDash(baseDash ?? []);
+                    continue;
                 }
+
+                if (!open) {
+                    ctx.beginPath();
+                    open = true;
+                }
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
             }
+            flush();
 
             resetAlpha?.();
             ctx.restore();

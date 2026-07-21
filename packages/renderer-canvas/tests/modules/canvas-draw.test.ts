@@ -803,9 +803,46 @@ describe("styleOf paint-time decoration", () => {
         });
         render(ctx);
 
-        // First stroke is the batched pass with the call-level style, then the
+        // First stroke is the batched run with the call-level style, then the
         // decorated item strokes on its own.
         expect(strokes).toEqual(["#123", "#f00"]);
+    });
+
+    it("preserves array paint order when a decorated line comes before a plain one", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeStyleRecordingCtx();
+
+        const items = [
+            { from: { x: 0, y: 0 }, to: { x: 2, y: 2 }, data: { id: 0 } },
+            { from: { x: 1, y: 0 }, to: { x: 3, y: 2 }, data: { id: 1 } },
+        ];
+        draw.drawLine(items, { strokeStyle: "#123" }, 1, {
+            styleOf: (item) => ((item.data as { id: number }).id === 0 ? { strokeStyle: "#f00" } : undefined),
+        });
+        render(ctx);
+
+        // The decorated item is FIRST in the array, so it must paint first —
+        // the plain line after it draws on top, matching hit-test priority.
+        expect(strokes).toEqual(["#f00", "#123"]);
+    });
+
+    it("batches contiguous undecorated runs around decorated items without reordering", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeStyleRecordingCtx();
+
+        const items = [
+            { from: { x: 0, y: 0 }, to: { x: 1, y: 1 }, data: { id: 0 } },
+            { from: { x: 1, y: 0 }, to: { x: 2, y: 1 }, data: { id: 1 } },
+            { from: { x: 2, y: 0 }, to: { x: 3, y: 1 }, data: { id: 2 } },
+            { from: { x: 3, y: 0 }, to: { x: 4, y: 1 }, data: { id: 3 } },
+        ];
+        draw.drawLine(items, { strokeStyle: "#123" }, 1, {
+            styleOf: (item) => ((item.data as { id: number }).id === 1 ? { strokeStyle: "#f00" } : undefined),
+        });
+        render(ctx);
+
+        // 4 items, 3 strokes: run(#0) -> decorated(#1) -> run(#2, #3).
+        expect(strokes).toEqual(["#123", "#f00", "#123"]);
     });
 
     it("decorates paths at paint time, including the fill toggle staying visual-only", () => {
