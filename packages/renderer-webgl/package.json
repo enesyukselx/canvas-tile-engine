@@ -1,6 +1,6 @@
 {
     "name": "@canvas-tile-engine/renderer-webgl",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with WebGL",
     "author": "Enes Yüksel",
     "license": "MIT",
