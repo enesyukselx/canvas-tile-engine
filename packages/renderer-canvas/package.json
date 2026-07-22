@@ -1,6 +1,6 @@
 {
     "name": "@canvas-tile-engine/renderer-canvas",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with Canvas",
     "author": "Enes Yüksel",
     "license": "MIT",
@@ -51,7 +51,7 @@
         "format:check": "oxfmt --check"
     },
     "peerDependencies": {
-        "@canvas-tile-engine/core": ">=0.4.0"
+        "@canvas-tile-engine/core": ">=0.10.0"
     },
     "dependencies": {
         "@canvas-tile-engine/core": "workspace:^"

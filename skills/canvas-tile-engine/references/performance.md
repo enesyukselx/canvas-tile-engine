@@ -21,10 +21,11 @@ Consequences for generated code:
 - Prefer ONE `drawRect(bigArray)` over many `drawRect(singleItem)` calls -
   the spatial index and style batching work per call.
 - The index is built from item positions at registration time. If item
-  positions change, re-register (new handle / layer swap). If only styles or
-  sprite frames change, mutation + `render()` is fine.
+  positions change, re-register (new handle / layer swap). If only styles
+  change, use `styleOf` (paint-time overlay, zero rebuild; core >= 0.10) or
+  mutation + `render()`; sprite frame changes are mutation + `render()`.
 - Keep item arrays referentially stable in React - a new array identity
-  rebuilds the index.
+  rebuilds the index. The `styleOf` prop is exempt (read through a ref).
 
 ## Choosing a renderer
 
@@ -66,8 +67,9 @@ an offscreen canvas once, then blit the visible region per frame.
 
 - Use when the item set is static AND mostly visible (minimaps, fixed-zoom
   overviews). Do not use for content that changes.
-- Invalidation is manual: `clearStaticCache(cacheKey)` after data changes,
-  then re-register the draw call.
+- Invalidation (core >= 0.10): re-register with the same `cacheKey` - it
+  replaces the old registration and rebuilds the cache. On older cores it is
+  manual: `clearStaticCache(cacheKey)` after data changes, then re-register.
 - Offscreen dimension cap: 16384px. World extent * scale beyond that falls
   back safely.
 
@@ -84,8 +86,11 @@ an offscreen canvas once, then blit the visible region per frame.
 2. Stable arrays (React: `useMemo`/state; vanilla: keep the same array and
    mutate for animation).
 3. Static caches for minimap/overview layers; `cacheKey` per dataset.
-4. Transient visuals (hover/selection) on their own layer or a single
-   swapped `DrawHandle` - never accumulate handles per mouse move.
+4. Selection/hover tint on registered items via `styleOf` (mutate the
+   selection set + `render()`; zero re-registration, core >= 0.10). Overlay
+   visuals (a hover cursor cell) on their own layer with a registration id
+   (`drawRect(item, layer, { id: "hover" })`) or a single swapped
+   `DrawHandle` - never accumulate handles per mouse move.
 5. `SpriteAnimator` for frame animation (fps-gated repaints) instead of a
    60fps `requestAnimationFrame` loop.
 6. Enable only needed `eventHandlers`; `hover` fires on every pointer move.
