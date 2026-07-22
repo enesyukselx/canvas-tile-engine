@@ -50,7 +50,7 @@
         "test:coverage": "vitest run --coverage"
     },
     "peerDependencies": {
-        "@canvas-tile-engine/core": ">=0.4.0",
+        "@canvas-tile-engine/core": ">=0.10.0",
         "@shopify/react-native-skia": ">=2.0.0-next.0",
         "react-native": ">=0.78.0"
     },
