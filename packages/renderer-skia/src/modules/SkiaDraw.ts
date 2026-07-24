@@ -235,12 +235,18 @@ export class SkiaDraw {
             this.strokePaint.setStrokeWidth(
                 resolveLineWidthPx(style, cellSize),
             );
+            const dash = resolveLineDashPx(style, cellSize);
+            if (dash)
+                this.strokePaint.setPathEffect(
+                    Skia.PathEffect.MakeDash(dash, 0),
+                );
             if (rounded)
                 canvas.drawRRect(
                     this.makeRRect(rect, radius),
                     this.strokePaint,
                 );
             else canvas.drawRect(rect, this.strokePaint);
+            if (dash) this.strokePaint.setPathEffect(null);
         }
 
         if (count !== -1) canvas.restoreToCount(count);
@@ -337,7 +343,13 @@ export class SkiaDraw {
             this.strokePaint.setStrokeWidth(
                 resolveLineWidthPx(style, cellSize),
             );
+            const dash = resolveLineDashPx(style, cellSize);
+            if (dash)
+                this.strokePaint.setPathEffect(
+                    Skia.PathEffect.MakeDash(dash, 0),
+                );
             canvas.drawCircle(cx, cy, radius, this.strokePaint);
+            if (dash) this.strokePaint.setPathEffect(null);
         }
     }
 
@@ -810,9 +822,10 @@ export class SkiaDraw {
     // of the Canvas2D renderer's offscreen cache. The picture is recorded at
     // the camera scale active at record time and replayed under the camera
     // transform, so world-unit style values (lineWidth, radius) scale with
-    // zoom exactly as intended. Pixel-denominated opt-ins (lineWidthPx) are
-    // baked in at the record scale and scale along on replay — use the
-    // dynamic draw methods when a zoom-independent px width must hold.
+    // zoom exactly as intended. Pixel-denominated opt-ins (lineWidthPx,
+    // lineDashPx) are baked in at the record scale and scale along on replay
+    // — use the dynamic draw methods when a zoom-independent px value must
+    // hold.
 
     drawStaticRect(
         items: Array<Rect>,

@@ -391,3 +391,56 @@ describe("non-square rects", () => {
         expect(rects).toHaveLength(1);
     });
 });
+
+// Dash unit contract shared by all renderers: lineDash is world units
+// (px = value * scale), lineDashPx is screen pixels and wins. On Skia the
+// pattern lands on the stroke paint as a dash path effect.
+describe("dashed rect/circle borders", () => {
+    it("applies world lineDash to rect strokes scaled by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.5, 0.25] } }],
+            1
+        );
+        render(canvas);
+
+        expect(ops).toHaveLength(1);
+        expect(ops[0].pathEffect).toEqual({ __dash: [5, 2.5], phase: 0 });
+    });
+
+    it("applies lineDashPx to circle strokes and resets the effect afterwards", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawCircle(
+            [
+                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDashPx: [6, 3] } },
+                { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } }, // stays solid
+            ],
+            1
+        );
+        render(canvas);
+
+        const circles = ops.filter((o) => o.op === "circle");
+        expect(circles).toHaveLength(2);
+        expect(circles[0].pathEffect).toEqual({ __dash: [6, 3], phase: 0 });
+        expect(circles[1].pathEffect).toBeNull();
+    });
+
+    it("keeps fills unaffected by a dashed border", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [{ x: 1, y: 1, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00", lineDashPx: [4, 2] } }],
+            1
+        );
+        render(canvas);
+
+        expect(ops).toHaveLength(2); // fill + stroke
+        expect(ops[0].pathEffect).toBeNull();
+        expect(ops[1].pathEffect).toEqual({ __dash: [4, 2], phase: 0 });
+    });
+});
