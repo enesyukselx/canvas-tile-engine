@@ -391,3 +391,33 @@ describe("non-square rects", () => {
         expect(rects).toHaveLength(1);
     });
 });
+
+describe("smuggled decoration geometry on paths", () => {
+    it("resolves the stroked width from the registration-time item style", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        // Non-literal returns bypass TS excess-property checks; the width
+        // must come from the layers hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 4, y: 0 },
+                        { x: 4, y: 4 },
+                    ],
+                    style: { strokeStyle: "#f00", lineWidthPx: 4 },
+                },
+            ],
+            1,
+            { styleOf: () => smuggled }
+        );
+        render(canvas);
+
+        const paths = ops.filter((o) => o.op === "path");
+        expect(paths).toHaveLength(1);
+        expect(paths[0].strokeWidth).toBe(4); // item width, not the smuggled 12
+    });
+});
