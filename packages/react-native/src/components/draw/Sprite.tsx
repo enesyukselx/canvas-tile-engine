@@ -29,6 +29,12 @@ export interface SpriteProps {
     layer?: number;
     /** Fired when a non-looping animation reaches its last frame. */
     onComplete?: () => void;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative animations.
+     * Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
@@ -45,6 +51,7 @@ export const Sprite = memo(function Sprite({
     playing = true,
     layer = 1,
     onComplete,
+    hitTest,
 }: SpriteProps) {
     const { engine, requestRender } = useEngineContext();
 
@@ -59,7 +66,7 @@ export const Sprite = memo(function Sprite({
     onCompleteRef.current = onComplete;
 
     useEffect(() => {
-        const handle = engine.drawImage(drawnItems, layer);
+        const handle = engine.drawImage(drawnItems, layer, { hitTest });
         requestRender();
         return () => {
             if (handle) {
@@ -69,7 +76,7 @@ export const Sprite = memo(function Sprite({
                 requestRender();
             }
         };
-    }, [engine, drawnItems, layer, requestRender]);
+    }, [engine, drawnItems, layer, hitTest, requestRender]);
 
     useEffect(() => {
         if (!playing || frames.length === 0) return;

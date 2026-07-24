@@ -140,7 +140,7 @@ after mount.
 ### Draw methods
 
 All return a `DrawHandle` (`{ id: symbol, layer: number }`) and accept an
-optional `options?` last parameter (core >= 0.10) with two fields:
+optional `options?` last parameter (core >= 0.10) with these fields:
 
 - `id?: string` - re-registering with the same `id` atomically replaces the
   previous registration (draw callback + hit-test entries) instead of
@@ -154,6 +154,13 @@ optional `options?` last parameter (core >= 0.10) with two fields:
   set + `render()`, nothing re-registers). Line/path decorations exclude
   `lineWidth`/`lineWidthPx` (and `cornerRadius*` for paths) - hit-test
   geometry is registration-time. Not available on statics or `drawImage`.
+- `hitTest?: boolean` - `false` keeps the registration out of hit testing
+  (the `pointer-events: none` of the draw API). Declare decorative content
+  (floor tiles, background images, zone overlays) once at registration and
+  every `hitTest`/`hitTestFirst`/`hitTestRect` query stays clean - PREFER
+  this over filtering results or passing `layer` at every query site. Also
+  skips hit-registry bookkeeping (spatial index) for large decorative sets.
+  Statics accept it too (as their `options?` last parameter). Default `true`.
 
 Full item shapes and semantics: [drawing.md](drawing.md).
 
@@ -210,6 +217,10 @@ touch targets with `padding` (world units) and/or `paddingPx` (screen pixels,
 zoom-independent, converted with the current scale per query). Both expand
 every tested item outward and combine additively; negative values are 0. Use
 these instead of registering invisible oversized "halo" items.
+
+Decorative registrations opt out with `hitTest: false` at draw time (see
+Draw methods above) - e.g. `engine.drawRect(floorTiles, 0, { hitTest: false })`
+keeps a marquee from selecting the floor along with the units.
 
 ```ts
 engine.drawRect(stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })), 2);

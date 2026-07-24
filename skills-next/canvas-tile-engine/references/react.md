@@ -126,21 +126,23 @@ only repaints.
 
 | Component                         | Props (defaults)                                                                                                                      |
 | :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
-| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`                                                                                      |
-| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`                                                                                  |
-| `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`                                                                                        |
+| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`, `hitTest?`                                                                                      |
+| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`, `hitTest?`                                                                                  |
+| `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`, `hitTest?`                                                                                        |
 | `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`, `styleOf?`                                                                                      |
-| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`                                                                 |
-| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`                                                                              |
+| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`, `hitTest?`                                                                 |
+| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`, `hitTest?`                                                                              |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
-| `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
-| `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |
-| `<CanvasTileEngine.StaticImage>`  | `items: ImageItem[]`, `cacheKey: string`, `layer = 1`                                                                                 |
-| `<CanvasTileEngine.Sprite>`       | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?` |
+| `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                      |
+| `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                    |
+| `<CanvasTileEngine.StaticImage>`  | `items: ImageItem[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                 |
+| `<CanvasTileEngine.Sprite>`       | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?`, `hitTest?` |
 | `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config, transform) => void`, `layer = 1`                                                                    |
 
 Item shapes are identical to the core draw API: [drawing.md](drawing.md).
-Sprite semantics: [sprites.md](sprites.md).
+Sprite semantics: [sprites.md](sprites.md). `hitTest={false}` keeps a
+component's items out of `hitTest`/`hitTestRect` queries (decorative floors,
+terrain, overlays) — the `pointer-events: none` of the draw components.
 
 All the types and helpers these components and handles use are re-exported from
 `@canvas-tile-engine/react` — import them from the binding instead of reaching

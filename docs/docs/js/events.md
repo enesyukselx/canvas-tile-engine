@@ -371,7 +371,26 @@ Semantics to know:
 - Draw calls with 500+ items are queried through a spatial index, so
   hit testing large scenes on hover is cheap.
 
-### Generous touch targets: `padding` and `paddingPx`
+### Opting content out: `hitTest: false`
+
+By default every rect/circle/image/path/line registration participates in hit
+testing, so decorative content — floor tiles, background art, zone overlays —
+shows up in every query result: a marquee over the board selects the floor
+along with the units. Instead of filtering at every query site, declare
+decorative content once at registration — the `pointer-events: none` of the
+draw API:
+
+```ts
+engine.drawRect(floorTiles, 0, { id: "floor", hitTest: false });
+engine.drawStaticImage(terrainTiles, "terrain", 0, { hitTest: false });
+
+// Marquee and click queries now see only interactive content
+const hits = engine.hitTestRect(dragBounds, { mode: "contain" }); // units only
+```
+
+Opted-out registrations skip hit-registry bookkeeping entirely, so large
+decorative sets also stop paying the spatial-index cost. Re-registering under
+the same `id` (or `cacheKey`) with the flag changed toggles participation.
 
 By default the hit area is exactly the drawn geometry, which makes small
 markers hard to click. Both options expand every item's hit geometry outward:
