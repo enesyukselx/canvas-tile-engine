@@ -21,12 +21,18 @@ export interface LineProps {
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     styleOf?: StyleOf<LineType<any>, LineDecorationStyle>;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content.
+     * Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
  * Draws lines on the canvas.
  */
-export const Line = memo(function Line({ items, style, layer = 1, styleOf }: LineProps) {
+export const Line = memo(function Line({ items, style, layer = 1, styleOf, hitTest }: LineProps) {
     const { engine, requestRender } = useEngineContext();
 
     // Read through a ref so styleOf identity changes never re-register.
@@ -40,7 +46,7 @@ export const Line = memo(function Line({ items, style, layer = 1, styleOf }: Lin
     }, [styleOf, requestRender]);
 
     useEffect(() => {
-        const handle = engine.drawLine(items, style, layer, { styleOf: (item) => styleOfRef.current?.(item) });
+        const handle = engine.drawLine(items, style, layer, { styleOf: (item) => styleOfRef.current?.(item), hitTest });
         requestRender();
         return () => {
             if (handle) {
@@ -50,7 +56,7 @@ export const Line = memo(function Line({ items, style, layer = 1, styleOf }: Lin
                 requestRender();
             }
         };
-    }, [engine, items, style, layer, requestRender]);
+    }, [engine, items, style, layer, hitTest, requestRender]);
 
     return null;
 });
