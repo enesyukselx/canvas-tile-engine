@@ -450,6 +450,42 @@ describe("CanvasTileEngine", () => {
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3, paddingPx: 0.4 })).toBeDefined();
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3 })).toBeUndefined();
         });
+
+        it("hitTest: false keeps a registration out of every hit query", () => {
+            const e = createEngineWithDrawAPI();
+            // Decorative floor under an interactive unit at the same cell
+            e.drawRect({ x: 2, y: 2, size: 1 }, 0, { hitTest: false });
+            e.drawCircle({ x: 2, y: 2, size: 1 }, 2);
+
+            const hits = e.hitTest({ x: 2.5, y: 2.5 });
+            expect(hits).toHaveLength(1);
+            expect(hits[0].kind).toBe("circle");
+
+            // Marquee over the cell sees the unit, not the floor
+            const marquee = e.hitTestRect({ minX: 1.8, maxX: 3.2, minY: 1.8, maxY: 3.2 });
+            expect(marquee).toHaveLength(1);
+            expect(marquee[0].kind).toBe("circle");
+        });
+
+        it("static draws accept hitTest: false too", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0, { hitTest: false });
+            expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeUndefined();
+        });
+
+        it("id-replace toggles hit participation in both directions", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor" });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+
+            // Same id, now opted out: the stale hit entry must not survive
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor", hitTest: false });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+
+            // And opting back in re-registers
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor" });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+        });
     });
 
     describe("id-based draw registration replace", () => {
