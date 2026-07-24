@@ -153,12 +153,16 @@ function makeDashRecordingCtx() {
     const ctx = {
         lineWidth: 1,
         globalAlpha: 1,
+        fillStyle: "#000",
         strokeStyle: "#000",
         save() {},
         restore() {},
         beginPath() {},
+        rect() {},
+        arc() {},
         moveTo() {},
         lineTo() {},
+        fill() {},
         setLineDash(pattern: number[]) {
             dashes.push(pattern);
         },
@@ -210,6 +214,41 @@ describe("CanvasDraw line dash", () => {
 
         expect(dashes).toEqual([]);
         expect(strokes()).toBe(1);
+    });
+
+    it("dashes rect borders with the same unit contract and resets after the stroke", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8, 0.4] } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([[8, 4], []]);
+    });
+
+    it("dashes circle borders and prefers lineDashPx over lineDash", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawCircle(
+            [{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8], lineDashPx: [6, 3] } }],
+            1,
+        );
+        render(ctx);
+
+        expect(dashes).toEqual([[6, 3], []]);
+    });
+
+    it("keeps rect/circle borders solid when no dash is given", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes, strokes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00" } }], 1);
+        draw.drawCircle([{ x: 3, y: 3, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00" } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([]);
+        expect(strokes()).toBe(2);
     });
 });
 

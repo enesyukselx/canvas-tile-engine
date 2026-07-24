@@ -59,7 +59,10 @@ plays the same role.
 `drawLine`/`drawPath` (not statics, not `drawImage`). Identify items via
 `item.data`; return `undefined` for undecorated items (the common case). For
 `drawLine` the decoration overlays the call-level `style` per item - the way
-to give individual lines their own color. Type-enforced limits: Line and
+to give individual lines their own color. Rect/Circle decorations cover the
+full shape style, so a dashed selection frame is one decoration away:
+`styleOf: (s) => selected.has(s.data.id) ? { strokeStyle: "#f59e0b",
+lineDashPx: [6, 4] } : undefined`. Type-enforced limits: Line and
 Path decorations exclude `lineWidth`/`lineWidthPx` (Path also `cornerRadius`/
 `cornerRadiusPx`) because hit-test geometry resolves at registration time;
 relatedly, decorating an unfilled path with `fillStyle` paints a fill but hit
@@ -103,6 +106,8 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
         strokeStyle?: string;
         lineWidth?: number;    // border width in WORLD units (scales with zoom)
         lineWidthPx?: number;  // border width in screen px (zoom-independent); wins over lineWidth
+        lineDash?: number[];   // border dash pattern in WORLD units (scales with zoom); Canvas2D setLineDash semantics
+        lineDashPx?: number[]; // border dash pattern in screen px (zoom-independent); wins over lineDash
     };
     rotate?: number;          // degrees, positive = clockwise (Rect/Image only)
     radius?: number | number[]; // corner radius in WORLD units, scales with zoom (Rect only);
@@ -123,7 +128,8 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
 
 Styles: if `fillStyle` is set the shape is filled; if `strokeStyle` is set it
 is stroked; both work together. Any CSS color string works (`"#22c55e"`,
-`"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`).
+`"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`). `lineDash`/`lineDashPx`
+dash the border (selection frames, ghost placements); omit for solid.
 
 ## Primitives
 

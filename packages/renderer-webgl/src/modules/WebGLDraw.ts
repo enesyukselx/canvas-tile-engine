@@ -169,6 +169,7 @@ export class WebGLDraw {
                         rotation,
                         this.colorParser.parse(style.strokeStyle),
                         resolveLineWidthPx(style, this.camera.scale),
+                        resolveLineDashPx(style, this.camera.scale),
                     );
                 }
             }
@@ -243,6 +244,7 @@ export class WebGLDraw {
                         radius,
                         this.colorParser.parse(style.strokeStyle),
                         resolveLineWidthPx(style, this.camera.scale),
+                        resolveLineDashPx(style, this.camera.scale),
                     );
                 }
             }
@@ -770,6 +772,7 @@ export class WebGLDraw {
         rotation: number,
         color: RGBA,
         lineWidth: number,
+        dash?: number[],
     ) {
         const cos = Math.cos(rotation);
         const sin = Math.sin(rotation);
@@ -783,6 +786,19 @@ export class WebGLDraw {
         const tr = corner(hw, -hh);
         const br = corner(hw, hh);
         const bl = corner(-hw, hh);
+
+        if (dash) {
+            // Walk the perimeter as one closed polyline so the dash phase
+            // flows continuously around the corners. The solid path's
+            // corner-coverage extensions are skipped: they would distort the
+            // pattern, and dashed outlines have gaps by design anyway.
+            let phase = 0;
+            phase = this.pushSegment(lines, tl, tr, color, lineWidth, dash, phase);
+            phase = this.pushSegment(lines, tr, br, color, lineWidth, dash, phase);
+            phase = this.pushSegment(lines, br, bl, color, lineWidth, dash, phase);
+            this.pushSegment(lines, bl, tl, color, lineWidth, dash, phase);
+            return;
+        }
 
         // Horizontal edges are extended by half the stroke width and vertical
         // edges shrunk by the same amount, so the corner squares are covered
@@ -808,7 +824,26 @@ export class WebGLDraw {
         radius: number,
         color: RGBA,
         lineWidth: number,
+        dash?: number[],
     ) {
+        if (dash) {
+            // Thread the dash phase through the chord polyline so the pattern
+            // flows continuously around the circle. No miter extensions: they
+            // would distort the pattern, and dashed outlines gap by design.
+            let phase = 0;
+            let prev: Coords = { x: cx + radius, y: cy };
+            for (let i = 1; i <= CIRCLE_STROKE_SEGMENTS; i++) {
+                const angle = (i / CIRCLE_STROKE_SEGMENTS) * Math.PI * 2;
+                const curr: Coords = {
+                    x: cx + Math.cos(angle) * radius,
+                    y: cy + Math.sin(angle) * radius,
+                };
+                phase = this.pushSegment(lines, prev, curr, color, lineWidth, dash, phase);
+                prev = curr;
+            }
+            return;
+        }
+
         // Extend each chord by the miter length so adjacent segments meet
         // without gaps on the outside of the joint.
         const ext = (Math.max(lineWidth, 1) / 2) * Math.tan(Math.PI / CIRCLE_STROKE_SEGMENTS);

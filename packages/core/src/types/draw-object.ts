@@ -22,6 +22,17 @@ export type DrawObject<TData = unknown> = {
          * Takes precedence over `lineWidth`.
          */
         lineWidthPx?: number;
+        /**
+         * Border dash pattern in world units (dashes are anchored to the shape
+         * and scale with zoom). Follows Canvas2D `setLineDash` semantics.
+         * Ignored when `lineDashPx` is set. Omit for a solid border.
+         */
+        lineDash?: number[];
+        /**
+         * Border dash pattern in screen pixels, independent of zoom.
+         * Takes precedence over `lineDash`.
+         */
+        lineDashPx?: number[];
     };
     /** Rotation angle in degrees (0 = no rotation, positive = clockwise) */
     rotate?: number;
