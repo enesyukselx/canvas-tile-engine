@@ -166,10 +166,12 @@ drawLine(items: Line | Line[], style?: LineStyle, layer?: number, options?: Draw
 
 **Line Properties:**
 
-| Property | Type       | Description        |
-| :------- | :--------- | :----------------- |
-| `from`   | `{ x, y }` | Start coordinates. |
-| `to`     | `{ x, y }` | End coordinates.   |
+| Property | Type        | Description                                                                                                   |
+| :------- | :---------- | :------------------------------------------------------------------------------------------------------------ |
+| `from`   | `{ x, y }`  | Start coordinates.                                                                                            |
+| `to`     | `{ x, y }`  | End coordinates.                                                                                              |
+| `style`  | `LineStyle` | Per-item override of the call-level style — mixed-style batches in one call. May change the width (see below). |
+| `data`   | `TData`     | Arbitrary app data; carried through to `hitTest` results.                                                     |
 
 ```typescript
 // Single line
@@ -179,13 +181,24 @@ engine.drawLine(
     1,
 );
 
-// Multiple lines
+// Multiple lines sharing the call-level style
 engine.drawLine(
     [
         { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
         { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
     ],
     { strokeStyle: "red", lineWidthPx: 2 },
+    1,
+);
+
+// Mixed styles in one call: item style overrides the call-level default
+engine.drawLine(
+    [
+        { from: { x: 0, y: 0 }, to: { x: 8, y: 0 } }, // call-level style
+        { from: { x: 0, y: 1 }, to: { x: 8, y: 1 }, style: { strokeStyle: "#f59e0b", lineWidthPx: 4 } },
+        { from: { x: 0, y: 2 }, to: { x: 8, y: 2 }, style: { lineDashPx: [6, 3] } },
+    ],
+    { strokeStyle: "#94a3b8", lineWidthPx: 1 },
     1,
 );
 ```
@@ -201,6 +214,8 @@ engine.drawLine(
 | `lineDashPx`  | px    | Zoom-independent dash pattern; wins over `lineDash`.                    |
 
 Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat).
+
+An item's `style` overrides the call-level style unit pair by unit pair: an item that sets either width field (or either dash field) replaces that whole pair, so an item's world-unit `lineWidth` is never shadowed by the call-level `lineWidthPx`. Because item styles are read at registration time (unlike `styleOf` decorations), they may change the stroke width — hit testing follows the item's own width.
 
 Lines participate in hit testing: a click/tap within half the stroke width of a segment hits it (with a minimum tap width for hairlines). An optional `data` field on each line carries through to hit results.
 
@@ -753,8 +768,8 @@ Rules of thumb:
 
 - Identify items through `item.data` (the same convention as `hitTest` results); most items should return `undefined`.
 - The returned object **overlays** the item's `style` — return only the fields that change (`{ fillStyle: "blue" }` keeps the item's stroke).
-- Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths): those feed hit-test geometry resolved at registration time, and the types enforce it. A width change is a geometry change — re-register for that.
-- For `drawLine`, `styleOf` overlays the call-level `style` per item, which also makes it the way to give individual lines their own color.
+- Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths): those feed hit-test geometry resolved at registration time, and the types enforce it. A width change is a geometry change — for lines, put it in the item's own `style` (registration-time, so hit testing follows); otherwise re-register.
+- For `drawLine`, `styleOf` overlays both the call-level `style` and the item's own `style` per item — use item styles for static per-line looks and `styleOf` for state-driven ones (selection, hover).
 - Static draw methods do not support `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply. Changing styles is dynamic content.
 
 ### Remove a Single Draw Call (`DrawHandle`)

@@ -58,12 +58,14 @@ plays the same role.
 `styleOf` details: available on dynamic `drawRect`/`drawCircle`/`drawText`/
 `drawLine`/`drawPath` (not statics, not `drawImage`). Identify items via
 `item.data`; return `undefined` for undecorated items (the common case). For
-`drawLine` the decoration overlays the call-level `style` per item - the way
-to give individual lines their own color. Type-enforced limits: Line and
+`drawLine` the decoration overlays both the call-level `style` and the
+item's own `style` per item - use item styles for static per-line looks and
+`styleOf` for state-driven ones. Type-enforced limits: Line and
 Path decorations exclude `lineWidth`/`lineWidthPx` (Path also `cornerRadius`/
-`cornerRadiusPx`) because hit-test geometry resolves at registration time;
-relatedly, decorating an unfilled path with `fillStyle` paints a fill but hit
-testing still targets the stroke.
+`cornerRadiusPx`) because hit-test geometry resolves at registration time -
+for lines, a per-item width belongs in the item's registration-time `style`
+instead (hit testing follows it); relatedly, decorating an unfilled path
+with `fillStyle` paints a fill but hit testing still targets the stroke.
 
 ## Layers
 
@@ -283,14 +285,28 @@ engine.drawPath({ commands: [
  PathStyle = LineStyle fields + fillStyle? +
 cornerRadius? (world) / cornerRadiusPx? (px, wins) for tangent-arc corner
 rounding. Fill-only items draw no outline; unstyled items stroke a hairline.
-Line keeps its call-level style argument, and Line
-items accept `data?` now that lines surface in hit results. LineStyle =
+Line keeps its call-level style argument as the batch DEFAULT; a Line item's
+own `style?: LineStyle` overrides it per item, unit pair by unit pair (an
+item setting either width or dash field replaces that whole pair, so an
+item's world `lineWidth` is never shadowed by the batch `lineWidthPx`).
+Item styles are registration-time, so unlike styleOf they may change the
+width - hit testing follows the item's own width. Line items also accept
+`data?` (surfaced in hit results). LineStyle =
 { strokeStyle?, lineWidth? (world), lineWidthPx?, lineDash? (world),
 lineDashPx? }. UNIT RULE (matches Text size/fontPx): plain numbers are world
 units and scale with zoom; *Px variants are screen pixels and take
 precedence. GridLines lineWidth stays px by design. Path fills are exact on
 every renderer, both fill rules and self-intersecting outlines included
 (WebGL uses a two-pass stencil-then-cover fill).
+
+```ts
+// Mixed-style batch in ONE call: item style overrides the call-level default
+engine.drawLine([
+    { from: { x: 0, y: 0 }, to: { x: 8, y: 0 } },                                   // batch style
+    { from: { x: 0, y: 1 }, to: { x: 8, y: 1 }, style: { strokeStyle: "#f59e0b", lineWidthPx: 4 } },
+    { from: { x: 0, y: 2 }, to: { x: 8, y: 2 }, style: { lineDashPx: [6, 3] } },
+], { strokeStyle: "#94a3b8", lineWidthPx: 1 }, 1);
+```
 
 ### Grid lines
 

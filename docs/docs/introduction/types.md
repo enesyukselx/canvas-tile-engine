@@ -80,6 +80,8 @@ type Text = {
 type Line = {
     from: Coords;
     to: Coords;
+    style?: LineStyle; // per-item override of drawLine's call-level style
+    data?: TData; // app data, returned on hitTest results
 };
 
 type PathItem<TData = unknown> = {
@@ -100,7 +102,7 @@ type LineStyle = {
 };
 ```
 
-`PathItem` describes a free-form path (open polyline, closed outline, or filled shape); `PathStyle` extends the `LineStyle` fields with `fillStyle` and `cornerRadius`/`cornerRadiusPx`. `drawLine` takes a `LineStyle` as its second argument; dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around path corners.
+`PathItem` describes a free-form path (open polyline, closed outline, or filled shape); `PathStyle` extends the `LineStyle` fields with `fillStyle` and `cornerRadius`/`cornerRadiusPx`. `drawLine` takes a `LineStyle` as its second argument as the batch default; a `Line` item's own `style` overrides it per item, unit pair by unit pair (an item that sets either width or dash field replaces that whole pair, so a world-unit value is never shadowed by the batch's `*Px` value). Because item styles are registration-time, they may change `lineWidth`/`lineWidthPx` — hit testing follows the item's own width. Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around path corners.
 
 ### `ImageItem<TImage>`
 
