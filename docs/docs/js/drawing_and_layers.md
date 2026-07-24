@@ -71,6 +71,8 @@ Every draw method accepts an optional `options` object as its last parameter. It
 - `strokeStyle`: Border color
 - `lineWidth`: Border width in world units; scales with zoom like the shape
 - `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
+- `lineDash`: Border dash pattern in world units; dashes scale with zoom. Canvas2D `setLineDash` semantics; omit for a solid border
+- `lineDashPx`: Border dash pattern in screen pixels, independent of zoom; wins over `lineDash`
 
 ```typescript
 // Draw a blue square on layer 1
@@ -128,6 +130,17 @@ engine.drawRect(
         size: 1,
         radius: [0.2, 0, 0.2, 0], // Diagonal rounded corners
         style: { fillStyle: "#9b59b6" },
+    },
+    1,
+);
+
+// Dashed selection outline (screen-pixel dashes stay crisp at every zoom)
+engine.drawRect(
+    {
+        x: 14,
+        y: 5,
+        size: 1,
+        style: { strokeStyle: "#f59e0b", lineWidthPx: 2, lineDashPx: [6, 4] },
     },
     1,
 );
