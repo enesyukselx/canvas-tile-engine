@@ -453,7 +453,14 @@ export class CanvasDraw implements IDrawAPI<Image> {
                     );
                 } else {
                     const pts = item.points!.map((p) => this.transformer.worldToScreen(p.x, p.y));
-                    traceRoundedPath(ctx, pts, item.closed === true, resolveCornerRadiusPx(style, this.camera.scale));
+                    // Corner radius from item.style: registration-time only (see
+                    // the stroke-width note below).
+                    traceRoundedPath(
+                        ctx,
+                        pts,
+                        item.closed === true,
+                        resolveCornerRadiusPx(item.style, this.camera.scale),
+                    );
                 }
 
                 if (filled) {
@@ -464,7 +471,11 @@ export class CanvasDraw implements IDrawAPI<Image> {
                 // (defaulting to a hairline, matching the legacy behavior).
                 if (style?.strokeStyle !== undefined || !filled) {
                     if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
-                    const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+                    // Stroke width from item.style, not the decorated merge:
+                    // hit testing reads the registration-time style, and the
+                    // decoration types' width exclusion is only type-level —
+                    // a smuggled width must not desync paint from hit.
+                    const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(item.style, this.camera.scale));
                     const dash = resolveLineDashPx(style, this.camera.scale);
                     if (dash) ctx.setLineDash(dash);
                     ctx.stroke();
