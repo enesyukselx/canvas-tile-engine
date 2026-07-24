@@ -5,7 +5,8 @@ import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
 import { HitTester, HitResult, HitTestOptions, HitTestRectOptions } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
-import { validateCoords, validateFitBounds, validateScale } from "./utils/validateConfig";
+import { validateCoords, validateScale } from "./utils/validateConfig";
+import { fitScale } from "./utils/fitScale";
 import { snapCenterToGrid } from "./utils/viewport";
 import {
     Bounds,
@@ -605,25 +606,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     fitBounds(bounds: Bounds, options: FitBoundsOptions = {}) {
         const { padding = 0, paddingPx, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
-        validateFitBounds(bounds, padding, paddingPx);
 
         const size = this.viewport.getSize();
-        let rawScale: number;
-        if (paddingPx !== undefined) {
-            // Pixel padding shrinks the viewport instead of growing the
-            // bounds, so the margin is independent of the content's world
-            // size. Clamped to keep at least 1px of fit area per axis when
-            // the padding would consume the viewport.
-            const fitWidth = bounds.maxX - bounds.minX;
-            const fitHeight = bounds.maxY - bounds.minY;
-            const availWidth = Math.max(1, size.width - paddingPx * 2);
-            const availHeight = Math.max(1, size.height - paddingPx * 2);
-            rawScale = Math.min(availWidth / fitWidth, availHeight / fitHeight);
-        } else {
-            const fitWidth = bounds.maxX - bounds.minX + padding * 2;
-            const fitHeight = bounds.maxY - bounds.minY + padding * 2;
-            rawScale = Math.min(size.width / fitWidth, size.height / fitHeight);
-        }
+        // Shared with the config-time helper (it also validates), so the
+        // scale a caller derives from fitScale() is exactly the scale this
+        // method targets before clamping.
+        const rawScale = fitScale(bounds, size, { padding, paddingPx });
         const targetScale = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, rawScale));
         const center = {
             x: (bounds.minX + bounds.maxX) / 2,

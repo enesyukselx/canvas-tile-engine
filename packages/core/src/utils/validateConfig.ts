@@ -2,8 +2,9 @@ import { CanvasTileEngineConfig } from "../types";
 
 /**
  * Creates a validation error with descriptive message.
+ * @internal Shared by the validators here and sibling utils (fitScale).
  */
-function configError(message: string): Error {
+export function configError(message: string): Error {
     return new Error(`[CanvasTileEngine] Invalid config: ${message}`);
 }
 
