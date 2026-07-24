@@ -65,6 +65,22 @@ Path decorations exclude `lineWidth`/`lineWidthPx` (Path also `cornerRadius`/
 relatedly, decorating an unfilled path with `fillStyle` paints a fill but hit
 testing still targets the stroke.
 
+What a decoration may change, per primitive (each rule matches that
+primitive's hit-test geometry - do NOT assume "all styleOf behaves the
+same"):
+
+| Primitive     | May change                                     | May NOT change                  | Per-item width instead        |
+| :------------ | :--------------------------------------------- | :------------------------------ | :---------------------------- |
+| Rect / Circle | full style, `lineWidth`/`lineWidthPx` included | -                               | already allowed here          |
+| Text          | full text style                                | -                               | -                             |
+| Line          | `strokeStyle`, `lineDash`/`lineDashPx`         | `lineWidth`/`lineWidthPx`       | re-register with the width    |
+| Path          | `strokeStyle`, dash, `fillStyle` (see above)   | `lineWidth*`, `cornerRadius*`   | re-register with the values   |
+
+Rect/circle borders never feed hit geometry (hit area = box/disc), so
+decorating their width is safe; line/path hit corridors derive from width
+(paths also corner radius) at registration time, so a paint-time change
+would desync visuals from hit areas.
+
 ## Layers
 
 Ascending draw order: layer 0 paints first (bottom), higher layers paint on

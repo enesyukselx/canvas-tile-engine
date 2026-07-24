@@ -197,6 +197,15 @@ const png = await renderToBuffer({
   registration (`removeDrawHandle`/`clearLayer`/`clearAll`) also drops the
   cache. On older versions nothing auto-invalidates: changing item data
   requires `clearStaticCache(cacheKey)` + `clearLayer` + re-register.
+- **`styleOf` limits differ by primitive**: Rect/Circle/Text decorations may
+  change the full style (width included - shape borders never feed hit
+  geometry). Line and Path decorations are color + dash only: no
+  `lineWidth`/`lineWidthPx` (Path also no `cornerRadius*`), because the hit
+  corridor derives from those at registration time. The types enforce this
+  only for inline object literals - non-literal returns and plain JS bypass
+  the check silently - so never route width changes through `styleOf`;
+  re-register instead. Path quirk: decorating an unfilled path with
+  `fillStyle` paints the fill but hit testing stays on the stroke.
 - **Do not roll your own culling, spatial index, pan/zoom math, or DPR
   handling** - the engine does all of it.
 
