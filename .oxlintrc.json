@@ -21,6 +21,7 @@
         "run-example.js"
     ],
     "rules": {
+        "curly": "error",
         "no-array-constructor": "error",
         "no-unused-expressions": "error",
         "no-unused-vars": "error",
