@@ -586,27 +586,44 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * area visible, clamped to the scale limits. Animated by default; not
      * related to setBounds, which restricts camera movement.
      * @param bounds Rectangle to fit. Every edge must be finite.
-     * @param options `padding` in world units (default 0), `durationMs`
-     * (default 500, 0 = instant), and `onComplete`.
+     * @param options `padding` in world units (default 0) or `paddingPx` in
+     * screen pixels (wins over `padding`), `durationMs` (default 500,
+     * 0 = instant), and `onComplete`.
      * @throws {ConfigValidationError} If an edge is not finite, min >= max on
-     * an axis, or padding is negative.
+     * an axis, or a padding value is negative.
      * @example
      * ```ts
      * // Show the whole board with one cell of margin
      * engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+     *
+     * // 24px of air around any selection, small or huge
+     * engine.fitBounds(selectionBounds, { paddingPx: 24 });
      *
      * // Jump to a selection instantly
      * engine.fitBounds(selectionBounds, { durationMs: 0 });
      * ```
      */
     fitBounds(bounds: Bounds, options: FitBoundsOptions = {}) {
-        const { padding = 0, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
-        validateFitBounds(bounds, padding);
+        const { padding = 0, paddingPx, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
+        validateFitBounds(bounds, padding, paddingPx);
 
         const size = this.viewport.getSize();
-        const fitWidth = bounds.maxX - bounds.minX + padding * 2;
-        const fitHeight = bounds.maxY - bounds.minY + padding * 2;
-        const rawScale = Math.min(size.width / fitWidth, size.height / fitHeight);
+        let rawScale: number;
+        if (paddingPx !== undefined) {
+            // Pixel padding shrinks the viewport instead of growing the
+            // bounds, so the margin is independent of the content's world
+            // size. Clamped to keep at least 1px of fit area per axis when
+            // the padding would consume the viewport.
+            const fitWidth = bounds.maxX - bounds.minX;
+            const fitHeight = bounds.maxY - bounds.minY;
+            const availWidth = Math.max(1, size.width - paddingPx * 2);
+            const availHeight = Math.max(1, size.height - paddingPx * 2);
+            rawScale = Math.min(availWidth / fitWidth, availHeight / fitHeight);
+        } else {
+            const fitWidth = bounds.maxX - bounds.minX + padding * 2;
+            const fitHeight = bounds.maxY - bounds.minY + padding * 2;
+            rawScale = Math.min(size.width / fitWidth, size.height / fitHeight);
+        }
         const targetScale = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, rawScale));
         const center = {
             x: (bounds.minX + bounds.maxX) / 2,
