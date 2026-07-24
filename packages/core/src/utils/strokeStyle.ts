@@ -69,3 +69,38 @@ export function resolveCornerRadiusPx(style: CornerRadiusStyle | undefined, scal
     if (style?.cornerRadius !== undefined) return Math.max(0, style.cornerRadius * scale);
     return 0;
 }
+
+/** The stroke fields {@link overlayLineStyle} understands. */
+export interface OverlayableLineStyle extends StrokeWidthStyle, LineDashStyle {
+    strokeStyle?: string;
+}
+
+/**
+ * Overlay one line style on another, unit-pair by unit-pair. A plain
+ * field-by-field spread breaks the world/px precedence rule across layers: a
+ * base `lineWidthPx` would survive the merge and shadow an overlay that only
+ * sets the world `lineWidth`. Instead, a layer that sets either field of a
+ * pair (`lineWidth`/`lineWidthPx`, `lineDash`/`lineDashPx`) replaces the
+ * whole pair — the `*Px`-wins rule applies within one layer, never across
+ * layers. Used for `Line.style` over the call-level style, and for `styleOf`
+ * decorations over both.
+ */
+export function overlayLineStyle<T extends OverlayableLineStyle>(
+    base: T | undefined,
+    // Partial also admits narrowed decoration types (e.g. LineDecorationStyle,
+    // which omits the width pair entirely).
+    over: Partial<T> | undefined,
+): T {
+    if (!over) return base ?? ({} as T);
+    if (!base) return over as T;
+    const result = { ...base, ...over };
+    if (over.lineWidth !== undefined || over.lineWidthPx !== undefined) {
+        result.lineWidth = over.lineWidth;
+        result.lineWidthPx = over.lineWidthPx;
+    }
+    if (over.lineDash !== undefined || over.lineDashPx !== undefined) {
+        result.lineDash = over.lineDash;
+        result.lineDashPx = over.lineDashPx;
+    }
+    return result;
+}

@@ -10,7 +10,7 @@ import {
 } from "../utils/pathGeometry";
 import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
-import { resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
+import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { resolveSizeWorld } from "../utils/itemSize";
 import { SpatialIndex } from "./SpatialIndex";
 
@@ -76,7 +76,8 @@ type HitEntry = {
     /** Static draw calls replay at a recorded scale, so `sizePx` is ignored
      * for them — the hit box must match what is actually drawn. */
     ignoreSizePx?: boolean;
-    /** Call-level stroke style (line entries only; path items carry their own). */
+    /** Call-level stroke style (line entries only; path items carry their
+     * own). Per-item `Line.style` overlays it at test time. */
     style?: LineStyle;
     /** Lazy R-Tree over item anchors, built on the first query of a large entry. */
     index?: SpatialIndex<BoxedItem> | null;
@@ -531,7 +532,13 @@ export class HitTester {
     private testItem(point: Coords, item: HitItem, entry: HitEntry, padding: number): boolean {
         const kind = entry.kind;
         if (kind === "path") return this.testPath(point, item as PathItem, padding);
-        if (kind === "line") return this.testLine(point, item as Line, entry.style, padding);
+        if (kind === "line") {
+            // Per-item style overlays the call-level style field by field —
+            // the same merge the renderers paint with — so an item with its
+            // own lineWidth gets a matching hit threshold.
+            const line = item as Line;
+            return this.testLine(point, line, overlayLineStyle(entry.style, line.style), padding);
+        }
 
         const box = this.boxFor(item as BoxedItem, kind, !entry.ignoreSizePx);
 
