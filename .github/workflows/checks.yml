@@ -9,6 +9,7 @@ on:
             - "turbo.json"
             - "pnpm-lock.yaml"
             - "pnpm-workspace.yaml"
+            - ".oxlintrc.json"
 jobs:
     checks:
         name: Typecheck - Lint
