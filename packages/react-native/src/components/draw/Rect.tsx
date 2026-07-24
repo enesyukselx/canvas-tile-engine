@@ -20,12 +20,18 @@ export interface RectProps {
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     styleOf?: StyleOf<RectType<any>, ShapeDecorationStyle>;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content like
+     * floor tiles. Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
  * Draws rectangles on the canvas.
  */
-export const Rect = memo(function Rect({ items, layer = 1, styleOf }: RectProps) {
+export const Rect = memo(function Rect({ items, layer = 1, styleOf, hitTest }: RectProps) {
     const { engine, requestRender } = useEngineContext();
 
     // Read through a ref so styleOf identity changes never re-register.
@@ -39,7 +45,7 @@ export const Rect = memo(function Rect({ items, layer = 1, styleOf }: RectProps)
     }, [styleOf, requestRender]);
 
     useEffect(() => {
-        const handle = engine.drawRect(items, layer, { styleOf: (item) => styleOfRef.current?.(item) });
+        const handle = engine.drawRect(items, layer, { styleOf: (item) => styleOfRef.current?.(item), hitTest });
         requestRender();
         return () => {
             if (handle) {
@@ -49,7 +55,7 @@ export const Rect = memo(function Rect({ items, layer = 1, styleOf }: RectProps)
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender]);
+    }, [engine, items, layer, hitTest, requestRender]);
 
     return null;
 });
