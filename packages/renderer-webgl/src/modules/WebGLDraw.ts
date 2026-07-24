@@ -16,6 +16,7 @@ import {
     resolveLineWidthPx,
     resolveSizeWorld,
     resolveLineDashPx,
+    overlayLineStyle,
     resolveCornerRadiusPx,
     flattenPathCommands,
     pathCommandsBounds,
@@ -274,18 +275,20 @@ export class WebGLDraw {
                 if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
 
                 let itemColor = color;
+                let itemWidth = lineWidth;
                 let itemDash = dash;
                 const deco = styleOf?.(item);
-                if (deco) {
-                    const merged = { ...style, ...deco };
+                if (deco || item.style) {
+                    const merged = overlayLineStyle(overlayLineStyle(style, item.style), deco);
                     itemColor = this.colorParser.parse(merged.strokeStyle ?? "#000");
+                    itemWidth = resolveLineWidthPx(merged, this.camera.scale);
                     itemDash = resolveLineDashPx(merged, this.camera.scale);
                 }
 
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
                 // Each Line item is its own subpath: the dash phase restarts.
-                this.pushSegment(lines, a, b, itemColor, lineWidth, itemDash, 0);
+                this.pushSegment(lines, a, b, itemColor, itemWidth, itemDash, 0);
             }
 
             gl.drawLines(lines);
