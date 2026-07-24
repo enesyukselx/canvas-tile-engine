@@ -81,3 +81,59 @@ describe("CanvasDraw non-square rects", () => {
         expect(rects[0].w).toBe(300);
     });
 });
+
+// Fake 2D context recording setLineDash calls and strokes for dash tests.
+function makeDashRecordingCtx() {
+    const dashes: number[][] = [];
+    let strokeCount = 0;
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        fillStyle: "#000",
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        rect() {},
+        arc() {},
+        fill() {},
+        setLineDash(pattern: number[]) {
+            dashes.push(pattern);
+        },
+        stroke() {
+            strokeCount++;
+        },
+    };
+    return { ctx: ctx as unknown as SKRSContext2D, dashes, strokes: () => strokeCount };
+}
+
+// Dash unit contract shared by all renderers: lineDash is world units
+// (px = value * scale), lineDashPx is screen pixels and wins.
+describe("CanvasDraw dashed rect/circle borders", () => {
+    it("dashes rect borders and resets after the stroke", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8, 0.4] } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([[8, 4], []]);
+    });
+
+    it("dashes circle borders preferring lineDashPx and stays solid without a dash", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes, strokes } = makeDashRecordingCtx();
+
+        draw.drawCircle(
+            [
+                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8], lineDashPx: [6, 3] } },
+                { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(dashes).toEqual([[6, 3], []]);
+        expect(strokes()).toBe(2);
+    });
+});
