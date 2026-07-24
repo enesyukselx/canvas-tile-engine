@@ -941,6 +941,27 @@ describe("CanvasDraw per-item line style", () => {
         expect(strokes[1].dash).toEqual([]);
     });
 
+    it("ignores a width smuggled into a styleOf decoration (paint stays hit-consistent)", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        // Non-literal returns bypass TS excess-property checks — the exact
+        // hole a runtime guard must cover. The decoration's color applies;
+        // its width must not (hit testing never sees decorations).
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidthPx: 4 } }],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+            { styleOf: () => smuggled },
+        );
+        render(ctx);
+
+        expect(strokes).toHaveLength(1);
+        expect(strokes[0].strokeStyle).toBe("#0f0"); // decoration color applies
+        expect(strokes[0].lineWidth).toBe(4); // item width, not the smuggled 12
+    });
+
     it("styleOf decorations overlay the item's own style", () => {
         const { draw, render } = setup();
         const { ctx, strokes } = makeLineStyleRecordingCtx();

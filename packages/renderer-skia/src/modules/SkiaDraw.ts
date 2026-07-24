@@ -389,16 +389,17 @@ export class SkiaDraw {
                 if (deco || item.style) {
                     // Item with its own style (or a decoration): repaint with
                     // the merged style, then restore the shared paint for the
-                    // rest of the batch.
-                    const merged = overlayLineStyle(
-                        overlayLineStyle(style, item.style),
-                        deco,
-                    );
+                    // rest of the batch. Width resolves from the
+                    // registration-time layers only (call style + item.style)
+                    // — the same layers hit testing reads — so a smuggled
+                    // decoration width cannot desync paint from hit.
+                    const registration = overlayLineStyle(style, item.style);
+                    const merged = overlayLineStyle(registration, deco);
                     this.strokePaint.setColor(
                         this.color(merged.strokeStyle ?? "#000000"),
                     );
                     this.strokePaint.setStrokeWidth(
-                        resolveLineWidthPx(merged, this.camera.scale),
+                        resolveLineWidthPx(registration, this.camera.scale),
                     );
                     const mergedDash = resolveLineDashPx(
                         merged,

@@ -67,6 +67,25 @@ describe("WebGLDraw per-item line style", () => {
         expect(lines[0].width).toBe(5); // 0.5 world * scale 10
     });
 
+    it("ignores a width smuggled into a styleOf decoration", () => {
+        const { draw, render } = setup();
+        const { gl, lines } = makeLineRecordingGL();
+
+        // Non-literal returns bypass TS excess-property checks; the width
+        // must resolve from the registration-time layers hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidthPx: 4 } }],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+            { styleOf: () => smuggled },
+        );
+        render(gl);
+
+        expect(lines).toHaveLength(1);
+        expect(lines[0].width).toBe(4); // item width, not the smuggled 12
+    });
+
     it("tessellates an item's own dash pattern", () => {
         const { draw, render } = setup();
         const { gl, lines } = makeLineRecordingGL();

@@ -279,9 +279,14 @@ export class WebGLDraw {
                 let itemDash = dash;
                 const deco = styleOf?.(item);
                 if (deco || item.style) {
-                    const merged = overlayLineStyle(overlayLineStyle(style, item.style), deco);
+                    // Width resolves from the registration-time layers only
+                    // (call style + item.style) — the same layers hit testing
+                    // reads — so a smuggled decoration width cannot desync
+                    // paint from hit. Color and dash take the full merge.
+                    const registration = overlayLineStyle(style, item.style);
+                    const merged = overlayLineStyle(registration, deco);
                     itemColor = this.colorParser.parse(merged.strokeStyle ?? "#000");
-                    itemWidth = resolveLineWidthPx(merged, this.camera.scale);
+                    itemWidth = resolveLineWidthPx(registration, this.camera.scale);
                     itemDash = resolveLineDashPx(merged, this.camera.scale);
                 }
 

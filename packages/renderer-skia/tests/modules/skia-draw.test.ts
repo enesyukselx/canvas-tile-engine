@@ -436,3 +436,26 @@ describe("per-item line style", () => {
         expect(lines[1].pathEffect).toBeNull();
     });
 });
+
+describe("smuggled decoration width", () => {
+    it("resolves the painted width from registration-time layers only", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        // Non-literal returns bypass TS excess-property checks; the width
+        // must resolve from the layers hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidthPx: 4 } }],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+            { styleOf: () => smuggled }
+        );
+        render(canvas);
+
+        const lines = ops.filter((o) => o.op === "line");
+        expect(lines).toHaveLength(1);
+        expect(lines[0].color).toEqual({ parsed: "#0f0" }); // deco color applies
+        expect(lines[0].strokeWidth).toBe(4); // item width, not the smuggled 12
+    });
+});

@@ -246,13 +246,20 @@ export class CanvasDraw {
                 const deco = styleOf?.(item);
                 if (deco || item.style) {
                     flush();
-                    const merged = overlayLineStyle(overlayLineStyle(style, item.style), deco);
+                    // Width resolves from the registration-time layers only
+                    // (call style + item.style) — the same layers hit testing
+                    // reads — so a width smuggled past the decoration types
+                    // (JS callers, non-literal returns) can never desync the
+                    // painted stroke from the hit corridor. Color and dash
+                    // take the full merge including the decoration.
+                    const registration = overlayLineStyle(style, item.style);
+                    const merged = overlayLineStyle(registration, deco);
                     ctx.strokeStyle = merged.strokeStyle ?? "#000000";
                     ctx.setLineDash(resolveLineDashPx(merged, this.camera.scale) ?? []);
                     // Clear the batch's sub-pixel alpha before applying the
                     // item width so the two cannot compound.
                     resetAlpha();
-                    const resetItemAlpha = applyLineWidth(ctx, resolveLineWidthPx(merged, this.camera.scale));
+                    const resetItemAlpha = applyLineWidth(ctx, resolveLineWidthPx(registration, this.camera.scale));
                     ctx.beginPath();
                     ctx.moveTo(a.x, a.y);
                     ctx.lineTo(b.x, b.y);
