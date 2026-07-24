@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasTileEngine } from "../../src/CanvasTileEngine";
+import { fitScale } from "../../src/utils/fitScale";
 import type { CanvasTileEngineConfig, Coords, IRenderer } from "../../src/types";
 
 type Mount = Record<string, never>;
@@ -239,6 +240,18 @@ describe("CanvasTileEngine", () => {
             // going negative or non-finite.
             e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 500, durationMs: 0 });
             expect(e.getScale()).toBe(0.01); // wideLimits minScale
+        });
+
+        it("lands exactly on the scale fitScale() derives (shared math, no drift)", () => {
+            const e = createEngine(wideLimits);
+            const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 50 };
+            const size = { width: 800, height: 600 };
+
+            e.fitBounds(bounds, { paddingPx: 24, durationMs: 0 });
+            expect(e.getScale()).toBe(fitScale(bounds, size, { paddingPx: 24 }));
+
+            e.fitBounds(bounds, { padding: 3, durationMs: 0 });
+            expect(e.getScale()).toBe(fitScale(bounds, size, { padding: 3 }));
         });
 
         it("clamps the scale to the limits", () => {
