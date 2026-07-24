@@ -395,6 +395,30 @@ describe("HitTester lines", () => {
         expect(ht.hitTestFirst({ x: 1.5, y: 0.3 })).toBeUndefined();
     });
 
+    it("per-item style overlays the call-level style for that item's hit width", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(
+            handle(1),
+            "line",
+            [
+                { from: { x: 0, y: 0 }, to: { x: 3, y: 0 } },
+                { from: { x: 0, y: 2 }, to: { x: 3, y: 2 }, style: { lineWidthPx: 24 } },
+                // Color-only item style: the width still comes from the call level
+                { from: { x: 0, y: 4 }, to: { x: 3, y: 4 }, style: { strokeStyle: "red" } },
+            ],
+            1,
+            { style: { strokeStyle: "blue", lineWidthPx: 8 } },
+        );
+
+        // Call-level width 8px at scale 40 -> half 0.1 world
+        expect(ht.hitTestFirst({ x: 1.5, y: 0.25 })).toBeUndefined();
+        // Item width 24px -> half 0.3 world
+        expect(ht.hitTestFirst({ x: 1.5, y: 2.25 })).toBeDefined();
+        // Recolored item keeps the call-level hit width
+        expect(ht.hitTestFirst({ x: 1.5, y: 4.25 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 1.5, y: 4.05 })).toBeDefined();
+    });
+
     it("linear-scans large line/path entries instead of the anchor index", () => {
         const ht = new HitTester(() => 40);
         const items = Array.from({ length: 600 }, (_, i) => ({
