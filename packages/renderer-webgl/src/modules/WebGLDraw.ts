@@ -414,7 +414,9 @@ export class WebGLDraw {
                     }));
                 } else {
                     const closed = item.closed === true;
-                    const radiusPx = resolveCornerRadiusPx(style, this.camera.scale);
+                    // Registration-time only (the layer hit testing reads);
+                    // the decoration types' exclusion is only type-level.
+                    const radiusPx = resolveCornerRadiusPx(item.style, this.camera.scale);
                     const pts = item.points!.map((p) => this.transformer.worldToScreen(p.x, p.y));
                     // Corner rounding flattens into a denser polyline, so dash
                     // tessellation and fills run over it unchanged. Closed
@@ -437,7 +439,9 @@ export class WebGLDraw {
 
                 if (style?.strokeStyle !== undefined || !filled) {
                     const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
-                    const lineWidth = resolveLineWidthPx(style, this.camera.scale);
+                    // Width from item.style: registration-time only, matching
+                    // the hit corridor (decoration exclusion is type-level).
+                    const lineWidth = resolveLineWidthPx(item.style, this.camera.scale);
                     const dash = resolveLineDashPx(style, this.camera.scale);
 
                     for (const sub of subpaths) {
