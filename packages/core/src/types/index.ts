@@ -241,6 +241,25 @@ export interface DrawOptions {
      * a new registration (remove with the returned handle or `clearLayer`).
      */
     id?: string;
+    /**
+     * Set to `false` to keep this registration out of hit testing — the
+     * `pointer-events: none` of the draw API. Decorative content (floor
+     * tiles, background images, zone overlays) declared once at registration
+     * stops leaking into every `hitTest`/`hitTestFirst`/`hitTestRect` query,
+     * and large decorative sets skip hit-registry bookkeeping entirely.
+     * Default `true`. Text and custom draw functions never enter hit testing
+     * regardless of this flag.
+     */
+    hitTest?: boolean;
+}
+
+/** Options for the static draw helpers (`drawStaticRect`, ...). Their
+ * `cacheKey` already plays the registration-id role, so only the hit-test
+ * opt-out applies. */
+export interface StaticDrawOptions {
+    /** Set to `false` to keep this registration out of hit testing; see
+     * {@link DrawOptions.hitTest}. */
+    hitTest?: boolean;
 }
 
 /** Options for {@link CanvasTileEngine.drawRect}. */
