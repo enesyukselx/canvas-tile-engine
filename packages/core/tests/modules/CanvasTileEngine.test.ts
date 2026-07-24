@@ -208,6 +208,39 @@ describe("CanvasTileEngine", () => {
             expect(e.getScale()).toBeCloseTo(800 / 120);
         });
 
+        it("paddingPx shrinks the viewport instead of growing the bounds", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 40, durationMs: 0 });
+            // min((800 - 80) / 100, (600 - 80) / 50) = 7.2
+            expect(e.getScale()).toBeCloseTo(7.2);
+        });
+
+        it("paddingPx keeps the same pixel margin regardless of content size", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 40, durationMs: 0 });
+            const small = e.getScale();
+            // 10x larger content, same paddingPx: margin stays 40px, so the
+            // scale is exactly 10x smaller (world padding would need a manual
+            // 10x to achieve this).
+            e.fitBounds({ minX: 0, maxX: 1000, minY: 0, maxY: 500 }, { paddingPx: 40, durationMs: 0 });
+            expect(e.getScale()).toBeCloseTo(small / 10);
+        });
+
+        it("paddingPx wins over world padding", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { padding: 10, paddingPx: 40, durationMs: 0 });
+            expect(e.getScale()).toBeCloseTo(7.2); // not 800 / 120
+        });
+
+        it("clamps a paddingPx that would consume the viewport", () => {
+            const e = createEngine(wideLimits);
+            // 2 * 500 exceeds both viewport axes; the fit area floors at 1px
+            // per axis and the result rides the scale limits instead of
+            // going negative or non-finite.
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 500, durationMs: 0 });
+            expect(e.getScale()).toBe(0.01); // wideLimits minScale
+        });
+
         it("clamps the scale to the limits", () => {
             engine.fitBounds({ minX: 0, maxX: 1, minY: 0, maxY: 1 }, { durationMs: 0 });
             expect(engine.getScale()).toBe(2); // maxScale
@@ -245,6 +278,8 @@ describe("CanvasTileEngine", () => {
             expect(() => engine.fitBounds({ minX: 0, maxX: Infinity, minY: 0, maxY: 10 })).toThrow();
             expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: NaN })).toThrow();
             expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { padding: -1 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { paddingPx: -1 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { paddingPx: NaN })).toThrow();
         });
     });
 
