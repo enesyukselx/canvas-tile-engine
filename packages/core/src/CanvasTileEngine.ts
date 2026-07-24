@@ -5,7 +5,8 @@ import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
 import { HitTester, HitResult, HitTestOptions, HitTestRectOptions } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
-import { validateCoords, validateFitBounds, validateScale } from "./utils/validateConfig";
+import { validateCoords, validateScale } from "./utils/validateConfig";
+import { fitScale } from "./utils/fitScale";
 import { snapCenterToGrid } from "./utils/viewport";
 import {
     Bounds,
@@ -586,27 +587,31 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * area visible, clamped to the scale limits. Animated by default; not
      * related to setBounds, which restricts camera movement.
      * @param bounds Rectangle to fit. Every edge must be finite.
-     * @param options `padding` in world units (default 0), `durationMs`
-     * (default 500, 0 = instant), and `onComplete`.
+     * @param options `padding` in world units (default 0) or `paddingPx` in
+     * screen pixels (wins over `padding`), `durationMs` (default 500,
+     * 0 = instant), and `onComplete`.
      * @throws {ConfigValidationError} If an edge is not finite, min >= max on
-     * an axis, or padding is negative.
+     * an axis, or a padding value is negative.
      * @example
      * ```ts
      * // Show the whole board with one cell of margin
      * engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+     *
+     * // 24px of air around any selection, small or huge
+     * engine.fitBounds(selectionBounds, { paddingPx: 24 });
      *
      * // Jump to a selection instantly
      * engine.fitBounds(selectionBounds, { durationMs: 0 });
      * ```
      */
     fitBounds(bounds: Bounds, options: FitBoundsOptions = {}) {
-        const { padding = 0, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
-        validateFitBounds(bounds, padding);
+        const { padding = 0, paddingPx, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
 
         const size = this.viewport.getSize();
-        const fitWidth = bounds.maxX - bounds.minX + padding * 2;
-        const fitHeight = bounds.maxY - bounds.minY + padding * 2;
-        const rawScale = Math.min(size.width / fitWidth, size.height / fitHeight);
+        // Shared with the config-time helper (it also validates), so the
+        // scale a caller derives from fitScale() is exactly the scale this
+        // method targets before clamping.
+        const rawScale = fitScale(bounds, size, { padding, paddingPx });
         const targetScale = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, rawScale));
         const center = {
             x: (bounds.minX + bounds.maxX) / 2,

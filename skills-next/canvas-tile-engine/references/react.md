@@ -147,7 +147,7 @@ All the types and helpers these components and handles use are re-exported from
 into `@canvas-tile-engine/core`. That includes the draw-object types (`Rect`,
 `Circle`, `Text`, `Line`, `LineStyle`, `ImageItem`, `PathItem`, `PathStyle`,
 `PathCommand`, `Coords`), the imperative `DrawHandle`, every `on*Callback`
-type plus `WheelInfo`, and the `gridToSize` / `pathCommandsBounds` helpers.
+type plus `WheelInfo`, and the `gridToSize` / `fitScale` / `pathCommandsBounds` helpers.
 
 Static components clear their cache automatically when `items` gets a new
 array identity (or when `cacheKey` changes) — no manual `clearStaticCache`

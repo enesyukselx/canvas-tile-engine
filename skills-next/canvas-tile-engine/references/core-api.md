@@ -133,7 +133,7 @@ after mount.
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
 | `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |
 | `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
-| `fitBounds(bounds, opts?): void` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. |
+| `fitBounds(bounds, opts?): void` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. |
 | `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. |
 | `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |
 
@@ -291,9 +291,36 @@ cells fully visible, often with `drag`/`zoom` disabled. On core versions
 before 0.5 `gridToSize` has no `center` field - compute
 `{ x: (columns-1)/2, y: (rows-1)/2 }` manually.
 
+### `fitScale` - content-driven scale limits
+
+`fitScale(bounds, size, opts?)` returns the scale (px per world unit) at
+which `bounds` exactly fits a `size`-px viewport - the SAME math `fitBounds`
+uses (shared implementation, no drift), as a pure config-time function. The
+`gridToSize` of free-form content: derive `scale`/`minScale` from the content
+instead of hand-tuning constants that need recalibration whenever the
+content size changes. `opts: { padding? (world), paddingPx? (screen px, wins) }`.
+Result is unclamped - apply your own policy. Throws on invalid bounds/
+paddings/size.
+
+```ts
+import { fitScale } from "@canvas-tile-engine/core";
+
+const fit = fitScale(WORLD_BOUNDS, VIEWPORT, { paddingPx: 24 });
+const config = {
+    size: VIEWPORT,
+    scale: fit,          // open showing everything
+    minScale: fit * 0.8, // overview slack - your policy
+    maxScale: 64,        // quality cap - NOT derivable from bounds, keep hand-picked
+};
+// Runtime content change: setScaleLimits(fit * 0.8, 64) + fitBounds(bounds)
+```
+
+Only `maxScale` stays manual by design: it is a content-resolution quality
+cap (asset px density, label readability), which no bounds can imply.
+
 ## Exported types and classes (import from `@canvas-tile-engine/core`)
 
-Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`,
+Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`,
 `SpatialIndex`, `Config`, `ViewportState`, `CoordinateTransformer`,
 `GestureProcessor`, `AnimationController`.
 

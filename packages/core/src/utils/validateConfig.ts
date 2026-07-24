@@ -2,8 +2,9 @@ import { CanvasTileEngineConfig } from "../types";
 
 /**
  * Creates a validation error with descriptive message.
+ * @internal Shared by the validators here and sibling utils (fitScale).
  */
-function configError(message: string): Error {
+export function configError(message: string): Error {
     return new Error(`[CanvasTileEngine] Invalid config: ${message}`);
 }
 
@@ -169,11 +170,13 @@ export function validateCoords(x: number, y: number): void {
  * be fitted into the viewport.
  * @param bounds The rectangle to fit.
  * @param padding World-unit margin added on every side.
- * @throws {ConfigValidationError} If bounds or padding are invalid.
+ * @param paddingPx Screen-pixel margin kept free on every side.
+ * @throws {ConfigValidationError} If bounds or a padding value is invalid.
  */
 export function validateFitBounds(
     bounds: { minX: number; maxX: number; minY: number; maxY: number },
     padding: number,
+    paddingPx?: number,
 ): void {
     const edges = [
         ["minX", bounds.minX],
@@ -194,6 +197,9 @@ export function validateFitBounds(
     }
     if (typeof padding !== "number" || !Number.isFinite(padding) || padding < 0) {
         throw configError(`fitBounds padding must be a non-negative finite number, got ${padding}`);
+    }
+    if (paddingPx !== undefined && (typeof paddingPx !== "number" || !Number.isFinite(paddingPx) || paddingPx < 0)) {
+        throw configError(`fitBounds paddingPx must be a non-negative finite number, got ${paddingPx}`);
     }
 }
 

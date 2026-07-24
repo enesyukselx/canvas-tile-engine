@@ -249,9 +249,12 @@ Fits a world-space rectangle into the viewport: centers the view on the rectangl
 | Parameter | Type | Description |
 | :-------- | :--- | :---------- |
 | `bounds` | `{ minX, maxX, minY, maxY }` | Rectangle to fit. Every edge must be finite. |
-| `options.padding` | `number` | Extra world-unit margin on every side. Default `0`. |
+| `options.padding` | `number` | Extra world-unit margin on every side; scales with the content. Default `0`. |
+| `options.paddingPx` | `number` | Screen-pixel margin kept free on every side, independent of the content's world size. Wins over `padding`. |
 | `options.durationMs` | `number` | Animation duration in ms. Default `500`; `0` = instant. |
 | `options.onComplete` | `function` | Called when the fit completes. |
+
+`padding` keeps the margin proportional to the content; `paddingPx` keeps it a fixed number of screen pixels regardless of how large the fitted area is — the right choice for fit-to-selection UI (same world/px pair as `hitTest`'s `padding`/`paddingPx`).
 
 ```tsx
 const showWholeBoard = () => {
@@ -259,7 +262,7 @@ const showWholeBoard = () => {
 };
 
 const zoomToSelection = (selection: { minX: number; maxX: number; minY: number; maxY: number }) => {
-    engine.fitBounds(selection, { padding: 0.5, durationMs: 300 });
+    engine.fitBounds(selection, { paddingPx: 24, durationMs: 300 });
 };
 ```
 
