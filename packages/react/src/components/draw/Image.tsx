@@ -10,16 +10,22 @@ export interface ImageProps {
      */
     items: ImageItem | ImageItem[];
     layer?: number;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content like
+     * terrain art. Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
  * Draws images on the canvas.
  */
-export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
+export const Image = memo(function Image({ items, layer = 1, hitTest }: ImageProps) {
     const { engine, requestRender } = useEngineContext();
 
     useEffect(() => {
-        const handle = engine.drawImage(items, layer);
+        const handle = engine.drawImage(items, layer, { hitTest });
         requestRender();
         return () => {
             if (handle) {
@@ -29,7 +35,7 @@ export const Image = memo(function Image({ items, layer = 1 }: ImageProps) {
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender]);
+    }, [engine, items, layer, hitTest, requestRender]);
 
     return null;
 });

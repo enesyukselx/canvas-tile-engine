@@ -380,6 +380,17 @@ onClick={(coords) => {
 }}
 ```
 
+Decorative content — floor tiles, background art, zone overlays — can opt out
+of hit testing entirely with the `hitTest={false}` prop (the
+`pointer-events: none` of the draw components), so clicks and marquee queries
+only ever see interactive content:
+
+```tsx
+<CanvasTileEngine.Rect items={floorTiles} layer={0} hitTest={false} />
+<CanvasTileEngine.Circle items={units} layer={2} />
+{/* hitTest / hitTestRect now return units only */}
+```
+
 ## Managing the Cursor
 
 The engine never touches `canvas.style.cursor` - cursor styling is fully owned

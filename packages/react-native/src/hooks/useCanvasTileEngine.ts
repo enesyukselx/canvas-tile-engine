@@ -21,6 +21,8 @@ import type {
     TextDrawOptions,
     LineDrawOptions,
     PathDrawOptions,
+    DrawOptions,
+    StaticDrawOptions,
     DrawTransform,
     PathItem,
 } from "@canvas-tile-engine/core";
@@ -98,13 +100,13 @@ export interface EngineHandle {
         layer?: number,
         options?: RectDrawOptions<TData>,
     ): DrawHandle;
-    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
+    drawStaticRect(items: Rect[], cacheKey: string, layer?: number, options?: StaticDrawOptions): DrawHandle;
     drawCircle<TData = unknown>(
         items: Circle<TData> | Circle<TData>[],
         layer?: number,
         options?: CircleDrawOptions<TData>,
     ): DrawHandle;
-    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number, options?: StaticDrawOptions): DrawHandle;
     drawLine<TData = unknown>(
         items: Line<TData> | Line<TData>[],
         style?: LineStyle,
@@ -121,8 +123,13 @@ export interface EngineHandle {
         layer?: number,
         options?: PathDrawOptions<TData>,
     ): DrawHandle;
-    drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number): DrawHandle;
-    drawStaticImage(items: ImageItem<SkImage>[], cacheKey: string, layer?: number): DrawHandle;
+    drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number, options?: DrawOptions): DrawHandle;
+    drawStaticImage(
+        items: ImageItem<SkImage>[],
+        cacheKey: string,
+        layer?: number,
+        options?: StaticDrawOptions,
+    ): DrawHandle;
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
 
     clearLayer(layer: number): void;
@@ -265,14 +272,20 @@ export function useCanvasTileEngine(): EngineHandle {
             drawRect(items, layer, options) {
                 return instanceRef.current?.drawRect(items, layer, options) ?? droppedDraw("drawRect");
             },
-            drawStaticRect(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? droppedDraw("drawStaticRect");
+            drawStaticRect(items, cacheKey, layer, options) {
+                return (
+                    instanceRef.current?.drawStaticRect(items, cacheKey, layer, options) ??
+                    droppedDraw("drawStaticRect")
+                );
             },
             drawCircle(items, layer, options) {
                 return instanceRef.current?.drawCircle(items, layer, options) ?? droppedDraw("drawCircle");
             },
-            drawStaticCircle(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? droppedDraw("drawStaticCircle");
+            drawStaticCircle(items, cacheKey, layer, options) {
+                return (
+                    instanceRef.current?.drawStaticCircle(items, cacheKey, layer, options) ??
+                    droppedDraw("drawStaticCircle")
+                );
             },
             drawLine(items, style, layer, options) {
                 return instanceRef.current?.drawLine(items, style, layer, options) ?? droppedDraw("drawLine");
@@ -283,11 +296,14 @@ export function useCanvasTileEngine(): EngineHandle {
             drawPath(items, layer, options) {
                 return instanceRef.current?.drawPath(items, layer, options) ?? droppedDraw("drawPath");
             },
-            drawImage(items, layer) {
-                return instanceRef.current?.drawImage(items, layer) ?? droppedDraw("drawImage");
+            drawImage(items, layer, options) {
+                return instanceRef.current?.drawImage(items, layer, options) ?? droppedDraw("drawImage");
             },
-            drawStaticImage(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? droppedDraw("drawStaticImage");
+            drawStaticImage(items, cacheKey, layer, options) {
+                return (
+                    instanceRef.current?.drawStaticImage(items, cacheKey, layer, options) ??
+                    droppedDraw("drawStaticImage")
+                );
             },
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
                 return (
