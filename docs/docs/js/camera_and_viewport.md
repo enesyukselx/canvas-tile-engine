@@ -190,19 +190,25 @@ Fits a world-space rectangle into the viewport: centers the view on the rectangl
 | Parameter | Type | Description |
 | :-------- | :--- | :---------- |
 | `bounds` | `{ minX, maxX, minY, maxY }` | Rectangle to fit. Every edge must be finite. |
-| `options.padding` | `number` | Extra world-unit margin on every side. Default `0`. |
+| `options.padding` | `number` | Extra world-unit margin on every side; scales with the content. Default `0`. |
+| `options.paddingPx` | `number` | Screen-pixel margin kept free on every side, independent of the content's world size. Wins over `padding`. |
 | `options.durationMs` | `number` | Animation duration in ms. Default `500`; `0` = instant. |
 | `options.onComplete` | `function` | Called when the fit completes. |
+
+`padding` is world units: it grows the fitted area, so the visual margin stays proportional to the content (a 10x larger board needs a 10x larger padding for the same framing). `paddingPx` shrinks the viewport instead: "24px of air" frames a 3-cell selection and a 10k-cell board identically — the right choice for fit-to-selection UI. The same world/px pair as `hitTest`'s `padding`/`paddingPx`.
 
 ```typescript
 // Show the whole 32x32 board with one cell of margin
 engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
 
+// 24px of air around any selection, small or huge
+engine.fitBounds(selectionBounds, { paddingPx: 24 });
+
 // Jump to a selection instantly
 engine.fitBounds(selectionBounds, { durationMs: 0 });
 ```
 
-Throws a `ConfigValidationError` if an edge is not finite, `min >= max` on an axis, or padding is negative.
+Throws a `ConfigValidationError` if an edge is not finite, `min >= max` on an axis, or a padding value is negative. A `paddingPx` too large for the viewport is clamped (at least 1px of fit area per axis) and the result rides the scale limits.
 
 ## Viewport & Resizing
 

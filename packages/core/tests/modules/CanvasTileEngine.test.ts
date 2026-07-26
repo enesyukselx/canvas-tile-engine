@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasTileEngine } from "../../src/CanvasTileEngine";
+import { fitScale } from "../../src/utils/fitScale";
 import type { CanvasTileEngineConfig, Coords, IRenderer } from "../../src/types";
 
 type Mount = Record<string, never>;
@@ -208,6 +209,51 @@ describe("CanvasTileEngine", () => {
             expect(e.getScale()).toBeCloseTo(800 / 120);
         });
 
+        it("paddingPx shrinks the viewport instead of growing the bounds", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 40, durationMs: 0 });
+            // min((800 - 80) / 100, (600 - 80) / 50) = 7.2
+            expect(e.getScale()).toBeCloseTo(7.2);
+        });
+
+        it("paddingPx keeps the same pixel margin regardless of content size", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 40, durationMs: 0 });
+            const small = e.getScale();
+            // 10x larger content, same paddingPx: margin stays 40px, so the
+            // scale is exactly 10x smaller (world padding would need a manual
+            // 10x to achieve this).
+            e.fitBounds({ minX: 0, maxX: 1000, minY: 0, maxY: 500 }, { paddingPx: 40, durationMs: 0 });
+            expect(e.getScale()).toBeCloseTo(small / 10);
+        });
+
+        it("paddingPx wins over world padding", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { padding: 10, paddingPx: 40, durationMs: 0 });
+            expect(e.getScale()).toBeCloseTo(7.2); // not 800 / 120
+        });
+
+        it("clamps a paddingPx that would consume the viewport", () => {
+            const e = createEngine(wideLimits);
+            // 2 * 500 exceeds both viewport axes; the fit area floors at 1px
+            // per axis and the result rides the scale limits instead of
+            // going negative or non-finite.
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 500, durationMs: 0 });
+            expect(e.getScale()).toBe(0.01); // wideLimits minScale
+        });
+
+        it("lands exactly on the scale fitScale() derives (shared math, no drift)", () => {
+            const e = createEngine(wideLimits);
+            const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 50 };
+            const size = { width: 800, height: 600 };
+
+            e.fitBounds(bounds, { paddingPx: 24, durationMs: 0 });
+            expect(e.getScale()).toBe(fitScale(bounds, size, { paddingPx: 24 }));
+
+            e.fitBounds(bounds, { padding: 3, durationMs: 0 });
+            expect(e.getScale()).toBe(fitScale(bounds, size, { padding: 3 }));
+        });
+
         it("clamps the scale to the limits", () => {
             engine.fitBounds({ minX: 0, maxX: 1, minY: 0, maxY: 1 }, { durationMs: 0 });
             expect(engine.getScale()).toBe(2); // maxScale
@@ -245,6 +291,8 @@ describe("CanvasTileEngine", () => {
             expect(() => engine.fitBounds({ minX: 0, maxX: Infinity, minY: 0, maxY: 10 })).toThrow();
             expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: NaN })).toThrow();
             expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { padding: -1 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { paddingPx: -1 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { paddingPx: NaN })).toThrow();
         });
     });
 
@@ -449,6 +497,42 @@ describe("CanvasTileEngine", () => {
             // 0.3 world + 0.4px / scale 2 = 0.5 -> effective radius 0.75 covers 0.7
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3, paddingPx: 0.4 })).toBeDefined();
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3 })).toBeUndefined();
+        });
+
+        it("hitTest: false keeps a registration out of every hit query", () => {
+            const e = createEngineWithDrawAPI();
+            // Decorative floor under an interactive unit at the same cell
+            e.drawRect({ x: 2, y: 2, size: 1 }, 0, { hitTest: false });
+            e.drawCircle({ x: 2, y: 2, size: 1 }, 2);
+
+            const hits = e.hitTest({ x: 2.5, y: 2.5 });
+            expect(hits).toHaveLength(1);
+            expect(hits[0].kind).toBe("circle");
+
+            // Marquee over the cell sees the unit, not the floor
+            const marquee = e.hitTestRect({ minX: 1.8, maxX: 3.2, minY: 1.8, maxY: 3.2 });
+            expect(marquee).toHaveLength(1);
+            expect(marquee[0].kind).toBe("circle");
+        });
+
+        it("static draws accept hitTest: false too", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0, { hitTest: false });
+            expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeUndefined();
+        });
+
+        it("id-replace toggles hit participation in both directions", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor" });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+
+            // Same id, now opted out: the stale hit entry must not survive
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor", hitTest: false });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+
+            // And opting back in re-registers
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor" });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
         });
     });
 
