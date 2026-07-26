@@ -5,6 +5,7 @@ export type * from "./types";
 export * from "./constants";
 // Utilities
 export { gridToSize } from "./utils/gridToSize";
+export { fitScale, type FitScaleOptions } from "./utils/fitScale";
 export { resolveLineWidthPx, resolveLineDashPx, resolveRadiusPx, resolveCornerRadiusPx } from "./utils/strokeStyle";
 export { cornerArc } from "./utils/pathCorners";
 export { traceRoundedPath, traceCommands, type PathTraceTarget, type CommandTraceTarget } from "./utils/tracePath";

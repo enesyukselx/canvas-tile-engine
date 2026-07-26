@@ -79,3 +79,55 @@ const engine = new CanvasTileEngine(
 
 // Creates a 480x480 pixel canvas showing an 8x8 grid
 ```
+
+## fitScale
+
+The scale (pixels per world unit) at which a world rectangle exactly fits a viewport — the same math `fitBounds` uses to pick its target scale, exposed as a pure function for config time. Where `gridToSize` derives config for fixed boards, `fitScale` derives scale limits for free-form content, so `scale`/`minScale` stop being hand-tuned constants that must be recalibrated every time the content size changes.
+
+```ts
+import { fitScale } from "@canvas-tile-engine/core";
+
+const VIEWPORT = { width: 800, height: 600 };
+const WORLD_BOUNDS = { minX: 0, maxX: 200, minY: 0, maxY: 120 };
+
+const fit = fitScale(WORLD_BOUNDS, VIEWPORT, { paddingPx: 24 });
+
+const config = {
+    size: VIEWPORT,
+    scale: fit, // open showing everything
+    minScale: fit * 0.8, // small overview slack - your policy
+    maxScale: 64, // quality cap - intentionally hand-picked (see below)
+};
+```
+
+When the content grows 10x, `fit` shrinks 10x automatically — no retuning. Only `maxScale` stays a deliberate choice: it is a content-resolution quality cap (at what pixel density your tiles or labels stop looking good), which no bounds can imply.
+
+### Parameters
+
+| Parameter           | Type                          | Description                                                                                    |
+| ------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `bounds`            | `{ minX, maxX, minY, maxY }`  | Rectangle to fit. Every edge must be finite.                                                   |
+| `size`              | `{ width, height }`           | Viewport size in logical pixels.                                                               |
+| `options.padding`   | `number`                      | World-unit margin on every side; scales with the content. Default `0`.                         |
+| `options.paddingPx` | `number`                      | Screen-pixel margin kept free on every side, content-size-independent. Wins over `padding`.    |
+
+Returns the fitting scale as a plain number, unclamped — apply your own min/max policy. Throws a `ConfigValidationError` on non-finite bounds, `min >= max` on an axis, negative paddings, or a non-positive `size`. Because `fitBounds` shares this exact computation, `engine.fitBounds(bounds, { paddingPx: 24 })` lands precisely on the scale `fitScale(bounds, size, { paddingPx: 24 })` returns (before scale-limit clamping).
+
+### Example: content-driven scale limits
+
+```ts
+function configForContent(bounds: Bounds) {
+    const fit = fitScale(bounds, VIEWPORT, { paddingPx: 24 });
+    return {
+        size: VIEWPORT,
+        scale: fit,
+        minScale: fit * 0.8,
+        maxScale: 64,
+    };
+}
+
+// Later, when the content changes at runtime:
+const fit = fitScale(newBounds, engine.getSize(), { paddingPx: 24 });
+engine.setScaleLimits(fit * 0.8, 64);
+engine.fitBounds(newBounds, { paddingPx: 24 });
+```
