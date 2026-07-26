@@ -25,13 +25,6 @@ Install with the skills CLI (works across agents):
 npx skills add enesyukselx/canvas-tile-engine
 ```
 
-Or as a Claude Code plugin:
-
-```
-/plugin marketplace add enesyukselx/canvas-tile-engine
-/plugin install canvas-tile-engine@canvas-tile-engine
-```
-
 See [skills/](./skills) for details and manual installation.
 
 ## Why It Exists
