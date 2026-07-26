@@ -20,12 +20,18 @@ export interface CircleProps {
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     styleOf?: StyleOf<CircleType<any>, ShapeDecorationStyle>;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content.
+     * Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
  * Draws circles on the canvas.
  */
-export const Circle = memo(function Circle({ items, layer = 1, styleOf }: CircleProps) {
+export const Circle = memo(function Circle({ items, layer = 1, styleOf, hitTest }: CircleProps) {
     const { engine, requestRender } = useEngineContext();
 
     // Read through a ref so styleOf identity changes never re-register.
@@ -39,7 +45,7 @@ export const Circle = memo(function Circle({ items, layer = 1, styleOf }: Circle
     }, [styleOf, requestRender]);
 
     useEffect(() => {
-        const handle = engine.drawCircle(items, layer, { styleOf: (item) => styleOfRef.current?.(item) });
+        const handle = engine.drawCircle(items, layer, { styleOf: (item) => styleOfRef.current?.(item), hitTest });
         requestRender();
         return () => {
             if (handle) {
@@ -49,7 +55,7 @@ export const Circle = memo(function Circle({ items, layer = 1, styleOf }: Circle
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender]);
+    }, [engine, items, layer, hitTest, requestRender]);
 
     return null;
 });

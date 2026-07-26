@@ -11,12 +11,18 @@ export interface StaticCircleProps {
     items: CircleType[];
     cacheKey: string;
     layer?: number;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content.
+     * Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
  * Draws static circles with caching for performance.
  */
-export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer = 1 }: StaticCircleProps) {
+export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer = 1, hitTest }: StaticCircleProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
     const prevItemsRef = useRef(items);
@@ -36,7 +42,7 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
         }
         prevItemsRef.current = items;
 
-        const handle = engine.drawStaticCircle(items, cacheKey, layer);
+        const handle = engine.drawStaticCircle(items, cacheKey, layer, { hitTest });
         requestRender();
 
         return () => {
@@ -47,7 +53,7 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
                 requestRender();
             }
         };
-    }, [engine, items, cacheKey, layer, requestRender]);
+    }, [engine, items, cacheKey, layer, hitTest, requestRender]);
 
     useEffect(() => {
         return () => {

@@ -23,6 +23,8 @@ import type {
     TextDrawOptions,
     LineDrawOptions,
     PathDrawOptions,
+    DrawOptions,
+    StaticDrawOptions,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -187,7 +189,7 @@ export interface EngineHandle {
     ): DrawHandle;
 
     /** Draw static rectangles (cached) */
-    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
+    drawStaticRect(items: Rect[], cacheKey: string, layer?: number, options?: StaticDrawOptions): DrawHandle;
 
     /** Draw circles */
     drawCircle<TData = unknown>(
@@ -197,7 +199,7 @@ export interface EngineHandle {
     ): DrawHandle;
 
     /** Draw static circles (cached) */
-    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number, options?: StaticDrawOptions): DrawHandle;
 
     /** Draw lines */
     drawLine<TData = unknown>(
@@ -222,10 +224,10 @@ export interface EngineHandle {
     ): DrawHandle;
 
     /** Draw images */
-    drawImage(items: ImageItem | ImageItem[], layer?: number): DrawHandle;
+    drawImage(items: ImageItem | ImageItem[], layer?: number, options?: DrawOptions): DrawHandle;
 
     /** Draw static images (cached) */
-    drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number): DrawHandle;
+    drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number, options?: StaticDrawOptions): DrawHandle;
 
     /** Draw grid lines */
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
@@ -427,16 +429,22 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.drawRect(items, layer, options) ?? droppedDraw("drawRect");
             },
 
-            drawStaticRect(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticRect(items, cacheKey, layer) ?? droppedDraw("drawStaticRect");
+            drawStaticRect(items, cacheKey, layer, options) {
+                return (
+                    instanceRef.current?.drawStaticRect(items, cacheKey, layer, options) ??
+                    droppedDraw("drawStaticRect")
+                );
             },
 
             drawCircle(items, layer, options) {
                 return instanceRef.current?.drawCircle(items, layer, options) ?? droppedDraw("drawCircle");
             },
 
-            drawStaticCircle(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticCircle(items, cacheKey, layer) ?? droppedDraw("drawStaticCircle");
+            drawStaticCircle(items, cacheKey, layer, options) {
+                return (
+                    instanceRef.current?.drawStaticCircle(items, cacheKey, layer, options) ??
+                    droppedDraw("drawStaticCircle")
+                );
             },
 
             drawLine(items, style, layer, options) {
@@ -451,12 +459,15 @@ export function useCanvasTileEngine(): EngineHandle {
                 return instanceRef.current?.drawPath(items, layer, options) ?? droppedDraw("drawPath");
             },
 
-            drawImage(items, layer) {
-                return instanceRef.current?.drawImage(items, layer) ?? droppedDraw("drawImage");
+            drawImage(items, layer, options) {
+                return instanceRef.current?.drawImage(items, layer, options) ?? droppedDraw("drawImage");
             },
 
-            drawStaticImage(items, cacheKey, layer) {
-                return instanceRef.current?.drawStaticImage(items, cacheKey, layer) ?? droppedDraw("drawStaticImage");
+            drawStaticImage(items, cacheKey, layer, options) {
+                return (
+                    instanceRef.current?.drawStaticImage(items, cacheKey, layer, options) ??
+                    droppedDraw("drawStaticImage")
+                );
             },
 
             drawGridLines(cellSize, lineWidth, strokeStyle, layer) {

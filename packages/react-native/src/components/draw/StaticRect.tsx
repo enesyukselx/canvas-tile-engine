@@ -11,6 +11,12 @@ export interface StaticRectProps {
     items: RectType[];
     cacheKey: string;
     layer?: number;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content like
+     * minimap tiles. Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
@@ -21,7 +27,7 @@ export interface StaticRectProps {
  * this over `Rect` for large item sets that don't change — per-frame cost is
  * independent of item count.
  */
-export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 }: StaticRectProps) {
+export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1, hitTest }: StaticRectProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
     const prevItemsRef = useRef(items);
@@ -42,7 +48,7 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 
         }
         prevItemsRef.current = items;
 
-        const handle = engine.drawStaticRect(items, cacheKey, layer);
+        const handle = engine.drawStaticRect(items, cacheKey, layer, { hitTest });
         requestRender();
 
         return () => {
@@ -53,7 +59,7 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1 
                 requestRender();
             }
         };
-    }, [engine, items, cacheKey, layer, requestRender]);
+    }, [engine, items, cacheKey, layer, hitTest, requestRender]);
 
     // Cleanup cache on unmount
     useEffect(() => {
