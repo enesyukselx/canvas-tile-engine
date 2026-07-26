@@ -133,7 +133,7 @@ after mount.
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
 | `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |
 | `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
-| `fitBounds(bounds, opts?): void` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. |
+| `fitBounds(bounds, opts?): void` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. |
 | `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. |
 | `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |
 

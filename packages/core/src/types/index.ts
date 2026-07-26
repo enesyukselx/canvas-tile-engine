@@ -73,8 +73,20 @@ export interface Bounds {
 
 /** Options for the engine's `fitBounds` method. */
 export interface FitBoundsOptions {
-    /** Extra world-unit margin added on every side of the rectangle. Default 0. */
+    /**
+     * Extra world-unit margin added on every side of the rectangle. Scales
+     * with the content: 10x larger bounds need a 10x larger padding for the
+     * same framing. Ignored when {@link paddingPx} is set. Default 0.
+     */
     padding?: number;
+    /**
+     * Screen-pixel margin kept free on every side of the viewport,
+     * independent of the content's world size — "20px of air" frames a
+     * 3-cell selection and a 10k-cell board identically. Takes precedence
+     * over {@link padding}. A value too large for the viewport is clamped so
+     * the fit stays valid.
+     */
+    paddingPx?: number;
     /** Animation duration in ms (default 500). Use 0 for an instant jump. */
     durationMs?: number;
     /** Fired when the fit completes (synchronously when instant). */
