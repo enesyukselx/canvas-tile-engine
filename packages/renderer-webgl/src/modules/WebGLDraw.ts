@@ -24,6 +24,8 @@ import {
     roundedPolyline,
     roundedRing,
     resolveRadiusPx,
+    resolveOrigin,
+    computeOriginOffset,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
@@ -132,7 +134,7 @@ export class WebGLDraw {
                 const size = item.size ?? 1;
                 const w = item.width ?? size;
                 const h = item.height ?? size;
-                const origin = this.resolveOrigin(item.origin);
+                const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
@@ -141,7 +143,7 @@ export class WebGLDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxW = w * this.camera.scale;
                 const pxH = h * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
                 const cx = drawX + pxW / 2;
                 const cy = drawY + pxH / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
@@ -210,7 +212,7 @@ export class WebGLDraw {
             for (const item of visibleItems) {
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-                const origin = this.resolveOrigin(item.origin);
+                const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
@@ -219,7 +221,7 @@ export class WebGLDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
                 const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: drawX, y: drawY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
                 const cx = drawX + radius;
                 const cy = drawY + radius;
 
@@ -486,7 +488,7 @@ export class WebGLDraw {
             for (const item of visibleItems) {
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-                const origin = this.resolveOrigin(item.origin);
+                const origin = resolveOrigin(item.origin);
 
                 if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
 
@@ -508,7 +510,7 @@ export class WebGLDraw {
                 if (aspect > 1) drawH = pxSize / aspect;
                 else drawW = pxSize * aspect;
 
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: baseX, y: baseY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
@@ -635,18 +637,6 @@ export class WebGLDraw {
 
     // ─── Geometry helpers ───
 
-    private resolveOrigin(origin: { mode?: string; x?: number; y?: number } | undefined): {
-        mode: "cell" | "self";
-        x: number;
-        y: number;
-    } {
-        return {
-            mode: origin?.mode === "self" ? "self" : "cell",
-            x: origin?.x ?? 0.5,
-            y: origin?.y ?? 0.5,
-        };
-    }
-
     /**
      * Normalize a radius value to per-corner radii [topLeft, topRight,
      * bottomRight, bottomLeft], following `ctx.roundRect` semantics: shorter
@@ -690,27 +680,6 @@ export class WebGLDraw {
             pxSize / (bl + tl) || 1,
         );
         return [tl * scale, tr * scale, br * scale, bl * scale];
-    }
-
-    private computeOriginOffset(
-        pos: Coords,
-        pxW: number,
-        pxH: number,
-        origin: { mode: "cell" | "self"; x: number; y: number },
-        camera: ICamera,
-    ) {
-        if (origin.mode === "cell") {
-            const cell = camera.scale;
-            return {
-                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
-            };
-        }
-
-        return {
-            x: pos.x - origin.x * pxW,
-            y: pos.y - origin.y * pxH,
-        };
     }
 
     /**

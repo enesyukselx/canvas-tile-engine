@@ -19,6 +19,8 @@ import {
     resolveLineDashPx,
     resolveRadiusPx,
     resolveCornerRadiusPx,
+    resolveOrigin,
+    computeOriginOffset,
     traceRoundedPath,
     traceCommands,
     pathCommandsBounds,
@@ -200,12 +202,12 @@ export class SkiaDraw {
         styleOf?: StyleOf<Rect, ShapeDecorationStyle>,
     ) {
         const size = item.size ?? 1;
-        const origin = this.resolveOrigin(item.origin);
+        const origin = resolveOrigin(item.origin);
         const deco = styleOf?.(item);
         const style = deco ? { ...item.style, ...deco } : item.style;
         const pxW = (item.width ?? size) * cellSize;
         const pxH = (item.height ?? size) * cellSize;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(
+        const { x: drawX, y: drawY } = computeOriginOffset(
             pos,
             pxW,
             pxH,
@@ -311,14 +313,14 @@ export class SkiaDraw {
         useSizePx: boolean,
         styleOf?: StyleOf<Circle, ShapeDecorationStyle>,
     ) {
-        const origin = this.resolveOrigin(item.origin);
+        const origin = resolveOrigin(item.origin);
         const deco = styleOf?.(item);
         const style = deco ? { ...item.style, ...deco } : item.style;
         const pxSize = useSizePx
             ? resolveSizePx(item, cellSize)
             : (item.size ?? 1) * cellSize;
         const radius = pxSize / 2;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(
+        const { x: drawX, y: drawY } = computeOriginOffset(
             pos,
             pxSize,
             pxSize,
@@ -697,7 +699,7 @@ export class SkiaDraw {
         cellSize: number,
         useSizePx: boolean,
     ) {
-        const origin = this.resolveOrigin(item.origin);
+        const origin = resolveOrigin(item.origin);
 
         const img = item.img;
         const imgW = img.width();
@@ -721,7 +723,7 @@ export class SkiaDraw {
         if (aspect > 1) drawH = pxSize / aspect;
         else drawW = pxSize * aspect;
 
-        const { x: baseX, y: baseY } = this.computeOriginOffset(
+        const { x: baseX, y: baseY } = computeOriginOffset(
             pos,
             pxSize,
             pxSize,
@@ -995,20 +997,6 @@ export class SkiaDraw {
         return parsed;
     }
 
-    private resolveOrigin(
-        origin: { mode?: string; x?: number; y?: number } | undefined,
-    ): {
-        mode: "cell" | "self";
-        x: number;
-        y: number;
-    } {
-        return {
-            mode: origin?.mode === "self" ? "self" : "cell",
-            x: origin?.x ?? 0.5,
-            y: origin?.y ?? 0.5,
-        };
-    }
-
     /**
      * Resolves `Rect.radius` into either a single uniform radius or a
      * per-corner `[topLeft, topRight, bottomRight, bottomLeft]` tuple,
@@ -1058,27 +1046,6 @@ export class SkiaDraw {
             topRight: { x: topRight, y: topRight },
             bottomRight: { x: bottomRight, y: bottomRight },
             bottomLeft: { x: bottomLeft, y: bottomLeft },
-        };
-    }
-
-    private computeOriginOffset(
-        pos: Coords,
-        pxW: number,
-        pxH: number,
-        origin: { mode: "cell" | "self"; x: number; y: number },
-        cellSize: number,
-    ) {
-        if (origin.mode === "cell") {
-            const cell = cellSize;
-            return {
-                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
-            };
-        }
-
-        return {
-            x: pos.x - origin.x * pxW,
-            y: pos.y - origin.y * pxH,
         };
     }
 
