@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
-import { CanvasDraw, Layer, type OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import {
+    CanvasDraw,
+    Layer,
+    type DrawContext,
+    type OffscreenCanvasFactory,
+} from "@canvas-tile-engine/renderer-shared/canvas2d";
 
 // Minimal fake 2D context that records the active font at every fillText() call.
 function makeTextRecordingCtx() {
@@ -25,7 +30,7 @@ function makeTextRecordingCtx() {
 function setupAtScale(scale: number) {
     const camera = { x: 0, y: 0, scale } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer<SKRSContext2D>();
+    const layers = new Layer<DrawContext<SKRSContext2D>>();
     const createOffscreen: OffscreenCanvasFactory<SKRSContext2D, Canvas> = () => {
         throw new Error("not used in these tests");
     };

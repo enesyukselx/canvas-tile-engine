@@ -1,5 +1,5 @@
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { CanvasDraw, Layer, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CanvasDraw, DrawContext, Layer, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
 
 /** Browser 2D contexts the shared pipeline runs on: the visible canvas plus offscreen static caches. */
 export type BrowserContext2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -30,7 +30,7 @@ const createOffscreen: OffscreenCanvasFactory<BrowserContext2D, BrowserOffscreen
  * @internal
  */
 export function createBrowserCanvasDraw(
-    layers: Layer<BrowserContext2D>,
+    layers: Layer<DrawContext<BrowserContext2D>>,
     transformer: CoordinateTransformer,
     camera: ICamera,
 ): BrowserCanvasDraw {

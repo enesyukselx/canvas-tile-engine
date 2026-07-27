@@ -541,6 +541,10 @@ importers:
       '@canvas-tile-engine/core':
         specifier: workspace:^
         version: link:../core
+    devDependencies:
+      '@canvas-tile-engine/renderer-shared':
+        specifier: workspace:^
+        version: link:../renderer-shared
 
 packages:
 

@@ -1,5 +1,5 @@
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { CanvasDraw, Layer, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CanvasDraw, DrawContext, Layer, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { createCanvas, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
 
 /** The shared Canvas2D pipeline instantiated for the @napi-rs/canvas platform. */
@@ -17,7 +17,7 @@ const createOffscreen: OffscreenCanvasFactory<SKRSContext2D, Canvas> = (width, h
  * @internal
  */
 export function createServerCanvasDraw(
-    layers: Layer<SKRSContext2D>,
+    layers: Layer<DrawContext<SKRSContext2D>>,
     transformer: CoordinateTransformer,
     camera: ICamera,
 ): ServerCanvasDraw {

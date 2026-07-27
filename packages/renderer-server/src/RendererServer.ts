@@ -19,7 +19,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import { createCanvas, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
-import { CoordinateOverlayRenderer, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CoordinateOverlayRenderer, DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { createServerCanvasDraw, type ServerCanvasDraw } from "./modules/createCanvasDraw";
 import { ImageLoaderServer } from "./modules/ImageLoaderServer";
 import type { ImageFormat, ServerMount } from "./types";
@@ -54,7 +54,7 @@ export class RendererServer implements IRenderer<ServerMount, Image> {
     private config!: Config;
     private viewport!: ViewportState;
     private transformer!: CoordinateTransformer;
-    private layers!: Layer<SKRSContext2D>;
+    private layers!: Layer<DrawContext<SKRSContext2D>>;
     private drawAPI!: ServerCanvasDraw;
     private coordinateOverlay!: CoordinateOverlayRenderer<SKRSContext2D>;
     private imageLoader = new ImageLoaderServer();

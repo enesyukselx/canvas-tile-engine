@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { WebGLDraw } from "../../src/modules/WebGLDraw";
-import { Layer } from "../../src/modules/Layer";
+import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
+import { Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import type { GLRenderer, LineInstance, ShapeInstance } from "../../src/modules/gl/GLRenderer";
 
 // Fake GL renderer recording every ShapeInstance passed to drawShapes.
@@ -31,7 +31,7 @@ function makeLineRecordingGL() {
 function setup() {
     const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer();
+    const layers = new Layer<WebGLDrawContext>();
     const draw = new WebGLDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale: 10 } as never;
     const ctx = { save() {}, restore() {} } as unknown as CanvasRenderingContext2D;

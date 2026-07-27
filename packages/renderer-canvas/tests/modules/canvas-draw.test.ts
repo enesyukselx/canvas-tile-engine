@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
 
 // Minimal fake 2D context that records state at every stroke()/fill() call.
@@ -34,7 +34,7 @@ function makeRecordingCtx() {
 function setup() {
     const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer<BrowserContext2D>();
+    const layers = new Layer<DrawContext<BrowserContext2D>>();
     const draw = createBrowserCanvasDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale: 10 } as never;
     const render = (ctx: CanvasRenderingContext2D) =>
@@ -365,7 +365,7 @@ function makeTextRecordingCtx() {
 function setupAtScale(scale: number) {
     const camera = { x: 0, y: 0, scale } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer<BrowserContext2D>();
+    const layers = new Layer<DrawContext<BrowserContext2D>>();
     const draw = createBrowserCanvasDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale } as never;
     const render = (ctx: CanvasRenderingContext2D) =>

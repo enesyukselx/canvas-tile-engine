@@ -22,9 +22,13 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import { CoordinateOverlayRenderer, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import {
+    CoordinateOverlayRenderer,
+    DebugOverlay,
+    DrawContext,
+    Layer,
+} from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { BrowserCanvasDraw, BrowserContext2D, createBrowserCanvasDraw } from "./modules/createCanvasDraw";
-import { CanvasDebug } from "./modules/CanvasDebug";
 import { EventBinder } from "./modules/EventBinder";
 import { ResizeWatcher } from "./modules/ResizeWatcher";
 import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
@@ -45,11 +49,11 @@ export class RendererCanvas implements IRenderer {
     private camera!: ICamera;
     private config!: Config;
     private viewport!: ViewportState;
-    private layers!: Layer<BrowserContext2D>;
+    private layers!: Layer<DrawContext<BrowserContext2D>>;
     private drawAPI!: BrowserCanvasDraw;
     private transformer!: CoordinateTransformer;
     private coordinateOverlayRenderer!: CoordinateOverlayRenderer<CanvasRenderingContext2D>;
-    private debugOverlay?: CanvasDebug;
+    private debugOverlay?: DebugOverlay<CanvasRenderingContext2D>;
 
     // Event handling
     private gestureProcessor!: GestureProcessor;
@@ -187,7 +191,7 @@ export class RendererCanvas implements IRenderer {
         );
 
         if (this.config.get().debug?.enabled) {
-            this.debugOverlay = new CanvasDebug(this.canvasContext, this.camera, this.config, this.viewport);
+            this.debugOverlay = new DebugOverlay(this.canvasContext, this.camera, this.config, this.viewport);
             // Start FPS loop if fps hud is enabled
             if (this.config.get().debug?.hud?.fps) {
                 this.debugOverlay.setFpsUpdateCallback(() => this.render());

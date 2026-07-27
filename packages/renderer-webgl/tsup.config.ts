@@ -11,4 +11,7 @@ export default defineConfig({
     // (default tsup output is index.js/index.mjs, which leaves `require`
     // pointing at a non-existent dist/index.cjs).
     outExtension: ({ format }) => ({ js: format === "cjs" ? ".cjs" : ".mjs" }),
+    // renderer-shared is a private workspace package: bundle its TypeScript
+    // source into dist so it never appears as a published dependency.
+    noExternal: [/^@canvas-tile-engine\/renderer-shared/],
 });
