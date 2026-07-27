@@ -33,13 +33,20 @@ type Rect = {
     y: number;
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number };
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        lineWidth?: number;
+        lineWidthPx?: number;
+        lineDash?: number[];
+        lineDashPx?: number[];
+    };
     rotate?: number;
     radius?: number | number[];
 };
 ```
 
-`size`, `radius`, and `style.lineWidth` are world units and scale with zoom, so borders and corner rounding stay proportional to the shape. `style.lineWidthPx` is a zoom-independent width in screen pixels and takes precedence over `lineWidth` (the same pattern as `Text`'s `size`/`fontPx`). `rotate` is degrees, clockwise.
+`size`, `radius`, `style.lineWidth`, and `style.lineDash` are world units and scale with zoom, so borders, corner rounding, and dash patterns stay proportional to the shape. `style.lineWidthPx` and `style.lineDashPx` are zoom-independent screen-pixel variants and take precedence over their world counterparts (the same pattern as `Text`'s `size`/`fontPx`). Dash patterns follow Canvas2D `setLineDash` semantics; omit them for a solid border. `rotate` is degrees, clockwise.
 
 ### `Circle`
 
@@ -49,9 +56,18 @@ type Circle = {
     y: number;
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number };
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        lineWidth?: number;
+        lineWidthPx?: number;
+        lineDash?: number[];
+        lineDashPx?: number[];
+    };
 };
 ```
+
+The style fields follow the same unit convention as `Rect`.
 
 ### `Text`
 

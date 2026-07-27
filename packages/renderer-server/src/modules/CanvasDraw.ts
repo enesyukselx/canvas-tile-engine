@@ -616,6 +616,8 @@ export class CanvasDraw implements IDrawAPI<Image> {
                   strokeStyle?: string;
                   lineWidth?: number;
                   lineWidthPx?: number;
+                  lineDash?: number[];
+                  lineDashPx?: number[];
               }
             | undefined,
         scale: number,
@@ -623,7 +625,10 @@ export class CanvasDraw implements IDrawAPI<Image> {
         if (style?.fillStyle) ctx.fill();
         if (style?.strokeStyle) {
             const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, scale));
+            const dash = resolveLineDashPx(style, scale);
+            if (dash) ctx.setLineDash(dash);
             ctx.stroke();
+            if (dash) ctx.setLineDash([]);
             resetAlpha();
         }
     }

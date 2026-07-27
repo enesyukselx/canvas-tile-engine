@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import { WebGLDraw } from "../../src/modules/WebGLDraw";
 import { Layer } from "../../src/modules/Layer";
-import type { GLRenderer, ShapeInstance } from "../../src/modules/gl/GLRenderer";
+import type { GLRenderer, LineInstance, ShapeInstance } from "../../src/modules/gl/GLRenderer";
 
 // Fake GL renderer recording every ShapeInstance passed to drawShapes.
 function makeRecordingGL() {
@@ -14,6 +14,18 @@ function makeRecordingGL() {
         drawLines() {},
     } as unknown as GLRenderer;
     return { gl, shapes };
+}
+
+// Fake GL renderer recording every LineInstance passed to drawLines.
+function makeLineRecordingGL() {
+    const lines: LineInstance[] = [];
+    const gl = {
+        drawShapes() {},
+        drawLines(items: LineInstance[]) {
+            lines.push(...items);
+        },
+    } as unknown as GLRenderer;
+    return { gl, lines };
 }
 
 function setup() {
@@ -70,5 +82,63 @@ describe("WebGLDraw non-square rects", () => {
 
         expect(shapes).toHaveLength(1);
         expect(shapes[0].halfW).toBe(150);
+    });
+});
+
+// Dashed borders are CPU-tessellated into on-interval sub-segments; the phase
+// flows around the perimeter so the pattern is continuous across corners.
+describe("WebGLDraw dashed rect/circle borders", () => {
+    it("keeps solid rect strokes as four corner-covering edge lines", () => {
+        const { draw, render } = setup();
+        const { gl, lines } = makeLineRecordingGL();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidthPx: 2 } }], 1);
+        render(gl);
+
+        expect(lines).toHaveLength(4);
+    });
+
+    it("tessellates dashed rect borders around the perimeter", () => {
+        const { draw, render } = setup(); // scale 10 -> screen box (10,10)-(20,20)
+        const { gl, lines } = makeLineRecordingGL();
+
+        // 5px on / 5px off on 10px edges: one on-segment per edge, and the
+        // phase re-enters "on" exactly at each corner.
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDashPx: [5, 5] } }], 1);
+        render(gl);
+
+        expect(lines.map(({ x1, y1, x2, y2 }) => ({ x1, y1, x2, y2 }))).toEqual([
+            { x1: 10, y1: 10, x2: 15, y2: 10 }, // top: tl -> midpoint
+            { x1: 20, y1: 10, x2: 20, y2: 15 }, // right: tr -> midpoint
+            { x1: 20, y1: 20, x2: 15, y2: 20 }, // bottom: br -> midpoint
+            { x1: 10, y1: 20, x2: 10, y2: 15 }, // left: bl -> midpoint
+        ]);
+    });
+
+    it("scales world lineDash by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { gl, lines } = makeLineRecordingGL();
+
+        // world [0.5, 0.5] -> px [5, 5]: same tessellation as the px test above
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.5, 0.5] } }], 1);
+        render(gl);
+
+        expect(lines).toHaveLength(4);
+        expect(lines[0]).toMatchObject({ x1: 10, y1: 10, x2: 15, y2: 10 });
+    });
+
+    it("dashes circle borders through the chord polyline without miter extensions", () => {
+        const { draw, render } = setup(); // circle at (15,15), r = 5
+        const { gl, lines } = makeLineRecordingGL();
+
+        // The on-interval covers the whole outline: every chord survives as-is,
+        // so the first chord starts exactly on the circle (the solid path would
+        // extend it by the miter length).
+        draw.drawCircle([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDashPx: [1000, 1] } }], 1);
+        render(gl);
+
+        expect(lines).toHaveLength(48);
+        expect(lines[0].x1).toBe(20);
+        expect(lines[0].y1).toBe(15);
     });
 });
