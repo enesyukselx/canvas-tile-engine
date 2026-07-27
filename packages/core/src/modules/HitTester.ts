@@ -12,6 +12,7 @@ import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
 import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { resolveSizeWorld } from "../utils/itemSize";
+import { resolveOrigin, computeOriginOffset } from "../utils/origin";
 import { SpatialIndex } from "./SpatialIndex";
 
 /** Primitive kinds that participate in hit testing. */
@@ -254,13 +255,10 @@ export class HitTester {
         const rect = item as Rect;
         const w = kind === "rect" ? (rect.width ?? size) : size;
         const h = kind === "rect" ? (rect.height ?? size) : size;
-        const mode = item.origin?.mode === "self" ? "self" : "cell";
-        const ox = item.origin?.x ?? 0.5;
-        const oy = item.origin?.y ?? 0.5;
-
-        // World-unit mirror of the renderers' computeOriginOffset (px = world * scale)
-        const left = mode === "cell" ? item.x - 0.5 + ox - w / 2 : item.x - ox * w;
-        const top = mode === "cell" ? item.y - 0.5 + oy - h / 2 : item.y - oy * h;
+        const origin = resolveOrigin(item.origin);
+        // World-unit call (renderers use px, cellSize = camera.scale); here a
+        // cell is exactly 1 world unit, so cellSize = 1.
+        const { x: left, y: top } = computeOriginOffset({ x: item.x, y: item.y }, w, h, origin, 1);
 
         if (kind !== "image") return { left, top, w, h };
 

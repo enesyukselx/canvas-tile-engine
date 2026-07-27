@@ -71,6 +71,8 @@ Every draw method accepts an optional `options` object as its last parameter. It
 - `strokeStyle`: Border color
 - `lineWidth`: Border width in world units; scales with zoom like the shape
 - `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
+- `lineDash`: Border dash pattern in world units; dashes scale with zoom. Canvas2D `setLineDash` semantics; omit for a solid border
+- `lineDashPx`: Border dash pattern in screen pixels, independent of zoom; wins over `lineDash`
 
 ```typescript
 // Draw a blue square on layer 1
@@ -128,6 +130,17 @@ engine.drawRect(
         size: 1,
         radius: [0.2, 0, 0.2, 0], // Diagonal rounded corners
         style: { fillStyle: "#9b59b6" },
+    },
+    1,
+);
+
+// Dashed selection outline (screen-pixel dashes stay crisp at every zoom)
+engine.drawRect(
+    {
+        x: 14,
+        y: 5,
+        size: 1,
+        style: { strokeStyle: "#f59e0b", lineWidthPx: 2, lineDashPx: [6, 4] },
     },
     1,
 );
@@ -771,6 +784,17 @@ Rules of thumb:
 - Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths): those feed hit-test geometry resolved at registration time, and the types enforce it. A width change is a geometry change — for lines, put it in the item's own `style` (registration-time, so hit testing follows); otherwise re-register.
 - For `drawLine`, `styleOf` overlays both the call-level `style` and the item's own `style` per item — use item styles for static per-line looks and `styleOf` for state-driven ones (selection, hover).
 - Static draw methods do not support `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply. Changing styles is dynamic content.
+
+What a decoration may change differs by primitive. Each rule is right for its own hit-test geometry, but the differences are easy to miss if you assume "it's all `styleOf`, it all behaves the same":
+
+| Primitive     | May change                                       | May not change                                       | Per-item width/geometry instead |
+| :------------ | :----------------------------------------------- | :--------------------------------------------------- | :------------------------------ |
+| Rect / Circle | full style, `lineWidth`/`lineWidthPx` included   | -                                                    | already allowed here            |
+| Text          | full text style                                  | -                                                    | -                               |
+| Line          | `strokeStyle`, `lineDash`/`lineDashPx`           | `lineWidth`/`lineWidthPx`                            | re-register with the new width  |
+| Path          | `strokeStyle`, dash, `fillStyle` (see below)     | `lineWidth`/`lineWidthPx`, `cornerRadius`/`cornerRadiusPx` | re-register with the new values |
+
+Why the split: a rect/circle border never feeds hit-test geometry (the hit area is the box/disc), so decorating its width is safe. A line/path hit corridor derives from the stroke width — and a path outline from its corner radius — resolved at registration time, so a paint-time change would silently desync what you see from what you can click. Path quirk from the same family: decorating an unfilled path with `fillStyle` paints the fill, but hit testing stays on the stroke.
 
 ### Remove a Single Draw Call (`DrawHandle`)
 

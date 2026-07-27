@@ -60,12 +60,31 @@ plays the same role.
 `item.data`; return `undefined` for undecorated items (the common case). For
 `drawLine` the decoration overlays both the call-level `style` and the
 item's own `style` per item - use item styles for static per-line looks and
-`styleOf` for state-driven ones. Type-enforced limits: Line and
+`styleOf` for state-driven ones. Rect/Circle decorations cover the full
+shape style, so a dashed selection frame is one decoration away:
+`styleOf: (s) => selected.has(s.data.id) ? { strokeStyle: "#f59e0b",
+lineDashPx: [6, 4] } : undefined`. Type-enforced limits: Line and
 Path decorations exclude `lineWidth`/`lineWidthPx` (Path also `cornerRadius`/
 `cornerRadiusPx`) because hit-test geometry resolves at registration time -
 for lines, a per-item width belongs in the item's registration-time `style`
 instead (hit testing follows it); relatedly, decorating an unfilled path
 with `fillStyle` paints a fill but hit testing still targets the stroke.
+
+What a decoration may change, per primitive (each rule matches that
+primitive's hit-test geometry - do NOT assume "all styleOf behaves the
+same"):
+
+| Primitive     | May change                                     | May NOT change                  | Per-item width instead        |
+| :------------ | :--------------------------------------------- | :------------------------------ | :---------------------------- |
+| Rect / Circle | full style, `lineWidth`/`lineWidthPx` included | -                               | already allowed here          |
+| Text          | full text style                                | -                               | -                             |
+| Line          | `strokeStyle`, `lineDash`/`lineDashPx`         | `lineWidth`/`lineWidthPx`       | re-register with the width    |
+| Path          | `strokeStyle`, dash, `fillStyle` (see above)   | `lineWidth*`, `cornerRadius*`   | re-register with the values   |
+
+Rect/circle borders never feed hit geometry (hit area = box/disc), so
+decorating their width is safe; line/path hit corridors derive from width
+(paths also corner radius) at registration time, so a paint-time change
+would desync visuals from hit areas.
 
 ## Layers
 
@@ -105,6 +124,8 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
         strokeStyle?: string;
         lineWidth?: number;    // border width in WORLD units (scales with zoom)
         lineWidthPx?: number;  // border width in screen px (zoom-independent); wins over lineWidth
+        lineDash?: number[];   // border dash pattern in WORLD units (scales with zoom); Canvas2D setLineDash semantics
+        lineDashPx?: number[]; // border dash pattern in screen px (zoom-independent); wins over lineDash
     };
     rotate?: number;          // degrees, positive = clockwise (Rect/Image only)
     radius?: number | number[]; // corner radius in WORLD units, scales with zoom (Rect only);
@@ -125,7 +146,8 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
 
 Styles: if `fillStyle` is set the shape is filled; if `strokeStyle` is set it
 is stroked; both work together. Any CSS color string works (`"#22c55e"`,
-`"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`).
+`"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`). `lineDash`/`lineDashPx`
+dash the border (selection frames, ghost placements); omit for solid.
 
 ## Primitives
 

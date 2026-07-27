@@ -153,12 +153,16 @@ function makeDashRecordingCtx() {
     const ctx = {
         lineWidth: 1,
         globalAlpha: 1,
+        fillStyle: "#000",
         strokeStyle: "#000",
         save() {},
         restore() {},
         beginPath() {},
+        rect() {},
+        arc() {},
         moveTo() {},
         lineTo() {},
+        fill() {},
         setLineDash(pattern: number[]) {
             dashes.push(pattern);
         },
@@ -210,6 +214,41 @@ describe("CanvasDraw line dash", () => {
 
         expect(dashes).toEqual([]);
         expect(strokes()).toBe(1);
+    });
+
+    it("dashes rect borders with the same unit contract and resets after the stroke", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8, 0.4] } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([[8, 4], []]);
+    });
+
+    it("dashes circle borders and prefers lineDashPx over lineDash", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawCircle(
+            [{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8], lineDashPx: [6, 3] } }],
+            1,
+        );
+        render(ctx);
+
+        expect(dashes).toEqual([[6, 3], []]);
+    });
+
+    it("keeps rect/circle borders solid when no dash is given", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes, strokes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00" } }], 1);
+        draw.drawCircle([{ x: 3, y: 3, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00" } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([]);
+        expect(strokes()).toBe(2);
     });
 });
 
@@ -518,6 +557,44 @@ describe("CanvasDraw path items", () => {
 
         expect(ops.filter((op) => op === "stroke")).toHaveLength(2);
         expect(ops.filter((op) => op === "beginPath")).toHaveLength(2);
+    });
+
+    it("ignores width and cornerRadius smuggled into a styleOf decoration", () => {
+        const { draw, render } = setup(); // scale 10
+        const widths: number[] = [];
+        let arcs = 0;
+        const ctx = {
+            lineWidth: 1,
+            globalAlpha: 1,
+            strokeStyle: "#000",
+            fillStyle: "#000",
+            save() {},
+            restore() {},
+            beginPath() {},
+            moveTo() {},
+            lineTo() {},
+            arc() {
+                arcs++;
+            },
+            closePath() {},
+            setLineDash() {},
+            fill() {},
+            stroke() {
+                widths.push(ctx.lineWidth);
+            },
+        };
+
+        // Non-literal returns bypass TS excess-property checks — the exact
+        // hole this guards: geometry-feeding values must resolve from the
+        // registration-time item style hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12, cornerRadiusPx: 30 };
+        draw.drawPath([{ points: square, closed: true, style: { strokeStyle: "#f00", lineWidthPx: 4 } }], 1, {
+            styleOf: () => smuggled,
+        });
+        render(ctx as unknown as CanvasRenderingContext2D);
+
+        expect(widths).toEqual([4]); // item width, not the smuggled 12
+        expect(arcs).toBe(0); // no smuggled corner rounding
     });
 });
 

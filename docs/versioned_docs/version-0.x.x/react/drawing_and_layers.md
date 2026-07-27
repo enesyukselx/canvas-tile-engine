@@ -616,7 +616,18 @@ The two props now split cleanly:
 - `items` changed → geometry changed → re-register (keep it stable with `useMemo`/state).
 - `styleOf` changed → appearance changed → repaint only, zero rebuild.
 
-Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths) — those feed hit-test geometry resolved at registration time, and the types enforce it. Static components (`<StaticRect>` etc.) do not take `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply.
+What a decoration may change differs by primitive. Each rule is right for its own hit-test geometry, but the differences are easy to miss if you assume "it's all `styleOf`, it all behaves the same":
+
+| Primitive     | May change                                       | May not change                                       | Per-item width/geometry instead |
+| :------------ | :----------------------------------------------- | :--------------------------------------------------- | :------------------------------ |
+| Rect / Circle | full style, `lineWidth`/`lineWidthPx` included   | -                                                    | already allowed here            |
+| Text          | full text style                                  | -                                                    | -                               |
+| Line          | `strokeStyle`, `lineDash`/`lineDashPx`           | `lineWidth`/`lineWidthPx`                            | re-register with the new width  |
+| Path          | `strokeStyle`, dash, `fillStyle` (see below)     | `lineWidth`/`lineWidthPx`, `cornerRadius`/`cornerRadiusPx` | re-register with the new values |
+
+Why the split: a rect/circle border never feeds hit-test geometry (the hit area is the box/disc), so decorating its width is safe. A line/path hit corridor derives from the stroke width — and a path outline from its corner radius — resolved at registration time, so a paint-time change would silently desync what you see from what you can click. Path quirk from the same family: decorating an unfilled path with `fillStyle` paints the fill, but hit testing stays on the stroke.
+
+Static components (`<StaticRect>` etc.) do not take `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply.
 
 ## Dynamic Content
 

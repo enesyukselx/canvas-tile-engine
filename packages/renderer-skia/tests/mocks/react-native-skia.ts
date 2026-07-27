@@ -81,13 +81,28 @@ export function makeRecordingCanvas() {
             ops.push({ op: "scale", sx, sy });
         },
         drawRect(rect: unknown, paint: MockPaint) {
-            ops.push({ op: "rect", rect, style: paint.style, color: paint.color, strokeWidth: paint.strokeWidth });
+            ops.push({
+                op: "rect",
+                rect,
+                style: paint.style,
+                color: paint.color,
+                strokeWidth: paint.strokeWidth,
+                pathEffect: paint.pathEffect,
+            });
         },
         drawRRect(rrect: unknown, paint: MockPaint) {
-            ops.push({ op: "rrect", rrect, style: paint.style, color: paint.color });
+            ops.push({ op: "rrect", rrect, style: paint.style, color: paint.color, pathEffect: paint.pathEffect });
         },
         drawCircle(cx: number, cy: number, r: number, paint: MockPaint) {
-            ops.push({ op: "circle", cx, cy, r, style: paint.style, strokeWidth: paint.strokeWidth });
+            ops.push({
+                op: "circle",
+                cx,
+                cy,
+                r,
+                style: paint.style,
+                strokeWidth: paint.strokeWidth,
+                pathEffect: paint.pathEffect,
+            });
         },
         drawLine(x1: number, y1: number, x2: number, y2: number, paint: MockPaint) {
             ops.push({
@@ -104,8 +119,8 @@ export function makeRecordingCanvas() {
         drawText(text: string, x: number, y: number, _paint: MockPaint, font: { size: number }) {
             ops.push({ op: "text", text, x, y, fontSize: font.size });
         },
-        drawPath() {
-            ops.push({ op: "path" });
+        drawPath(_path: unknown, paint: MockPaint) {
+            ops.push({ op: "path", style: paint.style, strokeWidth: paint.strokeWidth });
         },
         drawImageRect(img: unknown, src: unknown, dest: unknown, paint: MockPaint) {
             ops.push({ op: "image", img, src, dest, alpha: paint.alphaf });

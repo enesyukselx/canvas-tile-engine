@@ -3,7 +3,12 @@ import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
 import { SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "../../src/modules/Layer";
-import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
+import {
+    colorParseCalls,
+    makeRecordingCanvas,
+    matchFontCalls,
+    type MockPicture,
+} from "../mocks/react-native-skia";
 
 interface Op {
     op: string;
@@ -24,7 +29,13 @@ function setup(scale = 10) {
     const draw = new SkiaDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale } as never;
     const render = (canvas: SkCanvas) =>
-        layers.drawAll({ canvas, camera, transformer, config, topLeft: { x: 0, y: 0 } });
+        layers.drawAll({
+            canvas,
+            camera,
+            transformer,
+            config,
+            topLeft: { x: 0, y: 0 },
+        });
     return { draw, render, camera };
 }
 
@@ -100,7 +111,7 @@ describe("color caching", () => {
                 { x: 3, y: 3, size: 1, style: { fillStyle: "#ff0000" } },
                 { x: 5, y: 5, size: 1, style: { fillStyle: "#00ff00" } },
             ],
-            1
+            1,
         );
         render(canvas);
         render(canvas); // second frame reuses the cache too
@@ -114,7 +125,10 @@ describe("text rendering", () => {
     it("uses the exact (unrounded) scaled font size", () => {
         const { draw, render } = setup(11.5);
         const { canvas, ops } = makeCanvas();
-        draw.drawText({ x: 1, y: 1, size: 1, text: "hi", style: { fillStyle: "#000" } }, 2);
+        draw.drawText(
+            { x: 1, y: 1, size: 1, text: "hi", style: { fillStyle: "#000" } },
+            2,
+        );
         render(canvas);
 
         const textOp = ops.find((o) => o.op === "text");
@@ -129,9 +143,15 @@ describe("text rendering", () => {
         draw.drawText(
             [
                 { x: 1, y: 1, text: "default", style: { fillStyle: "#000" } },
-                { x: 2, y: 1, text: "sized", size: 2, style: { fillStyle: "#000" } },
+                {
+                    x: 2,
+                    y: 1,
+                    text: "sized",
+                    size: 2,
+                    style: { fillStyle: "#000" },
+                },
             ],
-            2
+            2,
         );
         render(canvas);
 
@@ -145,14 +165,29 @@ describe("text rendering", () => {
             const { canvas, ops } = makeCanvas();
             draw.drawText(
                 [
-                    { x: 1, y: 1, text: "fixed", fontPx: 14, style: { fillStyle: "#000" } },
-                    { x: 2, y: 1, text: "both", size: 2, fontPx: 14, style: { fillStyle: "#000" } },
+                    {
+                        x: 1,
+                        y: 1,
+                        text: "fixed",
+                        fontPx: 14,
+                        style: { fillStyle: "#000" },
+                    },
+                    {
+                        x: 2,
+                        y: 1,
+                        text: "both",
+                        size: 2,
+                        fontPx: 14,
+                        style: { fillStyle: "#000" },
+                    },
                 ],
-                2
+                2,
             );
             render(canvas);
 
-            const sizes = ops.filter((o) => o.op === "text").map((o) => o.fontSize);
+            const sizes = ops
+                .filter((o) => o.op === "text")
+                .map((o) => o.fontSize);
             expect(sizes).toEqual([14, 14]);
         }
     });
@@ -165,9 +200,15 @@ describe("text rendering", () => {
         draw.drawText(
             [
                 { x: 20, y: 1, text: "culled", style: { fillStyle: "#000" } },
-                { x: 20, y: 1, text: "visible", fontPx: 140, style: { fillStyle: "#000" } },
+                {
+                    x: 20,
+                    y: 1,
+                    text: "visible",
+                    fontPx: 140,
+                    style: { fillStyle: "#000" },
+                },
             ],
-            2
+            2,
         );
         render(canvas);
 
@@ -180,10 +221,22 @@ describe("text rendering", () => {
         const { canvas } = makeCanvas();
         draw.drawText(
             [
-                { x: 1, y: 1, size: 1, text: "a", style: { fillStyle: "#000" } },
-                { x: 3, y: 3, size: 2, text: "b", style: { fillStyle: "#000" } },
+                {
+                    x: 1,
+                    y: 1,
+                    size: 1,
+                    text: "a",
+                    style: { fillStyle: "#000" },
+                },
+                {
+                    x: 3,
+                    y: 3,
+                    size: 2,
+                    text: "b",
+                    style: { fillStyle: "#000" },
+                },
             ],
-            2
+            2,
         );
         render(canvas);
         render(canvas);
@@ -193,7 +246,10 @@ describe("text rendering", () => {
 });
 
 describe("image opacity", () => {
-    const fakeImage = { width: () => 10, height: () => 10 } as unknown as import("@shopify/react-native-skia").SkImage;
+    const fakeImage = {
+        width: () => 10,
+        height: () => 10,
+    } as unknown as import("@shopify/react-native-skia").SkImage;
 
     // Image opacity contract shared by all renderers: alpha = opacity ?? 1.
     // Mirrors the fixture values in the canvas, webgl, and server suites.
@@ -205,9 +261,15 @@ describe("image opacity", () => {
             [
                 { x: 1, y: 1, img: fakeImage, opacity: 0.5 },
                 { x: 3, y: 3, img: fakeImage },
-                { x: 5, y: 5, img: fakeImage, sprite: { x: 0, y: 0, w: 5, h: 5 }, opacity: 0.25 },
+                {
+                    x: 5,
+                    y: 5,
+                    img: fakeImage,
+                    sprite: { x: 0, y: 0, w: 5, h: 5 },
+                    opacity: 0.25,
+                },
             ],
-            1
+            1,
         );
         render(canvas);
 
@@ -219,11 +281,18 @@ describe("image opacity", () => {
         const { draw, render } = setup();
         const { canvas, ops } = makeCanvas();
 
-        draw.drawStaticImage([{ x: 1, y: 1, img: fakeImage, opacity: 0.5 }], "cache-img-opacity", 1);
+        draw.drawStaticImage(
+            [{ x: 1, y: 1, img: fakeImage, opacity: 0.5 }],
+            "cache-img-opacity",
+            1,
+        );
         render(canvas);
 
-        const picture = ops.find((o) => o.op === "picture")?.picture as MockPicture;
-        const alphas = picture.ops.filter((o) => o.op === "image").map((o) => (o as Op).alpha);
+        const picture = ops.find((o) => o.op === "picture")
+            ?.picture as MockPicture;
+        const alphas = picture.ops
+            .filter((o) => o.op === "image")
+            .map((o) => (o as Op).alpha);
         expect(alphas).toEqual([0.5]);
     });
 });
@@ -256,14 +325,19 @@ describe("static picture cache", () => {
         const dynamicCanvas = makeCanvas();
         dynamic.draw.drawRect(items, 1);
         dynamic.render(dynamicCanvas.canvas);
-        const dynamicRects = dynamicCanvas.ops.filter((o) => o.op === "rect").map((o) => o.rect);
+        const dynamicRects = dynamicCanvas.ops
+            .filter((o) => o.op === "rect")
+            .map((o) => o.rect);
 
         const stat = setup();
         const staticCanvas = makeCanvas();
         stat.draw.drawStaticRect(items, "cache-b", 1);
         stat.render(staticCanvas.canvas);
-        const picture = staticCanvas.ops.find((o) => o.op === "picture")?.picture as MockPicture;
-        const staticRects = picture.ops.filter((o) => o.op === "rect").map((o) => o.rect);
+        const picture = staticCanvas.ops.find((o) => o.op === "picture")
+            ?.picture as MockPicture;
+        const staticRects = picture.ops
+            .filter((o) => o.op === "rect")
+            .map((o) => o.rect);
 
         expect(staticRects).toEqual(dynamicRects);
     });
@@ -299,7 +373,9 @@ describe("static picture cache", () => {
         draw.drawStaticRect(items, "cache-d", 1);
         render(canvas);
 
-        const pictures = ops.filter((o) => o.op === "picture").map((o) => o.picture);
+        const pictures = ops
+            .filter((o) => o.op === "picture")
+            .map((o) => o.picture);
         expect(pictures).toHaveLength(3);
         expect(pictures[1]).toBe(pictures[0]);
         expect(pictures[2]).not.toBe(pictures[0]);
@@ -322,10 +398,15 @@ describe("stroke width handling", () => {
         const { canvas, ops } = makeCanvas();
         draw.drawRect(
             [
-                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.8 } },
+                {
+                    x: 1,
+                    y: 1,
+                    size: 1,
+                    style: { strokeStyle: "#f00", lineWidth: 0.8 },
+                },
                 { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } },
             ],
-            1
+            1,
         );
         render(canvas);
 
@@ -339,8 +420,19 @@ describe("stroke width handling", () => {
         const { draw, render } = setup(); // scale 10
         const { canvas, ops } = makeCanvas();
         draw.drawRect(
-            [{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineWidth: 0.8, lineWidthPx: 3 } }],
-            1
+            [
+                {
+                    x: 1,
+                    y: 1,
+                    size: 1,
+                    style: {
+                        strokeStyle: "#f00",
+                        lineWidth: 0.8,
+                        lineWidthPx: 3,
+                    },
+                },
+            ],
+            1,
         );
         render(canvas);
 
@@ -358,11 +450,24 @@ describe("non-square rects", () => {
 
         draw.drawRect(
             [
-                { x: 2, y: 2, width: 4, height: 2, style: { fillStyle: "#f00" } },
+                {
+                    x: 2,
+                    y: 2,
+                    width: 4,
+                    height: 2,
+                    style: { fillStyle: "#f00" },
+                },
                 { x: 2, y: 2, size: 1, style: { fillStyle: "#0f0" } },
-                { x: 1, y: 1, width: 2, height: 1, origin: { mode: "self", x: 0, y: 0 }, style: { fillStyle: "#00f" } },
+                {
+                    x: 1,
+                    y: 1,
+                    width: 2,
+                    height: 1,
+                    origin: { mode: "self", x: 0, y: 0 },
+                    style: { fillStyle: "#00f" },
+                },
             ],
-            1
+            1,
         );
         render(canvas);
 
@@ -380,10 +485,16 @@ describe("non-square rects", () => {
 
         draw.drawRect(
             [
-                { x: 20, y: 0, width: 30, height: 1, style: { fillStyle: "#f00" } },
+                {
+                    x: 20,
+                    y: 0,
+                    width: 30,
+                    height: 1,
+                    style: { fillStyle: "#f00" },
+                },
                 { x: 20, y: 0, size: 1, style: { fillStyle: "#0f0" } },
             ],
-            1
+            1,
         );
         render(canvas);
 
@@ -437,7 +548,7 @@ describe("per-item line style", () => {
     });
 });
 
-describe("smuggled decoration width", () => {
+describe("smuggled decoration width on lines", () => {
     it("resolves the painted width from registration-time layers only", () => {
         const { draw, render } = setup();
         const { canvas, ops } = makeCanvas();
@@ -449,7 +560,7 @@ describe("smuggled decoration width", () => {
             [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidthPx: 4 } }],
             { strokeStyle: "#00f", lineWidthPx: 2 },
             1,
-            { styleOf: () => smuggled }
+            { styleOf: () => smuggled },
         );
         render(canvas);
 
@@ -457,5 +568,110 @@ describe("smuggled decoration width", () => {
         expect(lines).toHaveLength(1);
         expect(lines[0].color).toEqual({ parsed: "#0f0" }); // deco color applies
         expect(lines[0].strokeWidth).toBe(4); // item width, not the smuggled 12
+    });
+});
+
+describe("smuggled decoration geometry on paths", () => {
+    it("resolves the stroked width from the registration-time item style", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        // Non-literal returns bypass TS excess-property checks; the width
+        // must come from the layers hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 4, y: 0 },
+                        { x: 4, y: 4 },
+                    ],
+                    style: { strokeStyle: "#f00", lineWidthPx: 4 },
+                },
+            ],
+            1,
+            { styleOf: () => smuggled },
+        );
+        render(canvas);
+
+        const paths = ops.filter((o) => o.op === "path");
+        expect(paths).toHaveLength(1);
+        expect(paths[0].strokeWidth).toBe(4); // item width, not the smuggled 12
+    });
+});
+// Dash unit contract shared by all renderers: lineDash is world units
+// (px = value * scale), lineDashPx is screen pixels and wins. On Skia the
+// pattern lands on the stroke paint as a dash path effect.
+describe("dashed rect/circle borders", () => {
+    it("applies world lineDash to rect strokes scaled by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                {
+                    x: 1,
+                    y: 1,
+                    size: 1,
+                    style: { strokeStyle: "#f00", lineDash: [0.5, 0.25] },
+                },
+            ],
+            1,
+        );
+        render(canvas);
+
+        expect(ops).toHaveLength(1);
+        expect(ops[0].pathEffect).toEqual({ __dash: [5, 2.5], phase: 0 });
+    });
+
+    it("applies lineDashPx to circle strokes and resets the effect afterwards", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawCircle(
+            [
+                {
+                    x: 1,
+                    y: 1,
+                    size: 1,
+                    style: { strokeStyle: "#f00", lineDashPx: [6, 3] },
+                },
+                { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } }, // stays solid
+            ],
+            1,
+        );
+        render(canvas);
+
+        const circles = ops.filter((o) => o.op === "circle");
+        expect(circles).toHaveLength(2);
+        expect(circles[0].pathEffect).toEqual({ __dash: [6, 3], phase: 0 });
+        expect(circles[1].pathEffect).toBeNull();
+    });
+
+    it("keeps fills unaffected by a dashed border", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                {
+                    x: 1,
+                    y: 1,
+                    size: 1,
+                    style: {
+                        fillStyle: "#0f0",
+                        strokeStyle: "#f00",
+                        lineDashPx: [4, 2],
+                    },
+                },
+            ],
+            1,
+        );
+        render(canvas);
+
+        expect(ops).toHaveLength(2); // fill + stroke
+        expect(ops[0].pathEffect).toBeNull();
+        expect(ops[1].pathEffect).toEqual({ __dash: [4, 2], phase: 0 });
     });
 });
