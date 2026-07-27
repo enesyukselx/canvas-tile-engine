@@ -72,6 +72,7 @@ pnpm --filter @canvas-tile-engine/renderer-canvas test
 pnpm --filter @canvas-tile-engine/renderer-webgl test
 pnpm --filter @canvas-tile-engine/renderer-skia test
 pnpm --filter @canvas-tile-engine/renderer-server test
+pnpm --filter @canvas-tile-engine/renderer-shared test
 ```
 
 ### Examples
