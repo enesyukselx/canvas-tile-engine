@@ -26,14 +26,17 @@ import { WebGLDraw } from "./modules/WebGLDraw";
 import { Layer } from "./modules/Layer";
 import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
 import { WebGLDebug } from "./modules/WebGLDebug";
-import { EventBinder } from "./modules/EventBinder";
-import { ResizeWatcher } from "./modules/ResizeWatcher";
-import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
-import { ImageLoader } from "./modules/ImageLoader";
-import { SizeController } from "./modules/SizeController";
+import {
+    EventBinder,
+    ImageLoader,
+    ResizeWatcher,
+    ResponsiveWatcher,
+    SizeController,
+    initStyles,
+} from "@canvas-tile-engine/renderer-shared/dom";
 import { GLRenderer } from "./modules/gl/GLRenderer";
 import { ColorParser } from "./utils/color";
-import { createOverlayCanvas, getWebGLContext, initStyles } from "./utils/webgl";
+import { createOverlayCanvas, getWebGLContext } from "./utils/webgl";
 
 /**
  * WebGL2/WebGL1 implementation of {@link IRenderer}.
@@ -266,8 +269,7 @@ export class RendererWebGL implements IRenderer {
         this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
         this.sizeController = new SizeController(
             this.canvasWrapper,
-            this.canvas,
-            this.overlayCanvas,
+            [this.canvas, this.overlayCanvas],
             this.camera,
             this.viewport,
             this.config,
@@ -293,8 +295,7 @@ export class RendererWebGL implements IRenderer {
             }
             this.responsiveWatcher = new ResponsiveWatcher(
                 this.canvasWrapper,
-                this.canvas,
-                this.overlayCanvas,
+                [this.canvas, this.overlayCanvas],
                 this.camera,
                 this.viewport,
                 this.config,
@@ -314,8 +315,7 @@ export class RendererWebGL implements IRenderer {
         } else if (this.config.get().eventHandlers?.resize) {
             this.resizeWatcher = new ResizeWatcher(
                 this.canvasWrapper,
-                this.canvas,
-                this.overlayCanvas,
+                [this.canvas, this.overlayCanvas],
                 this.viewport,
                 this.camera,
                 this.config,

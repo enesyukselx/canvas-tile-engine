@@ -26,12 +26,14 @@ import { CanvasDraw } from "./modules/CanvasDraw";
 import { Layer } from "./modules/Layer";
 import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
 import { CanvasDebug } from "./modules/CanvasDebug";
-import { EventBinder } from "./modules/EventBinder";
-import { ResizeWatcher } from "./modules/ResizeWatcher";
-import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
-import { ImageLoader } from "./modules/ImageLoader";
-import { SizeController } from "./modules/SizeController";
-import { initStyles } from "./utils/canvas";
+import {
+    EventBinder,
+    ImageLoader,
+    ResizeWatcher,
+    ResponsiveWatcher,
+    SizeController,
+    initStyles,
+} from "@canvas-tile-engine/renderer-shared/dom";
 
 export class RendererCanvas implements IRenderer {
     /** Transform helpers handed to the onDraw hook. */
@@ -225,7 +227,7 @@ export class RendererCanvas implements IRenderer {
         this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
         this.sizeController = new SizeController(
             this.canvasWrapper,
-            this.canvas,
+            [this.canvas],
             this.camera,
             this.viewport,
             this.config,
@@ -253,7 +255,7 @@ export class RendererCanvas implements IRenderer {
             }
             this.responsiveWatcher = new ResponsiveWatcher(
                 this.canvasWrapper,
-                this.canvas,
+                [this.canvas],
                 this.camera,
                 this.viewport,
                 this.config,
@@ -274,7 +276,7 @@ export class RendererCanvas implements IRenderer {
             // Non-responsive mode with resize enabled - use ResizeWatcher
             this.resizeWatcher = new ResizeWatcher(
                 this.canvasWrapper,
-                this.canvas,
+                [this.canvas],
                 this.viewport,
                 this.camera,
                 this.config,

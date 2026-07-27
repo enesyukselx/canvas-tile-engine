@@ -2,12 +2,14 @@ import { AnimationController, Config, Coords, ICamera, ViewportState } from "@ca
 
 /**
  * Controls canvas size and handles resize animations.
- * Manages DOM manipulation for wrapper and canvas elements.
+ * Manages DOM manipulation for the wrapper and every managed canvas (renderers
+ * with an overlay pass both canvases so they stay in sync).
+ * @internal
  */
 export class SizeController {
     constructor(
         private canvasWrapper: HTMLDivElement,
-        private canvas: HTMLCanvasElement,
+        private canvases: HTMLCanvasElement[],
         private camera: ICamera,
         private viewport: ViewportState,
         private config: Config,
@@ -77,10 +79,12 @@ export class SizeController {
         this.canvasWrapper.style.height = `${roundedH}px`;
 
         // Canvas resolution (physical pixels for HiDPI)
-        this.canvas.width = roundedW * dpr;
-        this.canvas.height = roundedH * dpr;
-        this.canvas.style.width = `${roundedW}px`;
-        this.canvas.style.height = `${roundedH}px`;
+        for (const el of this.canvases) {
+            el.width = roundedW * dpr;
+            el.height = roundedH * dpr;
+            el.style.width = `${roundedW}px`;
+            el.style.height = `${roundedH}px`;
+        }
 
         this.camera.setCenter(center, roundedW, roundedH);
         this.onRender();
