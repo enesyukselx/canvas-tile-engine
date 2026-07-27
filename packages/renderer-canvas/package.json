@@ -55,5 +55,8 @@
     },
     "dependencies": {
         "@canvas-tile-engine/core": "workspace:^"
+    },
+    "devDependencies": {
+        "@canvas-tile-engine/renderer-shared": "workspace:^"
     }
 }

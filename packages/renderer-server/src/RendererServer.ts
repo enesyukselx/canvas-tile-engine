@@ -19,10 +19,9 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import { createCanvas, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
-import { CanvasDraw } from "./modules/CanvasDraw";
-import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
+import { CoordinateOverlayRenderer, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { createServerCanvasDraw, type ServerCanvasDraw } from "./modules/createCanvasDraw";
 import { ImageLoaderServer } from "./modules/ImageLoaderServer";
-import { Layer } from "./modules/Layer";
 import type { ImageFormat, ServerMount } from "./types";
 
 /** Construction options for {@link RendererServer}. */
@@ -55,9 +54,9 @@ export class RendererServer implements IRenderer<ServerMount, Image> {
     private config!: Config;
     private viewport!: ViewportState;
     private transformer!: CoordinateTransformer;
-    private layers!: Layer;
-    private drawAPI!: CanvasDraw;
-    private coordinateOverlay!: CoordinateOverlayRenderer;
+    private layers!: Layer<SKRSContext2D>;
+    private drawAPI!: ServerCanvasDraw;
+    private coordinateOverlay!: CoordinateOverlayRenderer<SKRSContext2D>;
     private imageLoader = new ImageLoaderServer();
     private readonly pixelRatio: number;
 
@@ -97,7 +96,7 @@ export class RendererServer implements IRenderer<ServerMount, Image> {
         this.ctx = ctx;
 
         this.layers = new Layer();
-        this.drawAPI = new CanvasDraw(this.layers, this.transformer, this.camera, (w, h) => createCanvas(w, h));
+        this.drawAPI = createServerCanvasDraw(this.layers, this.transformer, this.camera);
         this.coordinateOverlay = new CoordinateOverlayRenderer(this.ctx, this.camera, this.config, this.viewport);
 
         this.applyTransform();

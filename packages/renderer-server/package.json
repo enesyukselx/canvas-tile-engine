@@ -64,6 +64,7 @@
         "@napi-rs/canvas": "^0.1.60"
     },
     "devDependencies": {
+        "@canvas-tile-engine/renderer-shared": "workspace:^",
         "@types/node": "^25.3.3"
     }
 }

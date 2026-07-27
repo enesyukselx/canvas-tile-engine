@@ -22,9 +22,8 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import { CanvasDraw } from "./modules/CanvasDraw";
-import { Layer } from "./modules/Layer";
-import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
+import { CoordinateOverlayRenderer, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { BrowserCanvasDraw, BrowserContext2D, createBrowserCanvasDraw } from "./modules/createCanvasDraw";
 import { CanvasDebug } from "./modules/CanvasDebug";
 import { EventBinder } from "./modules/EventBinder";
 import { ResizeWatcher } from "./modules/ResizeWatcher";
@@ -46,10 +45,10 @@ export class RendererCanvas implements IRenderer {
     private camera!: ICamera;
     private config!: Config;
     private viewport!: ViewportState;
-    private layers!: Layer;
-    private drawAPI!: CanvasDraw;
+    private layers!: Layer<BrowserContext2D>;
+    private drawAPI!: BrowserCanvasDraw;
     private transformer!: CoordinateTransformer;
-    private coordinateOverlayRenderer!: CoordinateOverlayRenderer;
+    private coordinateOverlayRenderer!: CoordinateOverlayRenderer<CanvasRenderingContext2D>;
     private debugOverlay?: CanvasDebug;
 
     // Event handling
@@ -176,7 +175,7 @@ export class RendererCanvas implements IRenderer {
         this.viewport = deps.viewport;
         this.camera = deps.camera;
         this.layers = new Layer();
-        this.drawAPI = new CanvasDraw(this.layers, deps.transformer, deps.camera);
+        this.drawAPI = createBrowserCanvasDraw(this.layers, deps.transformer, deps.camera);
 
         this.applyCanvasSize();
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyLineWidth } from "../../src/utils/canvas";
+import { applyLineWidth } from "../src/canvas2d/applyLineWidth";
 
 describe("applyLineWidth", () => {
     const createMockContext = () => ({
