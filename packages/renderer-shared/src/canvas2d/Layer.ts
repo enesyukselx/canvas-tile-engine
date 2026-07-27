@@ -10,22 +10,25 @@ export type DrawContext<TContext> = {
 };
 
 /** @internal */
-export type DrawCallback<TContext> = (dc: DrawContext<TContext>) => void;
+export type DrawCallback<TDrawContext> = (dc: TDrawContext) => void;
 
 /**
- * Manages ordered draw callbacks for canvas rendering, generic over the
- * platform's 2D context type.
+ * Manages ordered draw callbacks for canvas rendering, generic over the full
+ * draw context handed to callbacks. Plain Canvas2D renderers use
+ * {@link DrawContext}; renderers with extra per-frame state (e.g. WebGL's
+ * batched GL renderer alongside its 2D overlay) intersect their own fields
+ * onto it.
  * @internal
  */
-export class Layer<TContext extends { save(): void; restore(): void }> {
-    private layers = new Map<number, { id: symbol; fn: DrawCallback<TContext> }[]>();
+export class Layer<TDrawContext extends { ctx: { save(): void; restore(): void } }> {
+    private layers = new Map<number, { id: symbol; fn: DrawCallback<TDrawContext> }[]>();
 
     /**
      * Register a draw callback at a specific layer index.
      * @param layer Layer order; lower numbers draw first.
      * @param fn Callback receiving drawing context.
      */
-    add(layer: number, fn: DrawCallback<TContext>): DrawHandle {
+    add(layer: number, fn: DrawCallback<TDrawContext>): DrawHandle {
         const id = Symbol("layer-callback");
         const entry = { id, fn };
         if (!this.layers.has(layer)) {
@@ -66,7 +69,7 @@ export class Layer<TContext extends { save(): void; restore(): void }> {
      * Draw all registered callbacks in layer order.
      * @param dc Drawing context shared with callbacks.
      */
-    drawAll(dc: DrawContext<TContext>) {
+    drawAll(dc: TDrawContext) {
         const keys = [...this.layers.keys()].sort((a, b) => a - b);
         for (const layer of keys) {
             const fns = this.layers.get(layer);

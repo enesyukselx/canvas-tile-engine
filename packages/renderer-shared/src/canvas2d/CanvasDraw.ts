@@ -36,7 +36,7 @@ import type {
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
-import { Layer } from "./Layer";
+import { DrawContext, Layer } from "./Layer";
 import { applyLineWidth } from "./applyLineWidth";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
 
@@ -79,7 +79,7 @@ export class CanvasDraw<
      * fall back to dynamic drawing).
      */
     constructor(
-        private layers: Layer<TContext>,
+        private layers: Layer<DrawContext<TContext>>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
         private createOffscreen: OffscreenCanvasFactory<TContext, TCanvas> | null,
