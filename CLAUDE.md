@@ -101,6 +101,7 @@ For example development against local package changes, run `pnpm dev:lib` in one
 - `packages/renderer-webgl/` - `@canvas-tile-engine/renderer-webgl`: WebGL renderer with a Canvas2D overlay.
 - `packages/renderer-skia/` - `@canvas-tile-engine/renderer-skia`: React Native Skia renderer.
 - `packages/renderer-server/` - `@canvas-tile-engine/renderer-server`: headless Node.js renderer for PNG/JPEG/WebP buffers.
+- `packages/renderer-shared/` - `@canvas-tile-engine/renderer-shared`: private internal package with modules shared between renderers. Not published; consumers bundle its TypeScript source.
 - `examples/` - Vite, React, React Native, spritesheet, and server-rendering examples.
 - `docs/` - Docusaurus documentation site.
 
@@ -152,6 +153,14 @@ Key public contracts:
 - Uses `@napi-rs/canvas` with no DOM and no interaction/event loop.
 - `renderToBuffer()` is the preferred one-shot API.
 - Supports PNG/JPEG/WebP output, font registration, image loading from paths, static caches, and custom drawing via `SKRSContext2D`.
+
+`renderer-shared` (internal, not published):
+
+- Two entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types) and `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too).
+- No build step: `exports` points at `src/*.ts` and consumers bundle the source with tsup (`noExternal`).
+- Consumers depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files; the `workspace:^` publishing rule does not apply to it.
+- Never import it from application code or examples; its API has no semver guarantees.
+- When shared code changes behavior, add changesets for the affected renderer packages (the private package itself is not versioned).
 
 ### React Packages
 
@@ -219,7 +228,7 @@ For every edit, feature, or fix, check whether these need updating alongside the
 
 ## Releases (Changesets)
 
-Publishing is managed with Changesets (`.changeset/config.json`; private packages — docs and all examples — are excluded from versioning).
+Publishing is managed with Changesets (`.changeset/config.json`; private packages — docs, all examples, and `renderer-shared` — are excluded from versioning).
 
 - Any PR that changes a published package's behavior or public artifact must include a changeset: run `pnpm changeset`, pick the affected packages and bump type, describe the change (this text becomes the CHANGELOG entry).
 - On push to `master`, `.github/workflows/release.yml` (changesets/action) collects pending changesets into a "Version Packages" PR. Merging that PR bumps versions, updates CHANGELOGs, publishes to npm with `pnpm release`, and pushes git tags.

@@ -507,6 +507,12 @@ importers:
         specifier: ^25.3.3
         version: 25.3.3
 
+  packages/renderer-shared:
+    devDependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:^
+        version: link:../core
+
   packages/renderer-skia:
     dependencies:
       '@canvas-tile-engine/core':
