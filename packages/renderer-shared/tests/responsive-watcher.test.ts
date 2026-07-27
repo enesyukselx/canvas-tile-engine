@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
-import { ResponsiveWatcher } from "../../src/modules/ResponsiveWatcher";
+import { ResponsiveWatcher } from "../src/dom/ResponsiveWatcher";
 
 /**
  * Minimal camera with real scale/limit clamping semantics (mirrors core Camera,
@@ -90,7 +90,7 @@ function createWatcher(options: {
     const { camera, state } = createFakeCamera(10, options.minScale, options.maxScale);
     const viewport = new ViewportState(1000, 800);
     const wrapper = createWrapper(options.wrapperWidth, options.wrapperHeight);
-    const watcher = new ResponsiveWatcher(wrapper, createCanvas(), camera, viewport, config, () => {});
+    const watcher = new ResponsiveWatcher(wrapper, [createCanvas()], camera, viewport, config, () => {});
     return { watcher, state, viewport, wrapper };
 }
 
