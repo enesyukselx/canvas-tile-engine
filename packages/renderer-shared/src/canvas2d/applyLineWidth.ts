@@ -1,15 +1,14 @@
-import type { SKRSContext2D } from "@napi-rs/canvas";
-
 /**
  * Apply lineWidth to a canvas context with an alpha fallback for values < 1.
  * For lineWidth < 1, uses globalAlpha to simulate thinner lines while keeping
- * lineWidth at 1 — mirrors the Canvas2D renderer so output stays consistent.
+ * lineWidth at 1. This ensures consistent rendering across browsers, DPR
+ * settings, and the server renderer.
  *
- * @param ctx Canvas rendering context.
+ * @param ctx Canvas rendering context (any Canvas2D-shaped context).
  * @param lineWidth Desired line width (can be < 1 for semi-transparent thin lines).
  * @returns Cleanup function that resets globalAlpha to 1.
  */
-export function applyLineWidth(ctx: SKRSContext2D, lineWidth: number): () => void {
+export function applyLineWidth(ctx: { lineWidth: number; globalAlpha: number }, lineWidth: number): () => void {
     if (lineWidth >= 1) {
         ctx.lineWidth = lineWidth;
         return () => {}; // No cleanup needed

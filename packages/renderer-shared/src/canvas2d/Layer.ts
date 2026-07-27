@@ -1,17 +1,8 @@
-import { CanvasTileEngineConfig, CoordinateTransformer, Coords, ICamera } from "@canvas-tile-engine/core";
-import { GLRenderer } from "./gl/GLRenderer";
+import { CanvasTileEngineConfig, CoordinateTransformer, Coords, DrawHandle, ICamera } from "@canvas-tile-engine/core";
 
-/**
- * Drawing context passed to every layer callback.
- *
- * Primitives (rects, circles, images, lines) are issued through the batched
- * {@link GLRenderer} (`gl`), while text and user-supplied draw functions use the
- * stacked 2D overlay context (`ctx`), which mirrors the Canvas2D renderer API.
- * @internal
- */
-export type DrawContext = {
-    gl: GLRenderer;
-    ctx: CanvasRenderingContext2D;
+/** @internal */
+export type DrawContext<TContext> = {
+    ctx: TContext;
     camera: ICamera;
     transformer: CoordinateTransformer;
     config: Required<CanvasTileEngineConfig>;
@@ -19,26 +10,25 @@ export type DrawContext = {
 };
 
 /** @internal */
-export type DrawCallback = (dc: DrawContext) => void;
-
-export interface DrawHandle {
-    layer: number;
-    id: symbol;
-}
+export type DrawCallback<TDrawContext> = (dc: TDrawContext) => void;
 
 /**
- * Manages ordered draw callbacks for WebGL rendering.
+ * Manages ordered draw callbacks for canvas rendering, generic over the full
+ * draw context handed to callbacks. Plain Canvas2D renderers use
+ * {@link DrawContext}; renderers with extra per-frame state (e.g. WebGL's
+ * batched GL renderer alongside its 2D overlay) intersect their own fields
+ * onto it.
  * @internal
  */
-export class Layer {
-    private layers = new Map<number, { id: symbol; fn: DrawCallback }[]>();
+export class Layer<TDrawContext extends { ctx: { save(): void; restore(): void } }> {
+    private layers = new Map<number, { id: symbol; fn: DrawCallback<TDrawContext> }[]>();
 
     /**
      * Register a draw callback at a specific layer index.
      * @param layer Layer order; lower numbers draw first.
      * @param fn Callback receiving drawing context.
      */
-    add(layer: number, fn: DrawCallback): DrawHandle {
+    add(layer: number, fn: DrawCallback<TDrawContext>): DrawHandle {
         const id = Symbol("layer-callback");
         const entry = { id, fn };
         if (!this.layers.has(layer)) {
@@ -79,7 +69,7 @@ export class Layer {
      * Draw all registered callbacks in layer order.
      * @param dc Drawing context shared with callbacks.
      */
-    drawAll(dc: DrawContext) {
+    drawAll(dc: TDrawContext) {
         const keys = [...this.layers.keys()].sort((a, b) => a - b);
         for (const layer of keys) {
             const fns = this.layers.get(layer);

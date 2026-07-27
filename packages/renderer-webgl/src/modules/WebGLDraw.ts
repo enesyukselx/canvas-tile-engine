@@ -38,7 +38,8 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
-import { Layer } from "./Layer";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { GLRenderer } from "./gl/GLRenderer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
 
@@ -56,6 +57,16 @@ const CIRCLE_STROKE_SEGMENTS = 48;
  * raw draw functions are delegated to the 2D overlay context.
  * @internal
  */
+/**
+ * Drawing context passed to every layer callback.
+ *
+ * Primitives (rects, circles, images, lines) are issued through the batched
+ * {@link GLRenderer} (`gl`), while text and user-supplied draw functions use the
+ * stacked 2D overlay context (`ctx`), which mirrors the Canvas2D renderer API.
+ * @internal
+ */
+export type WebGLDrawContext = DrawContext<CanvasRenderingContext2D> & { gl: GLRenderer };
+
 export class WebGLDraw {
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
@@ -65,7 +76,7 @@ export class WebGLDraw {
     private colorParser = new ColorParser();
 
     constructor(
-        private layers: Layer,
+        private layers: Layer<WebGLDrawContext>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
     ) {}

@@ -6,6 +6,7 @@ import {
     DEFAULT_VALUES,
     DrawHandle,
     ICamera,
+    IDrawAPI,
     ImageItem,
     Line,
     PathItem,
@@ -35,8 +36,9 @@ import type {
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
-import { Layer } from "./Layer";
-import { applyLineWidth } from "../utils/canvas";
+import { DrawContext, Layer } from "./Layer";
+import { applyLineWidth } from "./applyLineWidth";
+import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
 const SPATIAL_INDEX_THRESHOLD = 500;
@@ -44,40 +46,44 @@ const SPATIAL_INDEX_THRESHOLD = 500;
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
 // Cache for static layers (pre-rendered offscreen canvases)
-interface StaticCache {
-    canvas: OffscreenCanvas | HTMLCanvasElement;
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+interface StaticCache<TContext, TCanvas> {
+    canvas: TCanvas;
+    ctx: TContext;
     worldBounds: { minX: number; minY: number; maxX: number; maxY: number };
     scale: number;
 }
 
 /**
- * Canvas-specific helpers for adding draw callbacks to the layer stack.
+ * The Canvas2D drawing pipeline (culling, spatial index, origin, rotation,
+ * static caching) shared by the browser Canvas2D renderer and the headless
+ * server renderer, generic over the platform's context, image, and offscreen
+ * canvas types.
  * @internal
  */
-export class CanvasDraw {
+export class CanvasDraw<
+    TContext extends Canvas2DContextLike<TImage | TCanvas>,
+    TImage extends CanvasImageSourceLike,
+    TCanvas extends CanvasImageSourceLike,
+> implements IDrawAPI<TImage> {
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
         screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
     };
-    private staticCaches = new Map<string, StaticCache>();
-    private staticCacheSupported: boolean;
+    private staticCaches = new Map<string, StaticCache<TContext, TCanvas>>();
     private warnedStaticCacheDisabled = false;
 
+    /**
+     * @param createOffscreen Offscreen canvas factory for static caching, or
+     * `null` when the platform has no offscreen surface (static draws then
+     * fall back to dynamic drawing).
+     */
     constructor(
-        private layers: Layer,
+        private layers: Layer<DrawContext<TContext>>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
-    ) {
-        this.staticCacheSupported = typeof OffscreenCanvas !== "undefined" || typeof document !== "undefined";
-    }
-
-    /**
-     * Register a generic draw callback; receives raw context, current coords, and config.
-     * @param fn Callback invoked during render.
-     * @param layer Layer order (lower draws first).
-     */
+        private createOffscreen: OffscreenCanvasFactory<TContext, TCanvas> | null,
+    ) {}
 
     private isVisible(
         x: number,
@@ -106,13 +112,13 @@ export class CanvasDraw {
         };
     }
 
+    /**
+     * Register a generic draw callback; receives raw context, current coords, and config.
+     * @param fn Callback invoked during render.
+     * @param layer Layer order (lower draws first).
+     */
     addDrawFunction(
-        fn: (
-            ctx: CanvasRenderingContext2D,
-            coords: Coords,
-            config: Required<CanvasTileEngineConfig>,
-            transform: DrawTransform,
-        ) => void,
+        fn: (ctx: TContext, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer: number = 1,
     ): DrawHandle {
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
@@ -529,8 +535,8 @@ export class CanvasDraw {
      * Draw an image, optionally cropped to a spritesheet source rectangle.
      */
     private blitImage(
-        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-        img: HTMLImageElement,
+        ctx: TContext,
+        img: TImage,
         sprite: SpriteRect | undefined,
         dx: number,
         dy: number,
@@ -551,7 +557,7 @@ export class CanvasDraw {
         }
     }
 
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+    drawImage(items: Array<ImageItem<TImage>> | ImageItem<TImage>, layer: number = 1): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
 
         // Build spatial index for large datasets (RBush R-Tree)
@@ -680,7 +686,7 @@ export class CanvasDraw {
      * stroke, never the fill or neighboring items.
      */
     private fillStrokePath(
-        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        ctx: TContext,
         style:
             | {
                   fillStyle?: string;
@@ -727,16 +733,9 @@ export class CanvasDraw {
     >(
         items: T[],
         cacheKey: string,
-        renderFn: (
-            ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-            item: T,
-            x: number,
-            y: number,
-            pxW: number,
-            pxH: number,
-        ) => void,
-    ): StaticCache | null {
-        if (!this.staticCacheSupported) {
+        renderFn: (ctx: TContext, item: T, x: number, y: number, pxW: number, pxH: number) => void,
+    ): StaticCache<TContext, TCanvas> | null {
+        if (!this.createOffscreen) {
             if (!this.warnedStaticCacheDisabled) {
                 console.warn("[CanvasDraw] Static cache disabled: OffscreenCanvas not available.");
                 this.warnedStaticCacheDisabled = true;
@@ -805,27 +804,9 @@ export class CanvasDraw {
             cache.worldBounds.maxY !== maxY;
 
         if (needsRebuild) {
-            // Create offscreen canvas
-            const offscreen =
-                typeof OffscreenCanvas !== "undefined"
-                    ? new OffscreenCanvas(canvasWidth, canvasHeight)
-                    : document.createElement("canvas");
+            const offscreen = this.createOffscreen(canvasWidth, canvasHeight);
 
-            // Guard instanceof with typeof to avoid ReferenceError when OffscreenCanvas is undefined (e.g., jsdom)
-            const isOffscreenCanvas = typeof OffscreenCanvas !== "undefined" && offscreen instanceof OffscreenCanvas;
-
-            if (!isOffscreenCanvas) {
-                (offscreen as HTMLCanvasElement).width = canvasWidth;
-                (offscreen as HTMLCanvasElement).height = canvasHeight;
-            }
-
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-            const offCtx = offscreen.getContext("2d") as
-                | CanvasRenderingContext2D
-                | OffscreenCanvasRenderingContext2D
-                | null;
-
-            if (!offCtx) {
+            if (!offscreen) {
                 if (!this.warnedStaticCacheDisabled) {
                     console.warn("[CanvasDraw] Static cache disabled: 2D context unavailable.");
                     this.warnedStaticCacheDisabled = true;
@@ -846,12 +827,12 @@ export class CanvasDraw {
                 };
                 const { x, y } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
 
-                renderFn(offCtx, item, x, y, pxW, pxH);
+                renderFn(offscreen.ctx, item, x, y, pxW, pxH);
             }
 
             cache = {
-                canvas: offscreen,
-                ctx: offCtx,
+                canvas: offscreen.canvas,
+                ctx: offscreen.ctx,
                 worldBounds: { minX, minY, maxX, maxY },
                 scale: renderScale,
             };
@@ -865,7 +846,7 @@ export class CanvasDraw {
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
-    private addStaticCacheLayer(cache: StaticCache | null, layer: number): DrawHandle | null {
+    private addStaticCacheLayer(cache: StaticCache<TContext, TCanvas> | null, layer: number): DrawHandle | null {
         if (!cache) {
             return null;
         }
@@ -1016,19 +997,19 @@ export class CanvasDraw {
      * Draw images with pre-rendering cache.
      * Renders all items once to an offscreen canvas, then blits the visible portion each frame.
      * Ideal for large static datasets like terrain tiles or static decorations.
-     * @param items Array of image objects with position and HTMLImageElement
+     * @param items Array of image objects with position and platform image handle
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache")
      * @param layer Layer order
      */
-    drawStaticImage(items: Array<ImageItem>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
-            const img = (item as { img: HTMLImageElement }).img;
-            const sprite = (item as { sprite?: SpriteRect }).sprite;
-            const opacity = (item as { opacity?: number }).opacity ?? 1;
-            const rotationDeg = (item as { rotate?: number }).rotate ?? 0;
+            const img = item.img;
+            const sprite = item.sprite;
+            const opacity = item.opacity ?? 1;
+            const rotationDeg = item.rotate ?? 0;
             const rotation = rotationDeg * (Math.PI / 180);
-            const flipX = (item as { flipX?: boolean }).flipX === true;
-            const flipY = (item as { flipY?: boolean }).flipY === true;
+            const flipX = item.flipX === true;
+            const flipY = item.flipY === true;
             const srcW = sprite?.w ?? img.width;
             const srcH = sprite?.h ?? img.height;
             const aspect = srcW / srcH;

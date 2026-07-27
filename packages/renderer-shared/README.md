@@ -11,8 +11,10 @@ never appears in published `package.json` dependencies.
 
 - `@canvas-tile-engine/renderer-shared/canvas2d` - the Canvas2D drawing
   pipeline shared by `renderer-canvas` (browser) and `renderer-server`
-  (`@napi-rs/canvas`): draw modules, coordinate overlay, layer management,
-  and canvas utils, generic over the 2D context and image types.
+  (`@napi-rs/canvas`): draw modules, coordinate overlay, debug HUD, layer
+  management, and canvas utils, generic over the 2D context and image types.
+  `renderer-webgl`'s stacked 2D overlay consumes the Layer,
+  CoordinateOverlayRenderer, and DebugOverlay modules too.
 - `@canvas-tile-engine/renderer-shared/dom` - browser plumbing shared by
   `renderer-canvas` and `renderer-webgl`: event binding, resize/responsive
   watchers, size control, and image loading. Sizing modules take a list of

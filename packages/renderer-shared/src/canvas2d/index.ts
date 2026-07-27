@@ -1,3 +1,7 @@
 // Canvas2D drawing pipeline shared by renderer-canvas and renderer-server.
-// Modules land here as they are extracted from the renderer packages.
-export {};
+export { CanvasDraw } from "./CanvasDraw";
+export { Layer, type DrawContext, type DrawCallback } from "./Layer";
+export { CoordinateOverlayRenderer } from "./CoordinateOverlayRenderer";
+export { DebugOverlay } from "./DebugOverlay";
+export { applyLineWidth } from "./applyLineWidth";
+export type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";

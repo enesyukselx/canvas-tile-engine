@@ -1,13 +1,16 @@
 import { Config, DEBUG_HUD, ICamera, ViewportState } from "@canvas-tile-engine/core";
+import type { Canvas2DContextLike } from "./types";
 
 const FPS_SAMPLE_SIZE = 10;
 
 /**
- * Canvas-only debug overlay: draws grid and HUD information.
+ * Debug overlay: draws HUD information (coordinates, scale, tiles in view,
+ * FPS) on a Canvas2D-style context. Used by the Canvas2D renderer directly
+ * and by the WebGL renderer on its 2D overlay canvas.
  * @internal
  */
-export class CanvasDebug {
-    private ctx: CanvasRenderingContext2D;
+export class DebugOverlay<TContext extends Canvas2DContextLike> {
+    private ctx: TContext;
     private camera: ICamera;
     private config: Config;
     private viewport: ViewportState;
@@ -19,7 +22,7 @@ export class CanvasDebug {
     private fpsLoopRunning = false;
     private onFpsUpdate: (() => void) | null = null;
 
-    constructor(ctx: CanvasRenderingContext2D, camera: ICamera, config: Config, viewport: ViewportState) {
+    constructor(ctx: TContext, camera: ICamera, config: Config, viewport: ViewportState) {
         this.ctx = ctx;
         this.camera = camera;
         this.config = config;

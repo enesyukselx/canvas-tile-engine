@@ -22,10 +22,12 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import { CanvasDraw } from "./modules/CanvasDraw";
-import { Layer } from "./modules/Layer";
-import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
-import { CanvasDebug } from "./modules/CanvasDebug";
+import {
+    CoordinateOverlayRenderer,
+    DebugOverlay,
+    DrawContext,
+    Layer,
+} from "@canvas-tile-engine/renderer-shared/canvas2d";
 import {
     EventBinder,
     ImageLoader,
@@ -34,6 +36,7 @@ import {
     SizeController,
     initStyles,
 } from "@canvas-tile-engine/renderer-shared/dom";
+import { BrowserCanvasDraw, BrowserContext2D, createBrowserCanvasDraw } from "./modules/createCanvasDraw";
 
 export class RendererCanvas implements IRenderer {
     /** Transform helpers handed to the onDraw hook. */
@@ -48,11 +51,11 @@ export class RendererCanvas implements IRenderer {
     private camera!: ICamera;
     private config!: Config;
     private viewport!: ViewportState;
-    private layers!: Layer;
-    private drawAPI!: CanvasDraw;
+    private layers!: Layer<DrawContext<BrowserContext2D>>;
+    private drawAPI!: BrowserCanvasDraw;
     private transformer!: CoordinateTransformer;
-    private coordinateOverlayRenderer!: CoordinateOverlayRenderer;
-    private debugOverlay?: CanvasDebug;
+    private coordinateOverlayRenderer!: CoordinateOverlayRenderer<CanvasRenderingContext2D>;
+    private debugOverlay?: DebugOverlay<CanvasRenderingContext2D>;
 
     // Event handling
     private gestureProcessor!: GestureProcessor;
@@ -178,7 +181,7 @@ export class RendererCanvas implements IRenderer {
         this.viewport = deps.viewport;
         this.camera = deps.camera;
         this.layers = new Layer();
-        this.drawAPI = new CanvasDraw(this.layers, deps.transformer, deps.camera);
+        this.drawAPI = createBrowserCanvasDraw(this.layers, deps.transformer, deps.camera);
 
         this.applyCanvasSize();
 
@@ -190,7 +193,7 @@ export class RendererCanvas implements IRenderer {
         );
 
         if (this.config.get().debug?.enabled) {
-            this.debugOverlay = new CanvasDebug(this.canvasContext, this.camera, this.config, this.viewport);
+            this.debugOverlay = new DebugOverlay(this.canvasContext, this.camera, this.config, this.viewport);
             // Start FPS loop if fps hud is enabled
             if (this.config.get().debug?.hud?.fps) {
                 this.debugOverlay.setFpsUpdateCallback(() => this.render());

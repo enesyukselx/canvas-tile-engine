@@ -22,10 +22,8 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import { WebGLDraw } from "./modules/WebGLDraw";
-import { Layer } from "./modules/Layer";
-import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
-import { WebGLDebug } from "./modules/WebGLDebug";
+import { WebGLDraw, type WebGLDrawContext } from "./modules/WebGLDraw";
+import { CoordinateOverlayRenderer, DebugOverlay, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import {
     EventBinder,
     ImageLoader,
@@ -69,11 +67,11 @@ export class RendererWebGL implements IRenderer {
     private camera!: ICamera;
     private config!: Config;
     private viewport!: ViewportState;
-    private layers!: Layer;
+    private layers!: Layer<WebGLDrawContext>;
     private drawAPI!: WebGLDraw;
     private transformer!: CoordinateTransformer;
-    private coordinateOverlayRenderer!: CoordinateOverlayRenderer;
-    private debugOverlay?: WebGLDebug;
+    private coordinateOverlayRenderer!: CoordinateOverlayRenderer<CanvasRenderingContext2D>;
+    private debugOverlay?: DebugOverlay<CanvasRenderingContext2D>;
     private colorParser = new ColorParser();
 
     // Event handling
@@ -233,7 +231,7 @@ export class RendererWebGL implements IRenderer {
         );
 
         if (this.config.get().debug?.enabled) {
-            this.debugOverlay = new WebGLDebug(this.overlayCtx, this.camera, this.config, this.viewport);
+            this.debugOverlay = new DebugOverlay(this.overlayCtx, this.camera, this.config, this.viewport);
             if (this.config.get().debug?.hud?.fps) {
                 this.debugOverlay.setFpsUpdateCallback(() => this.render());
                 this.debugOverlay.startFpsLoop();
