@@ -15,16 +15,6 @@ try.
 npx skills add enesyukselx/canvas-tile-engine
 ```
 
-### Claude Code plugin marketplace
-
-```
-/plugin marketplace add enesyukselx/canvas-tile-engine
-/plugin install canvas-tile-engine@canvas-tile-engine
-```
-
-Updates ship with the repository: run `/plugin marketplace update
-canvas-tile-engine` to pull the latest version.
-
 ### Manual copy
 
 ```bash

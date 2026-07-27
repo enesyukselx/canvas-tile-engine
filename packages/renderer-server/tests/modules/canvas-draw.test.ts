@@ -89,3 +89,49 @@ describe("CanvasDraw text font sizing", () => {
         expect(texts.map((t) => t.text)).toEqual(["visible"]);
     });
 });
+
+// Fake 2D context recording stroke style/width at every stroke() call.
+function makeLineStyleRecordingCtx() {
+    const strokes: Array<{ strokeStyle: string; lineWidth: number }> = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        setLineDash() {},
+        stroke() {
+            strokes.push({ strokeStyle: ctx.strokeStyle, lineWidth: ctx.lineWidth });
+        },
+    };
+    return { ctx: ctx as unknown as SKRSContext2D, strokes };
+}
+
+// Per-item line style contract shared by all renderers (mirrors the canvas
+// suite): item.style overlays the call-level style field by field.
+describe("CanvasDraw per-item line style", () => {
+    it("strokes styled items solo with merged style and restores the batch style", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: 1, y: 0 } },
+                { from: { x: 0, y: 1 }, to: { x: 1, y: 1 }, style: { strokeStyle: "#f00", lineWidthPx: 6 } },
+                { from: { x: 0, y: 2 }, to: { x: 1, y: 2 } },
+            ],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+        );
+        render(ctx);
+
+        expect(strokes.map((s) => [s.strokeStyle, s.lineWidth])).toEqual([
+            ["#00f", 2],
+            ["#f00", 6],
+            ["#00f", 2],
+        ]);
+    });
+});

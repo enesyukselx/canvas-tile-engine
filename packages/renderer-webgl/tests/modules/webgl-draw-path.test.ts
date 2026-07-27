@@ -200,3 +200,23 @@ describe("WebGLDraw command paths", () => {
         expect(high.lines.length).toBeGreaterThan(lowCount * 2);
     });
 });
+
+describe("smuggled decoration geometry", () => {
+    it("resolves stroke width and corner radius from the registration-time item style", () => {
+        const { draw, render } = setup();
+        const { gl, lines } = makeRecordingGL();
+
+        // Non-literal returns bypass TS excess-property checks; geometry
+        // values must come from the layers hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12, cornerRadiusPx: 30 };
+        draw.drawPath([{ points: square, closed: true, style: { strokeStyle: "#f00", lineWidthPx: 4 } }], 1, {
+            styleOf: () => smuggled,
+        });
+        render(gl);
+
+        // 4 sharp edges (no smuggled rounding densifying the outline), all
+        // at the item width.
+        expect(lines).toHaveLength(4);
+        for (const line of lines) expect(line.width).toBe(4);
+    });
+});

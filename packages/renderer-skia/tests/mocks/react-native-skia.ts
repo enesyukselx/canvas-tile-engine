@@ -11,11 +11,13 @@ export interface MockPaint {
     color: unknown;
     strokeWidth: number;
     alphaf: number;
+    pathEffect: unknown;
     setAntiAlias(v: boolean): void;
     setStyle(v: number): void;
     setColor(c: unknown): void;
     setStrokeWidth(w: number): void;
     setAlphaf(a: number): void;
+    setPathEffect(e: unknown): void;
 }
 
 const makePaint = (): MockPaint => {
@@ -24,6 +26,7 @@ const makePaint = (): MockPaint => {
         color: undefined,
         strokeWidth: 1,
         alphaf: 1,
+        pathEffect: null,
         setAntiAlias() {},
         setStyle(v: number) {
             paint.style = v;
@@ -36,6 +39,9 @@ const makePaint = (): MockPaint => {
         },
         setAlphaf(a: number) {
             paint.alphaf = a;
+        },
+        setPathEffect(e: unknown) {
+            paint.pathEffect = e;
         },
     };
     return paint;
@@ -75,22 +81,46 @@ export function makeRecordingCanvas() {
             ops.push({ op: "scale", sx, sy });
         },
         drawRect(rect: unknown, paint: MockPaint) {
-            ops.push({ op: "rect", rect, style: paint.style, color: paint.color, strokeWidth: paint.strokeWidth });
+            ops.push({
+                op: "rect",
+                rect,
+                style: paint.style,
+                color: paint.color,
+                strokeWidth: paint.strokeWidth,
+                pathEffect: paint.pathEffect,
+            });
         },
         drawRRect(rrect: unknown, paint: MockPaint) {
-            ops.push({ op: "rrect", rrect, style: paint.style, color: paint.color });
+            ops.push({ op: "rrect", rrect, style: paint.style, color: paint.color, pathEffect: paint.pathEffect });
         },
         drawCircle(cx: number, cy: number, r: number, paint: MockPaint) {
-            ops.push({ op: "circle", cx, cy, r, style: paint.style, strokeWidth: paint.strokeWidth });
+            ops.push({
+                op: "circle",
+                cx,
+                cy,
+                r,
+                style: paint.style,
+                strokeWidth: paint.strokeWidth,
+                pathEffect: paint.pathEffect,
+            });
         },
         drawLine(x1: number, y1: number, x2: number, y2: number, paint: MockPaint) {
-            ops.push({ op: "line", x1, y1, x2, y2, strokeWidth: paint.strokeWidth });
+            ops.push({
+                op: "line",
+                x1,
+                y1,
+                x2,
+                y2,
+                strokeWidth: paint.strokeWidth,
+                color: paint.color,
+                pathEffect: paint.pathEffect,
+            });
         },
         drawText(text: string, x: number, y: number, _paint: MockPaint, font: { size: number }) {
             ops.push({ op: "text", text, x, y, fontSize: font.size });
         },
-        drawPath() {
-            ops.push({ op: "path" });
+        drawPath(_path: unknown, paint: MockPaint) {
+            ops.push({ op: "path", style: paint.style, strokeWidth: paint.strokeWidth });
         },
         drawImageRect(img: unknown, src: unknown, dest: unknown, paint: MockPaint) {
             ops.push({ op: "image", img, src, dest, alpha: paint.alphaf });
@@ -107,6 +137,9 @@ export const Skia = {
     Color: (value: string) => {
         colorParseCalls.push(value);
         return { parsed: value };
+    },
+    PathEffect: {
+        MakeDash: (intervals: number[], phase: number) => ({ __dash: intervals, phase }),
     },
     XYWHRect: (x: number, y: number, width: number, height: number) => ({ x, y, width, height }),
     RRectXY: (rect: unknown, rx: number, ry: number) => ({ rect, rx, ry }),

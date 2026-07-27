@@ -17,8 +17,11 @@ import {
     resolveSizePx,
     resolveSizeWorld,
     resolveLineDashPx,
+    overlayLineStyle,
     resolveRadiusPx,
     resolveCornerRadiusPx,
+    resolveOrigin,
+    computeOriginOffset,
     traceRoundedPath,
     traceCommands,
     pathCommandsBounds,
@@ -200,12 +203,12 @@ export class SkiaDraw {
         styleOf?: StyleOf<Rect, ShapeDecorationStyle>,
     ) {
         const size = item.size ?? 1;
-        const origin = this.resolveOrigin(item.origin);
+        const origin = resolveOrigin(item.origin);
         const deco = styleOf?.(item);
         const style = deco ? { ...item.style, ...deco } : item.style;
         const pxW = (item.width ?? size) * cellSize;
         const pxH = (item.height ?? size) * cellSize;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(
+        const { x: drawX, y: drawY } = computeOriginOffset(
             pos,
             pxW,
             pxH,
@@ -235,12 +238,18 @@ export class SkiaDraw {
             this.strokePaint.setStrokeWidth(
                 resolveLineWidthPx(style, cellSize),
             );
+            const dash = resolveLineDashPx(style, cellSize);
+            if (dash)
+                this.strokePaint.setPathEffect(
+                    Skia.PathEffect.MakeDash(dash, 0),
+                );
             if (rounded)
                 canvas.drawRRect(
                     this.makeRRect(rect, radius),
                     this.strokePaint,
                 );
             else canvas.drawRect(rect, this.strokePaint);
+            if (dash) this.strokePaint.setPathEffect(null);
         }
 
         if (count !== -1) canvas.restoreToCount(count);
@@ -311,14 +320,14 @@ export class SkiaDraw {
         useSizePx: boolean,
         styleOf?: StyleOf<Circle, ShapeDecorationStyle>,
     ) {
-        const origin = this.resolveOrigin(item.origin);
+        const origin = resolveOrigin(item.origin);
         const deco = styleOf?.(item);
         const style = deco ? { ...item.style, ...deco } : item.style;
         const pxSize = useSizePx
             ? resolveSizePx(item, cellSize)
             : (item.size ?? 1) * cellSize;
         const radius = pxSize / 2;
-        const { x: drawX, y: drawY } = this.computeOriginOffset(
+        const { x: drawX, y: drawY } = computeOriginOffset(
             pos,
             pxSize,
             pxSize,
@@ -337,7 +346,13 @@ export class SkiaDraw {
             this.strokePaint.setStrokeWidth(
                 resolveLineWidthPx(style, cellSize),
             );
+            const dash = resolveLineDashPx(style, cellSize);
+            if (dash)
+                this.strokePaint.setPathEffect(
+                    Skia.PathEffect.MakeDash(dash, 0),
+                );
             canvas.drawCircle(cx, cy, radius, this.strokePaint);
+            if (dash) this.strokePaint.setPathEffect(null);
         }
     }
 
@@ -352,10 +367,9 @@ export class SkiaDraw {
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const baseColor = this.color(style?.strokeStyle ?? "#000000");
+            const baseWidth = resolveLineWidthPx(style, this.camera.scale);
             this.strokePaint.setColor(baseColor);
-            this.strokePaint.setStrokeWidth(
-                resolveLineWidthPx(style, this.camera.scale),
-            );
+            this.strokePaint.setStrokeWidth(baseWidth);
             const dash = resolveLineDashPx(style, this.camera.scale);
             const baseDash = dash ? Skia.PathEffect.MakeDash(dash, 0) : null;
             if (baseDash) this.strokePaint.setPathEffect(baseDash);
@@ -386,12 +400,20 @@ export class SkiaDraw {
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
 
                 const deco = styleOf?.(item);
-                if (deco) {
-                    // Decorated item: repaint with the merged style, then
-                    // restore the shared paint for the rest of the batch.
-                    const merged = { ...style, ...deco };
+                if (deco || item.style) {
+                    // Item with its own style (or a decoration): repaint with
+                    // the merged style, then restore the shared paint for the
+                    // rest of the batch. Width resolves from the
+                    // registration-time layers only (call style + item.style)
+                    // — the same layers hit testing reads — so a smuggled
+                    // decoration width cannot desync paint from hit.
+                    const registration = overlayLineStyle(style, item.style);
+                    const merged = overlayLineStyle(registration, deco);
                     this.strokePaint.setColor(
                         this.color(merged.strokeStyle ?? "#000000"),
+                    );
+                    this.strokePaint.setStrokeWidth(
+                        resolveLineWidthPx(registration, this.camera.scale),
                     );
                     const mergedDash = resolveLineDashPx(
                         merged,
@@ -404,6 +426,7 @@ export class SkiaDraw {
                     );
                     canvas.drawLine(a.x, a.y, b.x, b.y, this.strokePaint);
                     this.strokePaint.setColor(baseColor);
+                    this.strokePaint.setStrokeWidth(baseWidth);
                     this.strokePaint.setPathEffect(baseDash);
                     continue;
                 }
@@ -598,11 +621,13 @@ export class SkiaDraw {
                     const pts = item.points!.map((p) =>
                         this.transformer.worldToScreen(p.x, p.y),
                     );
+                    // Corner radius from item.style: registration-time
+                    // only (see the stroke-width note below).
                     traceRoundedPath(
                         this.pathSink(path),
                         pts,
                         item.closed === true,
-                        resolveCornerRadiusPx(style, this.camera.scale),
+                        resolveCornerRadiusPx(item.style, this.camera.scale),
                     );
                 }
 
@@ -621,8 +646,12 @@ export class SkiaDraw {
                     this.strokePaint.setColor(
                         this.color(style?.strokeStyle ?? "#000000"),
                     );
+                    // Width from item.style, not the decorated merge:
+                    // hit testing reads the registration-time style, and
+                    // the decoration types' width exclusion is type-level
+                    // only — a smuggled width must not desync paint & hit.
                     this.strokePaint.setStrokeWidth(
-                        resolveLineWidthPx(style, this.camera.scale),
+                        resolveLineWidthPx(item.style, this.camera.scale),
                     );
                     const dash = resolveLineDashPx(style, this.camera.scale);
                     if (dash)
@@ -697,7 +726,7 @@ export class SkiaDraw {
         cellSize: number,
         useSizePx: boolean,
     ) {
-        const origin = this.resolveOrigin(item.origin);
+        const origin = resolveOrigin(item.origin);
 
         const img = item.img;
         const imgW = img.width();
@@ -721,7 +750,7 @@ export class SkiaDraw {
         if (aspect > 1) drawH = pxSize / aspect;
         else drawW = pxSize * aspect;
 
-        const { x: baseX, y: baseY } = this.computeOriginOffset(
+        const { x: baseX, y: baseY } = computeOriginOffset(
             pos,
             pxSize,
             pxSize,
@@ -810,9 +839,10 @@ export class SkiaDraw {
     // of the Canvas2D renderer's offscreen cache. The picture is recorded at
     // the camera scale active at record time and replayed under the camera
     // transform, so world-unit style values (lineWidth, radius) scale with
-    // zoom exactly as intended. Pixel-denominated opt-ins (lineWidthPx) are
-    // baked in at the record scale and scale along on replay — use the
-    // dynamic draw methods when a zoom-independent px width must hold.
+    // zoom exactly as intended. Pixel-denominated opt-ins (lineWidthPx,
+    // lineDashPx) are baked in at the record scale and scale along on replay
+    // — use the dynamic draw methods when a zoom-independent px value must
+    // hold.
 
     drawStaticRect(
         items: Array<Rect>,
@@ -995,20 +1025,6 @@ export class SkiaDraw {
         return parsed;
     }
 
-    private resolveOrigin(
-        origin: { mode?: string; x?: number; y?: number } | undefined,
-    ): {
-        mode: "cell" | "self";
-        x: number;
-        y: number;
-    } {
-        return {
-            mode: origin?.mode === "self" ? "self" : "cell",
-            x: origin?.x ?? 0.5,
-            y: origin?.y ?? 0.5,
-        };
-    }
-
     /**
      * Resolves `Rect.radius` into either a single uniform radius or a
      * per-corner `[topLeft, topRight, bottomRight, bottomLeft]` tuple,
@@ -1058,27 +1074,6 @@ export class SkiaDraw {
             topRight: { x: topRight, y: topRight },
             bottomRight: { x: bottomRight, y: bottomRight },
             bottomLeft: { x: bottomLeft, y: bottomLeft },
-        };
-    }
-
-    private computeOriginOffset(
-        pos: Coords,
-        pxW: number,
-        pxH: number,
-        origin: { mode: "cell" | "self"; x: number; y: number },
-        cellSize: number,
-    ) {
-        if (origin.mode === "cell") {
-            const cell = cellSize;
-            return {
-                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
-            };
-        }
-
-        return {
-            x: pos.x - origin.x * pxW,
-            y: pos.y - origin.y * pxH,
         };
     }
 

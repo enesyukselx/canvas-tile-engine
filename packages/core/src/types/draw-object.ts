@@ -1,4 +1,4 @@
-import { Coords } from ".";
+import { Coords, LineStyle } from ".";
 
 export type DrawObject<TData = unknown> = {
     x: number;
@@ -22,6 +22,17 @@ export type DrawObject<TData = unknown> = {
          * Takes precedence over `lineWidth`.
          */
         lineWidthPx?: number;
+        /**
+         * Border dash pattern in world units (dashes are anchored to the shape
+         * and scale with zoom). Follows Canvas2D `setLineDash` semantics.
+         * Ignored when `lineDashPx` is set. Omit for a solid border.
+         */
+        lineDash?: number[];
+        /**
+         * Border dash pattern in screen pixels, independent of zoom.
+         * Takes precedence over `lineDash`.
+         */
+        lineDashPx?: number[];
     };
     /** Rotation angle in degrees (0 = no rotation, positive = clockwise) */
     rotate?: number;
@@ -139,6 +150,15 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size"> &
 export type Line<TData = unknown> = {
     from: Coords;
     to: Coords;
+    /**
+     * Per-item style, overlaying the call-level `style` argument field by
+     * field — mixed-style batches no longer need one `drawLine` call per
+     * style. Registration-time like every item style, so unlike `styleOf`
+     * decorations it may change `lineWidth`/`lineWidthPx`: hit testing
+     * resolves this item's own stroke width. `styleOf` decorations still
+     * overlay both at paint time.
+     */
+    style?: LineStyle;
     /**
      * Arbitrary app data attached to the segment. Never read by the engine or
      * renderers; carried through so `hitTest` results can identify the item

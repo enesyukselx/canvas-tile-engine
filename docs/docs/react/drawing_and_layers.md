@@ -67,6 +67,8 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 - `strokeStyle`: Border color
 - `lineWidth`: Border width in world units; scales with zoom like the shape
 - `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
+- `lineDash`: Border dash pattern in world units; dashes scale with zoom. Canvas2D `setLineDash` semantics; omit for a solid border
+- `lineDashPx`: Border dash pattern in screen pixels, independent of zoom; wins over `lineDash`
 
 ```tsx
 <CanvasTileEngine
@@ -155,10 +157,10 @@ Draw straight lines between two points.
 | Prop      | Type                           | Default      | Description                                                                                                      |
 | :-------- | :----------------------------- | :----------- | :--------------------------------------------------------------------------------------------------------------- |
 | `items`   | `Line \| Line[]`               | **Required** | Line definitions.                                                                                                |
-| `style`   | `LineStyle`                    | -            | Line style (shared by all items).                                                                                |
-| `styleOf` | `(item) => style \| undefined` | -            | Per-item decoration overlaid on `style` (color/dash only); see [Styling by State](#styling-by-state-styleof). |
+| `style`   | `LineStyle`                    | -            | Default line style; an item's own `style` overrides it per item.                                                 |
+| `styleOf` | `(item) => style \| undefined` | -            | Per-item decoration overlaid on both (color/dash only); see [Styling by State](#styling-by-state-styleof). |
 
-**Line Properties:** `{ from: { x, y }, to: { x, y } }`
+**Line Properties:** `{ from: { x, y }, to: { x, y }, style?: LineStyle, data?: TData }` — an item's `style` overrides the `style` prop unit pair by unit pair and, being registration-time, may change the stroke width (hit testing follows it).
 
 ```tsx
 {
@@ -171,12 +173,12 @@ Draw straight lines between two points.
 />;
 
 {
-    /* Multiple lines */
+    /* Mixed styles in one batch: item style overrides the prop default */
 }
 <CanvasTileEngine.Line
     items={[
         { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
-        { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
+        { from: { x: 5, y: 0 }, to: { x: 0, y: 5 }, style: { strokeStyle: "#f59e0b", lineWidthPx: 4 } },
     ]}
     style={{ strokeStyle: "red", lineWidthPx: 2 }}
     layer={1}
