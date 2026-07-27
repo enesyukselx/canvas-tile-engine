@@ -17,6 +17,7 @@ import {
     resolveSizePx,
     resolveSizeWorld,
     resolveLineDashPx,
+    overlayLineStyle,
     resolveRadiusPx,
     resolveCornerRadiusPx,
     resolveOrigin,
@@ -366,10 +367,9 @@ export class SkiaDraw {
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             const baseColor = this.color(style?.strokeStyle ?? "#000000");
+            const baseWidth = resolveLineWidthPx(style, this.camera.scale);
             this.strokePaint.setColor(baseColor);
-            this.strokePaint.setStrokeWidth(
-                resolveLineWidthPx(style, this.camera.scale),
-            );
+            this.strokePaint.setStrokeWidth(baseWidth);
             const dash = resolveLineDashPx(style, this.camera.scale);
             const baseDash = dash ? Skia.PathEffect.MakeDash(dash, 0) : null;
             if (baseDash) this.strokePaint.setPathEffect(baseDash);
@@ -400,12 +400,20 @@ export class SkiaDraw {
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
 
                 const deco = styleOf?.(item);
-                if (deco) {
-                    // Decorated item: repaint with the merged style, then
-                    // restore the shared paint for the rest of the batch.
-                    const merged = { ...style, ...deco };
+                if (deco || item.style) {
+                    // Item with its own style (or a decoration): repaint with
+                    // the merged style, then restore the shared paint for the
+                    // rest of the batch. Width resolves from the
+                    // registration-time layers only (call style + item.style)
+                    // — the same layers hit testing reads — so a smuggled
+                    // decoration width cannot desync paint from hit.
+                    const registration = overlayLineStyle(style, item.style);
+                    const merged = overlayLineStyle(registration, deco);
                     this.strokePaint.setColor(
                         this.color(merged.strokeStyle ?? "#000000"),
+                    );
+                    this.strokePaint.setStrokeWidth(
+                        resolveLineWidthPx(registration, this.camera.scale),
                     );
                     const mergedDash = resolveLineDashPx(
                         merged,
@@ -418,6 +426,7 @@ export class SkiaDraw {
                     );
                     canvas.drawLine(a.x, a.y, b.x, b.y, this.strokePaint);
                     this.strokePaint.setColor(baseColor);
+                    this.strokePaint.setStrokeWidth(baseWidth);
                     this.strokePaint.setPathEffect(baseDash);
                     continue;
                 }

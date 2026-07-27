@@ -947,3 +947,111 @@ describe("styleOf paint-time decoration", () => {
         expect(strokes).toEqual(["#0f0"]);
     });
 });
+
+// Fake 2D context recording stroke style/width/dash at every stroke() call.
+function makeLineStyleRecordingCtx() {
+    const strokes: Array<{ strokeStyle: string; lineWidth: number; dash: number[] }> = [];
+    let currentDash: number[] = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        setLineDash(pattern: number[]) {
+            currentDash = pattern;
+        },
+        stroke() {
+            strokes.push({ strokeStyle: ctx.strokeStyle, lineWidth: ctx.lineWidth, dash: currentDash });
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, strokes };
+}
+
+// Per-item line style contract shared by all renderers: item.style overlays
+// the call-level style field by field; styleOf decorations overlay both.
+describe("CanvasDraw per-item line style", () => {
+    it("strokes styled items solo with merged style while plain runs keep batching", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: 1, y: 0 } },
+                { from: { x: 0, y: 1 }, to: { x: 1, y: 1 }, style: { strokeStyle: "#f00", lineWidthPx: 6 } },
+                { from: { x: 0, y: 2 }, to: { x: 1, y: 2 } },
+                { from: { x: 0, y: 3 }, to: { x: 1, y: 3 } },
+            ],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+        );
+        render(ctx);
+
+        // flush(plain run) + solo(styled) + flush(trailing run) = 3 strokes
+        expect(strokes.map((s) => [s.strokeStyle, s.lineWidth])).toEqual([
+            ["#00f", 2],
+            ["#f00", 6],
+            ["#00f", 2],
+        ]);
+    });
+
+    it("resolves item world lineWidth and lineDash by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidth: 0.5, lineDash: [0.8, 0.4] } },
+                { from: { x: 0, y: 1 }, to: { x: 1, y: 1 } }, // batch style, solid
+            ],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+        );
+        render(ctx);
+
+        expect(strokes[0].lineWidth).toBe(5); // 0.5 world * scale 10
+        expect(strokes[0].dash).toEqual([8, 4]);
+        expect(strokes[1].lineWidth).toBe(2); // batch width restored
+        expect(strokes[1].dash).toEqual([]);
+    });
+
+    it("ignores a width smuggled into a styleOf decoration (paint stays hit-consistent)", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        // Non-literal returns bypass TS excess-property checks — the exact
+        // hole a runtime guard must cover. The decoration's color applies;
+        // its width must not (hit testing never sees decorations).
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidthPx: 4 } }],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+            { styleOf: () => smuggled },
+        );
+        render(ctx);
+
+        expect(strokes).toHaveLength(1);
+        expect(strokes[0].strokeStyle).toBe("#0f0"); // decoration color applies
+        expect(strokes[0].lineWidth).toBe(4); // item width, not the smuggled 12
+    });
+
+    it("styleOf decorations overlay the item's own style", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { strokeStyle: "#f00" } }],
+            { strokeStyle: "#00f" },
+            1,
+            { styleOf: () => ({ strokeStyle: "#0f0" }) },
+        );
+        render(ctx);
+
+        expect(strokes).toHaveLength(1);
+        expect(strokes[0].strokeStyle).toBe("#0f0");
+    });
+});

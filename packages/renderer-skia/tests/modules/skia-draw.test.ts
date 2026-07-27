@@ -503,6 +503,74 @@ describe("non-square rects", () => {
     });
 });
 
+// Per-item line style contract shared by all renderers: item.style overlays
+// the call-level style field by field; the shared stroke paint is mutated for
+// the item's draw and restored for the rest of the batch.
+describe("per-item line style", () => {
+    it("paints an item's own width/color and restores the batch paint", () => {
+        const { draw, render } = setup(); // scale 10
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: 1, y: 0 } },
+                { from: { x: 0, y: 1 }, to: { x: 1, y: 1 }, style: { strokeStyle: "#f00", lineWidthPx: 6 } },
+                { from: { x: 0, y: 2 }, to: { x: 1, y: 2 } },
+            ],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1
+        );
+        render(canvas);
+
+        const lines = ops.filter((o) => o.op === "line");
+        expect(lines.map((o) => o.strokeWidth)).toEqual([2, 6, 2]);
+        expect(lines[1].color).toEqual({ parsed: "#f00" });
+        expect(lines[2].color).toEqual({ parsed: "#00f" });
+    });
+
+    it("applies an item's own dash as a path effect and restores it", () => {
+        const { draw, render } = setup(); // scale 10
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineDash: [0.8, 0.4] } },
+                { from: { x: 0, y: 1 }, to: { x: 1, y: 1 } },
+            ],
+            { strokeStyle: "#00f" },
+            1
+        );
+        render(canvas);
+
+        const lines = ops.filter((o) => o.op === "line");
+        expect(lines[0].pathEffect).toEqual({ __dash: [8, 4], phase: 0 });
+        expect(lines[1].pathEffect).toBeNull();
+    });
+});
+
+describe("smuggled decoration width on lines", () => {
+    it("resolves the painted width from registration-time layers only", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        // Non-literal returns bypass TS excess-property checks; the width
+        // must resolve from the layers hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidthPx: 4 } }],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+            { styleOf: () => smuggled },
+        );
+        render(canvas);
+
+        const lines = ops.filter((o) => o.op === "line");
+        expect(lines).toHaveLength(1);
+        expect(lines[0].color).toEqual({ parsed: "#0f0" }); // deco color applies
+        expect(lines[0].strokeWidth).toBe(4); // item width, not the smuggled 12
+    });
+});
+
 describe("smuggled decoration geometry on paths", () => {
     it("resolves the stroked width from the registration-time item style", () => {
         const { draw, render } = setup();

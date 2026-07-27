@@ -6,7 +6,14 @@ export * from "./constants";
 // Utilities
 export { gridToSize } from "./utils/gridToSize";
 export { fitScale, type FitScaleOptions } from "./utils/fitScale";
-export { resolveLineWidthPx, resolveLineDashPx, resolveRadiusPx, resolveCornerRadiusPx } from "./utils/strokeStyle";
+export {
+    resolveLineWidthPx,
+    resolveLineDashPx,
+    resolveRadiusPx,
+    resolveCornerRadiusPx,
+    overlayLineStyle,
+    type OverlayableLineStyle,
+} from "./utils/strokeStyle";
 export { cornerArc } from "./utils/pathCorners";
 export { traceRoundedPath, traceCommands, type PathTraceTarget, type CommandTraceTarget } from "./utils/tracePath";
 export { roundedPolyline, roundedRing, ARC_SEGMENT_LENGTH } from "./utils/pathFlatten";

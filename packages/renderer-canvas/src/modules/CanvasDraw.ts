@@ -17,6 +17,7 @@ import {
     resolveLineWidthPx,
     resolveSizeWorld,
     resolveLineDashPx,
+    overlayLineStyle,
     resolveRadiusPx,
     resolveCornerRadiusPx,
     resolveOrigin,
@@ -214,14 +215,16 @@ export class CanvasDraw {
             const baseStroke = style?.strokeStyle ?? "#000000";
             ctx.strokeStyle = baseStroke;
 
-            const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, this.camera.scale));
+            const baseWidthPx = resolveLineWidthPx(style, this.camera.scale);
+            const resetAlpha = applyLineWidth(ctx, baseWidthPx);
             const baseDash = resolveLineDashPx(style, this.camera.scale);
             if (baseDash) ctx.setLineDash(baseDash);
 
             // Contiguous batching keeps the array's paint order (later items
-            // draw on top): undecorated runs share one stroke; a decorated
-            // item flushes the open run, strokes on its own with the merged
-            // style, and the next run starts fresh.
+            // draw on top): runs on the shared batch style share one stroke;
+            // an item with its own `style` or a styleOf decoration flushes
+            // the open run, strokes on its own with the merged style, and
+            // the next run starts fresh.
             let open = false;
             const flush = () => {
                 if (!open) return;
@@ -239,15 +242,28 @@ export class CanvasDraw {
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
 
                 const deco = styleOf?.(item);
-                if (deco) {
+                if (deco || item.style) {
                     flush();
-                    const merged = { ...style, ...deco };
+                    // Width resolves from the registration-time layers only
+                    // (call style + item.style) — the same layers hit testing
+                    // reads — so a width smuggled past the decoration types
+                    // (JS callers, non-literal returns) can never desync the
+                    // painted stroke from the hit corridor. Color and dash
+                    // take the full merge including the decoration.
+                    const registration = overlayLineStyle(style, item.style);
+                    const merged = overlayLineStyle(registration, deco);
                     ctx.strokeStyle = merged.strokeStyle ?? "#000000";
                     ctx.setLineDash(resolveLineDashPx(merged, this.camera.scale) ?? []);
+                    // Clear the batch's sub-pixel alpha before applying the
+                    // item width so the two cannot compound.
+                    resetAlpha();
+                    const resetItemAlpha = applyLineWidth(ctx, resolveLineWidthPx(registration, this.camera.scale));
                     ctx.beginPath();
                     ctx.moveTo(a.x, a.y);
                     ctx.lineTo(b.x, b.y);
                     ctx.stroke();
+                    resetItemAlpha();
+                    applyLineWidth(ctx, baseWidthPx);
                     ctx.strokeStyle = baseStroke;
                     ctx.setLineDash(baseDash ?? []);
                     continue;

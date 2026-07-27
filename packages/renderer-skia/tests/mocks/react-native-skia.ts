@@ -105,7 +105,16 @@ export function makeRecordingCanvas() {
             });
         },
         drawLine(x1: number, y1: number, x2: number, y2: number, paint: MockPaint) {
-            ops.push({ op: "line", x1, y1, x2, y2, strokeWidth: paint.strokeWidth, pathEffect: paint.pathEffect });
+            ops.push({
+                op: "line",
+                x1,
+                y1,
+                x2,
+                y2,
+                strokeWidth: paint.strokeWidth,
+                color: paint.color,
+                pathEffect: paint.pathEffect,
+            });
         },
         drawText(text: string, x: number, y: number, _paint: MockPaint, font: { size: number }) {
             ops.push({ op: "text", text, x, y, fontSize: font.size });
