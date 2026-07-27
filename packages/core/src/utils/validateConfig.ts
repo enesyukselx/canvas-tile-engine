@@ -85,7 +85,9 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
         ["maxHeight", config.size.maxHeight, false],
     ] as const;
     for (const [name, value, mustBeFinite] of sizeLimits) {
-        if (value === undefined) continue;
+        if (value === undefined) {
+            continue;
+        }
         if (typeof value !== "number" || Number.isNaN(value) || (mustBeFinite && !Number.isFinite(value))) {
             throw configError(`size.${name} must be a ${mustBeFinite ? "finite " : ""}number, got ${value}`);
         }

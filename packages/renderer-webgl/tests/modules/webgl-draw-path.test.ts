@@ -217,6 +217,8 @@ describe("smuggled decoration geometry", () => {
         // 4 sharp edges (no smuggled rounding densifying the outline), all
         // at the item width.
         expect(lines).toHaveLength(4);
-        for (const line of lines) expect(line.width).toBe(4);
+        for (const line of lines) {
+            expect(line.width).toBe(4);
+        }
     });
 });

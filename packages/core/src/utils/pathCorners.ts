@@ -33,7 +33,9 @@ const EPSILON = 1e-9;
  * corners: zero-length segments, collinear continuation, or a fold-back.
  */
 export function cornerArc(prev: Coords, v: Coords, next: Coords, radiusPx: number): CornerArc | null {
-    if (radiusPx <= EPSILON) return null;
+    if (radiusPx <= EPSILON) {
+        return null;
+    }
 
     const ax = prev.x - v.x;
     const ay = prev.y - v.y;
@@ -41,19 +43,25 @@ export function cornerArc(prev: Coords, v: Coords, next: Coords, radiusPx: numbe
     const by = next.y - v.y;
     const la = Math.hypot(ax, ay);
     const lb = Math.hypot(bx, by);
-    if (la <= EPSILON || lb <= EPSILON) return null;
+    if (la <= EPSILON || lb <= EPSILON) {
+        return null;
+    }
 
     const cos = Math.min(1, Math.max(-1, (ax * bx + ay * by) / (la * lb)));
     const theta = Math.acos(cos);
     // Straight continuation (no corner) or a fold-back (no room for an arc).
-    if (theta >= Math.PI - 1e-6 || theta <= 1e-6) return null;
+    if (theta >= Math.PI - 1e-6 || theta <= 1e-6) {
+        return null;
+    }
 
     const halfTan = Math.tan(theta / 2);
     // Tangent offset along each segment is r / tan(θ/2); cap it at half the
     // shorter segment so neighboring corners never overlap.
     const tMax = Math.min(la, lb) / 2;
     const radius = Math.min(radiusPx, tMax * halfTan);
-    if (radius <= EPSILON) return null;
+    if (radius <= EPSILON) {
+        return null;
+    }
 
     const t = radius / halfTan;
     const t1 = { x: v.x + (ax / la) * t, y: v.y + (ay / la) * t };
@@ -63,7 +71,9 @@ export function cornerArc(prev: Coords, v: Coords, next: Coords, radiusPx: numbe
     let bisX = ax / la + bx / lb;
     let bisY = ay / la + by / lb;
     const bisLen = Math.hypot(bisX, bisY);
-    if (bisLen <= EPSILON) return null;
+    if (bisLen <= EPSILON) {
+        return null;
+    }
     bisX /= bisLen;
     bisY /= bisLen;
     const center = {

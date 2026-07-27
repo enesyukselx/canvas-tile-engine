@@ -213,7 +213,9 @@ export class GLRenderer {
     // ─── Shapes ───
 
     drawShapes(shapes: ShapeInstance[]) {
-        if (shapes.length === 0) return;
+        if (shapes.length === 0) {
+            return;
+        }
         const gl = this.gl;
 
         const data = new Float32Array(shapes.length * 6 * SHAPE_FLOATS_PER_VERTEX);
@@ -287,7 +289,9 @@ export class GLRenderer {
     // ─── Lines ───
 
     drawLines(lines: LineInstance[]) {
-        if (lines.length === 0) return;
+        if (lines.length === 0) {
+            return;
+        }
         const gl = this.gl;
 
         const data = new Float32Array(lines.length * 6 * LINE_FLOATS_PER_VERTEX);
@@ -344,7 +348,9 @@ export class GLRenderer {
      * Reuses the line pipeline's program (positions + colors, no instancing).
      */
     private flatTriangles(data: Float32Array, vertexCount: number) {
-        if (vertexCount === 0) return;
+        if (vertexCount === 0) {
+            return;
+        }
         const gl = this.gl;
 
         gl.useProgram(this.line.program);
@@ -401,13 +407,23 @@ export class GLRenderer {
 
         for (const ring of rings) {
             const n = ring.length;
-            if (n < 3) continue;
+            if (n < 3) {
+                continue;
+            }
             anyRing = true;
             for (const p of ring) {
-                if (p.x < minX) minX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y > maxY) maxY = p.y;
+                if (p.x < minX) {
+                    minX = p.x;
+                }
+                if (p.y < minY) {
+                    minY = p.y;
+                }
+                if (p.x > maxX) {
+                    maxX = p.x;
+                }
+                if (p.y > maxY) {
+                    maxY = p.y;
+                }
             }
             // Fan triangles (anchor, v[i], v[i+1]); edges touching the anchor
             // form zero-area triangles elsewhere and contribute no winding.
@@ -436,8 +452,11 @@ export class GLRenderer {
 
         // Pass 2: cover the bbox where the stencil matches the rule.
         gl.colorMask(true, true, true, true);
-        if (evenOdd) gl.stencilFunc(gl.EQUAL, 1, 0x01);
-        else gl.stencilFunc(gl.NOTEQUAL, 0, 0xff);
+        if (evenOdd) {
+            gl.stencilFunc(gl.EQUAL, 1, 0x01);
+        } else {
+            gl.stencilFunc(gl.NOTEQUAL, 0, 0xff);
+        }
         gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
 
         const quad = new Float32Array(6 * LINE_FLOATS_PER_VERTEX);
@@ -470,7 +489,9 @@ export class GLRenderer {
      * items with the same texture grouped together. Paint order is preserved.
      */
     drawImages(items: ImageInstance[]) {
-        if (items.length === 0) return;
+        if (items.length === 0) {
+            return;
+        }
         const gl = this.gl;
 
         gl.useProgram(this.texture.program);
@@ -551,12 +572,16 @@ export class GLRenderer {
     getTexture(source: TexImageSource): WebGLTexture | null {
         const width = (source as { width?: number }).width ?? 0;
         const height = (source as { height?: number }).height ?? 0;
-        if (!width || !height) return null;
+        if (!width || !height) {
+            return null;
+        }
 
         const gl = this.gl;
         const existing = this.textures.get(source);
         if (existing) {
-            if (existing.width === width && existing.height === height) return existing.texture;
+            if (existing.width === width && existing.height === height) {
+                return existing.texture;
+            }
             gl.bindTexture(gl.TEXTURE_2D, existing.texture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
             existing.width = width;
@@ -565,7 +590,9 @@ export class GLRenderer {
         }
 
         const texture = gl.createTexture();
-        if (!texture) return null;
+        if (!texture) {
+            return null;
+        }
 
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -581,7 +608,9 @@ export class GLRenderer {
     /** Drop the cached texture for a source so the next draw re-uploads its pixels. */
     invalidateTexture(source: TexImageSource) {
         const entry = this.textures.get(source);
-        if (!entry) return;
+        if (!entry) {
+            return;
+        }
         this.gl.deleteTexture(entry.texture);
         this.textures.delete(source);
     }
@@ -604,20 +633,26 @@ export class GLRenderer {
     // ─── Internal helpers ───
 
     private enableAttrib(location: number, size: number, stride: number, offset: number) {
-        if (location < 0) return;
+        if (location < 0) {
+            return;
+        }
         const gl = this.gl;
         gl.enableVertexAttribArray(location);
         gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset);
     }
 
     private disableAttrib(location: number) {
-        if (location < 0) return;
+        if (location < 0) {
+            return;
+        }
         this.gl.disableVertexAttribArray(location);
     }
 
     private createBuffer(): WebGLBuffer {
         const buffer = this.gl.createBuffer();
-        if (!buffer) throw new Error("WebGL: failed to create vertex buffer");
+        if (!buffer) {
+            throw new Error("WebGL: failed to create vertex buffer");
+        }
         return buffer;
     }
 
@@ -627,7 +662,9 @@ export class GLRenderer {
         const fragment = this.compileShader(gl.FRAGMENT_SHADER, fragmentSource);
 
         const program = gl.createProgram();
-        if (!program) throw new Error("WebGL: failed to create program");
+        if (!program) {
+            throw new Error("WebGL: failed to create program");
+        }
 
         gl.attachShader(program, vertex);
         gl.attachShader(program, fragment);
@@ -649,7 +686,9 @@ export class GLRenderer {
     private compileShader(type: number, source: string): WebGLShader {
         const gl = this.gl;
         const shader = gl.createShader(type);
-        if (!shader) throw new Error("WebGL: failed to create shader");
+        if (!shader) {
+            throw new Error("WebGL: failed to create shader");
+        }
 
         gl.shaderSource(shader, source);
         gl.compileShader(shader);

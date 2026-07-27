@@ -117,7 +117,9 @@ describe("CanvasTileEngine remount with key", () => {
         function ImperativeHarness({ renderer, engineKey }: { renderer: IRenderer; engineKey: string }) {
             const engine = useCanvasTileEngine();
             useEffect(() => {
-                if (!engine.instance) return;
+                if (!engine.instance) {
+                    return;
+                }
                 engine.drawRect(TILES, 1);
             }, [engine, engine.instance]);
             return <CanvasTileEngine key={engineKey} engine={engine} config={CONFIG} renderer={renderer} />;

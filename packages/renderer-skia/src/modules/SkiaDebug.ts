@@ -53,7 +53,9 @@ export class SkiaDebug {
      * Start FPS monitoring loop
      */
     startFpsLoop() {
-        if (this.fpsLoopRunning) return;
+        if (this.fpsLoopRunning) {
+            return;
+        }
         this.fpsLoopRunning = true;
         this.lastFrameTime = performance.now();
         this.fpsLoop();
@@ -67,7 +69,9 @@ export class SkiaDebug {
     }
 
     private fpsLoop() {
-        if (!this.fpsLoopRunning) return;
+        if (!this.fpsLoopRunning) {
+            return;
+        }
 
         const now = performance.now();
         const delta = now - this.lastFrameTime;

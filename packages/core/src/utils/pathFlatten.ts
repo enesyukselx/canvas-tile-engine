@@ -31,13 +31,18 @@ function emitArc(out: Coords[], arc: CornerArc, maxSegment: number): void {
  * `maxSegment` share one unit (pixels or world).
  */
 export function roundedPolyline(points: Coords[], radius: number, maxSegment: number = ARC_SEGMENT_LENGTH): Coords[] {
-    if (radius <= 0 || points.length < 3) return points;
+    if (radius <= 0 || points.length < 3) {
+        return points;
+    }
 
     const out: Coords[] = [points[0]];
     for (let i = 1; i < points.length - 1; i++) {
         const arc = cornerArc(points[i - 1], points[i], points[i + 1], radius);
-        if (arc) emitArc(out, arc, maxSegment);
-        else out.push(points[i]);
+        if (arc) {
+            emitArc(out, arc, maxSegment);
+        } else {
+            out.push(points[i]);
+        }
     }
     out.push(points[points.length - 1]);
     return out;
@@ -50,14 +55,19 @@ export function roundedPolyline(points: Coords[], radius: number, maxSegment: nu
  * to the first.
  */
 export function roundedRing(points: Coords[], radius: number, maxSegment: number = ARC_SEGMENT_LENGTH): Coords[] {
-    if (radius <= 0 || points.length < 3) return points;
+    if (radius <= 0 || points.length < 3) {
+        return points;
+    }
 
     const n = points.length;
     const out: Coords[] = [];
     for (let i = 0; i < n; i++) {
         const arc = cornerArc(points[(i - 1 + n) % n], points[i], points[(i + 1) % n], radius);
-        if (arc) emitArc(out, arc, maxSegment);
-        else out.push(points[i]);
+        if (arc) {
+            emitArc(out, arc, maxSegment);
+        } else {
+            out.push(points[i]);
+        }
     }
     return out;
 }

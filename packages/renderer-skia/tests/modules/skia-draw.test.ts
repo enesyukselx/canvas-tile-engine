@@ -3,12 +3,7 @@ import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
 import { SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "../../src/modules/Layer";
-import {
-    colorParseCalls,
-    makeRecordingCanvas,
-    matchFontCalls,
-    type MockPicture,
-} from "../mocks/react-native-skia";
+import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
 
 interface Op {
     op: string;
@@ -125,10 +120,7 @@ describe("text rendering", () => {
     it("uses the exact (unrounded) scaled font size", () => {
         const { draw, render } = setup(11.5);
         const { canvas, ops } = makeCanvas();
-        draw.drawText(
-            { x: 1, y: 1, size: 1, text: "hi", style: { fillStyle: "#000" } },
-            2,
-        );
+        draw.drawText({ x: 1, y: 1, size: 1, text: "hi", style: { fillStyle: "#000" } }, 2);
         render(canvas);
 
         const textOp = ops.find((o) => o.op === "text");
@@ -185,9 +177,7 @@ describe("text rendering", () => {
             );
             render(canvas);
 
-            const sizes = ops
-                .filter((o) => o.op === "text")
-                .map((o) => o.fontSize);
+            const sizes = ops.filter((o) => o.op === "text").map((o) => o.fontSize);
             expect(sizes).toEqual([14, 14]);
         }
     });
@@ -281,18 +271,11 @@ describe("image opacity", () => {
         const { draw, render } = setup();
         const { canvas, ops } = makeCanvas();
 
-        draw.drawStaticImage(
-            [{ x: 1, y: 1, img: fakeImage, opacity: 0.5 }],
-            "cache-img-opacity",
-            1,
-        );
+        draw.drawStaticImage([{ x: 1, y: 1, img: fakeImage, opacity: 0.5 }], "cache-img-opacity", 1);
         render(canvas);
 
-        const picture = ops.find((o) => o.op === "picture")
-            ?.picture as MockPicture;
-        const alphas = picture.ops
-            .filter((o) => o.op === "image")
-            .map((o) => (o as Op).alpha);
+        const picture = ops.find((o) => o.op === "picture")?.picture as MockPicture;
+        const alphas = picture.ops.filter((o) => o.op === "image").map((o) => (o as Op).alpha);
         expect(alphas).toEqual([0.5]);
     });
 });
@@ -325,19 +308,14 @@ describe("static picture cache", () => {
         const dynamicCanvas = makeCanvas();
         dynamic.draw.drawRect(items, 1);
         dynamic.render(dynamicCanvas.canvas);
-        const dynamicRects = dynamicCanvas.ops
-            .filter((o) => o.op === "rect")
-            .map((o) => o.rect);
+        const dynamicRects = dynamicCanvas.ops.filter((o) => o.op === "rect").map((o) => o.rect);
 
         const stat = setup();
         const staticCanvas = makeCanvas();
         stat.draw.drawStaticRect(items, "cache-b", 1);
         stat.render(staticCanvas.canvas);
-        const picture = staticCanvas.ops.find((o) => o.op === "picture")
-            ?.picture as MockPicture;
-        const staticRects = picture.ops
-            .filter((o) => o.op === "rect")
-            .map((o) => o.rect);
+        const picture = staticCanvas.ops.find((o) => o.op === "picture")?.picture as MockPicture;
+        const staticRects = picture.ops.filter((o) => o.op === "rect").map((o) => o.rect);
 
         expect(staticRects).toEqual(dynamicRects);
     });
@@ -373,9 +351,7 @@ describe("static picture cache", () => {
         draw.drawStaticRect(items, "cache-d", 1);
         render(canvas);
 
-        const pictures = ops
-            .filter((o) => o.op === "picture")
-            .map((o) => o.picture);
+        const pictures = ops.filter((o) => o.op === "picture").map((o) => o.picture);
         expect(pictures).toHaveLength(3);
         expect(pictures[1]).toBe(pictures[0]);
         expect(pictures[2]).not.toBe(pictures[0]);
@@ -518,7 +494,7 @@ describe("per-item line style", () => {
                 { from: { x: 0, y: 2 }, to: { x: 1, y: 2 } },
             ],
             { strokeStyle: "#00f", lineWidthPx: 2 },
-            1
+            1,
         );
         render(canvas);
 
@@ -538,7 +514,7 @@ describe("per-item line style", () => {
                 { from: { x: 0, y: 1 }, to: { x: 1, y: 1 } },
             ],
             { strokeStyle: "#00f" },
-            1
+            1,
         );
         render(canvas);
 

@@ -39,10 +39,14 @@ export class ImageLoaderServer implements IImageLoader<Image> {
      */
     async load(src: string, retry: number = DEFAULT_IMAGE_LOAD_RETRY_COUNT): Promise<Image> {
         const cached = this.cache.get(src);
-        if (cached) return cached;
+        if (cached) {
+            return cached;
+        }
 
         const pending = this.inflight.get(src);
-        if (pending) return pending;
+        if (pending) {
+            return pending;
+        }
 
         const task = (async () => {
             let lastError: unknown;

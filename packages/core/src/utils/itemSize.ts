@@ -11,7 +11,9 @@ export interface SizedItem {
 
 /** Effective drawn size in screen pixels. `sizePx` wins; else `size * scale`; default 1 world unit. */
 export function resolveSizePx(item: SizedItem, scale: number): number {
-    if (item.sizePx !== undefined) return item.sizePx;
+    if (item.sizePx !== undefined) {
+        return item.sizePx;
+    }
     return (item.size ?? 1) * scale;
 }
 
@@ -21,6 +23,8 @@ export function resolveSizePx(item: SizedItem, scale: number): number {
  * queries must re-evaluate this per frame instead of caching it.
  */
 export function resolveSizeWorld(item: SizedItem, scale: number): number {
-    if (item.sizePx !== undefined) return item.sizePx / scale;
+    if (item.sizePx !== undefined) {
+        return item.sizePx / scale;
+    }
     return item.size ?? 1;
 }

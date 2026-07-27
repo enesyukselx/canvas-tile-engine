@@ -32,7 +32,9 @@ export class Layer {
     add(layer: number, fn: DrawCallback): DrawHandle {
         const id = Symbol("layer-callback");
         const entry = { id, fn };
-        if (!this.layers.has(layer)) this.layers.set(layer, []);
+        if (!this.layers.has(layer)) {
+            this.layers.set(layer, []);
+        }
         this.layers.get(layer)!.push(entry);
         return { layer, id };
     }
@@ -43,7 +45,9 @@ export class Layer {
      */
     remove(handle: DrawHandle) {
         const list = this.layers.get(handle.layer);
-        if (!list) return;
+        if (!list) {
+            return;
+        }
         this.layers.set(
             handle.layer,
             list.filter((entry) => entry.id !== handle.id),
@@ -70,7 +74,9 @@ export class Layer {
         const keys = [...this.layers.keys()].sort((a, b) => a - b);
         for (const layer of keys) {
             const fns = this.layers.get(layer);
-            if (!fns) continue;
+            if (!fns) {
+                continue;
+            }
             for (const { fn } of fns) {
                 dc.ctx.save();
                 fn(dc);

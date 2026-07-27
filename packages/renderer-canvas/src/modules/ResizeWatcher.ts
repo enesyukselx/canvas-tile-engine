@@ -111,8 +111,12 @@ export class ResizeWatcher {
 
     private clamp(value: number, min?: number, max?: number) {
         let result = value;
-        if (min !== undefined) result = Math.max(min, result);
-        if (max !== undefined) result = Math.min(max, result);
+        if (min !== undefined) {
+            result = Math.max(min, result);
+        }
+        if (max !== undefined) {
+            result = Math.min(max, result);
+        }
         return result;
     }
 

@@ -151,7 +151,9 @@ export class CanvasDraw {
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                    continue;
+                }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxW = w * this.camera.scale;
@@ -218,7 +220,9 @@ export class CanvasDraw {
             const baseWidthPx = resolveLineWidthPx(style, this.camera.scale);
             const resetAlpha = applyLineWidth(ctx, baseWidthPx);
             const baseDash = resolveLineDashPx(style, this.camera.scale);
-            if (baseDash) ctx.setLineDash(baseDash);
+            if (baseDash) {
+                ctx.setLineDash(baseDash);
+            }
 
             // Contiguous batching keeps the array's paint order (later items
             // draw on top): runs on the shared batch style share one stroke;
@@ -227,7 +231,9 @@ export class CanvasDraw {
             // the next run starts fresh.
             let open = false;
             const flush = () => {
-                if (!open) return;
+                if (!open) {
+                    return;
+                }
                 ctx.stroke();
                 open = false;
             };
@@ -236,7 +242,9 @@ export class CanvasDraw {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                    continue;
+                }
 
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
@@ -322,7 +330,9 @@ export class CanvasDraw {
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                    continue;
+                }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
@@ -376,13 +386,17 @@ export class CanvasDraw {
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                    continue;
+                }
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
                 ctx.font = `${pxSize}px ${family}`;
 
-                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+                if (style?.fillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                }
                 ctx.textAlign = style?.textAlign ?? "center";
                 ctx.textBaseline = style?.textBaseline ?? "middle";
 
@@ -413,18 +427,30 @@ export class CanvasDraw {
         // Conservative world bounds per item for culling, computed once:
         // control-point hull for command paths, vertex bounds for polylines.
         const itemBounds = items.map((item) => {
-            if (item.commands !== undefined) return pathCommandsBounds(item.commands);
+            if (item.commands !== undefined) {
+                return pathCommandsBounds(item.commands);
+            }
             const points = item.points;
-            if (!points || points.length < 2) return null;
+            if (!points || points.length < 2) {
+                return null;
+            }
             let minX = Infinity;
             let minY = Infinity;
             let maxX = -Infinity;
             let maxY = -Infinity;
             for (const p of points) {
-                if (p.x < minX) minX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y > maxY) maxY = p.y;
+                if (p.x < minX) {
+                    minX = p.x;
+                }
+                if (p.y < minY) {
+                    minY = p.y;
+                }
+                if (p.x > maxX) {
+                    maxX = p.x;
+                }
+                if (p.y > maxY) {
+                    maxY = p.y;
+                }
             }
             return { minX, minY, maxX, maxY };
         });
@@ -433,12 +459,16 @@ export class CanvasDraw {
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
-                if (!bounds) continue;
+                if (!bounds) {
+                    continue;
+                }
 
                 const centerX = (bounds.minX + bounds.maxX) / 2;
                 const centerY = (bounds.minY + bounds.maxY) / 2;
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                    continue;
+                }
 
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
@@ -475,14 +505,18 @@ export class CanvasDraw {
                 // A fill-only item draws no outline; everything else strokes
                 // (defaulting to a hairline, matching the legacy behavior).
                 if (style?.strokeStyle !== undefined || !filled) {
-                    if (style?.strokeStyle) ctx.strokeStyle = style.strokeStyle;
+                    if (style?.strokeStyle) {
+                        ctx.strokeStyle = style.strokeStyle;
+                    }
                     // Stroke width from item.style, not the decorated merge:
                     // hit testing reads the registration-time style, and the
                     // decoration types' width exclusion is only type-level —
                     // a smuggled width must not desync paint from hit.
                     const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(item.style, this.camera.scale));
                     const dash = resolveLineDashPx(style, this.camera.scale);
-                    if (dash) ctx.setLineDash(dash);
+                    if (dash) {
+                        ctx.setLineDash(dash);
+                    }
                     ctx.stroke();
                     resetAlpha?.();
                 }
@@ -504,13 +538,17 @@ export class CanvasDraw {
         dh: number,
         opacity: number = 1,
     ) {
-        if (opacity !== 1) ctx.globalAlpha = opacity;
+        if (opacity !== 1) {
+            ctx.globalAlpha = opacity;
+        }
         if (sprite) {
             ctx.drawImage(img, sprite.x, sprite.y, sprite.w, sprite.h, dx, dy, dw, dh);
         } else {
             ctx.drawImage(img, dx, dy, dw, dh);
         }
-        if (opacity !== 1) ctx.globalAlpha = 1;
+        if (opacity !== 1) {
+            ctx.globalAlpha = 1;
+        }
     }
 
     drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
@@ -541,7 +579,9 @@ export class CanvasDraw {
                 const origin = resolveOrigin(item.origin);
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                    continue;
+                }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
@@ -554,8 +594,11 @@ export class CanvasDraw {
                 let drawW = pxSize;
                 let drawH = pxSize;
 
-                if (aspect > 1) drawH = pxSize / aspect;
-                else drawW = pxSize * aspect;
+                if (aspect > 1) {
+                    drawH = pxSize / aspect;
+                } else {
+                    drawW = pxSize * aspect;
+                }
 
                 // origin SELF/CELL
                 const { x: baseX, y: baseY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
@@ -575,10 +618,14 @@ export class CanvasDraw {
                     const centerY = offsetY + drawH / 2;
                     ctx.save();
                     ctx.translate(centerX, centerY);
-                    if (rotationDeg !== 0) ctx.rotate(rotation);
+                    if (rotationDeg !== 0) {
+                        ctx.rotate(rotation);
+                    }
                     // Innermost transform: the image is mirrored first, then
                     // the mirrored image rotates.
-                    if (flipX || flipY) ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+                    if (flipX || flipY) {
+                        ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+                    }
                     this.blitImage(ctx, item.img, item.sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
                     ctx.restore();
                 } else {
@@ -646,13 +693,19 @@ export class CanvasDraw {
             | undefined,
         scale: number,
     ) {
-        if (style?.fillStyle) ctx.fill();
+        if (style?.fillStyle) {
+            ctx.fill();
+        }
         if (style?.strokeStyle) {
             const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, scale));
             const dash = resolveLineDashPx(style, scale);
-            if (dash) ctx.setLineDash(dash);
+            if (dash) {
+                ctx.setLineDash(dash);
+            }
             ctx.stroke();
-            if (dash) ctx.setLineDash([]);
+            if (dash) {
+                ctx.setLineDash([]);
+            }
             resetAlpha();
         }
     }
@@ -705,10 +758,18 @@ export class CanvasDraw {
             const size = item.size ?? 1;
             const w = item.width ?? size;
             const h = item.height ?? size;
-            if (item.x - w / 2 < minX) minX = item.x - w / 2;
-            if (item.x + w / 2 > maxX) maxX = item.x + w / 2;
-            if (item.y - h / 2 < minY) minY = item.y - h / 2;
-            if (item.y + h / 2 > maxY) maxY = item.y + h / 2;
+            if (item.x - w / 2 < minX) {
+                minX = item.x - w / 2;
+            }
+            if (item.x + w / 2 > maxX) {
+                maxX = item.x + w / 2;
+            }
+            if (item.y - h / 2 < minY) {
+                minY = item.y - h / 2;
+            }
+            if (item.y + h / 2 > maxY) {
+                maxY = item.y + h / 2;
+            }
         }
 
         // Add padding
@@ -974,8 +1035,11 @@ export class CanvasDraw {
             let drawW = pxSize;
             let drawH = pxSize;
 
-            if (aspect > 1) drawH = pxSize / aspect;
-            else drawW = pxSize * aspect;
+            if (aspect > 1) {
+                drawH = pxSize / aspect;
+            } else {
+                drawW = pxSize * aspect;
+            }
 
             // x, y are top-left of pxSize box, need to center image within it
             const imgX = x + (pxSize - drawW) / 2;
@@ -986,10 +1050,14 @@ export class CanvasDraw {
                 const centerY = imgY + drawH / 2;
                 ctx.save();
                 ctx.translate(centerX, centerY);
-                if (rotationDeg !== 0) ctx.rotate(rotation);
+                if (rotationDeg !== 0) {
+                    ctx.rotate(rotation);
+                }
                 // Flip is scale-independent, so unlike sizePx it is honored
                 // in static caches too (mirrored first, rotation second).
-                if (flipX || flipY) ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+                if (flipX || flipY) {
+                    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+                }
                 this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
                 ctx.restore();
             } else {

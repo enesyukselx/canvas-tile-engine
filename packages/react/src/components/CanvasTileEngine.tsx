@@ -118,7 +118,9 @@ function CanvasTileEngineBase({
     // in the same frame will trigger only one render
     const rafIdRef = useRef<number | null>(null);
     const requestRender = useCallback(() => {
-        if (rafIdRef.current !== null) return;
+        if (rafIdRef.current !== null) {
+            return;
+        }
         rafIdRef.current = requestAnimationFrame(() => {
             rafIdRef.current = null;
             engine.render();

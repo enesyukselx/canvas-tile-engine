@@ -26,12 +26,16 @@ export function distToSegmentSq(p: Coords, a: Coords, b: Coords): number {
  * Returns `Infinity` for fewer than 2 points.
  */
 export function distanceToPolyline(p: Coords, points: Coords[], closed: boolean): number {
-    if (points.length < 2) return Infinity;
+    if (points.length < 2) {
+        return Infinity;
+    }
     let best = Infinity;
     const last = closed ? points.length : points.length - 1;
     for (let i = 0; i < last; i++) {
         const d = distToSegmentSq(p, points[i], points[(i + 1) % points.length]);
-        if (d < best) best = d;
+        if (d < best) {
+            best = d;
+        }
     }
     return Math.sqrt(best);
 }
@@ -64,7 +68,9 @@ function ringCrossings(p: Coords, points: Coords[]): { winding: number; crossing
  * this with a stroke-distance test so boundaries stay hittable.
  */
 export function pointInRing(p: Coords, points: Coords[], fillRule: "nonzero" | "evenodd" = "nonzero"): boolean {
-    if (points.length < 3) return false;
+    if (points.length < 3) {
+        return false;
+    }
     const { winding, crossings } = ringCrossings(p, points);
     return fillRule === "evenodd" ? crossings % 2 === 1 : winding !== 0;
 }
@@ -80,7 +86,9 @@ export function pointInRings(p: Coords, rings: Coords[][], fillRule: "nonzero" |
     let winding = 0;
     let crossings = 0;
     for (const ring of rings) {
-        if (ring.length < 3) continue;
+        if (ring.length < 3) {
+            continue;
+        }
         const c = ringCrossings(p, ring);
         winding += c.winding;
         crossings += c.crossings;
@@ -102,7 +110,9 @@ export function pointInRect(p: Coords, r: RectRegion): boolean {
 
 /** Whether the segment `a`-`b` touches the rectangle (endpoints included). */
 export function segmentIntersectsRect(a: Coords, b: Coords, r: RectRegion): boolean {
-    if (pointInRect(a, r) || pointInRect(b, r)) return true;
+    if (pointInRect(a, r) || pointInRect(b, r)) {
+        return true;
+    }
     // Liang-Barsky style clipping: track the parameter window [t0, t1] of the
     // segment against each slab; the window surviving all four means overlap.
     const dx = b.x - a.x;
@@ -110,14 +120,24 @@ export function segmentIntersectsRect(a: Coords, b: Coords, r: RectRegion): bool
     let t0 = 0;
     let t1 = 1;
     const clip = (p: number, q: number): boolean => {
-        if (p === 0) return q >= 0;
+        if (p === 0) {
+            return q >= 0;
+        }
         const t = q / p;
         if (p < 0) {
-            if (t > t1) return false;
-            if (t > t0) t0 = t;
+            if (t > t1) {
+                return false;
+            }
+            if (t > t0) {
+                t0 = t;
+            }
         } else {
-            if (t < t0) return false;
-            if (t < t1) t1 = t;
+            if (t < t0) {
+                return false;
+            }
+            if (t < t1) {
+                t1 = t;
+            }
         }
         return true;
     };
@@ -130,10 +150,14 @@ export function segmentIntersectsRect(a: Coords, b: Coords, r: RectRegion): bool
  * rect corner for filled shapes, so holes stay excluded correctly.
  */
 export function ringIntersectsRect(ring: Coords[], r: RectRegion, closed: boolean = true): boolean {
-    if (ring.length === 1) return pointInRect(ring[0], r);
+    if (ring.length === 1) {
+        return pointInRect(ring[0], r);
+    }
     const last = closed ? ring.length : ring.length - 1;
     for (let i = 0; i < last; i++) {
-        if (segmentIntersectsRect(ring[i], ring[(i + 1) % ring.length], r)) return true;
+        if (segmentIntersectsRect(ring[i], ring[(i + 1) % ring.length], r)) {
+            return true;
+        }
     }
     return false;
 }

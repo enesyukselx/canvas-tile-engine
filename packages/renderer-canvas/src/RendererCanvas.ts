@@ -78,56 +78,72 @@ export class RendererCanvas implements IRenderer {
         return this.gestureProcessor?.onClick;
     }
     set onClick(cb: onClickCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onClick = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onClick = cb;
+        }
     }
 
     get onRightClick(): onRightClickCallback | undefined {
         return this.gestureProcessor?.onRightClick;
     }
     set onRightClick(cb: onRightClickCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onRightClick = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onRightClick = cb;
+        }
     }
 
     get onHover(): onHoverCallback | undefined {
         return this.gestureProcessor?.onHover;
     }
     set onHover(cb: onHoverCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onHover = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onHover = cb;
+        }
     }
 
     get onMouseDown(): onMouseDownCallback | undefined {
         return this.gestureProcessor?.onMouseDown;
     }
     set onMouseDown(cb: onMouseDownCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseDown = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseDown = cb;
+        }
     }
 
     get onMouseUp(): onMouseUpCallback | undefined {
         return this.gestureProcessor?.onMouseUp;
     }
     set onMouseUp(cb: onMouseUpCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseUp = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseUp = cb;
+        }
     }
 
     get onMouseLeave(): onMouseLeaveCallback | undefined {
         return this.gestureProcessor?.onMouseLeave;
     }
     set onMouseLeave(cb: onMouseLeaveCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseLeave = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseLeave = cb;
+        }
     }
 
     get onZoom(): onZoomCallback | undefined {
         return this.gestureProcessor?.onZoom;
     }
     set onZoom(cb: onZoomCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onZoom = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onZoom = cb;
+        }
     }
 
     get onWheel(): onWheelCallback | undefined {
         return this.gestureProcessor?.onWheel;
     }
     set onWheel(cb: onWheelCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onWheel = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onWheel = cb;
+        }
     }
 
     /** Callback fired when camera position changes (drag/zoom). */
@@ -220,7 +236,9 @@ export class RendererCanvas implements IRenderer {
     // ─── Event Setup ───
 
     setupEvents(): void {
-        if (this.eventsAttached) return;
+        if (this.eventsAttached) {
+            return;
+        }
         this.eventBinder.attach();
         this.eventsAttached = true;
 
@@ -296,7 +314,9 @@ export class RendererCanvas implements IRenderer {
     private handleContextMenu = (e: MouseEvent): void => {
         // Claim the event only when right-click handling is opted into;
         // otherwise the browser context menu must keep working.
-        if (!this.config.get().eventHandlers.rightClick) return;
+        if (!this.config.get().eventHandlers.rightClick) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleRightClick(this.normalizePointer(e));
     };
@@ -305,7 +325,9 @@ export class RendererCanvas implements IRenderer {
         // Primary button only: the right button belongs to the context-menu
         // path (onRightClick) and the middle button to the browser
         // (autoscroll) — neither should start a drag or fire onMouseDown.
-        if (e.button !== 0) return;
+        if (e.button !== 0) {
+            return;
+        }
         this.gestureProcessor.handlePointerDown(this.normalizePointer(e));
     };
 
@@ -316,7 +338,9 @@ export class RendererCanvas implements IRenderer {
     private handleMouseUp = (e: MouseEvent): void => {
         // Primary button only, so releasing a secondary button mid-drag
         // does not end the primary-button drag or fire onMouseUp.
-        if (e.button !== 0) return;
+        if (e.button !== 0) {
+            return;
+        }
         this.gestureProcessor.handlePointerUp(this.normalizePointer(e));
     };
 
@@ -326,7 +350,9 @@ export class RendererCanvas implements IRenderer {
 
     private handleWheel = (e: WheelEvent): void => {
         // Without zoom opted in, the wheel must keep scrolling the page.
-        if (!this.config.get().eventHandlers.zoom) return;
+        if (!this.config.get().eventHandlers.zoom) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleWheel(this.normalizePointer(e), e.deltaY);
     };
@@ -344,13 +370,17 @@ export class RendererCanvas implements IRenderer {
     }
 
     private handleTouchStart = (e: TouchEvent): void => {
-        if (!this.touchInteractionsEnabled()) return;
+        if (!this.touchInteractionsEnabled()) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.touches));
     };
 
     private handleTouchMove = (e: TouchEvent): void => {
-        if (!this.touchInteractionsEnabled()) return;
+        if (!this.touchInteractionsEnabled()) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.touches));
     };

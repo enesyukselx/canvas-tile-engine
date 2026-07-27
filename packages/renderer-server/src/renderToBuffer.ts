@@ -48,7 +48,9 @@ export async function renderToBuffer(options: RenderToBufferOptions): Promise<Bu
     const engine = new CanvasTileEngine<ServerMount, Image>(SERVER_MOUNT, config, renderer, center);
 
     try {
-        if (draw) await draw(engine);
+        if (draw) {
+            await draw(engine);
+        }
         engine.render();
         return await renderer.encode(format, quality);
     } finally {

@@ -142,7 +142,9 @@ export class GestureProcessor {
      * state (matching onZoom, which reports the new scale).
      */
     private notifyWheel(pointer: NormalizedPointer, deltaY: number, source: "wheel" | "pinch"): void {
-        if (!this.onWheel || deltaY === 0) return;
+        if (!this.onWheel || deltaY === 0) {
+            return;
+        }
         const { coords, mouse, client } = this.processCoords(pointer);
         this.onWheel(coords, mouse, client, {
             deltaY,
@@ -259,7 +261,9 @@ export class GestureProcessor {
             return;
         }
 
-        if (pointers.length !== 1) return;
+        if (pointers.length !== 1) {
+            return;
+        }
         const pointer = pointers[0];
 
         // Fire onMouseDown callback for touch
@@ -397,7 +401,9 @@ export class GestureProcessor {
 
     handleWheel = (pointer: NormalizedPointer, deltaY: number): void => {
         const zoom = this.config.get().eventHandlers.zoom;
-        if (!zoom) return;
+        if (!zoom) {
+            return;
+        }
         const bounds = this.canvasBoundsGetter();
         const anchor =
             zoom === "center"
