@@ -21,13 +21,19 @@ export interface PathProps {
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     styleOf?: StyleOf<PathItem<any>, PathDecorationStyle>;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content like
+     * zone overlays. Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
  * Draws free-form paths: open or closed polylines, filled shapes with a fill
  * rule, per-item stroke/dash/corner styling, and hit-testable geometry.
  */
-export const Path = memo(function Path({ items, layer = 1, styleOf }: PathProps) {
+export const Path = memo(function Path({ items, layer = 1, styleOf, hitTest }: PathProps) {
     const { engine, requestRender } = useEngineContext();
 
     // Read through a ref so styleOf identity changes never re-register.
@@ -41,7 +47,7 @@ export const Path = memo(function Path({ items, layer = 1, styleOf }: PathProps)
     }, [styleOf, requestRender]);
 
     useEffect(() => {
-        const handle = engine.drawPath(items, layer, { styleOf: (item) => styleOfRef.current?.(item) });
+        const handle = engine.drawPath(items, layer, { styleOf: (item) => styleOfRef.current?.(item), hitTest });
         requestRender();
         return () => {
             if (handle) {
@@ -51,7 +57,7 @@ export const Path = memo(function Path({ items, layer = 1, styleOf }: PathProps)
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender]);
+    }, [engine, items, layer, hitTest, requestRender]);
 
     return null;
 });

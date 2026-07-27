@@ -19,6 +19,8 @@ import {
     resolveLineDashPx,
     resolveRadiusPx,
     resolveCornerRadiusPx,
+    resolveOrigin,
+    computeOriginOffset,
     traceRoundedPath,
     traceCommands,
     pathCommandsBounds,
@@ -143,11 +145,7 @@ export class CanvasDraw {
                 const size = item.size ?? 1;
                 const w = item.width ?? size;
                 const h = item.height ?? size;
-                const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
-                    x: item.origin?.x ?? 0.5,
-                    y: item.origin?.y ?? 0.5,
-                };
+                const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
@@ -157,7 +155,7 @@ export class CanvasDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxW = w * this.camera.scale;
                 const pxH = h * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
 
                 // Only update style when changed (reduces state changes)
                 if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
@@ -303,11 +301,7 @@ export class CanvasDraw {
             for (const item of visibleItems) {
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-                const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
-                    x: item.origin?.x ?? 0.5,
-                    y: item.origin?.y ?? 0.5,
-                };
+                const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
@@ -317,7 +311,7 @@ export class CanvasDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
                 const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: drawX, y: drawY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
 
                 // Only update style when changed
                 if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
@@ -528,11 +522,7 @@ export class CanvasDraw {
             for (const item of visibleItems) {
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-                const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
-                    x: item.origin?.x ?? 0.5,
-                    y: item.origin?.y ?? 0.5,
-                };
+                const origin = resolveOrigin(item.origin);
 
                 // Skip visibility check if using spatial index (already filtered)
                 if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
@@ -552,7 +542,7 @@ export class CanvasDraw {
                 else drawW = pxSize * aspect;
 
                 // origin SELF/CELL
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: baseX, y: baseY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
 
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
@@ -634,6 +624,8 @@ export class CanvasDraw {
                   strokeStyle?: string;
                   lineWidth?: number;
                   lineWidthPx?: number;
+                  lineDash?: number[];
+                  lineDashPx?: number[];
               }
             | undefined,
         scale: number,
@@ -641,30 +633,12 @@ export class CanvasDraw {
         if (style?.fillStyle) ctx.fill();
         if (style?.strokeStyle) {
             const resetAlpha = applyLineWidth(ctx, resolveLineWidthPx(style, scale));
+            const dash = resolveLineDashPx(style, scale);
+            if (dash) ctx.setLineDash(dash);
             ctx.stroke();
+            if (dash) ctx.setLineDash([]);
             resetAlpha();
         }
-    }
-
-    private computeOriginOffset(
-        pos: Coords,
-        pxW: number,
-        pxH: number,
-        origin: { mode: "cell" | "self"; x: number; y: number },
-        camera: ICamera,
-    ) {
-        if (origin.mode === "cell") {
-            const cell = camera.scale;
-            return {
-                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
-            };
-        }
-
-        return {
-            x: pos.x - origin.x * pxW,
-            y: pos.y - origin.y * pxH,
-        };
     }
 
     /**
@@ -787,17 +761,13 @@ export class CanvasDraw {
                 const size = item.size ?? 1;
                 const pxW = (item.width ?? size) * renderScale;
                 const pxH = (item.height ?? size) * renderScale;
-                const origin = {
-                    mode: item.origin?.mode === "self" ? "self" : ("cell" as "cell" | "self"),
-                    x: item.origin?.x ?? 0.5,
-                    y: item.origin?.y ?? 0.5,
-                };
+                const origin = resolveOrigin(item.origin);
                 // Cache-space equivalent of worldToScreen: cache pixel 0 is world minX.
                 const pos = {
                     x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
                     y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
                 };
-                const { x, y } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const { x, y } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
 
                 renderFn(offCtx, item, x, y, pxW, pxH);
             }

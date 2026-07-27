@@ -11,13 +11,19 @@ export interface StaticImageProps {
     items: ImageItem[];
     cacheKey: string;
     layer?: number;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content like
+     * terrain tiles. Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
  * Draws static images with caching for performance.
  * Ideal for terrain tiles or static decorations.
  */
-export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
+export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1, hitTest }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
     const prevItemsRef = useRef(items);
@@ -37,7 +43,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
         }
         prevItemsRef.current = items;
 
-        const handle = engine.drawStaticImage(items, cacheKey, layer);
+        const handle = engine.drawStaticImage(items, cacheKey, layer, { hitTest });
         requestRender();
 
         return () => {
@@ -48,7 +54,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
                 requestRender();
             }
         };
-    }, [engine, items, cacheKey, layer, requestRender]);
+    }, [engine, items, cacheKey, layer, hitTest, requestRender]);
 
     useEffect(() => {
         return () => {
