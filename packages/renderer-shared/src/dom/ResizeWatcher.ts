@@ -2,7 +2,7 @@ import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
 /**
  * Observes canvas resizing and keeps viewport/camera in sync.
- * Resizes both the WebGL canvas and the 2D overlay canvas.
+ * Resizes every managed canvas (renderers with an overlay pass both).
  * @internal
  */
 export class ResizeWatcher {
@@ -14,8 +14,7 @@ export class ResizeWatcher {
 
     constructor(
         private wrapper: HTMLDivElement,
-        private canvas: HTMLCanvasElement,
-        private overlay: HTMLCanvasElement,
+        private canvases: HTMLCanvasElement[],
         private viewport: ViewportState,
         private camera: ICamera,
         private config: Config,
@@ -25,14 +24,17 @@ export class ResizeWatcher {
     }
 
     start() {
+        // Ensure DPR is up to date before sizing
         this.viewport.updateDpr();
         this.currentDpr = this.viewport.dpr;
 
         const size = this.viewport.getSize();
+
         const configSize = this.config.get().size;
 
         const maxWidth = configSize?.maxWidth;
         const maxHeight = configSize?.maxHeight;
+
         const minWidth = configSize?.minWidth;
         const minHeight = configSize?.minHeight;
 
@@ -60,6 +62,7 @@ export class ResizeWatcher {
                 const prev = this.viewport.getSize();
 
                 if (width === prev.width && height === prev.height) {
+                    // No effective size change after clamping
                     continue;
                 }
 
@@ -101,8 +104,9 @@ export class ResizeWatcher {
         }
     }
 
+    /** Set canvas resolution (physical pixels for HiDPI) and CSS size (logical pixels). */
     private applyCanvasSize(width: number, height: number, dpr: number) {
-        for (const el of [this.canvas, this.overlay]) {
+        for (const el of this.canvases) {
             el.width = width * dpr;
             el.height = height * dpr;
             el.style.width = `${width}px`;
@@ -141,6 +145,7 @@ export class ResizeWatcher {
             this.currentDpr = nextDpr;
             const { width, height } = this.viewport.getSize();
 
+            // Update canvas resolution for new DPR while keeping logical size
             this.applyCanvasSize(width, height, nextDpr);
 
             if (this.onResize) {

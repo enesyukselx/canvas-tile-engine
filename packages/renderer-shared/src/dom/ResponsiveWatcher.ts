@@ -2,6 +2,7 @@ import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
 
 /**
  * Watches wrapper element size changes and handles responsive resizing.
+ * Resizes every managed canvas (renderers with an overlay pass both).
  * Supports two modes:
  * - "preserve-scale": Scale stays constant, visible tile count changes
  * - "preserve-viewport": Visible tile count stays constant, scale changes
@@ -26,7 +27,7 @@ export class ResponsiveWatcher {
 
     constructor(
         private wrapper: HTMLDivElement,
-        private canvas: HTMLCanvasElement,
+        private canvases: HTMLCanvasElement[],
         private camera: ICamera,
         private viewport: ViewportState,
         private config: Config,
@@ -162,16 +163,20 @@ export class ResponsiveWatcher {
             this.adaptMinScaleToBounds(width, height);
         }
 
-        // Update canvas resolution (physical pixels for HiDPI)
-        this.canvas.width = width * dpr;
-        this.canvas.height = height * dpr;
-
-        // Update canvas CSS size (logical pixels)
-        this.canvas.style.width = `${width}px`;
-        this.canvas.style.height = `${height}px`;
+        this.applyCanvasSize(width, height, dpr);
 
         if (this.camera.scale !== prevScale) {
             this.onScaleChange?.(this.camera.scale);
+        }
+    }
+
+    /** Set canvas resolution (physical pixels for HiDPI) and CSS size (logical pixels). */
+    private applyCanvasSize(width: number, height: number, dpr: number) {
+        for (const el of this.canvases) {
+            el.width = width * dpr;
+            el.height = height * dpr;
+            el.style.width = `${width}px`;
+            el.style.height = `${height}px`;
         }
     }
 
@@ -229,10 +234,7 @@ export class ResponsiveWatcher {
             const { width, height } = this.viewport.getSize();
 
             // Update canvas resolution for new DPR while keeping logical size
-            this.canvas.width = width * nextDpr;
-            this.canvas.height = height * nextDpr;
-            this.canvas.style.width = `${width}px`;
-            this.canvas.style.height = `${height}px`;
+            this.applyCanvasSize(width, height, nextDpr);
 
             this.onResize?.();
             this.onRender();

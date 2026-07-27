@@ -1,3 +1,7 @@
 // Browser plumbing shared by renderer-canvas and renderer-webgl.
-// Modules land here as they are extracted from the renderer packages.
-export {};
+export { EventBinder } from "./EventBinder";
+export { ImageLoader } from "./ImageLoader";
+export { SizeController } from "./SizeController";
+export { ResizeWatcher } from "./ResizeWatcher";
+export { ResponsiveWatcher } from "./ResponsiveWatcher";
+export { initStyles } from "./initStyles";

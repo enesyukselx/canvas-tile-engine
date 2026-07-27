@@ -1,5 +1,10 @@
 import { CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 
+/**
+ * Apply layout styles to the wrapper and the primary canvas. Shared by the
+ * Canvas2D and WebGL renderers so the two are drop-in interchangeable.
+ * @internal
+ */
 export function initStyles(
     canvasWrapper: HTMLDivElement,
     canvas: HTMLCanvasElement,
