@@ -7,6 +7,13 @@ import { FIXTURES_DIR, expectMatchesBaseline, makeTestImage } from "./helpers";
 // __baselines__/ and are committed; regenerate with UPDATE_SNAPSHOTS=1.
 // Scenes render through renderToBuffer, so they exercise the real engine +
 // shared canvas2d pipeline end to end.
+//
+// Note: the coordinate overlay is NOT snapshot-tested. It hardcodes the
+// Arial font family internally, and @napi-rs/canvas prefers the system font
+// over a registered alias of the same name — so its labels render with
+// different glyphs per platform (macOS has Arial, Linux CI does not) and can
+// never be deterministic. Snapshotting it needs a configurable overlay font
+// first.
 
 const base = {
     scale: 24,
@@ -243,19 +250,5 @@ describe("pixel snapshots", () => {
             },
         });
         expectMatchesBaseline("text", png);
-    });
-
-    it("overlays: coordinate overlay enabled", async () => {
-        const png = await renderToBuffer({
-            config: {
-                ...base,
-                coordinates: { enabled: true, shownScaleRange: { min: 1, max: 100 } },
-            },
-            draw: (engine) => {
-                engine.drawGridLines(1, 1, "#1e293b", 0);
-                engine.drawRect({ x: 0, y: 0, size: 2, style: { fillStyle: "#22c55e" } }, 1);
-            },
-        });
-        expectMatchesBaseline("coordinate-overlay", png);
     });
 });
