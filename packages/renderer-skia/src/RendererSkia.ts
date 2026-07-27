@@ -40,7 +40,6 @@ import { SkiaMount } from "./types";
  * and supplies the canvas via {@link SkiaMount.present}.
  */
 export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
-
     /** Transform helpers handed to the onDraw hook. */
     private drawTransform: DrawTransform = {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
@@ -83,56 +82,72 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         return this.gestureProcessor?.onClick;
     }
     set onClick(cb: onClickCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onClick = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onClick = cb;
+        }
     }
 
     get onRightClick(): onRightClickCallback | undefined {
         return this.gestureProcessor?.onRightClick;
     }
     set onRightClick(cb: onRightClickCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onRightClick = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onRightClick = cb;
+        }
     }
 
     get onHover(): onHoverCallback | undefined {
         return this.gestureProcessor?.onHover;
     }
     set onHover(cb: onHoverCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onHover = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onHover = cb;
+        }
     }
 
     get onMouseDown(): onMouseDownCallback | undefined {
         return this.gestureProcessor?.onMouseDown;
     }
     set onMouseDown(cb: onMouseDownCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseDown = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseDown = cb;
+        }
     }
 
     get onMouseUp(): onMouseUpCallback | undefined {
         return this.gestureProcessor?.onMouseUp;
     }
     set onMouseUp(cb: onMouseUpCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseUp = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseUp = cb;
+        }
     }
 
     get onMouseLeave(): onMouseLeaveCallback | undefined {
         return this.gestureProcessor?.onMouseLeave;
     }
     set onMouseLeave(cb: onMouseLeaveCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseLeave = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseLeave = cb;
+        }
     }
 
     get onZoom(): onZoomCallback | undefined {
         return this.gestureProcessor?.onZoom;
     }
     set onZoom(cb: onZoomCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onZoom = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onZoom = cb;
+        }
     }
 
     get onWheel(): onWheelCallback | undefined {
         return this.gestureProcessor?.onWheel;
     }
     set onWheel(cb: onWheelCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onWheel = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onWheel = cb;
+        }
     }
 
     init(deps: RendererDependencies<SkiaMount>): void {
@@ -172,7 +187,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
             },
             () => {
                 this.onCameraChange?.();
-            }
+            },
         );
 
         this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
@@ -267,7 +282,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
             () => {
                 this.onResize?.();
                 onComplete?.();
-            }
+            },
         );
     }
 

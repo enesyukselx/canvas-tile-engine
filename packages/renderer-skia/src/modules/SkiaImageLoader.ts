@@ -26,10 +26,14 @@ export class SkiaImageLoader implements IImageLoader<SkImage> {
 
     async load(src: string, retry: number = DEFAULT_IMAGE_LOAD_RETRY_COUNT): Promise<SkImage> {
         const cached = this.cache.get(src);
-        if (cached) return cached;
+        if (cached) {
+            return cached;
+        }
 
         const inflight = this.inflight.get(src);
-        if (inflight) return inflight;
+        if (inflight) {
+            return inflight;
+        }
 
         const task = this.decode(src, retry);
         this.inflight.set(src, task);

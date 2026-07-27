@@ -67,7 +67,9 @@ export class SpriteAnimator {
      */
     frameIndexAt(elapsedMs: number): number {
         const raw = Math.floor(Math.max(0, elapsedMs) / this.frameDurationMs);
-        if (this.loop) return raw % this.frames.length;
+        if (this.loop) {
+            return raw % this.frames.length;
+        }
         return Math.min(raw, this.frames.length - 1);
     }
 
@@ -91,12 +93,16 @@ export class SpriteAnimator {
 
         // Headless: no frame scheduling — leave the first frame applied.
         if (!canAnimate()) {
-            if (!this.loop) onComplete?.();
+            if (!this.loop) {
+                onComplete?.();
+            }
             return;
         }
 
         if (this.frames.length === 1) {
-            if (!this.loop) onComplete?.();
+            if (!this.loop) {
+                onComplete?.();
+            }
             return;
         }
 

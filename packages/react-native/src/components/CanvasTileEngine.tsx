@@ -178,7 +178,9 @@ function CanvasTileEngineBase({
     // same frame trigger only one render.
     const rafIdRef = useRef<number | null>(null);
     const requestRender = useCallback(() => {
-        if (rafIdRef.current !== null) return;
+        if (rafIdRef.current !== null) {
+            return;
+        }
         rafIdRef.current = requestAnimationFrame(() => {
             rafIdRef.current = null;
             engine.render();
@@ -201,7 +203,9 @@ function CanvasTileEngineBase({
             getDpr: () => PixelRatio.get(),
             present: (paint: (canvas: SkCanvas) => void) => {
                 const { width, height } = sizeRef.current;
-                if (width <= 0 || height <= 0) return;
+                if (width <= 0 || height <= 0) {
+                    return;
+                }
                 setPicture(createPicture(paint, { width, height }));
             },
         }),
@@ -229,7 +233,9 @@ function CanvasTileEngineBase({
             const { width, height } = e.nativeEvent.layout;
             const w = Math.round(width);
             const h = Math.round(height);
-            if (w <= 0 || h <= 0) return;
+            if (w <= 0 || h <= 0) {
+                return;
+            }
 
             const prev = sizeRef.current;
             sizeRef.current = { width: w, height: h };
@@ -314,9 +320,13 @@ function CanvasTileEngineBase({
     // no synthetic-mouse fallback, so their presence also claims the touches.
     const shouldClaimGesture = useCallback(() => {
         const instance = instanceRef.current;
-        if (!instance) return false;
+        if (!instance) {
+            return false;
+        }
         const eventHandlers = instance.getConfig().eventHandlers;
-        if (eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover) return true;
+        if (eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover) {
+            return true;
+        }
         return Boolean(callbacksRef.current.onMouseDown || callbacksRef.current.onMouseUp);
     }, []);
 
@@ -326,17 +336,25 @@ function CanvasTileEngineBase({
 
             if (touchCountRef.current === 0) {
                 claimRef.current = shouldClaimGesture();
-                if (!claimRef.current) return;
+                if (!claimRef.current) {
+                    return;
+                }
                 multiTouchRef.current = false;
                 tapRef.current =
                     pointers.length === 1
                         ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false }
                         : null;
             }
-            if (!claimRef.current) return;
+            if (!claimRef.current) {
+                return;
+            }
 
-            if (pointers.length > 1) markMultiTouch();
-            if (pointers.length === touchCountRef.current) return;
+            if (pointers.length > 1) {
+                markMultiTouch();
+            }
+            if (pointers.length === touchCountRef.current) {
+                return;
+            }
             touchCountRef.current = pointers.length;
             // Additional fingers re-dispatch touchStart so the engine
             // enters/rebases pinch mode.
@@ -347,17 +365,24 @@ function CanvasTileEngineBase({
 
     const onTouchesMove = useCallback(
         (e: GestureTouchEvent) => {
-            if (!claimRef.current) return;
+            if (!claimRef.current) {
+                return;
+            }
             const pointers = e.allTouches.map(toPointer);
-            if (pointers.length > 1) markMultiTouch();
+            if (pointers.length > 1) {
+                markMultiTouch();
+            }
 
             // Safety net: if a finger-count change wasn't delivered via
             // onTouchesDown/Up, resync the engine before forwarding moves.
             if (pointers.length !== touchCountRef.current) {
                 const prev = touchCountRef.current;
                 touchCountRef.current = pointers.length;
-                if (pointers.length > prev) rendererRef.current.dispatchTouchStart(pointers);
-                else rendererRef.current.dispatchTouchEnd(pointers);
+                if (pointers.length > prev) {
+                    rendererRef.current.dispatchTouchStart(pointers);
+                } else {
+                    rendererRef.current.dispatchTouchEnd(pointers);
+                }
                 return;
             }
 
@@ -376,7 +401,9 @@ function CanvasTileEngineBase({
 
     const endTouch = useCallback(
         (e: GestureTouchEvent, allowTap: boolean) => {
-            if (!claimRef.current) return;
+            if (!claimRef.current) {
+                return;
+            }
             const remaining = remainingPointers(e);
             const changed = e.changedTouches.length > 0 ? toPointer(e.changedTouches[0]) : undefined;
 
@@ -410,7 +437,9 @@ function CanvasTileEngineBase({
             // finger's start event, the engine never entered pinch mode and
             // would otherwise treat the final lift as a clean single-pointer
             // release.
-            if (!suppressTap && changed) rendererRef.current.dispatchPointerUp(changed);
+            if (!suppressTap && changed) {
+                rendererRef.current.dispatchPointerUp(changed);
+            }
 
             const tap = tapRef.current;
             if (

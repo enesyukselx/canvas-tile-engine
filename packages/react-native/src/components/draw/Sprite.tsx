@@ -79,7 +79,9 @@ export const Sprite = memo(function Sprite({
     }, [engine, drawnItems, layer, hitTest, requestRender]);
 
     useEffect(() => {
-        if (!playing || frames.length === 0) return;
+        if (!playing || frames.length === 0) {
+            return;
+        }
 
         const animator = new SpriteAnimator({ frames, fps, loop });
         animator.start(

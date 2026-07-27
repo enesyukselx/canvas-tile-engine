@@ -18,7 +18,9 @@ export function computeZoom(
     const limitedDelta = Math.min(Math.max(deltaY, DEFAULT_VALUES.MIN_WHEEL_DELTA), DEFAULT_VALUES.MAX_WHEEL_DELTA);
     const scaleFactor = Math.exp(-limitedDelta * DEFAULT_VALUES.ZOOM_SENSITIVITY);
     const newScale = Math.min(maxScale, Math.max(minScale, oldScale * scaleFactor));
-    if (newScale === oldScale) return { topLeft, scale: oldScale };
+    if (newScale === oldScale) {
+        return { topLeft, scale: oldScale };
+    }
     return {
         topLeft: {
             x: topLeft.x + mouse.x * (1 / oldScale - 1 / newScale),
@@ -40,7 +42,9 @@ export function computeZoom(
  * Non-integer tile counts have no aligned center; the value passes through.
  */
 export function snapCenterToGrid(value: number, tiles: number): number {
-    if (!Number.isInteger(tiles)) return value;
+    if (!Number.isInteger(tiles)) {
+        return value;
+    }
     return tiles % 2 === 0 ? Math.ceil(value - 1) + 0.5 : Math.ceil(value - 0.5);
 }
 

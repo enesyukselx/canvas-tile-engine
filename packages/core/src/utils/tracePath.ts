@@ -22,7 +22,9 @@ export interface PathTraceTarget {
  */
 export function traceRoundedPath(ctx: PathTraceTarget, pts: Coords[], closed: boolean, radiusPx: number): void {
     const n = pts.length;
-    if (n < 2) return;
+    if (n < 2) {
+        return;
+    }
 
     if (closed && n >= 3 && radiusPx > 0) {
         // Every vertex is a corner (cyclic neighbors). Start on the exit
@@ -55,7 +57,9 @@ export function traceRoundedPath(ctx: PathTraceTarget, pts: Coords[], closed: bo
         }
     }
     ctx.lineTo(pts[n - 1].x, pts[n - 1].y);
-    if (closed) ctx.closePath();
+    if (closed) {
+        ctx.closePath();
+    }
 }
 
 /**

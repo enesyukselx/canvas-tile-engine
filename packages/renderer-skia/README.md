@@ -46,10 +46,7 @@ export function Map() {
             style={{ flex: 1 }}
         >
             <CanvasTileEngine.GridLines cellSize={1} layer={0} />
-            <CanvasTileEngine.Circle
-                items={{ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }}
-                layer={1}
-            />
+            <CanvasTileEngine.Circle items={{ x: 0, y: 0, size: 0.8, style: { fillStyle: "#22d3ee" } }} layer={1} />
         </CanvasTileEngine>
     );
 }
