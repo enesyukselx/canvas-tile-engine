@@ -558,6 +558,44 @@ describe("CanvasDraw path items", () => {
         expect(ops.filter((op) => op === "stroke")).toHaveLength(2);
         expect(ops.filter((op) => op === "beginPath")).toHaveLength(2);
     });
+
+    it("ignores width and cornerRadius smuggled into a styleOf decoration", () => {
+        const { draw, render } = setup(); // scale 10
+        const widths: number[] = [];
+        let arcs = 0;
+        const ctx = {
+            lineWidth: 1,
+            globalAlpha: 1,
+            strokeStyle: "#000",
+            fillStyle: "#000",
+            save() {},
+            restore() {},
+            beginPath() {},
+            moveTo() {},
+            lineTo() {},
+            arc() {
+                arcs++;
+            },
+            closePath() {},
+            setLineDash() {},
+            fill() {},
+            stroke() {
+                widths.push(ctx.lineWidth);
+            },
+        };
+
+        // Non-literal returns bypass TS excess-property checks — the exact
+        // hole this guards: geometry-feeding values must resolve from the
+        // registration-time item style hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12, cornerRadiusPx: 30 };
+        draw.drawPath([{ points: square, closed: true, style: { strokeStyle: "#f00", lineWidthPx: 4 } }], 1, {
+            styleOf: () => smuggled,
+        });
+        render(ctx as unknown as CanvasRenderingContext2D);
+
+        expect(widths).toEqual([4]); // item width, not the smuggled 12
+        expect(arcs).toBe(0); // no smuggled corner rounding
+    });
 });
 
 // Fake 2D context recording arcs and image transforms.

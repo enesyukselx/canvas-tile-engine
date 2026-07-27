@@ -110,8 +110,8 @@ export function makeRecordingCanvas() {
         drawText(text: string, x: number, y: number, _paint: MockPaint, font: { size: number }) {
             ops.push({ op: "text", text, x, y, fontSize: font.size });
         },
-        drawPath() {
-            ops.push({ op: "path" });
+        drawPath(_path: unknown, paint: MockPaint) {
+            ops.push({ op: "path", style: paint.style, strokeWidth: paint.strokeWidth });
         },
         drawImageRect(img: unknown, src: unknown, dest: unknown, paint: MockPaint) {
             ops.push({ op: "image", img, src, dest, alpha: paint.alphaf });

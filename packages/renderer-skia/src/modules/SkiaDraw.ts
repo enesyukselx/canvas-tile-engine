@@ -612,11 +612,13 @@ export class SkiaDraw {
                     const pts = item.points!.map((p) =>
                         this.transformer.worldToScreen(p.x, p.y),
                     );
+                    // Corner radius from item.style: registration-time
+                    // only (see the stroke-width note below).
                     traceRoundedPath(
                         this.pathSink(path),
                         pts,
                         item.closed === true,
-                        resolveCornerRadiusPx(style, this.camera.scale),
+                        resolveCornerRadiusPx(item.style, this.camera.scale),
                     );
                 }
 
@@ -635,8 +637,12 @@ export class SkiaDraw {
                     this.strokePaint.setColor(
                         this.color(style?.strokeStyle ?? "#000000"),
                     );
+                    // Width from item.style, not the decorated merge:
+                    // hit testing reads the registration-time style, and
+                    // the decoration types' width exclusion is type-level
+                    // only — a smuggled width must not desync paint & hit.
                     this.strokePaint.setStrokeWidth(
-                        resolveLineWidthPx(style, this.camera.scale),
+                        resolveLineWidthPx(item.style, this.camera.scale),
                     );
                     const dash = resolveLineDashPx(style, this.camera.scale);
                     if (dash)
