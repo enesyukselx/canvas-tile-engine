@@ -796,6 +796,50 @@ What a decoration may change differs by primitive. Each rule is right for its ow
 
 Why the split: a rect/circle border never feeds hit-test geometry (the hit area is the box/disc), so decorating its width is safe. A line/path hit corridor derives from the stroke width — and a path outline from its corner radius — resolved at registration time, so a paint-time change would silently desync what you see from what you can click. Path quirk from the same family: decorating an unfilled path with `fillStyle` paints the fill, but hit testing stays on the stroke.
 
+### Show/Hide by State (`options.visibleOf`)
+
+`visibleOf` is `styleOf`'s sibling for visibility. The same dynamic draw methods (`drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`) accept a `visibleOf` callback that runs per item: return `false` to skip the item for that frame — it is neither painted nor hit-testable. `true` or `undefined` keeps it. Like `styleOf`, it reads external state live, so toggling a category is a set mutation plus `render()` — no filtered array copy, no re-registration, no spatial index rebuild:
+
+```typescript
+const hiddenCategories = new Set<string>();
+
+engine.drawRect(markers, 1, {
+    id: "markers",
+    visibleOf: (marker) => !hiddenCategories.has(marker.data.category),
+});
+
+// Toggling a filter checkbox:
+hiddenCategories.add("shops");
+engine.render(); // shops disappear — and stop hit-testing — immediately
+```
+
+A hidden item never hits: `hitTest`/`hitTestFirst`/`hitTestRect` skip it and report whatever is underneath. Like `styleOf`, `visibleOf` is dynamic-only — static draw methods replay a recorded image, so per-frame visibility cannot apply.
+
+### Per-Item Hit-Test Opt-Out (`options.interactiveOf`)
+
+The hit-tested draw methods (`drawRect`, `drawCircle`, `drawLine`, `drawPath`) also accept `interactiveOf`: return `false` to keep an item **painted but transparent to hit queries** — the per-item counterpart of the call-level `hitTest: false`. Queries fall through to items below it, so a decorative badge drawn on top of a unit no longer swallows the unit's clicks:
+
+```typescript
+engine.drawCircle(units, 1, { id: "units" });
+engine.drawCircle(badges, 2, {
+    id: "badges",
+    interactiveOf: () => false, // always decorative
+});
+// hitTestFirst over a badge now returns the unit under it
+```
+
+Or state-driven, e.g. disabled entries that should stop reacting without disappearing:
+
+```typescript
+engine.drawRect(seats, 1, {
+    id: "seats",
+    styleOf: (seat) => (disabled.has(seat.data.id) ? { fillStyle: "#9ca3af" } : undefined),
+    interactiveOf: (seat) => !disabled.has(seat.data.id),
+});
+```
+
+The two callbacks compose with a simple rule: `visibleOf: false` wins. A hidden item never hit-tests, regardless of what `interactiveOf` returns; `interactiveOf: false` only covers the "visible but not clickable" case. (Need the reverse — an invisible but tappable area? That is what `hitTest`'s `padding`/`paddingPx` options are for.)
+
 ### Remove a Single Draw Call (`DrawHandle`)
 
 Most `draw*()` methods (and `addDrawFunction`) return a **draw handle** that uniquely identifies the registered draw callback.
@@ -859,6 +903,7 @@ engine.render();
 | :---------------------- | :------------------------- | :----------------------- |
 | Camera pan/zoom         | ❌ No                      | User drags the map       |
 | Object color changes    | ❌ No — use `styleOf`      | Seat selection in cinema |
+| Object shown/hidden     | ❌ No — use `visibleOf`    | Category filter toggle   |
 | Object added/removed    | ✅ Yes — re-register (`id`) | Placing a tower          |
 | Object position changes | ✅ Yes — re-register (`id`) | Moving a unit            |
 | Loading new level       | ✅ Yes                     | Game level transition    |
@@ -866,7 +911,7 @@ engine.render();
 :::tip
 If your scene is **static** (objects don't change), you only need to call `drawX()` once at startup. The engine will re-render the same layer content when the camera moves.
 
-If your scene is **dynamic**, split the changes: appearance-only changes (selection, hover, highlight) go through `styleOf` + `render()` — no re-registration at all. Geometry changes (add/remove/move) register with an `id` and re-call `drawX(items, layer, { id })` + `render()`. Reach for `clearLayer()` when you want to wipe a whole layer regardless of what registered on it.
+If your scene is **dynamic**, split the changes: appearance-only changes (selection, hover, highlight) go through `styleOf` + `render()`, show/hide through `visibleOf` + `render()` — no re-registration at all. Geometry changes (add/remove/move) register with an `id` and re-call `drawX(items, layer, { id })` + `render()`. Reach for `clearLayer()` when you want to wipe a whole layer regardless of what registered on it.
 :::
 
 **Static Scene Example (Map):**

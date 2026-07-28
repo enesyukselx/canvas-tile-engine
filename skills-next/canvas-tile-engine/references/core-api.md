@@ -154,6 +154,20 @@ optional `options?` last parameter (core >= 0.10) with these fields:
   set + `render()`, nothing re-registers). Line/path decorations exclude
   `lineWidth`/`lineWidthPx` (and `cornerRadius*` for paths) - hit-test
   geometry is registration-time. Not available on statics or `drawImage`.
+- `visibleOf?: (item) => boolean | undefined` (same five dynamic methods as
+  `styleOf`) - per-item show/hide: `false` skips the item for the frame
+  (neither painted nor hit-testable; queries fall through to items below).
+  Reads external state live like `styleOf` - mutate a filter set +
+  `render()`, nothing re-registers. PREFER this over deriving a filtered
+  items array (which re-registers and rebuilds the spatial index). Not
+  available on statics or `drawImage`.
+- `interactiveOf?: (item) => boolean | undefined` (dynamic `drawRect`,
+  `drawCircle`, `drawLine`, `drawPath` - not `drawText`, text never
+  hit-tests) - per-item hit-test opt-out: `false` keeps the item painted but
+  transparent to `hitTest`/`hitTestFirst`/`hitTestRect`; queries fall
+  through to items below. The item-level counterpart of `hitTest: false`,
+  for decorative items mixed into an interactive set or disabled entries.
+  Items hidden by `visibleOf` never hit-test regardless of this callback.
 - `hitTest?: boolean` - `false` keeps the registration out of hit testing
   (the `pointer-events: none` of the draw API). Declare decorative content
   (floor tiles, background images, zone overlays) once at registration and

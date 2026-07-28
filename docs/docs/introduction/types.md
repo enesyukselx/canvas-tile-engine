@@ -175,6 +175,15 @@ type PathDecorationStyle = Omit<PathStyle, "lineWidth" | "lineWidthPx" | "corner
 
 The dynamic draw methods additionally accept `styleOf` in their options (`RectDrawOptions`, `CircleDrawOptions`, `TextDrawOptions`, `LineDrawOptions`, `PathDrawOptions` — each extends `DrawOptions`). The callback runs per item on every frame at paint time; returned fields overlay the item's own `style` for that frame, `undefined` leaves it untouched. Line and path decorations exclude stroke width (and corner radius), because those feed hit-test geometry resolved at registration time.
 
+### `VisibleOf` and `InteractiveOf`
+
+```ts
+type VisibleOf<TItem> = (item: TItem) => boolean | undefined;
+type InteractiveOf<TItem> = (item: TItem) => boolean | undefined;
+```
+
+Per-item siblings of `StyleOf`, accepted in the same options objects and read live the same way. `visibleOf` returning `false` skips the item for the frame — it is neither painted nor hit-testable. `interactiveOf` returning `false` keeps the item painted but transparent to `hitTest`/`hitTestFirst`/`hitTestRect` (the per-item counterpart of `hitTest: false`); queries fall through to items below. `true`/`undefined` keeps the default in both. A hidden item never hit-tests, regardless of `interactiveOf`. `visibleOf` exists on all five dynamic draw options; `interactiveOf` on the hit-tested four (`TextDrawOptions` has no `interactiveOf` — text never enters hit testing).
+
 ## Sprite Helpers
 
 ```ts

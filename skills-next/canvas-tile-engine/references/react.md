@@ -120,18 +120,18 @@ removes its handle on unmount, and batches repaints through a single
 `requestAnimationFrame`. `items` props are compared BY REFERENCE - a new
 array identity re-registers the callback and rebuilds the spatial index for
 500+ items. Keep items in `useMemo` or state, never inline literals. The
-`styleOf` prop is the exception: it is read through a ref, so its identity
-may change every render at no cost (inline arrows are fine) and a change
-only repaints.
+`styleOf`/`visibleOf`/`interactiveOf` props are the exception: they are read
+through refs, so their identity may change every render at no cost (inline
+arrows are fine) and a change only repaints.
 
 | Component                         | Props (defaults)                                                                                                                      |
 | :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
-| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`, `hitTest?`                                                                                      |
-| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`, `hitTest?`                                                                                  |
+| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                      |
+| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                  |
 | `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`, `hitTest?`                                                                                        |
-| `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`, `styleOf?`                                                                                      |
-| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`, `hitTest?`                                                                 |
-| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`, `hitTest?`                                                                              |
+| `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`, `styleOf?`, `visibleOf?`                                                                        |
+| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                 |
+| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                              |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
 | `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                      |
 | `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                    |
@@ -189,6 +189,13 @@ Contract: `items` changed = geometry changed = re-register (memoize it);
 `item.data`. Line/Path decorations exclude `lineWidth*` (Path also
 `cornerRadius*`) - hit-test geometry is registration-time. Statics take no
 `styleOf`.
+
+Same live-read model for visibility and hit testing: `visibleOf={(item) =>
+boolean | undefined}` (`false` = skip the item for the frame - not painted,
+not hit-testable; use for category filters instead of a filtered array) and
+`interactiveOf` (`false` = painted but transparent to hit queries, the
+per-item `hitTest={false}`; not on `<Text>`). A `visibleOf`-hidden item
+never hit-tests, regardless of `interactiveOf`. Statics take neither prop.
 
 ## Updating drawn data
 
