@@ -23,7 +23,7 @@ import type {
     TextDrawOptions,
     LineDrawOptions,
     PathDrawOptions,
-    DrawOptions,
+    ImageDrawOptions,
     StaticDrawOptions,
 } from "@canvas-tile-engine/core";
 
@@ -224,7 +224,11 @@ export interface EngineHandle {
     ): DrawHandle;
 
     /** Draw images */
-    drawImage(items: ImageItem | ImageItem[], layer?: number, options?: DrawOptions): DrawHandle;
+    drawImage<TData = unknown>(
+        items: ImageItem<HTMLImageElement, TData> | ImageItem<HTMLImageElement, TData>[],
+        layer?: number,
+        options?: ImageDrawOptions<HTMLImageElement, TData>,
+    ): DrawHandle;
 
     /** Draw static images (cached) */
     drawStaticImage(items: ImageItem[], cacheKey: string, layer?: number, options?: StaticDrawOptions): DrawHandle;

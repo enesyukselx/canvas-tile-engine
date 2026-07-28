@@ -798,7 +798,7 @@ Why the split: a rect/circle border never feeds hit-test geometry (the hit area 
 
 ### Show/Hide by State (`options.visibleOf`)
 
-`visibleOf` is `styleOf`'s sibling for visibility. The same dynamic draw methods (`drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`) accept a `visibleOf` callback that runs per item: return `false` to skip the item for that frame — it is neither painted nor hit-testable. `true` or `undefined` keeps it. Like `styleOf`, it reads external state live, so toggling a category is a set mutation plus `render()` — no filtered array copy, no re-registration, no spatial index rebuild:
+`visibleOf` is `styleOf`'s sibling for visibility. The dynamic draw methods (`drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`, and — unlike `styleOf` — `drawImage`) accept a `visibleOf` callback that runs per item: return `false` to skip the item for that frame — it is neither painted nor hit-testable. `true` or `undefined` keeps it. Like `styleOf`, it reads external state live, so toggling a category is a set mutation plus `render()` — no filtered array copy, no re-registration, no spatial index rebuild:
 
 ```typescript
 const hiddenCategories = new Set<string>();
@@ -817,7 +817,7 @@ A hidden item never hits: `hitTest`/`hitTestFirst`/`hitTestRect` skip it and rep
 
 ### Per-Item Hit-Test Opt-Out (`options.interactiveOf`)
 
-The hit-tested draw methods (`drawRect`, `drawCircle`, `drawLine`, `drawPath`) also accept `interactiveOf`: return `false` to keep an item **painted but transparent to hit queries** — the per-item counterpart of the call-level `hitTest: false`. Queries fall through to items below it, so a decorative badge drawn on top of a unit no longer swallows the unit's clicks:
+The hit-tested draw methods (`drawRect`, `drawCircle`, `drawImage`, `drawLine`, `drawPath`) also accept `interactiveOf`: return `false` to keep an item **painted but transparent to hit queries** — the per-item counterpart of the call-level `hitTest: false`. Queries fall through to items below it, so a decorative badge drawn on top of a unit no longer swallows the unit's clicks:
 
 ```typescript
 engine.drawCircle(units, 1, { id: "units" });

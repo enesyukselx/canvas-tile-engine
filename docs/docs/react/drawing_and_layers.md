@@ -376,6 +376,10 @@ Draw images scaled to world units.
 | :------ | :------------------------- | :----------- | :----------------- |
 | `items` | `ImageItem \| ImageItem[]` | **Required** | Image definitions. |
 | `layer` | `number`                   | `1`          | Rendering layer.   |
+| `visibleOf` | `(item) => boolean \| undefined` | -    | Per-item show/hide: `false` skips the item (not painted, not hit-testable) — marker category filters without a new `items` array. |
+| `interactiveOf` | `(item) => boolean \| undefined` | - | Per-item hit-test opt-out: `false` keeps the item painted but transparent to hit queries. |
+
+There is no `styleOf` — images carry no `style`; appearance changes go through item fields like `opacity`, which renderers read live at paint time.
 
 **ImageItem Properties:**
 

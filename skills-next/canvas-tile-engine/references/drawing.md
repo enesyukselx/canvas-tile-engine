@@ -105,12 +105,14 @@ engine.render(); // shops disappear and stop hit-testing; nothing re-registers
 engine.drawCircle(badges, 2, { interactiveOf: () => false }); // decorative
 ```
 
-`visibleOf` exists on the same five dynamic methods as `styleOf`;
-`interactiveOf` on the hit-tested four (not `drawText` - text never
+`visibleOf` exists on the five `styleOf` methods plus `drawImage`;
+`interactiveOf` on the hit-tested five (not `drawText` - text never
 hit-tests). Composition rule: a `visibleOf`-hidden item never hit-tests,
 regardless of `interactiveOf` (need an invisible-but-tappable area? use
-`hitTest`'s `padding`/`paddingPx` instead). Neither is available on statics
-or `drawImage`.
+`hitTest`'s `padding`/`paddingPx` instead). Neither is available on
+statics. `drawImage` still has no `styleOf` - images carry no `style`;
+state-driven appearance goes through item fields like `opacity`
+(mutate + `render()`, read live at paint time).
 
 ## Layers
 

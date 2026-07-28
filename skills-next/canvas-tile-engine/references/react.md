@@ -128,7 +128,7 @@ arrows are fine) and a change only repaints.
 | :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
 | `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                      |
 | `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                  |
-| `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`, `hitTest?`                                                                                        |
+| `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                        |
 | `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`, `styleOf?`, `visibleOf?`                                                                        |
 | `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                 |
 | `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                              |
@@ -194,8 +194,10 @@ Same live-read model for visibility and hit testing: `visibleOf={(item) =>
 boolean | undefined}` (`false` = skip the item for the frame - not painted,
 not hit-testable; use for category filters instead of a filtered array) and
 `interactiveOf` (`false` = painted but transparent to hit queries, the
-per-item `hitTest={false}`; not on `<Text>`). A `visibleOf`-hidden item
-never hit-tests, regardless of `interactiveOf`. Statics take neither prop.
+per-item `hitTest={false}`; not on `<Text>`). Both exist on `<Image>` too
+(which has no `styleOf` - images carry no `style`). A `visibleOf`-hidden
+item never hit-tests, regardless of `interactiveOf`. Statics take neither
+prop.
 
 ## Updating drawn data
 

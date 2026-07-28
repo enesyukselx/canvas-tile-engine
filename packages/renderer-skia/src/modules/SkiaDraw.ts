@@ -33,6 +33,7 @@ import type {
     LineDecorationStyle,
     PathDecorationStyle,
     RendererDrawOptions,
+    RendererImageDrawOptions,
     ShapeDecorationStyle,
     StyleOf,
     TextDecorationStyle,
@@ -573,8 +574,13 @@ export class SkiaDraw {
         });
     }
 
-    drawImage(items: Array<ImageItem<SkImage>> | ImageItem<SkImage>, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem<SkImage>> | ImageItem<SkImage>,
+        layer: number = 1,
+        options?: RendererImageDrawOptions<SkImage>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -595,6 +601,9 @@ export class SkiaDraw {
                 : list;
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
 

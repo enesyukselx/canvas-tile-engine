@@ -776,6 +776,10 @@ describe("CanvasTileEngine", () => {
                     id: Symbol(`path-${seq++}`),
                     layer,
                 })),
+                drawImage: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`image-${seq++}`),
+                    layer,
+                })),
                 removeDrawHandle: vi.fn(),
                 clearLayer: vi.fn(),
                 clearAll: vi.fn(),
@@ -785,6 +789,8 @@ describe("CanvasTileEngine", () => {
             (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
             return { e: new CanvasTileEngine<Mount>({}, baseConfig, renderer), drawAPI };
         }
+
+        const testImg = { width: 10, height: 10 } as unknown as HTMLImageElement;
 
         it("threads visibleOf through to the renderer draw API on every draw kind", () => {
             const { e, drawAPI } = createEngineWithDrawAPI();
@@ -813,6 +819,9 @@ describe("CanvasTileEngine", () => {
                 { visibleOf: visible },
             );
             expect(drawAPI.drawPath.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawImage({ x: 1, y: 1, size: 1, img: testImg }, 1, { visibleOf: visible });
+            expect(drawAPI.drawImage.mock.calls[0][2]).toEqual({ visibleOf: visible });
         });
 
         it("visibleOf reads live state: hiding an item drops it from hit queries without re-registering", () => {
@@ -865,6 +874,25 @@ describe("CanvasTileEngine", () => {
             const marquee = e.hitTestRect({ minX: 0, maxX: 10, minY: 0, maxY: 10 });
             expect(marquee).toHaveLength(1);
             expect(marquee[0].item.data).toBe("unit");
+        });
+
+        it("applies to image kind too", () => {
+            const { e } = createEngineWithDrawAPI();
+            const hidden = new Set<string>();
+            e.drawImage(
+                [
+                    { x: 2, y: 2, size: 1, img: testImg, data: "a" },
+                    { x: 5, y: 5, size: 1, img: testImg, data: "b" },
+                ],
+                1,
+                { visibleOf: (item) => !hidden.has(item.data!), interactiveOf: (item) => item.data !== "b" },
+            );
+
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+            hidden.add("a");
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+            // "b" stays visible but interactiveOf keeps it out of queries.
+            expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeUndefined();
         });
 
         it("applies to line and path kinds too", () => {

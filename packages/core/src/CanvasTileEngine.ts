@@ -39,6 +39,7 @@ import {
     TextDrawOptions,
     LineDrawOptions,
     PathDrawOptions,
+    ImageDrawOptions,
     StaticDrawOptions,
     StyleOf,
     VisibleOf,
@@ -1023,18 +1024,27 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Image definitions.
      * @param layer Layer order.
-     * @param options Optional `id`: re-registering with the same id replaces
-     * the previous registration instead of accumulating alongside it.
+     * @param options Optional `id` (re-registering with the same id replaces
+     * the previous registration), `visibleOf` (per-item show/hide, read live
+     * each frame; a hidden item neither paints nor hit-tests), and
+     * `interactiveOf` (per-item hit-test opt-out). Images carry no `style`,
+     * so there is no `styleOf` — appearance changes go through item fields
+     * like `opacity` (mutate + `render()`).
      */
-    drawImage(
-        items: Array<ImageItem<TImage>> | ImageItem<TImage>,
+    drawImage<TData = unknown>(
+        items: Array<ImageItem<TImage, TData>> | ImageItem<TImage, TData>,
         layer: number = 1,
-        options?: DrawOptions,
+        options?: ImageDrawOptions<TImage, TData>,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawImage(items, layer);
+        const handle = this.renderer.getDrawAPI().drawImage(items, layer, {
+            visibleOf: options?.visibleOf as VisibleOf<ImageItem<TImage>> | undefined,
+        });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "image", items, layer);
+            this.hitTester.register(handle, "image", items, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
         }
         this.trackDrawId(options?.id, handle);
         return handle;

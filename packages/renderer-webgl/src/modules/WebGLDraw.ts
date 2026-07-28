@@ -34,6 +34,7 @@ import type {
     LineDecorationStyle,
     PathDecorationStyle,
     RendererDrawOptions,
+    RendererImageDrawOptions,
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
@@ -532,8 +533,13 @@ export class WebGLDraw {
         });
     }
 
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem> | ImageItem,
+        layer: number = 1,
+        options?: RendererImageDrawOptions<HTMLImageElement>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -556,6 +562,9 @@ export class WebGLDraw {
             const images: ImageInstance[] = [];
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);

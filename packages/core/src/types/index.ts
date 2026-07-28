@@ -173,7 +173,11 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
         layer?: number,
         options?: RendererDrawOptions<Text, TextDecorationStyle>,
     ): DrawHandle;
-    drawImage(items: ImageItem<TImage> | ImageItem<TImage>[], layer?: number): DrawHandle;
+    drawImage(
+        items: ImageItem<TImage> | ImageItem<TImage>[],
+        layer?: number,
+        options?: RendererImageDrawOptions<TImage>,
+    ): DrawHandle;
     /** Receives fully normalized items: the engine converts every accepted
      * `drawPath` input (including the legacy `Coords[]` forms) before
      * delegating, so renderers only implement the item form. */
@@ -239,6 +243,14 @@ export type InteractiveOf<TItem> = (item: TItem) => boolean | undefined;
 export interface RendererDrawOptions<TItem, TStyle> {
     styleOf?: StyleOf<TItem, TStyle>;
     visibleOf?: VisibleOf<TItem>;
+}
+
+/**
+ * Paint-time options for `drawImage` — images carry no `style`, so only
+ * `visibleOf` reaches renderers.
+ */
+export interface RendererImageDrawOptions<TImage> {
+    visibleOf?: VisibleOf<ImageItem<TImage>>;
 }
 
 /** Decoration fields for `Rect`/`Circle` — the full shape style (stroke width
@@ -338,6 +350,16 @@ export interface LineDrawOptions<TData = unknown> extends DrawOptions {
     visibleOf?: VisibleOf<Line<TData>>;
     /** Per-item hit-test opt-out; see {@link InteractiveOf}. */
     interactiveOf?: InteractiveOf<Line<TData>>;
+}
+
+/** Options for {@link CanvasTileEngine.drawImage}. Images carry no `style`,
+ * so there is no `styleOf` — appearance changes go through item fields like
+ * `opacity` (read live at paint time; mutate + `render()`). */
+export interface ImageDrawOptions<TImage = unknown, TData = unknown> extends DrawOptions {
+    /** Per-item visibility; see {@link VisibleOf}. */
+    visibleOf?: VisibleOf<ImageItem<TImage, TData>>;
+    /** Per-item hit-test opt-out; see {@link InteractiveOf}. */
+    interactiveOf?: InteractiveOf<ImageItem<TImage, TData>>;
 }
 
 /** Options for {@link CanvasTileEngine.drawPath}. */

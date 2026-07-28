@@ -33,6 +33,7 @@ import type {
     LineDecorationStyle,
     PathDecorationStyle,
     RendererDrawOptions,
+    RendererImageDrawOptions,
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
@@ -574,8 +575,13 @@ export class CanvasDraw<
         }
     }
 
-    drawImage(items: Array<ImageItem<TImage>> | ImageItem<TImage>, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem<TImage>> | ImageItem<TImage>,
+        layer: number = 1,
+        options?: RendererImageDrawOptions<TImage>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const visibleOf = options?.visibleOf;
 
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
@@ -597,6 +603,9 @@ export class CanvasDraw<
                 : list;
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);

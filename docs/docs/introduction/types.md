@@ -182,7 +182,7 @@ type VisibleOf<TItem> = (item: TItem) => boolean | undefined;
 type InteractiveOf<TItem> = (item: TItem) => boolean | undefined;
 ```
 
-Per-item siblings of `StyleOf`, accepted in the same options objects and read live the same way. `visibleOf` returning `false` skips the item for the frame — it is neither painted nor hit-testable. `interactiveOf` returning `false` keeps the item painted but transparent to `hitTest`/`hitTestFirst`/`hitTestRect` (the per-item counterpart of `hitTest: false`); queries fall through to items below. `true`/`undefined` keeps the default in both. A hidden item never hit-tests, regardless of `interactiveOf`. `visibleOf` exists on all five dynamic draw options; `interactiveOf` on the hit-tested four (`TextDrawOptions` has no `interactiveOf` — text never enters hit testing).
+Per-item siblings of `StyleOf`, accepted in the same options objects and read live the same way. `visibleOf` returning `false` skips the item for the frame — it is neither painted nor hit-testable. `interactiveOf` returning `false` keeps the item painted but transparent to `hitTest`/`hitTestFirst`/`hitTestRect` (the per-item counterpart of `hitTest: false`); queries fall through to items below. `true`/`undefined` keeps the default in both. A hidden item never hit-tests, regardless of `interactiveOf`. `visibleOf` exists on all six dynamic draw options (including `ImageDrawOptions`); `interactiveOf` on the hit-tested five (`TextDrawOptions` has no `interactiveOf` — text never enters hit testing). `ImageDrawOptions` carries no `styleOf`: images have no `style`, appearance changes go through item fields like `opacity` (read live at paint time; mutate + `render()`).
 
 ## Sprite Helpers
 
