@@ -301,6 +301,16 @@ describe("Camera", () => {
 
 Renderer packages currently have thin test coverage - tests accompanying renderer changes are especially welcome.
 
+### Pixel snapshot tests
+
+`renderer-server/tests/snapshots/` renders real scenes through `renderToBuffer` and compares them against committed PNG baselines (`__baselines__/`) with a small perceptual tolerance. Because the Canvas2D pipeline is shared, these snapshots also guard the browser renderer's drawing code.
+
+- A failing snapshot writes a visual diff to `__diffs__/` (gitignored) - inspect it before deciding.
+- Intended rendering changes: regenerate baselines with `UPDATE_SNAPSHOTS=1 pnpm --filter @canvas-tile-engine/renderer-server test -- --run` and commit the updated PNGs with the PR.
+- Bumping `@napi-rs/canvas` may legitimately shift anti-aliased pixels; regenerate baselines in the bump PR.
+- Text scenes must use the registered fixture font (`tests/fixtures/`), never system fonts - system fonts differ per machine and break determinism.
+- Baseline-free invariants (determinism, static-vs-dynamic cache equality) live in `invariants.test.ts`; they never need updating.
+
 ## 📚 Documentation
 
 Documentation is built with [Docusaurus](https://docusaurus.io/) and lives in the `docs/` directory (its own npm project, not part of the pnpm workspace).
