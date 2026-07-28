@@ -60,7 +60,8 @@ export type HitTestRectOptions = {
     mode?: "intersect" | "contain";
 };
 
-type HitItem = Rect | Circle | ImageItem<unknown> | PathItem | Line;
+/** Union of item shapes a hit entry can hold. @internal */
+export type HitItem = Rect | Circle | ImageItem<unknown> | PathItem | Line;
 type BoxedItem = Rect | Circle | ImageItem<unknown>;
 
 type HitEntry = {
@@ -80,6 +81,12 @@ type HitEntry = {
     /** Call-level stroke style (line entries only; path items carry their
      * own). Per-item `Line.style` overlays it at test time. */
     style?: LineStyle;
+    /** Per-item visibility, evaluated live at query time: an item whose
+     * callback returns `false` is not painted, so it must not hit either. */
+    visibleOf?: (item: HitItem) => boolean | undefined;
+    /** Per-item hit-test opt-out, evaluated live at query time. A hidden
+     * item (`visibleOf` false) never hits regardless of this callback. */
+    interactiveOf?: (item: HitItem) => boolean | undefined;
     /** Lazy R-Tree over item anchors, built on the first query of a large entry. */
     index?: SpatialIndex<BoxedItem> | null;
     /** Item object -> position in `items`, built alongside the lazy index. */
@@ -130,7 +137,12 @@ export class HitTester {
         kind: HitKind,
         items: HitItem | HitItem[],
         layer: number,
-        opts?: { style?: LineStyle; ignoreSizePx?: boolean },
+        opts?: {
+            style?: LineStyle;
+            ignoreSizePx?: boolean;
+            visibleOf?: (item: HitItem) => boolean | undefined;
+            interactiveOf?: (item: HitItem) => boolean | undefined;
+        },
     ): void {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
@@ -158,6 +170,8 @@ export class HitTester {
             maxSizePx,
             ignoreSizePx: opts?.ignoreSizePx,
             style: opts?.style,
+            visibleOf: opts?.visibleOf,
+            interactiveOf: opts?.interactiveOf,
         });
     }
 
@@ -521,7 +535,19 @@ export class HitTester {
         return [{ points: outline, closed }];
     }
 
+    /** Per-item gate shared by point and rect queries: hidden items never
+     * hit (only `false` opts out — `undefined` means visible/interactive). */
+    private itemHittable(item: HitItem, entry: HitEntry): boolean {
+        if (entry.visibleOf?.(item) === false || entry.interactiveOf?.(item) === false) {
+            return false;
+        }
+        return true;
+    }
+
     private testItemRect(rect: RectRegion, item: HitItem, entry: HitEntry, mode: "intersect" | "contain"): boolean {
+        if (!this.itemHittable(item, entry)) {
+            return false;
+        }
         const kind = entry.kind;
 
         if (kind === "line") {
@@ -584,6 +610,9 @@ export class HitTester {
     }
 
     private testItem(point: Coords, item: HitItem, entry: HitEntry, padding: number): boolean {
+        if (!this.itemHittable(item, entry)) {
+            return false;
+        }
         const kind = entry.kind;
         if (kind === "path") {
             return this.testPath(point, item as PathItem, padding);
