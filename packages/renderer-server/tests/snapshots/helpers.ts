@@ -28,10 +28,14 @@ const MAX_DIFF_RATIO = 0.001;
 export function expectMatchesBaseline(name: string, actualPng: Buffer): void {
     const baselinePath = join(BASELINE_DIR, `${name}.png`);
 
-    if (UPDATE || !existsSync(baselinePath)) {
+    if (UPDATE) {
         mkdirSync(BASELINE_DIR, { recursive: true });
         writeFileSync(baselinePath, actualPng);
         return;
+    }
+
+    if (!existsSync(baselinePath)) {
+        throw new Error(`Missing snapshot baseline "${baselinePath}". ` + `Run with UPDATE_SNAPSHOTS=1 to create it.`);
     }
 
     const expected = PNG.sync.read(readFileSync(baselinePath));
