@@ -3,7 +3,7 @@ import { Config } from "./modules/Config";
 import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
-import { HitTester, HitResult, HitTestOptions, HitTestRectOptions } from "./modules/HitTester";
+import { HitTester, HitResult, HitTestOptions, HitTestRectOptions, HitItem } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateScale } from "./utils/validateConfig";
 import { fitScale } from "./utils/fitScale";
@@ -39,8 +39,11 @@ import {
     TextDrawOptions,
     LineDrawOptions,
     PathDrawOptions,
+    ImageDrawOptions,
     StaticDrawOptions,
     StyleOf,
+    VisibleOf,
+    InteractiveOf,
     ShapeDecorationStyle,
     TextDecorationStyle,
     LineDecorationStyle,
@@ -745,9 +748,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      * @param options Optional `id` (re-registering with the same id replaces
-     * the previous registration) and `styleOf` (paint-time decoration: the
+     * the previous registration), `styleOf` (paint-time decoration: the
      * returned fields overlay the item's `style` each frame without
-     * re-registering — mutate your state and call `render()`).
+     * re-registering — mutate your state and call `render()`), `visibleOf`
+     * (per-item show/hide, same live-read model; a hidden item neither paints
+     * nor hit-tests), and `interactiveOf` (per-item hit-test opt-out).
      */
     drawRect<TData = unknown>(
         items: Rect<TData> | Array<Rect<TData>>,
@@ -757,11 +762,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.replacePreviousDraw(options?.id);
         // TData only narrows the callback's item type for callers; renderers
         // hand back items from this same registration, so widening is safe.
-        const handle = this.renderer
-            .getDrawAPI()
-            .drawRect(items, layer, { styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined });
+        const handle = this.renderer.getDrawAPI().drawRect(items, layer, {
+            styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Rect> | undefined,
+        });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "rect", items, layer);
+            this.hitTester.register(handle, "rect", items, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
         }
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -861,10 +870,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param style Line style overrides.
      * @param layer Layer order.
      * @param options Optional `id` (re-registering with the same id replaces
-     * the previous registration) and `styleOf` (paint-time decoration overlaid
+     * the previous registration), `styleOf` (paint-time decoration overlaid
      * on the call-level `style` per item — also the way to give individual
-     * lines their own color). Decorations cannot change `lineWidth`: the
-     * hit-test area derives from the registration-time stroke width.
+     * lines their own color), `visibleOf` (per-item show/hide; a hidden line
+     * neither paints nor hit-tests), and `interactiveOf` (per-item hit-test
+     * opt-out). Decorations cannot change `lineWidth`: the hit-test area
+     * derives from the registration-time stroke width.
      */
     drawLine<TData = unknown>(
         items: Array<Line<TData>> | Line<TData>,
@@ -875,9 +886,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawLine(items, style, layer, {
             styleOf: options?.styleOf as StyleOf<Line, LineDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Line> | undefined,
         });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "line", items, layer, { style });
+            this.hitTester.register(handle, "line", items, layer, {
+                style,
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
         }
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -888,9 +904,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param items Circle definitions.
      * @param layer Layer order.
      * @param options Optional `id` (re-registering with the same id replaces
-     * the previous registration) and `styleOf` (paint-time decoration: the
+     * the previous registration), `styleOf` (paint-time decoration: the
      * returned fields overlay the item's `style` each frame without
-     * re-registering — mutate your state and call `render()`).
+     * re-registering — mutate your state and call `render()`), `visibleOf`
+     * (per-item show/hide, same live-read model; a hidden item neither paints
+     * nor hit-tests), and `interactiveOf` (per-item hit-test opt-out).
      */
     drawCircle<TData = unknown>(
         items: Circle<TData> | Array<Circle<TData>>,
@@ -900,9 +918,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawCircle(items, layer, {
             styleOf: options?.styleOf as StyleOf<Circle, ShapeDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Circle> | undefined,
         });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "circle", items, layer);
+            this.hitTester.register(handle, "circle", items, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
         }
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -940,9 +962,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: TextDrawOptions<TData>,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer
-            .getDrawAPI()
-            .drawText(items, layer, { styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined });
+        const handle = this.renderer.getDrawAPI().drawText(items, layer, {
+            styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Text> | undefined,
+        });
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -984,9 +1007,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const list = Array.isArray(items) ? items : [items];
         const handle = this.renderer.getDrawAPI().drawPath(list, layer, {
             styleOf: options?.styleOf as StyleOf<PathItem, PathDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<PathItem> | undefined,
         });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "path", list, layer);
+            this.hitTester.register(handle, "path", list, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
         }
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -997,18 +1024,27 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Image definitions.
      * @param layer Layer order.
-     * @param options Optional `id`: re-registering with the same id replaces
-     * the previous registration instead of accumulating alongside it.
+     * @param options Optional `id` (re-registering with the same id replaces
+     * the previous registration), `visibleOf` (per-item show/hide, read live
+     * each frame; a hidden item neither paints nor hit-tests), and
+     * `interactiveOf` (per-item hit-test opt-out). Images carry no `style`,
+     * so there is no `styleOf` — appearance changes go through item fields
+     * like `opacity` (mutate + `render()`).
      */
-    drawImage(
-        items: Array<ImageItem<TImage>> | ImageItem<TImage>,
+    drawImage<TData = unknown>(
+        items: Array<ImageItem<TImage, TData>> | ImageItem<TImage, TData>,
         layer: number = 1,
-        options?: DrawOptions,
+        options?: ImageDrawOptions<TImage, TData>,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawImage(items, layer);
+        const handle = this.renderer.getDrawAPI().drawImage(items, layer, {
+            visibleOf: options?.visibleOf as VisibleOf<ImageItem<TImage>> | undefined,
+        });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "image", items, layer);
+            this.hitTester.register(handle, "image", items, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
         }
         this.trackDrawId(options?.id, handle);
         return handle;

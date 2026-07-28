@@ -751,4 +751,169 @@ describe("CanvasTileEngine", () => {
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
         });
     });
+
+    describe("visibleOf / interactiveOf per-item callbacks", () => {
+        function createEngineWithDrawAPI() {
+            let seq = 0;
+            const drawAPI = {
+                drawRect: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`rect-${seq++}`),
+                    layer,
+                })),
+                drawCircle: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`circle-${seq++}`),
+                    layer,
+                })),
+                drawText: vi.fn((_items: unknown, layer: number = 2, _options?: unknown) => ({
+                    id: Symbol(`text-${seq++}`),
+                    layer,
+                })),
+                drawLine: vi.fn((_items: unknown, _style: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`line-${seq++}`),
+                    layer,
+                })),
+                drawPath: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`path-${seq++}`),
+                    layer,
+                })),
+                drawImage: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`image-${seq++}`),
+                    layer,
+                })),
+                removeDrawHandle: vi.fn(),
+                clearLayer: vi.fn(),
+                clearAll: vi.fn(),
+                clearStaticCache: vi.fn(),
+            };
+            const renderer = createMockRenderer();
+            (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
+            return { e: new CanvasTileEngine<Mount>({}, baseConfig, renderer), drawAPI };
+        }
+
+        const testImg = { width: 10, height: 10 } as unknown as HTMLImageElement;
+
+        it("threads visibleOf through to the renderer draw API on every draw kind", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const visible = () => true;
+
+            e.drawRect({ x: 1, y: 1, size: 1 }, 1, { visibleOf: visible });
+            expect(drawAPI.drawRect.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawCircle({ x: 1, y: 1, size: 1 }, 1, { visibleOf: visible });
+            expect(drawAPI.drawCircle.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawText({ x: 1, y: 1, text: "a" }, 2, { visibleOf: visible });
+            expect(drawAPI.drawText.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawLine({ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }, undefined, 1, { visibleOf: visible });
+            expect(drawAPI.drawLine.mock.calls[0][3]).toEqual({ visibleOf: visible });
+
+            e.drawPath(
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 1, y: 1 },
+                    ],
+                },
+                1,
+                { visibleOf: visible },
+            );
+            expect(drawAPI.drawPath.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawImage({ x: 1, y: 1, size: 1, img: testImg }, 1, { visibleOf: visible });
+            expect(drawAPI.drawImage.mock.calls[0][2]).toEqual({ visibleOf: visible });
+        });
+
+        it("visibleOf reads live state: hiding an item drops it from hit queries without re-registering", () => {
+            const { e } = createEngineWithDrawAPI();
+            const hidden = new Set<string>();
+            e.drawRect(
+                [
+                    { x: 2, y: 2, size: 1, data: "a" },
+                    { x: 5, y: 5, size: 1, data: "b" },
+                ],
+                1,
+                { visibleOf: (item) => !hidden.has(item.data!) },
+            );
+
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+
+            hidden.add("a");
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+            expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeDefined();
+        });
+
+        it("interactiveOf false keeps an item painted but lets queries fall through to items below", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1);
+            e.drawRect({ x: 2, y: 2, size: 1 }, 2, { interactiveOf: () => false });
+
+            const hits = e.hitTest({ x: 2.5, y: 2.5 });
+            expect(hits).toHaveLength(1);
+            expect(hits[0].layer).toBe(1);
+        });
+
+        it("an item hidden by visibleOf never hits, even when interactiveOf returns true", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { visibleOf: () => false, interactiveOf: () => true });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+        });
+
+        it("hitTestRect respects both callbacks", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawRect(
+                [
+                    { x: 2, y: 2, size: 1, data: "deco" },
+                    { x: 5, y: 5, size: 1, data: "unit" },
+                ],
+                1,
+                { interactiveOf: (item) => item.data !== "deco" },
+            );
+            e.drawCircle({ x: 7, y: 7, size: 1 }, 1, { visibleOf: () => false });
+
+            const marquee = e.hitTestRect({ minX: 0, maxX: 10, minY: 0, maxY: 10 });
+            expect(marquee).toHaveLength(1);
+            expect(marquee[0].item.data).toBe("unit");
+        });
+
+        it("applies to image kind too", () => {
+            const { e } = createEngineWithDrawAPI();
+            const hidden = new Set<string>();
+            e.drawImage(
+                [
+                    { x: 2, y: 2, size: 1, img: testImg, data: "a" },
+                    { x: 5, y: 5, size: 1, img: testImg, data: "b" },
+                ],
+                1,
+                { visibleOf: (item) => !hidden.has(item.data!), interactiveOf: (item) => item.data !== "b" },
+            );
+
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+            hidden.add("a");
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+            // "b" stays visible but interactiveOf keeps it out of queries.
+            expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeUndefined();
+        });
+
+        it("applies to line and path kinds too", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawLine({ from: { x: 0, y: 2 }, to: { x: 4, y: 2 } }, undefined, 1, { visibleOf: () => false });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+
+            e.drawPath(
+                {
+                    points: [
+                        { x: 5, y: 5 },
+                        { x: 8, y: 5 },
+                        { x: 8, y: 8 },
+                    ],
+                    closed: true,
+                    style: { fillStyle: "#000" },
+                },
+                1,
+                { interactiveOf: () => false },
+            );
+            expect(e.hitTestFirst({ x: 7.5, y: 6 })).toBeUndefined();
+        });
+    });
 });

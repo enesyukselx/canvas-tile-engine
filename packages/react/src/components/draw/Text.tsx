@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../../context/EngineContext";
-import type { Text as TextType, TextDecorationStyle, StyleOf } from "@canvas-tile-engine/core";
+import type { Text as TextType, TextDecorationStyle, StyleOf, VisibleOf } from "@canvas-tile-engine/core";
 
 export interface TextProps {
     /**
@@ -20,6 +20,14 @@ export interface TextProps {
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     styleOf?: StyleOf<TextType<any>, TextDecorationStyle>;
+    /**
+     * Per-item visibility: return `false` to skip an item for the frame.
+     * Read through a ref like `styleOf`: identity changes only repaint,
+     * never re-register or rebuild the spatial index. Use it to toggle
+     * categories or filter without a new `items` array.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    visibleOf?: VisibleOf<TextType<any>>;
 }
 
 /**
@@ -37,21 +45,26 @@ export interface TextProps {
  * />
  * ```
  */
-export const Text = memo(function Text({ items, layer = 2, styleOf }: TextProps) {
+export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf }: TextProps) {
     const { engine, requestRender } = useEngineContext();
 
-    // Read through a ref so styleOf identity changes never re-register.
+    // Read through refs so callback identity changes never re-register.
     const styleOfRef = useRef(styleOf);
+    const visibleOfRef = useRef(visibleOf);
 
     useEffect(() => {
         styleOfRef.current = styleOf;
+        visibleOfRef.current = visibleOf;
         // A new closure may capture new state (e.g. a changed selection set),
         // so repaint — that is how decoration updates reach the canvas.
         requestRender();
-    }, [styleOf, requestRender]);
+    }, [styleOf, visibleOf, requestRender]);
 
     useEffect(() => {
-        const handle = engine.drawText(items, layer, { styleOf: (item) => styleOfRef.current?.(item) });
+        const handle = engine.drawText(items, layer, {
+            styleOf: (item) => styleOfRef.current?.(item),
+            visibleOf: (item) => visibleOfRef.current?.(item),
+        });
         requestRender();
         return () => {
             if (handle) {

@@ -21,7 +21,7 @@ import type {
     TextDrawOptions,
     LineDrawOptions,
     PathDrawOptions,
-    DrawOptions,
+    ImageDrawOptions,
     StaticDrawOptions,
     DrawTransform,
     PathItem,
@@ -123,7 +123,11 @@ export interface EngineHandle {
         layer?: number,
         options?: PathDrawOptions<TData>,
     ): DrawHandle;
-    drawImage(items: ImageItem<SkImage> | ImageItem<SkImage>[], layer?: number, options?: DrawOptions): DrawHandle;
+    drawImage<TData = unknown>(
+        items: ImageItem<SkImage, TData> | ImageItem<SkImage, TData>[],
+        layer?: number,
+        options?: ImageDrawOptions<SkImage, TData>,
+    ): DrawHandle;
     drawStaticImage(
         items: ImageItem<SkImage>[],
         cacheKey: string,

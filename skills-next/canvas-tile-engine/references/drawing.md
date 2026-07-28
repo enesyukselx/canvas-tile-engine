@@ -86,6 +86,34 @@ decorating their width is safe; line/path hit corridors derive from width
 (paths also corner radius) at registration time, so a paint-time change
 would desync visuals from hit areas.
 
+`styleOf` siblings with the same live-read model:
+
+```ts
+// visibleOf: per-item show/hide. false = skip the item for the frame -
+// neither painted nor hit-testable (queries fall through to items below).
+// PREFERRED over a filtered items copy for category filters/toggles.
+const hidden = new Set<string>();
+engine.drawRect(markers, 1, {
+    id: "markers",
+    visibleOf: (m) => !hidden.has(m.data.category),
+});
+hidden.add("shops");
+engine.render(); // shops disappear and stop hit-testing; nothing re-registers
+
+// interactiveOf: per-item hit-test opt-out (the item-level hitTest: false).
+// false = still painted, but hitTest/hitTestFirst/hitTestRect skip it.
+engine.drawCircle(badges, 2, { interactiveOf: () => false }); // decorative
+```
+
+`visibleOf` exists on the five `styleOf` methods plus `drawImage`;
+`interactiveOf` on the hit-tested five (not `drawText` - text never
+hit-tests). Composition rule: a `visibleOf`-hidden item never hit-tests,
+regardless of `interactiveOf` (need an invisible-but-tappable area? use
+`hitTest`'s `padding`/`paddingPx` instead). Neither is available on
+statics. `drawImage` still has no `styleOf` - images carry no `style`;
+state-driven appearance goes through item fields like `opacity`
+(mutate + `render()`, read live at paint time).
+
 ## Layers
 
 Ascending draw order: layer 0 paints first (bottom), higher layers paint on

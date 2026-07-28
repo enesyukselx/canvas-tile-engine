@@ -34,6 +34,7 @@ import type {
     LineDecorationStyle,
     PathDecorationStyle,
     RendererDrawOptions,
+    RendererImageDrawOptions,
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
@@ -129,6 +130,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -143,6 +145,9 @@ export class WebGLDraw {
             const lines: LineInstance[] = [];
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 const size = item.size ?? 1;
                 const w = item.width ?? size;
                 const h = item.height ?? size;
@@ -202,6 +207,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -225,6 +231,9 @@ export class WebGLDraw {
             const lines: LineInstance[] = [];
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
@@ -280,6 +289,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
@@ -288,6 +298,9 @@ export class WebGLDraw {
             const lines: LineInstance[] = [];
 
             for (const item of list) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
@@ -328,6 +341,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -341,6 +355,9 @@ export class WebGLDraw {
             ctx.save();
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 const size = item.size ?? 1;
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
@@ -386,6 +403,7 @@ export class WebGLDraw {
         options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
     ): DrawHandle {
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
         // Conservative world bounds per item for culling, computed once:
         // control-point hull for command paths, vertex bounds for polylines.
         const itemBounds = items.map((item) => {
@@ -440,7 +458,7 @@ export class WebGLDraw {
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
-                if (!bounds) {
+                if (!bounds || visibleOf?.(item) === false) {
                     continue;
                 }
 
@@ -515,8 +533,13 @@ export class WebGLDraw {
         });
     }
 
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem> | ImageItem,
+        layer: number = 1,
+        options?: RendererImageDrawOptions<HTMLImageElement>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -539,6 +562,9 @@ export class WebGLDraw {
             const images: ImageInstance[] = [];
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
