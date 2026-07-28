@@ -172,6 +172,25 @@ describe("pixel snapshots", () => {
                             ],
                             style: { strokeStyle: "#fbbf24", lineWidthPx: 3 },
                         },
+                        {
+                            // Clean multi-subpath hole: two rings via
+                            // moveTo/closePath, no connector edges (contrast
+                            // with the single-ring evenodd item above).
+                            commands: [
+                                { type: "moveTo", x: 5, y: -4 },
+                                { type: "lineTo", x: 7, y: -4 },
+                                { type: "lineTo", x: 7, y: -2 },
+                                { type: "lineTo", x: 5, y: -2 },
+                                { type: "closePath" },
+                                { type: "moveTo", x: 5.5, y: -3.5 },
+                                { type: "lineTo", x: 6.5, y: -3.5 },
+                                { type: "lineTo", x: 6.5, y: -2.5 },
+                                { type: "lineTo", x: 5.5, y: -2.5 },
+                                { type: "closePath" },
+                            ],
+                            fillRule: "evenodd",
+                            style: { fillStyle: "#a855f7" },
+                        },
                     ],
                     1,
                 );
