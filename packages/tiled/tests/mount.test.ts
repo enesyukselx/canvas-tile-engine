@@ -121,6 +121,48 @@ describe("mountTiledMap", () => {
         expect(drawAPI.drawStaticImage.mock.calls[0][2]).toBe(5);
     });
 
+    it("registers an image layer as one cached image draw", async () => {
+        const { engine, drawAPI, imageLoader } = createMockEngine();
+        const map = await parseTiledMap({
+            ...MAP,
+            layers: [{ type: "imagelayer", name: "bg", image: "sky.png", imagewidth: 32, imageheight: 32 }],
+        });
+        await mountTiledMap(engine, map);
+
+        expect(imageLoader.load).toHaveBeenCalledWith("sky.png");
+        expect(drawAPI.drawStaticImage).toHaveBeenCalledTimes(1);
+        const [items, key] = drawAPI.drawStaticImage.mock.calls[0];
+        expect(items).toHaveLength(1);
+        expect(key).toBe("tiled:0:bg:image");
+    });
+
+    it("loads each distinct image once, including per-tile images", async () => {
+        const { engine, imageLoader } = createMockEngine();
+        const map = await parseTiledMap({
+            ...MAP,
+            tilesets: [
+                {
+                    firstgid: 1,
+                    name: "props",
+                    tilewidth: 16,
+                    tileheight: 16,
+                    columns: 0,
+                    tiles: [
+                        { id: 0, image: "barrel.png", imagewidth: 16, imageheight: 16 },
+                        { id: 1, image: "crate.png", imagewidth: 16, imageheight: 16 },
+                    ],
+                },
+            ],
+            layers: [{ type: "tilelayer", name: "props", data: [1, 1, 2, 0] }],
+        });
+        await mountTiledMap(engine, map);
+
+        // Two distinct images for three placed tiles.
+        expect(imageLoader.load).toHaveBeenCalledTimes(2);
+        expect(imageLoader.load).toHaveBeenCalledWith("barrel.png");
+        expect(imageLoader.load).toHaveBeenCalledWith("crate.png");
+    });
+
     it("resolves image sources through resolveImage", async () => {
         const { engine, imageLoader } = createMockEngine();
         const map = await parseTiledMap(MAP);

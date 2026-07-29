@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTiledMap } from "../src/parse";
-import { objectLayerToItems, tileLayerToItems } from "../src/mappers";
-import type { TiledObjectLayerData, TiledTileLayerData, TmjMap } from "../src/types";
+import { imageLayerToItem, objectLayerToItems, tileLayerToItems } from "../src/mappers";
+import type { TiledImageLayerData, TiledObjectLayerData, TiledTileLayerData, TmjMap } from "../src/types";
 
 const TILESET = {
     firstgid: 1,
@@ -25,7 +25,8 @@ async function parseWith(layers: TmjMap["layers"], tilesets: TmjMap["tilesets"] 
         tilesets,
         layers,
     });
-    return { map, images: new Map([[map.tilesets[0], IMG]]) };
+    // Loaded images are keyed by source string, like a real mount.
+    return { map, images: new Map(map.images.map((image) => [image.source, IMG])) };
 }
 
 describe("tileLayerToItems", () => {
@@ -83,6 +84,41 @@ describe("tileLayerToItems", () => {
     it("throws when a tileset image is missing", async () => {
         const { map } = await parseWith([{ type: "tilelayer", name: "t", data: [1, 0, 0, 0] }]);
         expect(() => tileLayerToItems(map.layers[0] as TiledTileLayerData, new Map())).toThrow(/no image loaded/);
+    });
+});
+
+describe("imageLayerToItem", () => {
+    const imageLayer = (extra: Record<string, unknown> = {}) =>
+        parseWith([{ type: "imagelayer", name: "bg", image: "sky.png", ...extra }]);
+
+    it("centers the image on its own box using the recorded pixel size", async () => {
+        const { map, images } = await imageLayer({ imagewidth: 64, imageheight: 32 });
+        const item = imageLayerToItem(map.layers[0] as TiledImageLayerData, images, map.tileSize);
+        // 64x32px on a 16px grid = 4x2 world units, top-left at (-0.5, -0.5)
+        expect(item).toEqual({ x: 1.5, y: 0.5, size: 4, img: IMG });
+    });
+
+    it("falls back to the loaded image's own dimensions", async () => {
+        const { map } = await imageLayer();
+        // Platform handles expose size as numbers (DOM/napi) or methods (Skia).
+        const domLike = new Map([["sky.png", { width: 32, height: 32 }]]);
+        const skiaLike = new Map([["sky.png", { width: () => 32, height: () => 32 }]]);
+        const layer = map.layers[0] as TiledImageLayerData;
+
+        expect(imageLayerToItem(layer, domLike, map.tileSize)).toMatchObject({ size: 2, x: 0.5, y: 0.5 });
+        expect(imageLayerToItem(layer, skiaLike, map.tileSize)).toMatchObject({ size: 2 });
+    });
+
+    it("returns null when no dimensions can be resolved", async () => {
+        const { map, images } = await imageLayer();
+        expect(imageLayerToItem(map.layers[0] as TiledImageLayerData, images, map.tileSize)).toBeNull();
+    });
+
+    it("carries layer opacity", async () => {
+        const { map, images } = await imageLayer({ imagewidth: 16, imageheight: 16, opacity: 0.4 });
+        expect(imageLayerToItem(map.layers[0] as TiledImageLayerData, images, map.tileSize)).toMatchObject({
+            opacity: 0.4,
+        });
     });
 });
 

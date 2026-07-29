@@ -5,6 +5,7 @@ import { pxPointToWorld, pxToWorld, rotateAround } from "./coords";
 import type {
     TiledAnimation,
     TiledCell,
+    TiledImage,
     TiledLayer,
     TiledMap,
     TiledObject,
@@ -81,9 +82,40 @@ function tileBoxSize(w: number, h: number, mapTileSize: number): number {
     return Math.max(w, h) / mapTileSize;
 }
 
+/**
+ * The image and source rect a local tile id draws from. Ordinary tilesets cut
+ * the tile out of one atlas; image-collection tilesets give every tile its own
+ * image, which the engine handles natively because each item carries its `img`.
+ */
+export function tilesetTile(
+    tileset: TiledTileset,
+    localId: number,
+): { image: TiledImage; sprite: SpriteRect; width: number; height: number } {
+    const own = tileset.tileImages.get(localId);
+    if (own) {
+        const width = own.width ?? tileset.tileWidth;
+        const height = own.height ?? tileset.tileHeight;
+        return { image: own, sprite: { x: 0, y: 0, w: width, h: height }, width, height };
+    }
+    if (!tileset.image) {
+        throw new Error(
+            `${PKG}: tileset "${tileset.name}" has no atlas image and tile ${localId} has no image of its own.`,
+        );
+    }
+    return {
+        image: tileset.image,
+        sprite: tilesetSpriteRect(tileset, localId),
+        width: tileset.tileWidth,
+        height: tileset.tileHeight,
+    };
+}
+
 function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number, warnings: string[]): TiledTileset {
-    const name = raw.name ?? raw.image;
-    if (!Number.isInteger(raw.columns) || raw.columns <= 0) {
+    const name = raw.name ?? raw.image ?? "(unnamed)";
+    // Image-collection tilesets have no atlas, so they have no column grid
+    // either; only atlas tilesets need one to cut sprite rects.
+    const isCollection = raw.image === undefined;
+    if (!isCollection && (!Number.isInteger(raw.columns) || raw.columns <= 0)) {
         throw new Error(`${PKG}: tileset "${name}" has no valid "columns" value.`);
     }
     if (raw.transparentcolor !== undefined) {
@@ -106,9 +138,8 @@ function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number
     const tileset: TiledTileset = {
         name,
         firstgid,
-        image: raw.image,
-        imageWidth: raw.imagewidth,
-        imageHeight: raw.imageheight,
+        image:
+            raw.image === undefined ? undefined : { source: raw.image, width: raw.imagewidth, height: raw.imageheight },
         tileWidth: raw.tilewidth,
         tileHeight: raw.tileheight,
         columns: raw.columns,
@@ -116,12 +147,20 @@ function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number
         spacing: raw.spacing ?? 0,
         tileOffset: { x: raw.tileoffset?.x ?? 0, y: raw.tileoffset?.y ?? 0 },
         objectAlignment,
+        tileImages: new Map(),
         animations: new Map(),
         tileProperties: new Map(),
     };
 
-    // Second pass: animations/properties need the finished tileset for
-    // sprite-rect math.
+    // Per-tile images first: sprite-rect math and animation frames below need
+    // to know which tiles carry their own image.
+    const tileImages = tileset.tileImages as Map<number, TiledImage>;
+    for (const tile of raw.tiles ?? []) {
+        if (tile.image !== undefined) {
+            tileImages.set(tile.id, { source: tile.image, width: tile.imagewidth, height: tile.imageheight });
+        }
+    }
+
     const animations = tileset.animations as Map<number, TiledAnimation>;
     const tileProperties = tileset.tileProperties as Map<number, Record<string, unknown>>;
     for (const tile of raw.tiles ?? []) {
@@ -132,6 +171,15 @@ function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number
                     `tileset "${name}" tile ${tile.id}: uneven animation frame durations; ` +
                         `playback uses the first frame's duration (${durations[0]}ms) for every frame.`,
                 );
+            }
+            // An animator swaps sprite RECTS inside one image; frames that live
+            // in different images would need the image swapped instead.
+            if (tile.animation.some((f) => tileImages.has(f.tileid))) {
+                warnings.push(
+                    `tileset "${name}" tile ${tile.id}: animation frames come from per-tile images, ` +
+                        `which cannot be animated (frames must share one image); the tile draws unanimated.`,
+                );
+                continue;
             }
             animations.set(tile.id, {
                 frames: tile.animation.map((f) => tilesetSpriteRect(tileset, f.tileid)),
@@ -248,10 +296,11 @@ function normalizeObject(
     } else if (o.gid !== undefined) {
         const { gid, flipX, flipY, rotate } = decodeGid(o.gid);
         const tileset = tilesetForGid(gid, tilesets);
+        const tile = tilesetTile(tileset, gid - tileset.firstgid);
         // A tile object may be scaled: width/height override the tile's own
         // pixel size, keeping the drawn aspect free of the tileset's.
-        const w = o.width ?? tileset.tileWidth;
-        const h = o.height ?? tileset.tileHeight;
+        const w = o.width ?? tile.width;
+        const h = o.height ?? tile.height;
         // The object's (x, y) is its alignment point on the tile, so the
         // tile's top-left is that point minus the alignment fractions. The
         // object's own rotation spins around (x, y), moving the center with it.
@@ -267,10 +316,10 @@ function normalizeObject(
         // The renderers aspect-fit a sprite; they cannot stretch it. A tile
         // object scaled to a different aspect than its tile therefore draws at
         // the tile's own aspect, filling the larger requested dimension.
-        if (w * tileset.tileHeight !== h * tileset.tileWidth) {
+        if (w * tile.height !== h * tile.width) {
             warnings.push(
                 `object ${label}: tile object scaled to ${w}x${h}px, a different aspect than its ` +
-                    `${tileset.tileWidth}x${tileset.tileHeight}px tile; drawn at the tile's aspect ` +
+                    `${tile.width}x${tile.height}px tile; drawn at the tile's aspect ` +
                     `(non-uniform scaling is not supported).`,
             );
         }
@@ -279,7 +328,8 @@ function normalizeObject(
             center: pxPointToWorld(centerPx, tileSize),
             size: tileBoxSize(w, h, tileSize),
             tileset,
-            sprite: tilesetSpriteRect(tileset, gid - tileset.firstgid),
+            image: tile.image,
+            sprite: tile.sprite,
             flipX,
             flipY,
             rotate: rotate + rotation,
@@ -347,6 +397,39 @@ function translateShape(shape: TiledObjectShape, dx: number, dy: number): TiledO
 }
 
 /**
+ * Every distinct image the finished layers reference, in draw order. Derived
+ * from the layers rather than the declarations, so an image-collection tileset
+ * with a thousand unplaced tiles costs a mount nothing, and no reference can be
+ * missed either.
+ */
+function collectImages(layers: TiledLayer[]): TiledImage[] {
+    const images: TiledImage[] = [];
+    const seen = new Set<string>();
+    const add = (image: TiledImage) => {
+        if (!seen.has(image.source)) {
+            seen.add(image.source);
+            images.push(image);
+        }
+    };
+    for (const layer of layers) {
+        if (layer.kind === "tiles") {
+            for (const cell of layer.cells) {
+                add(cell.image);
+            }
+        } else if (layer.kind === "image") {
+            add(layer.image);
+        } else {
+            for (const object of layer.objects) {
+                if (object.shape.kind === "tile") {
+                    add(object.shape.image);
+                }
+            }
+        }
+    }
+    return images;
+}
+
+/**
  * Parse and normalize a Tiled JSON map (`.tmj`) into the engine-space model.
  * Async only because external tilesets may need fetching via
  * `options.resolveTileset`. Throws on unsupported maps (non-orthogonal,
@@ -378,6 +461,17 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
     const warnings: string[] = [];
     const tileSize = raw.tilewidth;
 
+    const renderOrder = raw.renderorder ?? "right-down";
+    if (renderOrder !== "right-down") {
+        // Only matters where tiles overlap, i.e. tiles larger than the grid:
+        // cells are drawn in row-major order and cannot be re-sequenced per
+        // layer without giving up the static cache.
+        warnings.push(
+            `map renderorder "${renderOrder}" is not supported; tiles draw right-down, ` +
+                `which only differs where oversized tiles overlap.`,
+        );
+    }
+
     const tilesets: TiledTileset[] = [];
     for (const ref of raw.tilesets ?? []) {
         let source: TmjTileset;
@@ -399,7 +493,6 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
     tilesets.sort((a, b) => a.firstgid - b.firstgid);
 
     const layers: TiledLayer[] = [];
-
     const walk = (rawLayers: TmjLayer[], parentOpacity: number, parentOffset: Coords) => {
         for (const layer of rawLayers) {
             if (layer.visible === false) {
@@ -428,7 +521,34 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
             if (layer.type === "group") {
                 walk(layer.layers ?? [], opacity, offsetPx);
             } else if (layer.type === "imagelayer") {
-                warnings.push(`layer "${name}": image layers are not supported; skipped.`);
+                if (layer.image === undefined) {
+                    warnings.push(`layer "${name}": image layer has no image; skipped.`);
+                    continue;
+                }
+                if (layer.repeatx === true || layer.repeaty === true) {
+                    warnings.push(
+                        `layer "${name}": repeated image layers are not supported (one image is drawn once); ` +
+                            `bake the repetition into the image or use a tile layer.`,
+                    );
+                }
+                // Modern Tiled keeps x/y at 0 and puts the position in the
+                // offsets, but older files used x/y — honor both.
+                const topLeftPx = {
+                    x: (layer.x ?? 0) + offsetPx.x,
+                    y: (layer.y ?? 0) + offsetPx.y,
+                };
+                layers.push({
+                    kind: "image",
+                    name,
+                    opacity,
+                    image: {
+                        source: layer.image,
+                        width: layer.imagewidth,
+                        height: layer.imageheight,
+                    },
+                    topLeft: pxPointToWorld(topLeftPx, tileSize),
+                    properties: propsToRecord(layer.properties),
+                });
             } else if (layer.type === "tilelayer") {
                 const gids = decodeLayerData(layer, raw.width * raw.height);
                 const cells: TiledCell[] = [];
@@ -441,21 +561,23 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                     const localId = gid - tileset.firstgid;
                     const col = i % raw.width;
                     const row = Math.floor(i / raw.width);
+                    const tile = tilesetTile(tileset, localId);
                     // A tile sits on the BOTTOM-left of its cell, so tiles
                     // larger than the grid grow up and to the right. The item
                     // anchor is the drawn image's center, which is also the
                     // center of its square box.
                     const centerPx = {
-                        x: col * tileSize + tileset.tileOffset.x + tileset.tileWidth / 2,
-                        y: (row + 1) * tileSize + tileset.tileOffset.y - tileset.tileHeight / 2,
+                        x: col * tileSize + tileset.tileOffset.x + tile.width / 2,
+                        y: (row + 1) * tileSize + tileset.tileOffset.y - tile.height / 2,
                     };
                     const world = pxPointToWorld(centerPx, tileSize);
                     const cell: TiledCell = {
                         x: world.x + offset.x,
                         y: world.y + offset.y,
-                        size: tileBoxSize(tileset.tileWidth, tileset.tileHeight, tileSize),
+                        size: tileBoxSize(tile.width, tile.height, tileSize),
                         tileset,
-                        sprite: tilesetSpriteRect(tileset, localId),
+                        image: tile.image,
+                        sprite: tile.sprite,
                         flipX,
                         flipY,
                         rotate,
@@ -516,7 +638,9 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
         rows: raw.height,
         tileSize,
         tilesets,
+        images: collectImages(layers),
         layers,
+        ...(raw.backgroundcolor !== undefined ? { backgroundColor: raw.backgroundcolor } : {}),
         properties: propsToRecord(raw.properties),
         warnings,
     };

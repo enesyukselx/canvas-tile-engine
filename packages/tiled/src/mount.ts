@@ -1,7 +1,7 @@
 import { SpriteAnimator } from "@canvas-tile-engine/core";
 import type { CanvasTileEngine, DrawHandle } from "@canvas-tile-engine/core";
-import { objectLayerToItems, tileLayerToItems, type ObjectStyleOptions } from "./mappers";
-import type { TiledMap, TiledTileset } from "./types";
+import { imageLayerToItem, objectLayerToItems, tileLayerToItems, type ObjectStyleOptions } from "./mappers";
+import type { TiledImage, TiledMap } from "./types";
 
 export interface MountTiledMapOptions extends ObjectStyleOptions {
     /**
@@ -10,10 +10,11 @@ export interface MountTiledMapOptions extends ObjectStyleOptions {
      */
     layerOffset?: number;
     /**
-     * Resolve a tileset's image source (as written in the map file) to the
-     * URL/path handed to `engine.images.load`. Default: the source as-is.
+     * Resolve an image source (as written in the map or tileset file) to the
+     * URL/path handed to `engine.images.load`. Called once per distinct source
+     * in `map.images`. Default: the source as-is.
      */
-    resolveImage?: (source: string, tileset: TiledTileset) => string;
+    resolveImage?: (source: string, image: TiledImage) => string;
     /**
      * Draw tile layers dynamically instead of through static caches.
      * Static (default) is right for maps that do not change.
@@ -48,11 +49,13 @@ export async function mountTiledMap<TMount, TImage>(
 ): Promise<TiledMount> {
     const { layerOffset = 0, dynamic = false } = options;
 
-    const images = new Map<TiledTileset, TImage>();
+    // One load per distinct source, keyed by the source string the map file
+    // uses — atlases, per-tile images of image collections, and image layers.
+    const images = new Map<string, TImage>();
     await Promise.all(
-        map.tilesets.map(async (tileset) => {
-            const src = options.resolveImage ? options.resolveImage(tileset.image, tileset) : tileset.image;
-            images.set(tileset, await engine.images.load(src));
+        map.images.map(async (image) => {
+            const src = options.resolveImage ? options.resolveImage(image.source, image) : image.source;
+            images.set(image.source, await engine.images.load(src));
         }),
     );
 
@@ -87,6 +90,16 @@ export async function mountTiledMap<TMount, TImage>(
                 });
                 animators.push(animator);
             });
+        } else if (layer.kind === "image") {
+            const item = imageLayerToItem(layer, images, map.tileSize);
+            if (item) {
+                // A backdrop never changes, so it caches like a tile layer.
+                layerHandles.push(
+                    dynamic
+                        ? engine.drawImage([item], engineLayer, { id: `${idBase}:image` })
+                        : engine.drawStaticImage([item], `${idBase}:image`, engineLayer),
+                );
+            }
         } else {
             const { paths, markers, tiles, texts } = objectLayerToItems(layer, images, options);
             if (paths.length > 0) {

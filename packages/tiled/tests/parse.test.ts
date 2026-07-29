@@ -196,7 +196,7 @@ describe("parseTiledMap — tile layers", () => {
 });
 
 describe("parseTiledMap — layer tree", () => {
-    it("flattens groups, multiplies opacity, honors visible:false, warns on image layers", async () => {
+    it("flattens groups, multiplies opacity, honors visible:false", async () => {
         const map = await parseTiledMap(
             baseMap({
                 layers: [
@@ -207,7 +207,6 @@ describe("parseTiledMap — layer tree", () => {
                         layers: [
                             { type: "tilelayer", name: "a", opacity: 0.5, data: [1, 0, 0, 0] },
                             { type: "tilelayer", name: "hidden", visible: false, data: [1, 0, 0, 0] },
-                            { type: "imagelayer", name: "bg" },
                         ],
                     },
                 ],
@@ -216,7 +215,159 @@ describe("parseTiledMap — layer tree", () => {
         expect(map.layers).toHaveLength(1);
         expect(map.layers[0].name).toBe("a");
         expect(map.layers[0].opacity).toBe(0.25);
-        expect(map.warnings.some((w) => w.includes("image layers"))).toBe(true);
+        expect(map.warnings).toEqual([]);
+    });
+
+    it("warns on an unknown layer type", async () => {
+        const map = await parseTiledMap(baseMap({ layers: [{ type: "somethingnew", name: "x" }] }));
+        expect(map.layers).toHaveLength(0);
+        expect(map.warnings.some((w) => w.includes("unknown layer type"))).toBe(true);
+    });
+});
+
+describe("parseTiledMap — image layers", () => {
+    it("places the image by its top-left corner, offsets included", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "imagelayer",
+                        name: "bg",
+                        image: "sky.png",
+                        imagewidth: 64,
+                        imageheight: 32,
+                        offsetx: 16,
+                        offsety: 8,
+                        opacity: 0.5,
+                    },
+                ],
+            }),
+        );
+        expect(map.layers[0]).toEqual({
+            kind: "image",
+            name: "bg",
+            opacity: 0.5,
+            image: { source: "sky.png", width: 64, height: 32 },
+            // px (16, 8) -> item space (0.5, 0)
+            topLeft: { x: 0.5, y: 0 },
+            properties: {},
+        });
+        expect(map.images).toEqual([{ source: "sky.png", width: 64, height: 32 }]);
+    });
+
+    it("keeps the size unknown when the file does not record it", async () => {
+        const map = await parseTiledMap(baseMap({ layers: [{ type: "imagelayer", name: "bg", image: "sky.png" }] }));
+        expect(map.images[0]).toEqual({ source: "sky.png", width: undefined, height: undefined });
+    });
+
+    it("skips an image layer with no image, and warns on repetition", async () => {
+        const empty = await parseTiledMap(baseMap({ layers: [{ type: "imagelayer", name: "bg" }] }));
+        expect(empty.layers).toHaveLength(0);
+        expect(empty.warnings.some((w) => w.includes("no image"))).toBe(true);
+
+        const repeated = await parseTiledMap(
+            baseMap({ layers: [{ type: "imagelayer", name: "bg", image: "sky.png", repeatx: true }] }),
+        );
+        expect(repeated.layers).toHaveLength(1);
+        expect(repeated.warnings.some((w) => w.includes("repeated image layers"))).toBe(true);
+    });
+});
+
+describe("parseTiledMap — image-collection tilesets", () => {
+    const collection = {
+        firstgid: 1,
+        name: "props",
+        tilewidth: 32,
+        tileheight: 32,
+        columns: 0,
+        tiles: [
+            { id: 0, image: "barrel.png", imagewidth: 16, imageheight: 16 },
+            { id: 1, image: "statue.png", imagewidth: 32, imageheight: 48 },
+        ],
+    };
+
+    it("gives every tile its own image and full-image sprite rect", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                tilesets: [collection],
+                layers: [{ type: "tilelayer", name: "t", data: [1, 2, 0, 0] }],
+            }),
+        );
+        const cells = (map.layers[0] as TiledTileLayerData).cells;
+        expect(cells[0]).toMatchObject({
+            image: { source: "barrel.png" },
+            sprite: { x: 0, y: 0, w: 16, h: 16 },
+            size: 1, // 16px tile on a 16px grid
+        });
+        expect(cells[1]).toMatchObject({
+            image: { source: "statue.png" },
+            sprite: { x: 0, y: 0, w: 32, h: 48 },
+            size: 3,
+        });
+        // Both images are collected, in draw order.
+        expect(map.images.map((i) => i.source)).toEqual(["barrel.png", "statue.png"]);
+    });
+
+    it("only collects images the map actually places", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                tilesets: [collection],
+                layers: [{ type: "tilelayer", name: "t", data: [2, 0, 0, 0] }],
+            }),
+        );
+        expect(map.images.map((i) => i.source)).toEqual(["statue.png"]);
+    });
+
+    it("throws when a placed tile has neither an atlas nor its own image", async () => {
+        const map = baseMap({
+            tilesets: [{ ...collection, tiles: [{ id: 0, image: "barrel.png" }] }],
+            layers: [{ type: "tilelayer", name: "t", data: [2, 0, 0, 0] }],
+        });
+        await expect(parseTiledMap(map)).rejects.toThrow(/no atlas image/);
+    });
+
+    it("warns that per-tile-image animations cannot play", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                tilesets: [
+                    {
+                        ...collection,
+                        tiles: [
+                            {
+                                id: 0,
+                                image: "barrel.png",
+                                imagewidth: 16,
+                                imageheight: 16,
+                                animation: [
+                                    { tileid: 0, duration: 100 },
+                                    { tileid: 1, duration: 100 },
+                                ],
+                            },
+                            { id: 1, image: "statue.png", imagewidth: 16, imageheight: 16 },
+                        ],
+                    },
+                ],
+                layers: [{ type: "tilelayer", name: "t", data: [1, 0, 0, 0] }],
+            }),
+        );
+        expect(map.warnings.some((w) => w.includes("per-tile images"))).toBe(true);
+        expect((map.layers[0] as TiledTileLayerData).cells[0].animation).toBeUndefined();
+    });
+});
+
+describe("parseTiledMap — map-level fields", () => {
+    it("surfaces backgroundcolor for the engine config", async () => {
+        const map = await parseTiledMap(baseMap({ backgroundcolor: "#334155" }));
+        expect(map.backgroundColor).toBe("#334155");
+        const none = await parseTiledMap(baseMap({}));
+        expect(none.backgroundColor).toBeUndefined();
+    });
+
+    it("warns on a renderorder it cannot reproduce", async () => {
+        const map = await parseTiledMap(baseMap({ renderorder: "left-up" }));
+        expect(map.warnings.some((w) => w.includes("renderorder"))).toBe(true);
+        const normal = await parseTiledMap(baseMap({ renderorder: "right-down" }));
+        expect(normal.warnings).toEqual([]);
     });
 });
 

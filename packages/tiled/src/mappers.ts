@@ -1,5 +1,12 @@
 import type { Circle, ImageItem, PathCommand, PathItem, PathStyle, Text } from "@canvas-tile-engine/core";
-import type { TiledAnimation, TiledObjectData, TiledObjectLayerData, TiledTileLayerData, TiledTileset } from "./types";
+import type {
+    TiledAnimation,
+    TiledImage,
+    TiledImageLayerData,
+    TiledObjectData,
+    TiledObjectLayerData,
+    TiledTileLayerData,
+} from "./types";
 
 const PKG = "@canvas-tile-engine/tiled";
 
@@ -16,10 +23,16 @@ export interface TileLayerItems<TImage> {
     animated: AnimatedTileGroup<TImage>[];
 }
 
-function imageFor<TImage>(images: ReadonlyMap<TiledTileset, TImage>, tileset: TiledTileset): TImage {
-    const img = images.get(tileset);
+/**
+ * Loaded images are keyed by the source string as written in the map file, so
+ * one lookup serves atlases, per-tile images and image layers alike.
+ */
+export type TiledImageMap<TImage> = ReadonlyMap<string, TImage>;
+
+function imageFor<TImage>(images: TiledImageMap<TImage>, image: TiledImage): TImage {
+    const img = images.get(image.source);
     if (img === undefined) {
-        throw new Error(`${PKG}: no image loaded for tileset "${tileset.name}" — load every map tileset first.`);
+        throw new Error(`${PKG}: no image loaded for "${image.source}" — load every image in map.images first.`);
     }
     return img;
 }
@@ -31,7 +44,7 @@ function imageFor<TImage>(images: ReadonlyMap<TiledTileset, TImage>, tileset: Ti
  */
 export function tileLayerToItems<TImage>(
     layer: TiledTileLayerData,
-    images: ReadonlyMap<TiledTileset, TImage>,
+    images: TiledImageMap<TImage>,
 ): TileLayerItems<TImage> {
     const staticItems: ImageItem<TImage>[] = [];
     const groups = new Map<TiledAnimation, AnimatedTileGroup<TImage>>();
@@ -40,7 +53,7 @@ export function tileLayerToItems<TImage>(
         const item: ImageItem<TImage> = {
             x: cell.x,
             y: cell.y,
-            img: imageFor(images, cell.tileset),
+            img: imageFor(images, cell.image),
             sprite: cell.animation ? cell.animation.frames[0] : cell.sprite,
         };
         // Grid-sized tiles keep the default; oversized ones need their box.
@@ -75,6 +88,60 @@ export function tileLayerToItems<TImage>(
         }
     }
     return { staticItems, animated: [...groups.values()] };
+}
+
+/**
+ * Pixel size of a loaded image handle. Platforms differ — DOM and napi expose
+ * width/height as numbers, Skia's SkImage as methods — so duck-type both.
+ */
+function loadedImageSize(img: unknown): { w: number; h: number } | null {
+    const handle = img as { width?: number | (() => number); height?: number | (() => number) } | undefined;
+    if (!handle) {
+        return null;
+    }
+    const w = typeof handle.width === "function" ? handle.width() : handle.width;
+    const h = typeof handle.height === "function" ? handle.height() : handle.height;
+    if (typeof w !== "number" || typeof h !== "number" || !w || !h) {
+        return null;
+    }
+    return { w, h };
+}
+
+/**
+ * An image layer as a single image item, anchored so the image's top-left lands
+ * where Tiled puts it. The drawn size needs pixel dimensions: the map file's
+ * when it records them, otherwise the loaded image's own.
+ *
+ * Returns null when neither is available — the layer then draws nothing rather
+ * than at a guessed size.
+ */
+export function imageLayerToItem<TImage>(
+    layer: TiledImageLayerData,
+    images: TiledImageMap<TImage>,
+    mapTileSize: number,
+): ImageItem<TImage> | null {
+    const img = imageFor(images, layer.image);
+    const loaded = loadedImageSize(img);
+    const w = layer.image.width ?? loaded?.w;
+    const h = layer.image.height ?? loaded?.h;
+    if (w === undefined || h === undefined) {
+        return null;
+    }
+
+    const worldW = w / mapTileSize;
+    const worldH = h / mapTileSize;
+    const item: ImageItem<TImage> = {
+        // The renderers center an aspect-fitted image in its square box, so the
+        // anchor is the image's own center.
+        x: layer.topLeft.x + worldW / 2,
+        y: layer.topLeft.y + worldH / 2,
+        size: Math.max(worldW, worldH),
+        img,
+    };
+    if (layer.opacity !== 1) {
+        item.opacity = layer.opacity;
+    }
+    return item;
 }
 
 export interface ObjectLayerItems<TImage> {
@@ -130,7 +197,7 @@ function ellipseCommands(cx: number, cy: number, rx: number, ry: number): PathCo
  */
 export function objectLayerToItems<TImage>(
     layer: TiledObjectLayerData,
-    images: ReadonlyMap<TiledTileset, TImage>,
+    images: TiledImageMap<TImage>,
     options: ObjectStyleOptions = {},
 ): ObjectLayerItems<TImage> {
     const paths: PathItem<TiledObjectData>[] = [];
@@ -193,7 +260,7 @@ export function objectLayerToItems<TImage>(
                     x: shape.center.x,
                     y: shape.center.y,
                     size: shape.size,
-                    img: imageFor(images, shape.tileset),
+                    img: imageFor(images, shape.image),
                     sprite: shape.sprite,
                     data,
                 };

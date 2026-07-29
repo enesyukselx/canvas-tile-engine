@@ -15,13 +15,18 @@ export interface TmjFrame {
 
 export interface TmjTilesetTile {
     id: number;
+    /** Image-collection tilesets give every tile its own image. */
+    image?: string;
+    imagewidth?: number;
+    imageheight?: number;
     animation?: TmjFrame[];
     properties?: TmjProperty[];
 }
 
 export interface TmjTileset {
     name?: string;
-    image: string;
+    /** Absent for image-collection tilesets. */
+    image?: string;
     imagewidth?: number;
     imageheight?: number;
     tilewidth: number;
@@ -114,12 +119,23 @@ export interface TmjLayer {
     layers?: TmjLayer[];
     /** objectgroup */
     objects?: TmjObject[];
+    /** imagelayer */
+    image?: string;
+    imagewidth?: number;
+    imageheight?: number;
+    repeatx?: boolean;
+    repeaty?: boolean;
+    /** imagelayer position, in pixels (modern Tiled keeps these at 0). */
+    x?: number;
+    y?: number;
     properties?: TmjProperty[];
 }
 
 export interface TmjMap {
     type?: string;
     orientation?: string;
+    backgroundcolor?: string;
+    renderorder?: string;
     infinite?: boolean;
     width: number;
     height: number;
@@ -154,13 +170,25 @@ export type TiledObjectAlignment =
     | "bottom"
     | "bottomright";
 
+/**
+ * An image the map needs. `source` is the path exactly as written in the map or
+ * tileset file — resolve it to a real URL at mount time. The pixel size is
+ * present whenever the file records it.
+ */
+export interface TiledImage {
+    source: string;
+    width?: number;
+    height?: number;
+}
+
 export interface TiledTileset {
     name: string;
     firstgid: number;
-    /** Image source as written in the file (resolve to a URL/path at mount). */
-    image: string;
-    imageWidth?: number;
-    imageHeight?: number;
+    /**
+     * The atlas image. Absent for image-collection tilesets, where every tile
+     * carries its own image in {@link tileImages} instead.
+     */
+    image?: TiledImage;
     /**
      * Tile width in source pixels. May exceed the map grid: Tiled anchors an
      * oversized tile at the bottom-left of its cell, so it grows up and right.
@@ -175,6 +203,11 @@ export interface TiledTileset {
     tileOffset: Coords;
     /** Anchor point tile objects from this tileset are placed by. */
     objectAlignment: TiledObjectAlignment;
+    /**
+     * Local tile id → its own image, for image-collection tilesets. Empty for
+     * ordinary atlas tilesets.
+     */
+    tileImages: ReadonlyMap<number, TiledImage>;
     /** Local tile id → animation (only animated tiles present). */
     animations: ReadonlyMap<number, TiledAnimation>;
     /** Local tile id → custom properties (only tiles that have any). */
@@ -192,7 +225,9 @@ export interface TiledCell {
      */
     size: number;
     tileset: TiledTileset;
-    /** Atlas source rect (margin/spacing applied). */
+    /** The image this cell draws from — the atlas, or the tile's own image. */
+    image: TiledImage;
+    /** Source rect inside {@link image} (margin/spacing applied). */
     sprite: SpriteRect;
     flipX: boolean;
     flipY: boolean;
@@ -241,6 +276,7 @@ export type TiledObjectShape =
           /** World-unit size of the square box the tile draws in (see {@link TiledCell.size}). */
           size: number;
           tileset: TiledTileset;
+          image: TiledImage;
           sprite: SpriteRect;
           flipX: boolean;
           flipY: boolean;
@@ -269,7 +305,22 @@ export interface TiledObjectLayerData {
     properties: Record<string, unknown>;
 }
 
-export type TiledLayer = TiledTileLayerData | TiledObjectLayerData;
+export interface TiledImageLayerData {
+    kind: "image";
+    name: string;
+    opacity: number;
+    image: TiledImage;
+    /**
+     * Item-space position of the image's TOP-LEFT corner. The drawn size needs
+     * the image's pixel dimensions, so the mount resolves it after loading
+     * (`image.width`/`height` when the file recorded them, else the loaded
+     * image's own size).
+     */
+    topLeft: Coords;
+    properties: Record<string, unknown>;
+}
+
+export type TiledLayer = TiledTileLayerData | TiledObjectLayerData | TiledImageLayerData;
 
 export interface TiledMap {
     columns: number;
@@ -277,8 +328,16 @@ export interface TiledMap {
     /** px per cell in the source assets. */
     tileSize: number;
     tilesets: TiledTileset[];
+    /**
+     * Every distinct image the map references — tileset atlases, per-tile
+     * images of image-collection tilesets, and image layers — in first-use
+     * order. Load these and key them by `source`.
+     */
+    images: TiledImage[];
     /** Flattened (groups resolved), in draw order, invisible layers removed. */
     layers: TiledLayer[];
+    /** The map's `backgroundcolor`, ready for the engine's `backgroundColor`. */
+    backgroundColor?: string;
     properties: Record<string, unknown>;
     /** Non-fatal skips and quirks encountered while parsing. */
     warnings: string[];
