@@ -357,6 +357,29 @@ describe("static picture cache", () => {
         expect(pictures[2]).not.toBe(pictures[0]);
     });
 
+    it("covers per-axis width/height in the cull rect", () => {
+        // A rect wider than its `size` must still record inside its own cull
+        // rect: Skia is free to quick-reject or clip anything outside it.
+        const { draw, render } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticRect([{ x: 0, y: 0, width: 8, height: 2, style: { fillStyle: "#f00" } }], "cache-wh", 1);
+        render(canvas);
+
+        const picture = ops.find((o) => o.op === "picture")?.picture as MockPicture;
+        const cull = picture.bounds as { x: number; y: number; width: number; height: number };
+        const rect = (picture.ops.find((o) => o.op === "rect") as Op).rect as {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        };
+
+        expect(cull.x).toBeLessThanOrEqual(rect.x);
+        expect(cull.y).toBeLessThanOrEqual(rect.y);
+        expect(cull.x + cull.width).toBeGreaterThanOrEqual(rect.x + rect.width);
+        expect(cull.y + cull.height).toBeGreaterThanOrEqual(rect.y + rect.height);
+    });
+
     it("draws nothing for an empty item list", () => {
         const { draw, render } = setup();
         const { canvas, ops } = makeCanvas();
