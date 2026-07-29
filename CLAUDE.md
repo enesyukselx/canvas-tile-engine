@@ -80,6 +80,7 @@ pnpm --filter @canvas-tile-engine/renderer-shared test
 ```bash
 pnpm --filter vanilla-js-game-map dev
 pnpm --filter vanilla-js-spritesheet dev
+pnpm --filter tiled-map dev
 pnpm --filter react-game-map dev
 pnpm --filter react-responsive-game-map dev
 pnpm --filter react-pixel-paint dev
