@@ -54,7 +54,8 @@ keeps its aspect inside a square box). Tileset `tileoffset` and
 `objectalignment` (all nine anchors; orthogonal default bottom-left). CSV +
 base64 (+zlib/gzip via fflate). Tile / object / group / image layers (groups
 flatten, `visible: false` dropped). Layer pixel offsets
-(`offsetx`/`offsety`, accumulating down group trees). Layer opacity (tile
+(`offsetx`/`offsety`, accumulating down group trees). All four `renderorder`
+values (the cell sequence is the draw order, which decides overlap winners). Layer opacity (tile
 layers, image layers, tile objects). All 8 GID flip orientations. Tile
 animations. Custom properties (map, layer, tileset tile, object). Objects:
 rect, polygon, polyline, ellipse, point, tile, text. Object rotation.
@@ -62,15 +63,14 @@ rect, polygon, polyline, ellipse, point, tile, text. Object rotation.
 ## Warns (map still loads; entry in `map.warnings`)
 
 `tintcolor` (no tint stage), `parallaxx`/`parallaxy` (needs per-frame
-repositioning), `renderorder` != right-down (only differs where oversized
-tiles overlap), object-layer opacity for non-tile shapes (`PathStyle` and
+repositioning), object-layer opacity for non-tile shapes (`PathStyle` and
 `Circle.style` carry no alpha - use an `rgba()` color), ellipse rotation,
 non-uniformly scaled tile objects (renderers fit, never stretch), text
 bold/italic/underline/strikeout/wrap and justified alignment (font string is
 size + family; one unbroken line per item), repeated image layers,
 uneven animation frame durations (fps from the FIRST frame), animations whose
 frames live in different per-tile images, `transparentcolor`, unknown layer
-types.
+types, unknown render orders.
 
 ## Rejects (parseTiledMap throws, message names the fix)
 

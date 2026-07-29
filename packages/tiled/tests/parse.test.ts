@@ -363,11 +363,32 @@ describe("parseTiledMap — map-level fields", () => {
         expect(none.backgroundColor).toBeUndefined();
     });
 
-    it("warns on a renderorder it cannot reproduce", async () => {
-        const map = await parseTiledMap(baseMap({ renderorder: "left-up" }));
+    it("sequences cells by renderorder, which decides overlap winners", async () => {
+        // Four distinct tiles in a 2x2 map; the cell order is the draw order.
+        const at = async (renderorder: string) => {
+            const map = await parseTiledMap(
+                baseMap({ renderorder, layers: [{ type: "tilelayer", name: "t", data: [1, 2, 3, 4] }] }),
+            );
+            return (map.layers[0] as TiledTileLayerData).cells.map((c) => `${c.x},${c.y}`);
+        };
+
+        expect(await at("right-down")).toEqual(["0,0", "1,0", "0,1", "1,1"]);
+        expect(await at("right-up")).toEqual(["0,1", "1,1", "0,0", "1,0"]);
+        expect(await at("left-down")).toEqual(["1,0", "0,0", "1,1", "0,1"]);
+        expect(await at("left-up")).toEqual(["1,1", "0,1", "1,0", "0,0"]);
+    });
+
+    it("warns on an unknown renderorder and draws right-down", async () => {
+        const map = await parseTiledMap(
+            baseMap({ renderorder: "sideways", layers: [{ type: "tilelayer", name: "t", data: [1, 2, 3, 4] }] }),
+        );
         expect(map.warnings.some((w) => w.includes("renderorder"))).toBe(true);
-        const normal = await parseTiledMap(baseMap({ renderorder: "right-down" }));
-        expect(normal.warnings).toEqual([]);
+        expect((map.layers[0] as TiledTileLayerData).cells.map((c) => `${c.x},${c.y}`)).toEqual([
+            "0,0",
+            "1,0",
+            "0,1",
+            "1,1",
+        ]);
     });
 });
 

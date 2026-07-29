@@ -22,6 +22,9 @@ import type {
 
 const PKG = "@canvas-tile-engine/tiled";
 
+/** Tiled's four tile draw orders; the first word is the horizontal direction. */
+const RENDER_ORDERS = new Set(["right-down", "right-up", "left-down", "left-up"]);
+
 export interface ParseTiledMapOptions {
     /**
      * Return the parsed JSON of an external tileset (`.tsj`), given its
@@ -110,7 +113,7 @@ export function tilesetTile(
     };
 }
 
-function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number, warnings: string[]): TiledTileset {
+function normalizeTileset(raw: TmjTileset, firstgid: number, warnings: string[]): TiledTileset {
     const name = raw.name ?? raw.image ?? "(unnamed)";
     // Image-collection tilesets have no atlas, so they have no column grid
     // either; only atlas tilesets need one to cut sprite rects.
@@ -462,15 +465,14 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
     const tileSize = raw.tilewidth;
 
     const renderOrder = raw.renderorder ?? "right-down";
-    if (renderOrder !== "right-down") {
-        // Only matters where tiles overlap, i.e. tiles larger than the grid:
-        // cells are drawn in row-major order and cannot be re-sequenced per
-        // layer without giving up the static cache.
-        warnings.push(
-            `map renderorder "${renderOrder}" is not supported; tiles draw right-down, ` +
-                `which only differs where oversized tiles overlap.`,
-        );
+    if (!RENDER_ORDERS.has(renderOrder)) {
+        warnings.push(`map renderorder "${renderOrder}" is unknown; tiles draw right-down.`);
     }
+    // Draw order only shows where tiles overlap, i.e. tiles larger than the
+    // grid — but there it decides which tile wins, so the cell sequence follows
+    // the map's setting instead of always being row-major.
+    const columnOrder = renderOrder.startsWith("left") ? -1 : 1;
+    const rowOrder = renderOrder.endsWith("up") ? -1 : 1;
 
     const tilesets: TiledTileset[] = [];
     for (const ref of raw.tilesets ?? []) {
@@ -488,7 +490,7 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
         } else {
             source = ref;
         }
-        tilesets.push(normalizeTileset(source, ref.firstgid, tileSize, warnings));
+        tilesets.push(normalizeTileset(source, ref.firstgid, warnings));
     }
     tilesets.sort((a, b) => a.firstgid - b.firstgid);
 
@@ -552,45 +554,48 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
             } else if (layer.type === "tilelayer") {
                 const gids = decodeLayerData(layer, raw.width * raw.height);
                 const cells: TiledCell[] = [];
-                for (let i = 0; i < gids.length; i++) {
-                    if (gids[i] === 0) {
-                        continue;
+                for (let r = 0; r < raw.height; r++) {
+                    for (let c = 0; c < raw.width; c++) {
+                        const row = rowOrder === 1 ? r : raw.height - 1 - r;
+                        const col = columnOrder === 1 ? c : raw.width - 1 - c;
+                        const i = row * raw.width + col;
+                        if (gids[i] === 0) {
+                            continue;
+                        }
+                        const { gid, flipX, flipY, rotate } = decodeGid(gids[i]);
+                        const tileset = tilesetForGid(gid, tilesets);
+                        const localId = gid - tileset.firstgid;
+                        const tile = tilesetTile(tileset, localId);
+                        // A tile sits on the BOTTOM-left of its cell, so tiles
+                        // larger than the grid grow up and to the right. The item
+                        // anchor is the drawn image's center, which is also the
+                        // center of its square box.
+                        const centerPx = {
+                            x: col * tileSize + tileset.tileOffset.x + tile.width / 2,
+                            y: (row + 1) * tileSize + tileset.tileOffset.y - tile.height / 2,
+                        };
+                        const world = pxPointToWorld(centerPx, tileSize);
+                        const cell: TiledCell = {
+                            x: world.x + offset.x,
+                            y: world.y + offset.y,
+                            size: tileBoxSize(tile.width, tile.height, tileSize),
+                            tileset,
+                            image: tile.image,
+                            sprite: tile.sprite,
+                            flipX,
+                            flipY,
+                            rotate,
+                        };
+                        const animation = tileset.animations.get(localId);
+                        if (animation) {
+                            cell.animation = animation;
+                        }
+                        const properties = tileset.tileProperties.get(localId);
+                        if (properties) {
+                            cell.properties = properties;
+                        }
+                        cells.push(cell);
                     }
-                    const { gid, flipX, flipY, rotate } = decodeGid(gids[i]);
-                    const tileset = tilesetForGid(gid, tilesets);
-                    const localId = gid - tileset.firstgid;
-                    const col = i % raw.width;
-                    const row = Math.floor(i / raw.width);
-                    const tile = tilesetTile(tileset, localId);
-                    // A tile sits on the BOTTOM-left of its cell, so tiles
-                    // larger than the grid grow up and to the right. The item
-                    // anchor is the drawn image's center, which is also the
-                    // center of its square box.
-                    const centerPx = {
-                        x: col * tileSize + tileset.tileOffset.x + tile.width / 2,
-                        y: (row + 1) * tileSize + tileset.tileOffset.y - tile.height / 2,
-                    };
-                    const world = pxPointToWorld(centerPx, tileSize);
-                    const cell: TiledCell = {
-                        x: world.x + offset.x,
-                        y: world.y + offset.y,
-                        size: tileBoxSize(tile.width, tile.height, tileSize),
-                        tileset,
-                        image: tile.image,
-                        sprite: tile.sprite,
-                        flipX,
-                        flipY,
-                        rotate,
-                    };
-                    const animation = tileset.animations.get(localId);
-                    if (animation) {
-                        cell.animation = animation;
-                    }
-                    const properties = tileset.tileProperties.get(localId);
-                    if (properties) {
-                        cell.properties = properties;
-                    }
-                    cells.push(cell);
                 }
                 layers.push({
                     kind: "tiles",

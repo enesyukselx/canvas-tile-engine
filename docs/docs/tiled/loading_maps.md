@@ -60,6 +60,7 @@ Everything below is decided at parse time, so you find out before a single pixel
 | CSV and base64 layer data | Plain, `zlib`, or `gzip` |
 | Tile, object, group and image layers | Groups flatten; `visible: false` layers are dropped |
 | Layer pixel offsets | `offsetx`/`offsety`, accumulating down group trees |
+| `renderorder` | All four orders; decides which tile wins where oversized tiles overlap |
 | Layer opacity | Tile layers, image layers, and tile objects |
 | GID flip flags | All eight orientations, including the diagonal ones |
 | Tile animations | One animator per distinct animated tile, however many cells use it |
@@ -76,7 +77,6 @@ Each of these lands in `map.warnings` with the reason and what happens instead.
 | :--- | :--- |
 | `tintcolor` | Ignored — the engine has no tint stage |
 | `parallaxx` / `parallaxy` | Ignored — parallax needs per-frame repositioning against the camera |
-| `renderorder` other than `right-down` | Tiles draw right-down; only visible where oversized tiles overlap |
 | Object-layer opacity | Applies to tile objects; shapes, markers and labels stay opaque (use an `rgba()` style color) |
 | Ellipse rotation | The ellipse draws unrotated |
 | Non-uniformly scaled tile objects | Drawn at the tile's own aspect — the renderers fit a sprite, never stretch it |
@@ -86,7 +86,7 @@ Each of these lands in `map.warnings` with the reason and what happens instead.
 | Uneven animation frame durations | Every frame uses the first frame's duration |
 | Animations across per-tile images | The tile draws unanimated — an animator swaps rects inside one image |
 | `transparentcolor` | Ignored; export the image with real alpha instead |
-| Unknown layer types | Skipped |
+| Unknown layer types or render orders | Skipped / drawn right-down |
 
 ### Rejected
 
