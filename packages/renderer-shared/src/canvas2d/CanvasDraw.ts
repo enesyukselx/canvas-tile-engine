@@ -30,7 +30,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
-    BoundedItem,
+    AnchoredItem,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -749,7 +749,7 @@ export class CanvasDraw<
      * Handles bounds calculation, canvas creation, and rebuild logic.
      */
     private getOrCreateStaticCache<
-        T extends BoundedItem & {
+        T extends AnchoredItem & {
             radius?: number | number[];
             origin?: { mode?: "cell" | "self"; x?: number; y?: number };
         },

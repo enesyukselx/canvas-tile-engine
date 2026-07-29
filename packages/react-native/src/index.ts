@@ -74,6 +74,7 @@ export {
     gridToSize,
     fitScale,
     itemsBounds,
+    pathItemBounds,
     pathCommandsBounds,
     SpriteSheet,
     SpriteAnimator,

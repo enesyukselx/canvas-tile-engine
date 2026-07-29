@@ -142,7 +142,7 @@ import { itemsBounds } from "@canvas-tile-engine/core";
 // Fit to a selection
 engine.fitBounds(itemsBounds(selectedSeats), { paddingPx: 24 });
 
-// Fit to whatever a marquee caught
+// Fit to whatever a marquee caught - rects, lines and paths in one list
 const picked = engine.hitTestRect(marquee, { mode: "contain" }).map((hit) => hit.item);
 engine.fitBounds(itemsBounds(picked), { paddingPx: 24 });
 
@@ -153,18 +153,27 @@ engine.setScaleLimits(fit * 0.8, 64);
 
 ### Parameters
 
-| Parameter | Type                                        | Description                                                                 |
-| --------- | ------------------------------------------- | --------------------------------------------------------------------------- |
-| `items`   | `Array<{ x, y, size?, width?, height? }>`   | Any drawable items — `Rect`, `Circle`, `Text`, `ImageItem` all fit as-is.    |
+| Parameter | Type             | Description                                                                                              |
+| --------- | ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `items`   | `BoundedItem[]`  | Any mix of drawn items. Every kind the draw API accepts fits as-is, so `hitTest` results need no filtering. |
 
-Returns `{ minX, maxX, minY, maxY }`, or `null` for an empty list (there is no rectangle to describe — guard before passing it on).
+Returns `{ minX, maxX, minY, maxY }`, or `null` when nothing in the list has bounds (an empty list, or only items that draw nothing — guard before passing it on).
 
-Each item covers `width ?? size` by `height ?? size` world units, defaulting to one cell, centered on its anchor — the same box the renderers draw and the same math the static caches use for their bitmap bounds.
+Each kind contributes the geometry it is drawn from:
+
+| Kind                              | Box                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| `Rect`, `Circle`, `Text`, `Image` | `width ?? size` by `height ?? size` world units (default 1), centered on the anchor |
+| `Line`                            | its two endpoints                                                         |
+| `Path`                            | vertex box for `points`, control-point hull for `commands`                |
+
+Items that draw nothing are skipped rather than counted: a path with fewer than two points, an empty command list, an object with no geometry at all.
 
 Deliberately left out, so the result stays camera-independent:
 
 - `origin` offsets and `rotate` — both stay within half an item of this box; add your own `padding` if you need the slack.
-- `sizePx` — pixel-sized items only have a world extent once you pick a camera scale.
+- `sizePx` / `fontPx` — pixel sizes only gain a world extent once you pick a camera scale.
+- Measured text — a `Text` item contributes its `size` box, not its glyph extents. The engine has no font metrics (that is what keeps core platform-agnostic), so a long label reaches past this box. Pad accordingly when framing labels.
 
 ### Example: zoom to a group
 

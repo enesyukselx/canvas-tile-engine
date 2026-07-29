@@ -30,7 +30,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
-    BoundedItem,
+    AnchoredItem,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -766,7 +766,7 @@ export class SkiaDraw {
      * Register a layer callback that replays a cached picture of `items` under
      * the current camera transform, recording it first if `cacheKey` is new.
      */
-    private addStaticPictureLayer<T extends BoundedItem>(
+    private addStaticPictureLayer<T extends AnchoredItem>(
         cacheKey: string,
         items: T[],
         layer: number,
@@ -798,7 +798,7 @@ export class SkiaDraw {
     }
 
     /** Record `items` into a picture using a camera fixed at (0, 0) and the current scale. */
-    private recordStaticPicture<T extends BoundedItem>(
+    private recordStaticPicture<T extends AnchoredItem>(
         items: T[],
         paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
     ): { picture: SkPicture; recordScale: number } {

@@ -136,9 +136,11 @@ const zoomToSelection = () => {
 };
 ```
 
-Returns `{ minX, maxX, minY, maxY }`, or `null` for an empty list (there is no rectangle to describe — guard before passing it on). Each item covers `width ?? size` by `height ?? size` world units, defaulting to one cell, centered on its anchor — the same box the components draw.
+Returns `{ minX, maxX, minY, maxY }`, or `null` when nothing in the list has bounds — guard before passing it on.
 
-Deliberately left out, so the result stays camera-independent: `origin` offsets and `rotate` (both stay within half an item of this box — add `padding` if you need the slack), and `sizePx` (pixel-sized items only have a world extent once you pick a camera scale).
+Every item kind the components draw fits in one list, so a mixed selection (or a `hitTestRect` result) needs no filtering: `Rect`/`Circle`/`Text`/`Image` contribute `width ?? size` by `height ?? size` world units (default 1) centered on the anchor, `Line` its two endpoints, `Path` its vertex box or control-point hull. Items that draw nothing (a one-point path, an empty command list) are skipped.
+
+Deliberately left out, so the result stays camera-independent: `origin` offsets and `rotate` (both stay within half an item of this box — add `padding` if you need the slack), `sizePx`/`fontPx` (pixel sizes only gain a world extent once you pick a camera scale), and measured text (a `Text` item contributes its `size` box, not its glyph extents — the engine has no font metrics, so a long label reaches past this box).
 
 Pairs with `fitScale` for content-driven limits:
 
