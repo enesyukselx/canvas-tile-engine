@@ -220,6 +220,74 @@ describe("parseTiledMap — layer tree", () => {
     });
 });
 
+describe("parseTiledMap — layer offsets", () => {
+    it("shifts tile cells by the layer offset without the half-cell coordinate shift", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                layers: [{ type: "tilelayer", name: "t", data: [1, 0, 0, 0], offsetx: 8, offsety: -16 }],
+            }),
+        );
+        // Cell (0,0) is normally (0,0); +8px = +0.5, -16px = -1 world units.
+        expect((map.layers[0] as TiledTileLayerData).cells[0]).toMatchObject({ x: 0.5, y: -1 });
+    });
+
+    it("accumulates group offsets down the tree, like opacity", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "group",
+                        name: "g",
+                        offsetx: 16,
+                        layers: [{ type: "tilelayer", name: "t", data: [1, 0, 0, 0], offsetx: 8 }],
+                    },
+                ],
+            }),
+        );
+        expect((map.layers[0] as TiledTileLayerData).cells[0]).toMatchObject({ x: 1.5, y: 0 });
+    });
+
+    it("shifts object geometry of every kind", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "objectgroup",
+                        name: "o",
+                        offsetx: 16,
+                        offsety: 16,
+                        objects: [
+                            { id: 1, x: 0, y: 0, width: 16, height: 16 },
+                            { id: 2, x: 24, y: 24, point: true },
+                            { id: 3, x: 8, y: 8, width: 16, height: 16, ellipse: true },
+                            { id: 4, x: 16, y: 32, width: 16, height: 16, gid: 2 },
+                        ],
+                    },
+                ],
+            }),
+        );
+        const objects = (map.layers[0] as TiledObjectLayerData).objects;
+        expect(objects[0].shape).toMatchObject({
+            points: [
+                { x: 0.5, y: 0.5 },
+                { x: 1.5, y: 0.5 },
+                { x: 1.5, y: 1.5 },
+                { x: 0.5, y: 1.5 },
+            ],
+        });
+        expect(objects[1].shape).toMatchObject({ at: { x: 2, y: 2 } });
+        expect(objects[2].shape).toMatchObject({ center: { x: 1.5, y: 1.5 } });
+        expect(objects[3].shape).toMatchObject({ center: { x: 2, y: 2 } });
+    });
+
+    it("warns on parallax factors it cannot honor", async () => {
+        const map = await parseTiledMap(
+            baseMap({ layers: [{ type: "tilelayer", name: "t", data: [0, 0, 0, 0], parallaxx: 0.5 }] }),
+        );
+        expect(map.warnings.some((w) => w.includes("parallax"))).toBe(true);
+    });
+});
+
 describe("tiledMapBounds", () => {
     it("returns the raw corner-space extents of the map (cell k spans [k, k+1])", async () => {
         const map = await parseTiledMap(baseMap({ width: 40, height: 24, layers: [] }));

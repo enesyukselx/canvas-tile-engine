@@ -81,6 +81,9 @@ export interface TmjLayer {
     opacity?: number;
     offsetx?: number;
     offsety?: number;
+    /** Camera-relative scroll factors; 1 = moves with the map. */
+    parallaxx?: number;
+    parallaxy?: number;
     tintcolor?: string;
     /** tilelayer: GID array (csv encoding) or base64 string. */
     data?: number[] | string;

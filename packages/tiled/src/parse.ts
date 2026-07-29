@@ -262,6 +262,26 @@ function normalizeObject(
     return { data, shape, visible: true };
 }
 
+/** Shift a shape's geometry by a world-unit delta (a layer offset). */
+function translateShape(shape: TiledObjectShape, dx: number, dy: number): TiledObjectShape {
+    if (dx === 0 && dy === 0) {
+        return shape;
+    }
+    const move = (p: Coords): Coords => ({ x: p.x + dx, y: p.y + dy });
+    switch (shape.kind) {
+        case "rect":
+        case "polygon":
+        case "polyline":
+            return { ...shape, points: shape.points.map(move) };
+        case "ellipse":
+            return { ...shape, center: move(shape.center) };
+        case "point":
+            return { ...shape, at: move(shape.at) };
+        case "tile":
+            return { ...shape, center: move(shape.center) };
+    }
+}
+
 /**
  * Parse and normalize a Tiled JSON map (`.tmj`) into the engine-space model.
  * Async only because external tilesets may need fetching via
@@ -316,25 +336,33 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
 
     const layers: TiledLayer[] = [];
 
-    const walk = (rawLayers: TmjLayer[], parentOpacity: number) => {
+    const walk = (rawLayers: TmjLayer[], parentOpacity: number, parentOffset: Coords) => {
         for (const layer of rawLayers) {
             if (layer.visible === false) {
                 continue;
             }
             const name = layer.name ?? "(unnamed)";
-            if ((layer.offsetx ?? 0) !== 0 || (layer.offsety ?? 0) !== 0) {
-                throw new Error(
-                    `${PKG}: layer "${name}" uses a pixel offset (offsetx/offsety), which is not supported — ` +
-                        `remove the layer offset in Tiled.`,
-                );
-            }
             if (layer.tintcolor !== undefined) {
                 warnings.push(`layer "${name}": tintcolor is not supported; ignored.`);
             }
+            if ((layer.parallaxx ?? 1) !== 1 || (layer.parallaxy ?? 1) !== 1) {
+                warnings.push(
+                    `layer "${name}": parallax factors are not supported (they need per-frame repositioning); ` +
+                        `the layer draws at its normal position.`,
+                );
+            }
             const opacity = parentOpacity * (layer.opacity ?? 1);
+            // Group offsets accumulate down the tree, exactly like opacity.
+            const offsetPx = {
+                x: parentOffset.x + (layer.offsetx ?? 0),
+                y: parentOffset.y + (layer.offsety ?? 0),
+            };
+            // A layer offset is a delta, not a position, so it converts without
+            // the half-cell shift that pxToWorld applies to coordinates.
+            const offset = { x: offsetPx.x / tileSize, y: offsetPx.y / tileSize };
 
             if (layer.type === "group") {
-                walk(layer.layers ?? [], opacity);
+                walk(layer.layers ?? [], opacity, offsetPx);
             } else if (layer.type === "imagelayer") {
                 warnings.push(`layer "${name}": image layers are not supported; skipped.`);
             } else if (layer.type === "tilelayer") {
@@ -357,8 +385,10 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                         x: col * tileSize + tileset.tileOffset.x + tileset.tileWidth / 2,
                         y: (row + 1) * tileSize + tileset.tileOffset.y - tileset.tileHeight / 2,
                     };
+                    const world = pxPointToWorld(centerPx, tileSize);
                     const cell: TiledCell = {
-                        ...pxPointToWorld(centerPx, tileSize),
+                        x: world.x + offset.x,
+                        y: world.y + offset.y,
                         size: tileBoxSize(tileset.tileWidth, tileset.tileHeight, tileSize),
                         tileset,
                         sprite: tilesetSpriteRect(tileset, localId),
@@ -391,7 +421,10 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                 for (const o of layer.objects ?? []) {
                     const normalized = normalizeObject(o, tileSize, tilesets, warnings);
                     if (normalized) {
-                        objects.push(normalized);
+                        objects.push({
+                            ...normalized,
+                            shape: translateShape(normalized.shape, offset.x, offset.y),
+                        });
                     }
                 }
                 layers.push({
@@ -406,7 +439,7 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
             }
         }
     };
-    walk(raw.layers ?? [], 1);
+    walk(raw.layers ?? [], 1, { x: 0, y: 0 });
 
     return {
         columns: raw.width,
