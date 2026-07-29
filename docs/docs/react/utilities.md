@@ -117,3 +117,33 @@ const applyContent = (bounds: Bounds) => {
     engine.fitBounds(bounds, { paddingPx: 24 });
 };
 ```
+
+## itemsBounds
+
+The world rectangle enclosing a list of items — the missing half of `fitBounds` and `fitScale`, both of which take a rectangle you had to compute by hand. Because the `items` array you memoize for a draw component is exactly what it takes, "frame the current selection" becomes one call:
+
+```tsx
+import { itemsBounds } from "@canvas-tile-engine/react";
+
+const seats = useMemo(() => buildSeats(), []);
+const engine = useCanvasTileEngine();
+
+const zoomToSelection = () => {
+    const bounds = itemsBounds(seats.filter((s) => selected.has(s.data.id)));
+    if (bounds) {
+        engine.fitBounds(bounds, { paddingPx: 24 });
+    }
+};
+```
+
+Returns `{ minX, maxX, minY, maxY }`, or `null` for an empty list (there is no rectangle to describe — guard before passing it on). Each item covers `width ?? size` by `height ?? size` world units, defaulting to one cell, centered on its anchor — the same box the components draw.
+
+Deliberately left out, so the result stays camera-independent: `origin` offsets and `rotate` (both stay within half an item of this box — add `padding` if you need the slack), and `sizePx` (pixel-sized items only have a world extent once you pick a camera scale).
+
+Pairs with `fitScale` for content-driven limits:
+
+```tsx
+const bounds = itemsBounds(tiles);
+const fit = bounds ? fitScale(bounds, engine.getSize(), { paddingPx: 24 }) : 1;
+engine.setScaleLimits(fit * 0.8, 64);
+```

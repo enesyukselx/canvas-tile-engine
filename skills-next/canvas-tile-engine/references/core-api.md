@@ -343,13 +343,40 @@ const config = {
 Only `maxScale` stays manual by design: it is a content-resolution quality
 cap (asset px density, label readability), which no bounds can imply.
 
+### `itemsBounds` - the rectangle `fitBounds`/`fitScale` ask for
+
+`itemsBounds(items)` returns `{ minX, maxX, minY, maxY }` enclosing a list of
+items, or `null` for an empty list. Every drawable item shape fits as-is
+(`Rect`, `Circle`, `Text`, `ImageItem`): an item covers `width ?? size` by
+`height ?? size` world units (default 1) centered on its anchor - the same box
+the renderers draw. Use it instead of hand-rolling a min/max reduce before
+`fitBounds`/`fitScale`.
+
+```ts
+import { itemsBounds } from "@canvas-tile-engine/core";
+
+engine.fitBounds(itemsBounds(selectedSeats), { paddingPx: 24 });
+
+// Marquee selection -> frame it
+const picked = engine.hitTestRect(marquee, { mode: "contain" }).map((h) => h.item);
+const bounds = itemsBounds(picked);
+if (bounds) {
+    engine.fitBounds(bounds, { paddingPx: 24 });
+}
+```
+
+Deliberately camera-independent, so it leaves out `origin` offsets and
+`rotate` (both stay within half an item of the box - add `padding` for slack)
+and `sizePx` (no world extent without a scale). Null on empty is a real case:
+guard it, do not pass it straight through.
+
 ## Exported types and classes (import from `@canvas-tile-engine/core`)
 
 Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`,
-`SpatialIndex`, `Config`, `ViewportState`, `CoordinateTransformer`,
+`itemsBounds`, `SpatialIndex`, `Config`, `ViewportState`, `CoordinateTransformer`,
 `GestureProcessor`, `AnimationController`.
 
-Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `DrawObject`, `Rect`,
+Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `BoundedItem`, `DrawObject`, `Rect`,
 `Circle`, `Text`, `Line`, `PathItem`, `PathStyle`, `ImageItem<TImage>`, `SpriteRect`,
 `SpriteSheetOptions`, `SpriteAnimation`, `EventHandlers`, `ZoomMode`,
 `DrawHandle`, `LineStyle`, `TextAlign`, `TextBaseline`, `IRenderer`,

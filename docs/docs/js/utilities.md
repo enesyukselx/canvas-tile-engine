@@ -131,3 +131,47 @@ const fit = fitScale(newBounds, engine.getSize(), { paddingPx: 24 });
 engine.setScaleLimits(fit * 0.8, 64);
 engine.fitBounds(newBounds, { paddingPx: 24 });
 ```
+
+## itemsBounds
+
+The world rectangle enclosing a list of items — the missing half of `fitBounds` and `fitScale`, both of which take a rectangle you had to compute by hand. "Frame the current selection" becomes one call:
+
+```ts
+import { itemsBounds } from "@canvas-tile-engine/core";
+
+// Fit to a selection
+engine.fitBounds(itemsBounds(selectedSeats), { paddingPx: 24 });
+
+// Fit to whatever a marquee caught
+const picked = engine.hitTestRect(marquee, { mode: "contain" }).map((hit) => hit.item);
+engine.fitBounds(itemsBounds(picked), { paddingPx: 24 });
+
+// Derive scale limits from the content that exists right now
+const fit = fitScale(itemsBounds(tiles), engine.getSize(), { paddingPx: 24 });
+engine.setScaleLimits(fit * 0.8, 64);
+```
+
+### Parameters
+
+| Parameter | Type                                        | Description                                                                 |
+| --------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+| `items`   | `Array<{ x, y, size?, width?, height? }>`   | Any drawable items — `Rect`, `Circle`, `Text`, `ImageItem` all fit as-is.    |
+
+Returns `{ minX, maxX, minY, maxY }`, or `null` for an empty list (there is no rectangle to describe — guard before passing it on).
+
+Each item covers `width ?? size` by `height ?? size` world units, defaulting to one cell, centered on its anchor — the same box the renderers draw and the same math the static caches use for their bitmap bounds.
+
+Deliberately left out, so the result stays camera-independent:
+
+- `origin` offsets and `rotate` — both stay within half an item of this box; add your own `padding` if you need the slack.
+- `sizePx` — pixel-sized items only have a world extent once you pick a camera scale.
+
+### Example: zoom to a group
+
+```ts
+const group = units.filter((u) => u.data.team === "red");
+const bounds = itemsBounds(group);
+if (bounds) {
+    engine.fitBounds(bounds, { paddingPx: 32, durationMs: 300 });
+}
+```
