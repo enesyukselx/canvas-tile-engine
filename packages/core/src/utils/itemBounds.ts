@@ -106,9 +106,15 @@ function boundsOf(item: BoundedItem): Bounds | null {
 }
 
 /**
- * World-space rectangle enclosing every item in the list. Feeds
- * {@link Bounds}-taking APIs directly, so framing a selection is one call:
- * `engine.fitBounds(itemsBounds(selected), { paddingPx: 24 })`.
+ * World-space rectangle enclosing every item in the list — the input
+ * `fitBounds` and `fitScale` ask for:
+ *
+ * ```ts
+ * const selection = itemsBounds(selectedSeats);
+ * if (selection) {
+ *     engine.fitBounds(selection, { paddingPx: 24 });
+ * }
+ * ```
  *
  * Accepts every item kind the draw API does, mixed freely: anchored items
  * (`Rect`, `Circle`, `Text`, `ImageItem`) contribute their cell box, `Line` its

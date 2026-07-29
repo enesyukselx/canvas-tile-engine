@@ -358,10 +358,11 @@ EVERY item kind fits in one list, mixed freely - no filtering needed, so
 | `Line`                            | its two endpoints |
 | `PathItem`                        | vertex box for `points`, control-point hull for `commands` |
 
+Returns `Bounds | null`, and `fitBounds`/`fitScale` take a non-null `Bounds`, so
+the guard is part of the call - it is NOT a one-liner:
+
 ```ts
 import { itemsBounds } from "@canvas-tile-engine/core";
-
-engine.fitBounds(itemsBounds(selectedSeats), { paddingPx: 24 });
 
 // Marquee selection -> frame it (rects, lines and paths in one list)
 const picked = engine.hitTestRect(marquee, { mode: "contain" }).map((h) => h.item);
@@ -370,6 +371,9 @@ if (bounds) {
     engine.fitBounds(bounds, { paddingPx: 24 });
 }
 ```
+
+Skipping the guard (`itemsBounds(tiles)!`) is only safe for a set you know is
+non-empty; anything from a selection or a hit test can be empty.
 
 Items that draw nothing are skipped, not counted: a path with fewer than two
 points, an empty command list, an object with no geometry.

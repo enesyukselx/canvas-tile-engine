@@ -134,22 +134,37 @@ engine.fitBounds(newBounds, { paddingPx: 24 });
 
 ## itemsBounds
 
-The world rectangle enclosing a list of items — the missing half of `fitBounds` and `fitScale`, both of which take a rectangle you had to compute by hand. "Frame the current selection" becomes one call:
+The world rectangle enclosing a list of items — the missing half of `fitBounds` and `fitScale`, both of which take a rectangle you had to compute by hand:
 
 ```ts
 import { itemsBounds } from "@canvas-tile-engine/core";
 
-// Fit to a selection
-engine.fitBounds(itemsBounds(selectedSeats), { paddingPx: 24 });
+// Fit to a selection. The result is null when there is nothing to frame, so
+// guard it: "zoom to selection" with an empty selection should not move the
+// camera.
+const selection = itemsBounds(selectedSeats);
+if (selection) {
+    engine.fitBounds(selection, { paddingPx: 24 });
+}
 
 // Fit to whatever a marquee caught - rects, lines and paths in one list
 const picked = engine.hitTestRect(marquee, { mode: "contain" }).map((hit) => hit.item);
-engine.fitBounds(itemsBounds(picked), { paddingPx: 24 });
+const region = itemsBounds(picked);
+if (region) {
+    engine.fitBounds(region, { paddingPx: 24 });
+}
 
 // Derive scale limits from the content that exists right now
-const fit = fitScale(itemsBounds(tiles), engine.getSize(), { paddingPx: 24 });
-engine.setScaleLimits(fit * 0.8, 64);
+const content = itemsBounds(tiles);
+if (content) {
+    const fit = fitScale(content, engine.getSize(), { paddingPx: 24 });
+    engine.setScaleLimits(fit * 0.8, 64);
+}
 ```
+
+A set you know is non-empty (a fixed board, a hard-coded tile list) can skip the
+guard with a non-null assertion — `itemsBounds(tiles)!` — but anything derived
+from user selection or a hit test needs it.
 
 ### Parameters
 
