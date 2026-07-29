@@ -1,4 +1,4 @@
-import type { Bounds, Coords, SpriteRect } from "@canvas-tile-engine/core";
+import type { Bounds, Coords, SpriteRect, TextAlign, TextBaseline } from "@canvas-tile-engine/core";
 import { decodeGid } from "./gid";
 import { decodeLayerData } from "./decode";
 import { pxPointToWorld, pxToWorld, rotateAround } from "./coords";
@@ -15,6 +15,7 @@ import type {
     TmjMap,
     TmjObject,
     TmjProperty,
+    TmjText,
     TmjTileset,
 } from "./types";
 
@@ -154,6 +155,70 @@ function tilesetForGid(gid: number, tilesets: TiledTileset[]): TiledTileset {
     throw new Error(`${PKG}: GID ${gid} does not belong to any tileset.`);
 }
 
+/**
+ * A text object's anchor and typography, resolved from its box. Tiled aligns
+ * the text inside `[x, x+width] x [y, y+height]`; the engine draws from a
+ * single anchor plus an align/baseline pair, so the box collapses into the
+ * anchor point the alignment picks.
+ */
+function textShape(o: TmjObject, text: TmjText, tileSize: number, label: string, warnings: string[]): TiledObjectShape {
+    const unsupported: string[] = [];
+    if (text.bold === true) {
+        unsupported.push("bold");
+    }
+    if (text.italic === true) {
+        unsupported.push("italic");
+    }
+    if (text.underline === true) {
+        unsupported.push("underline");
+    }
+    if (text.strikeout === true) {
+        unsupported.push("strikeout");
+    }
+    if (text.wrap === true) {
+        unsupported.push("word wrap");
+    }
+    if (unsupported.length > 0) {
+        // The renderers build a font string from size + family only, and draw
+        // one unbroken line per item.
+        warnings.push(
+            `object ${label}: text ${unsupported.join(", ")} ${unsupported.length === 1 ? "is" : "are"} ` +
+                `not supported; the label draws as a single plain line.`,
+        );
+    }
+
+    const w = o.width ?? 0;
+    const h = o.height ?? 0;
+    const halign = text.halign ?? "left";
+    if (halign === "justify") {
+        warnings.push(`object ${label}: justified text is not supported; the label is left-aligned.`);
+    }
+
+    const align: TextAlign = halign === "center" ? "center" : halign === "right" ? "right" : "left";
+    const baseline: TextBaseline = text.valign === "center" ? "middle" : text.valign === "bottom" ? "bottom" : "top";
+    const anchorPx = {
+        x: o.x + (align === "center" ? w / 2 : align === "right" ? w : 0),
+        y: o.y + (baseline === "middle" ? h / 2 : baseline === "bottom" ? h : 0),
+    };
+    const rotation = o.rotation ?? 0;
+
+    return {
+        kind: "text",
+        // Rotation spins the whole object around its (x, y), which moves the
+        // resolved anchor with it.
+        at: pxPointToWorld(rotateAround(anchorPx, { x: o.x, y: o.y }, rotation), tileSize),
+        text: text.text,
+        // Tiled sizes text in map pixels, so it belongs in world units: the
+        // label scales with the map like everything else on it.
+        size: (text.pixelsize ?? 16) / tileSize,
+        ...(text.fontfamily !== undefined ? { fontFamily: text.fontfamily } : {}),
+        color: text.color ?? "#000000",
+        align,
+        baseline,
+        rotate: rotation,
+    };
+}
+
 function normalizeObject(
     o: TmjObject,
     tileSize: number,
@@ -165,10 +230,6 @@ function normalizeObject(
     }
 
     const label = o.name ? `"${o.name}"` : `#${o.id}`;
-    if (o.text !== undefined) {
-        warnings.push(`object ${label}: text objects are not supported; skipped.`);
-        return null;
-    }
 
     const data = {
         id: o.id,
@@ -180,7 +241,9 @@ function normalizeObject(
     const anchorPx = { x: o.x, y: o.y };
 
     let shape: TiledObjectShape;
-    if (o.point === true) {
+    if (o.text !== undefined) {
+        shape = textShape(o, o.text, tileSize, label, warnings);
+    } else if (o.point === true) {
         shape = { kind: "point", at: pxPointToWorld(anchorPx, tileSize) };
     } else if (o.gid !== undefined) {
         const { gid, flipX, flipY, rotate } = decodeGid(o.gid);
@@ -276,6 +339,7 @@ function translateShape(shape: TiledObjectShape, dx: number, dy: number): TiledO
         case "ellipse":
             return { ...shape, center: move(shape.center) };
         case "point":
+        case "text":
             return { ...shape, at: move(shape.at) };
         case "tile":
             return { ...shape, center: move(shape.center) };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTiledMap, tiledMapBounds } from "../src/parse";
 import { GID_FLIP_H } from "../src/gid";
-import type { TmjMap, TiledTileLayerData, TiledObjectLayerData } from "../src/types";
+import type { TmjMap, TmjText, TiledTileLayerData, TiledObjectLayerData } from "../src/types";
 
 const TILESET = {
     firstgid: 1,
@@ -217,6 +217,108 @@ describe("parseTiledMap — layer tree", () => {
         expect(map.layers[0].name).toBe("a");
         expect(map.layers[0].opacity).toBe(0.25);
         expect(map.warnings.some((w) => w.includes("image layers"))).toBe(true);
+    });
+});
+
+describe("parseTiledMap — text objects", () => {
+    const textObject = (text: TmjText) =>
+        baseMap({
+            layers: [
+                {
+                    type: "objectgroup",
+                    name: "labels",
+                    // 32x16px box starting at px (16, 16) = cells (1,1)-(2,2).
+                    objects: [{ id: 9, name: "sign", x: 16, y: 16, width: 32, height: 16, text }],
+                },
+            ],
+        });
+
+    it("resolves the box and alignment into a single anchor", async () => {
+        const map = await parseTiledMap(textObject({ text: "Town", pixelsize: 8, color: "#ff0000" }));
+        const shape = (map.layers[0] as TiledObjectLayerData).objects[0].shape;
+        expect(shape).toEqual({
+            kind: "text",
+            // left/top default: the anchor is the box's top-left corner
+            at: { x: 0.5, y: 0.5 },
+            text: "Town",
+            size: 0.5, // 8px on a 16px grid: labels scale with the map
+            color: "#ff0000",
+            align: "left",
+            baseline: "top",
+            rotate: 0,
+        });
+    });
+
+    it("moves the anchor for centered and bottom-right alignment", async () => {
+        const centered = await parseTiledMap(textObject({ text: "x", halign: "center", valign: "center" }));
+        const bottomRight = await parseTiledMap(textObject({ text: "x", halign: "right", valign: "bottom" }));
+
+        expect((centered.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({
+            at: { x: 1.5, y: 1 }, // box center px (32, 24)
+            align: "center",
+            baseline: "middle",
+        });
+        expect((bottomRight.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({
+            at: { x: 2.5, y: 1.5 }, // box bottom-right px (48, 32)
+            align: "right",
+            baseline: "bottom",
+        });
+    });
+
+    it("defaults size, color and alignment the way Tiled does", async () => {
+        const map = await parseTiledMap(textObject({ text: "plain" }));
+        expect((map.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({
+            size: 1, // 16px default on a 16px grid
+            color: "#000000",
+            align: "left",
+            baseline: "top",
+        });
+        expect(map.warnings).toEqual([]);
+    });
+
+    it("keeps the font family only when the map names one", async () => {
+        const named = await parseTiledMap(textObject({ text: "x", fontfamily: "Georgia" }));
+        const unnamed = await parseTiledMap(textObject({ text: "x" }));
+        expect((named.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({ fontFamily: "Georgia" });
+        expect((unnamed.layers[0] as TiledObjectLayerData).objects[0].shape).not.toHaveProperty("fontFamily");
+    });
+
+    it("warns for typography the renderers cannot express", async () => {
+        const map = await parseTiledMap(
+            textObject({ text: "x", bold: true, italic: true, underline: true, strikeout: true, wrap: true }),
+        );
+        const warning = map.warnings.find((w) => w.includes("not supported"))!;
+        for (const feature of ["bold", "italic", "underline", "strikeout", "word wrap"]) {
+            expect(warning).toContain(feature);
+        }
+    });
+
+    it("warns that justified text falls back to left-aligned", async () => {
+        const map = await parseTiledMap(textObject({ text: "x", halign: "justify" }));
+        expect(map.warnings.some((w) => w.includes("justified"))).toBe(true);
+        expect((map.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({ align: "left" });
+    });
+
+    it("rotates the resolved anchor around the object origin", async () => {
+        const map = await parseTiledMap(textObject({ text: "x", halign: "right" }));
+        // rotation lives on the object, not the text block
+        const rotated = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "objectgroup",
+                        name: "labels",
+                        objects: [{ id: 9, x: 16, y: 16, width: 32, height: 16, rotation: 90, text: { text: "x" } }],
+                    },
+                ],
+            }),
+        );
+        expect((map.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({ rotate: 0 });
+        // 90° CW around px (16,16) keeps the top-left anchor in place
+        expect((rotated.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({
+            at: { x: 0.5, y: 0.5 },
+            rotate: 90,
+        });
     });
 });
 
@@ -521,23 +623,13 @@ describe("parseTiledMap — objects", () => {
         }
     });
 
-    it("skips invisible and text objects (text with a warning)", async () => {
+    it("skips invisible objects", async () => {
         const map = await parseTiledMap(
             baseMap({
-                layers: [
-                    {
-                        type: "objectgroup",
-                        name: "o",
-                        objects: [
-                            { id: 1, x: 0, y: 0, visible: false },
-                            { id: 2, x: 0, y: 0, text: { text: "hi" } },
-                        ],
-                    },
-                ],
+                layers: [{ type: "objectgroup", name: "o", objects: [{ id: 1, x: 0, y: 0, visible: false }] }],
             }),
         );
         expect((map.layers[0] as TiledObjectLayerData).objects).toHaveLength(0);
-        expect(map.warnings.some((w) => w.includes("text objects"))).toBe(true);
     });
 
     it("warns about object-layer opacity only when a shape cannot honor it", async () => {

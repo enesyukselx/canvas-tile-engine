@@ -15,11 +15,13 @@ export type {
     TiledLayer,
     TiledMap,
     TiledObject,
+    TiledObjectAlignment,
     TiledObjectData,
     TiledObjectShape,
     TiledTileLayerData,
     TiledObjectLayerData,
     TiledTileset,
     TmjMap,
+    TmjText,
     TmjTileset,
 } from "./types";

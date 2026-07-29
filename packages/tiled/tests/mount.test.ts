@@ -19,6 +19,7 @@ function createMockEngine() {
         })),
         drawPath: vi.fn((_items: unknown, layer: number = 1, _o?: unknown) => ({ ...handle("path"), layer })),
         drawCircle: vi.fn((_items: unknown, layer: number = 1, _o?: unknown) => ({ ...handle("circle"), layer })),
+        drawText: vi.fn((_items: unknown, layer: number = 2, _o?: unknown) => ({ ...handle("text"), layer })),
         removeDrawHandle: vi.fn(),
         clearLayer: vi.fn(),
         clearAll: vi.fn(),
@@ -84,6 +85,7 @@ const MAP: TmjMap = {
             objects: [
                 { id: 1, name: "spawn", x: 0, y: 0, width: 16, height: 16 },
                 { id: 2, x: 24, y: 24, point: true },
+                { id: 3, x: 0, y: 0, width: 32, height: 16, text: { text: "Home" } },
             ],
         },
     ],
@@ -115,6 +117,7 @@ describe("mountTiledMap", () => {
 
         expect(drawAPI.drawPath.mock.calls[0][1]).toBe(6); // layerOffset + index 1
         expect(drawAPI.drawCircle.mock.calls[0][1]).toBe(6);
+        expect(drawAPI.drawText.mock.calls[0][1]).toBe(6);
         expect(drawAPI.drawStaticImage.mock.calls[0][2]).toBe(5);
     });
 
@@ -141,7 +144,8 @@ describe("mountTiledMap", () => {
             drawAPI.drawStaticImage.mock.calls.length +
             drawAPI.drawImage.mock.calls.length +
             drawAPI.drawPath.mock.calls.length +
-            drawAPI.drawCircle.mock.calls.length;
+            drawAPI.drawCircle.mock.calls.length +
+            drawAPI.drawText.mock.calls.length;
 
         mounted.destroy();
         mounted.destroy(); // idempotent

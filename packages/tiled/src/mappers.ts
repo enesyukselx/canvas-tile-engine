@@ -1,4 +1,4 @@
-import type { Circle, ImageItem, PathCommand, PathItem, PathStyle } from "@canvas-tile-engine/core";
+import type { Circle, ImageItem, PathCommand, PathItem, PathStyle, Text } from "@canvas-tile-engine/core";
 import type { TiledAnimation, TiledObjectData, TiledObjectLayerData, TiledTileLayerData, TiledTileset } from "./types";
 
 const PKG = "@canvas-tile-engine/tiled";
@@ -84,6 +84,8 @@ export interface ObjectLayerItems<TImage> {
     markers: Circle<TiledObjectData>[];
     /** Tile objects as image items. */
     tiles: ImageItem<TImage, TiledObjectData>[];
+    /** Text objects as text items. Text never hit-tests (engine-wide rule). */
+    texts: Text<TiledObjectData>[];
 }
 
 export interface ObjectStyleOptions {
@@ -134,6 +136,7 @@ export function objectLayerToItems<TImage>(
     const paths: PathItem<TiledObjectData>[] = [];
     const markers: Circle<TiledObjectData>[] = [];
     const tiles: ImageItem<TImage, TiledObjectData>[] = [];
+    const texts: Text<TiledObjectData>[] = [];
 
     const styleFor = (data: TiledObjectData): PathStyle | undefined => {
         const style = options.pathStyle;
@@ -157,6 +160,22 @@ export function objectLayerToItems<TImage>(
                 paths.push({
                     commands: ellipseCommands(shape.center.x, shape.center.y, shape.radiusX, shape.radiusY),
                     style: styleFor(data),
+                    data,
+                });
+                break;
+            case "text":
+                texts.push({
+                    x: shape.at.x,
+                    y: shape.at.y,
+                    text: shape.text,
+                    size: shape.size,
+                    ...(shape.rotate !== 0 ? { rotate: shape.rotate } : {}),
+                    style: {
+                        fillStyle: shape.color,
+                        ...(shape.fontFamily !== undefined ? { fontFamily: shape.fontFamily } : {}),
+                        textAlign: shape.align,
+                        textBaseline: shape.baseline,
+                    },
                     data,
                 });
                 break;
@@ -198,5 +217,5 @@ export function objectLayerToItems<TImage>(
             }
         }
     }
-    return { paths, markers, tiles };
+    return { paths, markers, tiles, texts };
 }

@@ -88,7 +88,7 @@ export async function mountTiledMap<TMount, TImage>(
                 animators.push(animator);
             });
         } else {
-            const { paths, markers, tiles } = objectLayerToItems(layer, images, options);
+            const { paths, markers, tiles, texts } = objectLayerToItems(layer, images, options);
             if (paths.length > 0) {
                 layerHandles.push(engine.drawPath(paths, engineLayer, { id: `${idBase}:paths` }));
             }
@@ -97,6 +97,10 @@ export async function mountTiledMap<TMount, TImage>(
             }
             if (markers.length > 0) {
                 layerHandles.push(engine.drawCircle(markers, engineLayer, { id: `${idBase}:markers` }));
+            }
+            // Labels last so they read on top of the shapes they annotate.
+            if (texts.length > 0) {
+                layerHandles.push(engine.drawText(texts, engineLayer, { id: `${idBase}:texts` }));
             }
         }
         handles.set(index, layerHandles);

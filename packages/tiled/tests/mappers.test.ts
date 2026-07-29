@@ -176,6 +176,42 @@ describe("objectLayerToItems", () => {
         expect(paths[1].style).toMatchObject({ strokeStyle: "#3b82f6" }); // fell back to default
     });
 
+    it("maps text objects to text items with the resolved style", async () => {
+        const { map, images } = await parseWith([
+            {
+                type: "objectgroup",
+                name: "labels",
+                objects: [
+                    {
+                        id: 9,
+                        name: "sign",
+                        x: 16,
+                        y: 16,
+                        width: 32,
+                        height: 16,
+                        text: { text: "Town", pixelsize: 8, color: "#f00", halign: "center", fontfamily: "Georgia" },
+                    },
+                ],
+            },
+        ]);
+        const { texts } = objectLayerToItems(map.layers[0] as TiledObjectLayerData, images);
+        expect(texts).toEqual([
+            {
+                x: 1.5,
+                y: 0.5,
+                text: "Town",
+                size: 0.5,
+                style: {
+                    fillStyle: "#f00",
+                    fontFamily: "Georgia",
+                    textAlign: "center",
+                    textBaseline: "top",
+                },
+                data: { id: 9, name: "sign", type: "", properties: {} },
+            },
+        ]);
+    });
+
     it("passes object-layer opacity to tile objects", async () => {
         const { map, images } = await parseWith([
             {

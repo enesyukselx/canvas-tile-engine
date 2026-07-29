@@ -1,4 +1,4 @@
-import type { Coords, SpriteRect } from "@canvas-tile-engine/core";
+import type { Coords, SpriteRect, TextAlign, TextBaseline } from "@canvas-tile-engine/core";
 
 // ─── Raw Tiled JSON (.tmj / .tsj) — the subset this package reads ───
 
@@ -49,6 +49,26 @@ export interface TmjPoint {
     y: number;
 }
 
+/** A text object's typography block. */
+export interface TmjText {
+    text: string;
+    fontfamily?: string;
+    /** Font size in map pixels. Default 16. */
+    pixelsize?: number;
+    /** CSS color; Tiled defaults to black. */
+    color?: string;
+    /** "left" (default) | "center" | "right" | "justify" */
+    halign?: string;
+    /** "top" (default) | "center" | "bottom" */
+    valign?: string;
+    wrap?: boolean;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strikeout?: boolean;
+    kerning?: boolean;
+}
+
 export interface TmjObject {
     id: number;
     name?: string;
@@ -70,7 +90,7 @@ export interface TmjObject {
     /** Vertices relative to (x, y), in pixels. */
     polygon?: TmjPoint[];
     polyline?: TmjPoint[];
-    text?: unknown;
+    text?: TmjText;
     properties?: TmjProperty[];
 }
 
@@ -199,6 +219,21 @@ export type TiledObjectShape =
     | { kind: "polyline"; points: Coords[] }
     | { kind: "ellipse"; center: Coords; radiusX: number; radiusY: number }
     | { kind: "point"; at: Coords }
+    | {
+          kind: "text";
+          /** Item-space anchor, already resolved from the box and alignment. */
+          at: Coords;
+          text: string;
+          /** Font em height in world units, so labels scale with the map. */
+          size: number;
+          /** Omitted when the map does not name one (the renderer's default wins). */
+          fontFamily?: string;
+          color: string;
+          align: TextAlign;
+          baseline: TextBaseline;
+          /** Degrees, clockwise, around the anchor. */
+          rotate: number;
+      }
     | {
           kind: "tile";
           /** Item-space center of the drawn tile. */
