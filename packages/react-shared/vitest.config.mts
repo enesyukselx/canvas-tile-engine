@@ -8,9 +8,7 @@ export default defineConfig({
         coverage: {
             provider: "v8",
             include: ["src/**/*.{ts,tsx}"],
-            // react-shared source is pulled in through the workspace symlink;
-            // its coverage belongs to react-shared's own suite, not this one.
-            exclude: ["src/**/*.d.ts", "src/**/*.{test,spec}.{ts,tsx}", "**/react-shared/**"],
+            exclude: ["src/**/*.d.ts", "src/**/*.{test,spec}.{ts,tsx}"],
         },
     },
 });
