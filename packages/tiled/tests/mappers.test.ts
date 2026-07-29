@@ -37,6 +37,21 @@ describe("tileLayerToItems", () => {
         expect(staticItems).toEqual([{ x: 0, y: 0, img: IMG, sprite: { x: 16, y: 16, w: 16, h: 16 }, opacity: 0.5 }]);
     });
 
+    it("carries the box size only for tiles larger than the grid", async () => {
+        const { map, images } = await parseWith(
+            [{ type: "tilelayer", name: "t", data: [1, 0, 0, 0] }],
+            [{ ...TILESET, tilewidth: 32, tileheight: 48, columns: 2 }],
+        );
+        const { staticItems } = tileLayerToItems(map.layers[0] as TiledTileLayerData, images);
+        expect(staticItems[0]).toEqual({
+            x: 0.5,
+            y: -1,
+            size: 3,
+            img: IMG,
+            sprite: { x: 0, y: 0, w: 32, h: 48 },
+        });
+    });
+
     it("splits animated cells into shared groups seeded with frame 0", async () => {
         const { map, images } = await parseWith(
             [{ type: "tilelayer", name: "t", data: [1, 1, 2, 0] }],

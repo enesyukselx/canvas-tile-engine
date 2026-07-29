@@ -30,6 +30,12 @@ export interface TmjTileset {
     tilecount?: number;
     margin?: number;
     spacing?: number;
+    /** Pixel shift applied when drawing any tile of this tileset. */
+    tileoffset?: { x?: number; y?: number };
+    /** Anchor tile objects are placed by; "unspecified" = the orientation default. */
+    objectalignment?: string;
+    /** Color treated as transparent by Tiled's own renderer. */
+    transparentcolor?: string;
     tiles?: TmjTilesetTile[];
 }
 
@@ -110,6 +116,21 @@ export interface TiledAnimation {
     fps: number;
 }
 
+/**
+ * Where a tile object's `(x, y)` anchor sits on the tile it draws. Tiled's
+ * `objectalignment`; orthogonal maps default to `"bottomleft"`.
+ */
+export type TiledObjectAlignment =
+    | "topleft"
+    | "top"
+    | "topright"
+    | "left"
+    | "center"
+    | "right"
+    | "bottomleft"
+    | "bottom"
+    | "bottomright";
+
 export interface TiledTileset {
     name: string;
     firstgid: number;
@@ -117,11 +138,20 @@ export interface TiledTileset {
     image: string;
     imageWidth?: number;
     imageHeight?: number;
-    /** Tile edge in source pixels (square, equal to the map grid). */
-    tileSize: number;
+    /**
+     * Tile width in source pixels. May exceed the map grid: Tiled anchors an
+     * oversized tile at the bottom-left of its cell, so it grows up and right.
+     */
+    tileWidth: number;
+    /** Tile height in source pixels; may exceed the map grid like {@link tileWidth}. */
+    tileHeight: number;
     columns: number;
     margin: number;
     spacing: number;
+    /** Pixel shift applied to every tile drawn from this tileset (`tileoffset`). */
+    tileOffset: Coords;
+    /** Anchor point tile objects from this tileset are placed by. */
+    objectAlignment: TiledObjectAlignment;
     /** Local tile id → animation (only animated tiles present). */
     animations: ReadonlyMap<number, TiledAnimation>;
     /** Local tile id → custom properties (only tiles that have any). */
@@ -132,6 +162,12 @@ export interface TiledTileset {
 export interface TiledCell {
     x: number;
     y: number;
+    /**
+     * World-unit size of the square box the tile draws in — the larger of the
+     * tile's pixel dimensions over the map grid. 1 for grid-sized tiles; the
+     * sprite keeps its own aspect inside the box.
+     */
+    size: number;
     tileset: TiledTileset;
     /** Atlas source rect (margin/spacing applied). */
     sprite: SpriteRect;
@@ -164,7 +200,7 @@ export type TiledObjectShape =
           kind: "tile";
           /** Item-space center of the drawn tile. */
           center: Coords;
-          /** World-unit size (tiles are square, so width === height). */
+          /** World-unit size of the square box the tile draws in (see {@link TiledCell.size}). */
           size: number;
           tileset: TiledTileset;
           sprite: SpriteRect;

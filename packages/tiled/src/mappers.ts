@@ -43,6 +43,10 @@ export function tileLayerToItems<TImage>(
             img: imageFor(images, cell.tileset),
             sprite: cell.animation ? cell.animation.frames[0] : cell.sprite,
         };
+        // Grid-sized tiles keep the default; oversized ones need their box.
+        if (cell.size !== 1) {
+            item.size = cell.size;
+        }
         if (cell.flipX) {
             item.flipX = true;
         }

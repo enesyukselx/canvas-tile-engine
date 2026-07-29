@@ -41,16 +41,67 @@ describe("parseTiledMap — validation", () => {
         await expect(parseTiledMap(baseMap({ tileheight: 8 }))).rejects.toThrow(/non-square/);
     });
 
-    it("rejects tilesets whose tile size differs from the map grid", async () => {
-        const map = baseMap({ tilesets: [{ ...TILESET, tilewidth: 32, tileheight: 32 }] });
-        await expect(parseTiledMap(map)).rejects.toThrow(/differs from the map grid/);
+    it("rejects tilesets with no usable columns value", async () => {
+        const map = baseMap({ tilesets: [{ ...TILESET, columns: 0 }] });
+        await expect(parseTiledMap(map)).rejects.toThrow(/columns/);
+    });
+});
+
+describe("parseTiledMap — tiles larger than the grid", () => {
+    // 32x32 tiles on a 16px grid: Tiled anchors a tile at the BOTTOM-left of
+    // its cell, so an oversized tile grows up and to the right.
+    const big = { ...TILESET, tilewidth: 32, tileheight: 32, columns: 2 };
+
+    it("boxes an oversized tile and centers it on the bottom-left anchor", async () => {
+        const map = await parseTiledMap(
+            baseMap({ tilesets: [big], layers: [{ type: "tilelayer", name: "t", data: [1, 0, 0, 0] }] }),
+        );
+        const cell = (map.layers[0] as TiledTileLayerData).cells[0];
+        // cell (0,0): px rect (0,-16)-(32,16), center px (16, 0)
+        expect(cell).toMatchObject({ x: 0.5, y: -0.5, size: 2 });
+        expect(cell.sprite).toEqual({ x: 0, y: 0, w: 32, h: 32 });
     });
 
-    it("rejects layers with pixel offsets", async () => {
-        const map = baseMap({
-            layers: [{ type: "tilelayer", name: "t", data: [0, 0, 0, 0], offsetx: 4 }],
+    it("keeps a non-square tile's aspect inside the larger box", async () => {
+        const tall = { ...TILESET, tilewidth: 32, tileheight: 48, columns: 2 };
+        const map = await parseTiledMap(
+            baseMap({ tilesets: [tall], layers: [{ type: "tilelayer", name: "t", data: [1, 0, 0, 0] }] }),
+        );
+        const cell = (map.layers[0] as TiledTileLayerData).cells[0];
+        // center px (0 + 16, 16 - 24) = (16, -8); box takes the larger side
+        expect(cell).toMatchObject({ x: 0.5, y: -1, size: 3 });
+        expect(cell.sprite).toEqual({ x: 0, y: 0, w: 32, h: 48 });
+    });
+
+    it("steps the atlas by each axis separately with margin and spacing", async () => {
+        const tall = { ...TILESET, tilewidth: 32, tileheight: 48, columns: 2, margin: 2, spacing: 1 };
+        const map = await parseTiledMap(
+            baseMap({ tilesets: [tall], layers: [{ type: "tilelayer", name: "t", data: [4, 0, 0, 0] }] }),
+        );
+        // local 3 -> col 1, row 1
+        expect((map.layers[0] as TiledTileLayerData).cells[0].sprite).toEqual({
+            x: 2 + 33,
+            y: 2 + 49,
+            w: 32,
+            h: 48,
         });
-        await expect(parseTiledMap(map)).rejects.toThrow(/offset/);
+    });
+
+    it("applies the tileset tileoffset to placed tiles", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                tilesets: [{ ...TILESET, tileoffset: { x: -8, y: 16 } }],
+                layers: [{ type: "tilelayer", name: "t", data: [1, 0, 0, 0] }],
+            }),
+        );
+        // grid-sized tile at cell (0,0) is normally (0,0); the offset shifts it
+        // by (-8, 16) px = (-0.5, 1) world units.
+        expect((map.layers[0] as TiledTileLayerData).cells[0]).toMatchObject({ x: -0.5, y: 1, size: 1 });
+    });
+
+    it("warns and keeps the transparentcolor image as-is", async () => {
+        const map = await parseTiledMap(baseMap({ tilesets: [{ ...TILESET, transparentcolor: "#ff00ff" }] }));
+        expect(map.warnings.some((w) => w.includes("transparentcolor"))).toBe(true);
     });
 });
 
@@ -299,6 +350,80 @@ describe("parseTiledMap — objects", () => {
             expect(shape.size).toBe(1);
             expect(shape.sprite).toEqual({ x: 16, y: 0, w: 16, h: 16 });
         }
+    });
+
+    it("honors the tileset objectalignment for tile objects", async () => {
+        const objectsAt = (alignment: string) =>
+            parseTiledMap(
+                baseMap({
+                    tilesets: [{ ...TILESET, objectalignment: alignment }],
+                    layers: [
+                        {
+                            type: "objectgroup",
+                            name: "o",
+                            objects: [{ id: 4, x: 16, y: 32, width: 16, height: 16, gid: 2 }],
+                        },
+                    ],
+                }),
+            );
+
+        // Same object, three anchors: the tile hangs below, above, or centered
+        // on px (16, 32) = the corner between cells (0,1) and (1,2).
+        const bottomLeft = (await objectsAt("bottomleft")).layers[0] as TiledObjectLayerData;
+        const topLeft = (await objectsAt("topleft")).layers[0] as TiledObjectLayerData;
+        const center = (await objectsAt("center")).layers[0] as TiledObjectLayerData;
+
+        expect(bottomLeft.objects[0].shape).toMatchObject({ center: { x: 1, y: 1 } });
+        expect(topLeft.objects[0].shape).toMatchObject({ center: { x: 1, y: 2 } });
+        expect(center.objects[0].shape).toMatchObject({ center: { x: 0.5, y: 1.5 } });
+    });
+
+    it("defaults to bottom-left when objectalignment is unspecified or unknown", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                tilesets: [{ ...TILESET, objectalignment: "sideways" }],
+                layers: [
+                    {
+                        type: "objectgroup",
+                        name: "o",
+                        objects: [{ id: 4, x: 16, y: 32, width: 16, height: 16, gid: 2 }],
+                    },
+                ],
+            }),
+        );
+        expect((map.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({ center: { x: 1, y: 1 } });
+        expect(map.warnings.some((w) => w.includes("objectalignment"))).toBe(true);
+    });
+
+    it("warns when a tile object is scaled to a different aspect than its tile", async () => {
+        const map = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "objectgroup",
+                        name: "o",
+                        // 16x16 tile forced into a 32x16 box: the renderers
+                        // aspect-fit, so it cannot be stretched.
+                        objects: [{ id: 4, x: 0, y: 32, width: 32, height: 16, gid: 2 }],
+                    },
+                ],
+            }),
+        );
+        expect(map.warnings.some((w) => w.includes("different aspect"))).toBe(true);
+        // Uniform scaling stays silent and doubles the box.
+        const uniform = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "objectgroup",
+                        name: "o",
+                        objects: [{ id: 4, x: 0, y: 32, width: 32, height: 32, gid: 2 }],
+                    },
+                ],
+            }),
+        );
+        expect(uniform.warnings).toEqual([]);
+        expect((uniform.layers[0] as TiledObjectLayerData).objects[0].shape).toMatchObject({ size: 2 });
     });
 
     it("rotates rect corners around the top-left anchor", async () => {

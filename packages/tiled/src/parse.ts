@@ -8,6 +8,7 @@ import type {
     TiledLayer,
     TiledMap,
     TiledObject,
+    TiledObjectAlignment,
     TiledObjectShape,
     TiledTileset,
     TmjLayer,
@@ -40,28 +41,65 @@ function propsToRecord(props: TmjProperty[] | undefined): Record<string, unknown
 export function tilesetSpriteRect(tileset: TiledTileset, localId: number): SpriteRect {
     const col = localId % tileset.columns;
     const row = Math.floor(localId / tileset.columns);
-    const step = tileset.tileSize + tileset.spacing;
     return {
-        x: tileset.margin + col * step,
-        y: tileset.margin + row * step,
-        w: tileset.tileSize,
-        h: tileset.tileSize,
+        x: tileset.margin + col * (tileset.tileWidth + tileset.spacing),
+        y: tileset.margin + row * (tileset.tileHeight + tileset.spacing),
+        w: tileset.tileWidth,
+        h: tileset.tileHeight,
     };
+}
+
+const OBJECT_ALIGNMENTS: Record<string, TiledObjectAlignment> = {
+    topleft: "topleft",
+    top: "top",
+    topright: "topright",
+    left: "left",
+    center: "center",
+    right: "right",
+    bottomleft: "bottomleft",
+    bottom: "bottom",
+    bottomright: "bottomright",
+};
+
+/**
+ * Anchor position as a fraction of the tile's width/height, measured from its
+ * top-left corner. `bottomleft` — the orthogonal default — is (0, 1).
+ */
+function alignmentFractions(alignment: TiledObjectAlignment): { fx: number; fy: number } {
+    const fx = alignment.endsWith("left") ? 0 : alignment.endsWith("right") ? 1 : 0.5;
+    const fy = alignment.startsWith("top") ? 0 : alignment.startsWith("bottom") ? 1 : 0.5;
+    return { fx, fy };
+}
+
+/**
+ * World-unit size of the square box a tile of `w` x `h` source pixels draws
+ * in. The renderers aspect-fit a sprite inside a square box and center it, so
+ * the box takes the larger dimension and the sprite keeps its own shape.
+ */
+function tileBoxSize(w: number, h: number, mapTileSize: number): number {
+    return Math.max(w, h) / mapTileSize;
 }
 
 function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number, warnings: string[]): TiledTileset {
     const name = raw.name ?? raw.image;
-    if (raw.tilewidth !== raw.tileheight) {
-        throw new Error(`${PKG}: tileset "${name}" has non-square tiles (${raw.tilewidth}x${raw.tileheight}).`);
-    }
-    if (raw.tilewidth !== mapTileSize) {
-        throw new Error(
-            `${PKG}: tileset "${name}" tile size (${raw.tilewidth}px) differs from the map grid (${mapTileSize}px). ` +
-                `Oversized-tile tilesets are not supported in v1.`,
-        );
-    }
     if (!Number.isInteger(raw.columns) || raw.columns <= 0) {
         throw new Error(`${PKG}: tileset "${name}" has no valid "columns" value.`);
+    }
+    if (raw.transparentcolor !== undefined) {
+        warnings.push(
+            `tileset "${name}": transparentcolor is not supported (the engine draws the image as-is); ` +
+                `export the image with real alpha instead.`,
+        );
+    }
+
+    const rawAlignment = raw.objectalignment ?? "unspecified";
+    // "unspecified" means "the orientation default", which is bottom-left for
+    // orthogonal maps — the only orientation this package accepts.
+    const objectAlignment = OBJECT_ALIGNMENTS[rawAlignment] ?? "bottomleft";
+    if (rawAlignment !== "unspecified" && OBJECT_ALIGNMENTS[rawAlignment] === undefined) {
+        warnings.push(
+            `tileset "${name}": unknown objectalignment "${rawAlignment}"; tile objects use bottom-left anchoring.`,
+        );
     }
 
     const tileset: TiledTileset = {
@@ -70,10 +108,13 @@ function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number
         image: raw.image,
         imageWidth: raw.imagewidth,
         imageHeight: raw.imageheight,
-        tileSize: raw.tilewidth,
+        tileWidth: raw.tilewidth,
+        tileHeight: raw.tileheight,
         columns: raw.columns,
         margin: raw.margin ?? 0,
         spacing: raw.spacing ?? 0,
+        tileOffset: { x: raw.tileoffset?.x ?? 0, y: raw.tileoffset?.y ?? 0 },
+        objectAlignment,
         animations: new Map(),
         tileProperties: new Map(),
     };
@@ -144,19 +185,36 @@ function normalizeObject(
     } else if (o.gid !== undefined) {
         const { gid, flipX, flipY, rotate } = decodeGid(o.gid);
         const tileset = tilesetForGid(gid, tilesets);
-        const w = o.width ?? tileSize;
-        const h = o.height ?? tileSize;
-        if (w !== h) {
-            warnings.push(`object ${label}: non-square tile object (${w}x${h}px); skipped.`);
-            return null;
+        // A tile object may be scaled: width/height override the tile's own
+        // pixel size, keeping the drawn aspect free of the tileset's.
+        const w = o.width ?? tileset.tileWidth;
+        const h = o.height ?? tileset.tileHeight;
+        // The object's (x, y) is its alignment point on the tile, so the
+        // tile's top-left is that point minus the alignment fractions. The
+        // object's own rotation spins around (x, y), moving the center with it.
+        const { fx, fy } = alignmentFractions(tileset.objectAlignment);
+        const centerPx = rotateAround(
+            {
+                x: o.x - fx * w + tileset.tileOffset.x + w / 2,
+                y: o.y - fy * h + tileset.tileOffset.y + h / 2,
+            },
+            anchorPx,
+            rotation,
+        );
+        // The renderers aspect-fit a sprite; they cannot stretch it. A tile
+        // object scaled to a different aspect than its tile therefore draws at
+        // the tile's own aspect, filling the larger requested dimension.
+        if (w * tileset.tileHeight !== h * tileset.tileWidth) {
+            warnings.push(
+                `object ${label}: tile object scaled to ${w}x${h}px, a different aspect than its ` +
+                    `${tileset.tileWidth}x${tileset.tileHeight}px tile; drawn at the tile's aspect ` +
+                    `(non-uniform scaling is not supported).`,
+            );
         }
-        // Tile objects anchor at their BOTTOM-left corner; the object's own
-        // rotation spins around that anchor, so the center moves with it.
-        const centerPx = rotateAround({ x: o.x + w / 2, y: o.y - h / 2 }, anchorPx, rotation);
         shape = {
             kind: "tile",
             center: pxPointToWorld(centerPx, tileSize),
-            size: w / tileSize,
+            size: tileBoxSize(w, h, tileSize),
             tileset,
             sprite: tilesetSpriteRect(tileset, gid - tileset.firstgid),
             flipX,
@@ -289,9 +347,19 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                     const { gid, flipX, flipY, rotate } = decodeGid(gids[i]);
                     const tileset = tilesetForGid(gid, tilesets);
                     const localId = gid - tileset.firstgid;
+                    const col = i % raw.width;
+                    const row = Math.floor(i / raw.width);
+                    // A tile sits on the BOTTOM-left of its cell, so tiles
+                    // larger than the grid grow up and to the right. The item
+                    // anchor is the drawn image's center, which is also the
+                    // center of its square box.
+                    const centerPx = {
+                        x: col * tileSize + tileset.tileOffset.x + tileset.tileWidth / 2,
+                        y: (row + 1) * tileSize + tileset.tileOffset.y - tileset.tileHeight / 2,
+                    };
                     const cell: TiledCell = {
-                        x: i % raw.width,
-                        y: Math.floor(i / raw.width),
+                        ...pxPointToWorld(centerPx, tileSize),
+                        size: tileBoxSize(tileset.tileWidth, tileset.tileHeight, tileSize),
                         tileset,
                         sprite: tilesetSpriteRect(tileset, localId),
                         flipX,
