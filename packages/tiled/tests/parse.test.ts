@@ -540,10 +540,34 @@ describe("parseTiledMap — objects", () => {
         expect(map.warnings.some((w) => w.includes("text objects"))).toBe(true);
     });
 
-    it("warns on object-layer opacity", async () => {
-        const map = await parseTiledMap(
-            baseMap({ layers: [{ type: "objectgroup", name: "o", opacity: 0.5, objects: [] }] }),
+    it("warns about object-layer opacity only when a shape cannot honor it", async () => {
+        const withShape = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "objectgroup",
+                        name: "o",
+                        opacity: 0.5,
+                        objects: [{ id: 1, x: 0, y: 0, width: 16, height: 16 }],
+                    },
+                ],
+            }),
         );
-        expect(map.warnings.some((w) => w.includes("object-layer opacity"))).toBe(true);
+        expect(withShape.warnings.some((w) => w.includes("object-layer opacity"))).toBe(true);
+
+        // Tile objects are images, so they take the opacity: nothing to warn about.
+        const tilesOnly = await parseTiledMap(
+            baseMap({
+                layers: [
+                    {
+                        type: "objectgroup",
+                        name: "o",
+                        opacity: 0.5,
+                        objects: [{ id: 1, x: 16, y: 32, width: 16, height: 16, gid: 2 }],
+                    },
+                ],
+            }),
+        );
+        expect(tilesOnly.warnings).toEqual([]);
     });
 });

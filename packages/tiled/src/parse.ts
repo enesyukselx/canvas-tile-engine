@@ -414,9 +414,6 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                     properties: propsToRecord(layer.properties),
                 });
             } else if (layer.type === "objectgroup") {
-                if (opacity !== 1) {
-                    warnings.push(`layer "${name}": object-layer opacity is not supported; objects draw fully opaque.`);
-                }
                 const objects: TiledObject[] = [];
                 for (const o of layer.objects ?? []) {
                     const normalized = normalizeObject(o, tileSize, tilesets, warnings);
@@ -426,6 +423,15 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                             shape: translateShape(normalized.shape, offset.x, offset.y),
                         });
                     }
+                }
+                // Tile objects are images and take the layer's opacity; every
+                // other shape draws through a style that carries no alpha
+                // channel of its own, so only warn when such a shape is present.
+                if (opacity !== 1 && objects.some((o) => o.shape.kind !== "tile")) {
+                    warnings.push(
+                        `layer "${name}": object-layer opacity applies to tile objects only; ` +
+                            `shapes, markers and labels draw fully opaque (use an rgba() style color instead).`,
+                    );
                 }
                 layers.push({
                     kind: "objects",

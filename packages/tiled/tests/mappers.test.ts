@@ -176,6 +176,19 @@ describe("objectLayerToItems", () => {
         expect(paths[1].style).toMatchObject({ strokeStyle: "#3b82f6" }); // fell back to default
     });
 
+    it("passes object-layer opacity to tile objects", async () => {
+        const { map, images } = await parseWith([
+            {
+                type: "objectgroup",
+                name: "o",
+                opacity: 0.25,
+                objects: [{ id: 4, x: 16, y: 32, width: 16, height: 16, gid: 2 }],
+            },
+        ]);
+        const { tiles } = objectLayerToItems(map.layers[0] as TiledObjectLayerData, images);
+        expect(tiles[0].opacity).toBe(0.25);
+    });
+
     it("maps tile objects to image items", async () => {
         const { map, images } = await parseWith([
             {

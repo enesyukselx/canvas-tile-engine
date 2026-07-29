@@ -178,6 +178,12 @@ export function objectLayerToItems<TImage>(
                     sprite: shape.sprite,
                     data,
                 };
+                // Tile objects are images, so they can honor layer opacity —
+                // paths and markers carry no opacity field (see the parse-time
+                // warning).
+                if (layer.opacity !== 1) {
+                    item.opacity = layer.opacity;
+                }
                 if (shape.flipX) {
                     item.flipX = true;
                 }
