@@ -12,7 +12,6 @@ import {
     Rect,
     SpatialIndex,
     Text,
-    VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveSizeWorld,
     resolveLineDashPx,
@@ -40,6 +39,7 @@ import type {
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
 import { GLRenderer } from "./gl/GLRenderer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
@@ -82,33 +82,6 @@ export class WebGLDraw {
         private camera: ICamera,
     ) {}
 
-    private isVisible(
-        x: number,
-        y: number,
-        sizeWorld: number,
-        topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>,
-    ) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        const minX = topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER;
-        const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
-        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
-    }
-
-    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        return {
-            minX: topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER,
-            minY: topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER,
-            maxX: topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER,
-            maxY: topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER,
-        };
-    }
-
     addDrawFunction(
         fn: (
             ctx: CanvasRenderingContext2D,
@@ -136,7 +109,7 @@ export class WebGLDraw {
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -155,7 +128,7 @@ export class WebGLDraw {
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -216,7 +189,7 @@ export class WebGLDraw {
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -240,7 +213,7 @@ export class WebGLDraw {
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -304,7 +277,7 @@ export class WebGLDraw {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -347,7 +320,7 @@ export class WebGLDraw {
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -365,7 +338,7 @@ export class WebGLDraw {
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
                     continue;
                 }
 
@@ -437,7 +410,7 @@ export class WebGLDraw {
                 const centerX = (bounds.minX + bounds.maxX) / 2;
                 const centerY = (bounds.minY + bounds.maxY) / 2;
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -520,7 +493,7 @@ export class WebGLDraw {
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -541,7 +514,7 @@ export class WebGLDraw {
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 

@@ -14,7 +14,6 @@ import {
     SpatialIndex,
     SpriteRect,
     Text,
-    VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveSizeWorld,
     resolveLineDashPx,
@@ -40,6 +39,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "./Layer";
+import { getViewportBounds, isVisible } from "../geometry/culling";
 import { applyLineWidth } from "./applyLineWidth";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
 
@@ -88,33 +88,6 @@ export class CanvasDraw<
         private createOffscreen: OffscreenCanvasFactory<TContext, TCanvas> | null,
     ) {}
 
-    private isVisible(
-        x: number,
-        y: number,
-        sizeWorld: number,
-        topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>,
-    ) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        const minX = topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER;
-        const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
-        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
-    }
-
-    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        return {
-            minX: topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER,
-            minY: topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER,
-            maxX: topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER,
-            maxY: topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER,
-        };
-    }
-
     /**
      * Register a generic draw callback; receives raw context, current coords, and config.
      * @param fn Callback invoked during render.
@@ -143,7 +116,7 @@ export class CanvasDraw<
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -164,7 +137,7 @@ export class CanvasDraw<
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -259,7 +232,7 @@ export class CanvasDraw<
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -325,7 +298,7 @@ export class CanvasDraw<
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -351,7 +324,7 @@ export class CanvasDraw<
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -392,7 +365,7 @@ export class CanvasDraw<
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -411,7 +384,7 @@ export class CanvasDraw<
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
                     continue;
                 }
 
@@ -464,7 +437,7 @@ export class CanvasDraw<
                 const centerX = (bounds.minX + bounds.maxX) / 2;
                 const centerY = (bounds.minY + bounds.maxY) / 2;
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -565,7 +538,7 @@ export class CanvasDraw<
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -585,7 +558,7 @@ export class CanvasDraw<
                 const origin = resolveOrigin(item.origin);
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 
