@@ -1,0 +1,344 @@
+import type { Coords, SpriteRect, TextAlign, TextBaseline } from "@canvas-tile-engine/core";
+
+// ─── Raw Tiled JSON (.tmj / .tsj) — the subset this package reads ───
+
+export interface TmjProperty {
+    name: string;
+    type?: string;
+    value: unknown;
+}
+
+export interface TmjFrame {
+    tileid: number;
+    duration: number;
+}
+
+export interface TmjTilesetTile {
+    id: number;
+    /** Image-collection tilesets give every tile its own image. */
+    image?: string;
+    imagewidth?: number;
+    imageheight?: number;
+    animation?: TmjFrame[];
+    properties?: TmjProperty[];
+}
+
+export interface TmjTileset {
+    name?: string;
+    /** Absent for image-collection tilesets. */
+    image?: string;
+    imagewidth?: number;
+    imageheight?: number;
+    tilewidth: number;
+    tileheight: number;
+    columns: number;
+    tilecount?: number;
+    margin?: number;
+    spacing?: number;
+    /** Pixel shift applied when drawing any tile of this tileset. */
+    tileoffset?: { x?: number; y?: number };
+    /** Anchor tile objects are placed by; "unspecified" = the orientation default. */
+    objectalignment?: string;
+    /** Color treated as transparent by Tiled's own renderer. */
+    transparentcolor?: string;
+    tiles?: TmjTilesetTile[];
+}
+
+/** Inline tileset, or a reference to an external `.tsj` file. */
+export type TmjTilesetRef =
+    | { firstgid: number; source: string }
+    | (TmjTileset & { firstgid: number; source?: undefined });
+
+export interface TmjPoint {
+    x: number;
+    y: number;
+}
+
+/** A text object's typography block. */
+export interface TmjText {
+    text: string;
+    fontfamily?: string;
+    /** Font size in map pixels. Default 16. */
+    pixelsize?: number;
+    /** CSS color; Tiled defaults to black. */
+    color?: string;
+    /** "left" (default) | "center" | "right" | "justify" */
+    halign?: string;
+    /** "top" (default) | "center" | "bottom" */
+    valign?: string;
+    wrap?: boolean;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strikeout?: boolean;
+    kerning?: boolean;
+}
+
+export interface TmjObject {
+    id: number;
+    name?: string;
+    /** Tiled <1.9 object type. */
+    type?: string;
+    /** Tiled >=1.9 renamed `type` to `class`. */
+    class?: string;
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    /** Degrees, clockwise, around the object's anchor. */
+    rotation?: number;
+    /** Tile object: a GID (with flip flags) drawn at the object position. */
+    gid?: number;
+    visible?: boolean;
+    ellipse?: boolean;
+    point?: boolean;
+    /** Vertices relative to (x, y), in pixels. */
+    polygon?: TmjPoint[];
+    polyline?: TmjPoint[];
+    text?: TmjText;
+    properties?: TmjProperty[];
+}
+
+export interface TmjLayer {
+    type: string; // "tilelayer" | "objectgroup" | "group" | "imagelayer"
+    name?: string;
+    visible?: boolean;
+    opacity?: number;
+    offsetx?: number;
+    offsety?: number;
+    /** Camera-relative scroll factors; 1 = moves with the map. */
+    parallaxx?: number;
+    parallaxy?: number;
+    tintcolor?: string;
+    /** tilelayer: GID array (csv encoding) or base64 string. */
+    data?: number[] | string;
+    encoding?: string; // "csv" (default) | "base64"
+    compression?: string; // "" | "zlib" | "gzip" | "zstd"
+    chunks?: unknown[];
+    /** group */
+    layers?: TmjLayer[];
+    /** objectgroup */
+    objects?: TmjObject[];
+    /** imagelayer */
+    image?: string;
+    imagewidth?: number;
+    imageheight?: number;
+    repeatx?: boolean;
+    repeaty?: boolean;
+    /** imagelayer position, in pixels (modern Tiled keeps these at 0). */
+    x?: number;
+    y?: number;
+    properties?: TmjProperty[];
+}
+
+export interface TmjMap {
+    type?: string;
+    orientation?: string;
+    backgroundcolor?: string;
+    renderorder?: string;
+    infinite?: boolean;
+    width: number;
+    height: number;
+    tilewidth: number;
+    tileheight: number;
+    layers?: TmjLayer[];
+    tilesets?: TmjTilesetRef[];
+    properties?: TmjProperty[];
+}
+
+// ─── Normalized model (engine-space; what parseTiledMap returns) ───
+
+/** One tile animation, shared by every cell referencing the same tileset tile. */
+export interface TiledAnimation {
+    frames: SpriteRect[];
+    /** Derived from the first frame's duration; see the RFC. */
+    fps: number;
+}
+
+/**
+ * Where a tile object's `(x, y)` anchor sits on the tile it draws. Tiled's
+ * `objectalignment`; orthogonal maps default to `"bottomleft"`.
+ */
+export type TiledObjectAlignment =
+    | "topleft"
+    | "top"
+    | "topright"
+    | "left"
+    | "center"
+    | "right"
+    | "bottomleft"
+    | "bottom"
+    | "bottomright";
+
+/**
+ * An image the map needs. `source` is the path exactly as written in the map or
+ * tileset file — resolve it to a real URL at mount time. The pixel size is
+ * present whenever the file records it.
+ */
+export interface TiledImage {
+    source: string;
+    width?: number;
+    height?: number;
+}
+
+export interface TiledTileset {
+    name: string;
+    firstgid: number;
+    /**
+     * The atlas image. Absent for image-collection tilesets, where every tile
+     * carries its own image in {@link tileImages} instead.
+     */
+    image?: TiledImage;
+    /**
+     * Tile width in source pixels. May exceed the map grid: Tiled anchors an
+     * oversized tile at the bottom-left of its cell, so it grows up and right.
+     */
+    tileWidth: number;
+    /** Tile height in source pixels; may exceed the map grid like {@link tileWidth}. */
+    tileHeight: number;
+    columns: number;
+    margin: number;
+    spacing: number;
+    /** Pixel shift applied to every tile drawn from this tileset (`tileoffset`). */
+    tileOffset: Coords;
+    /** Anchor point tile objects from this tileset are placed by. */
+    objectAlignment: TiledObjectAlignment;
+    /**
+     * Local tile id → its own image, for image-collection tilesets. Empty for
+     * ordinary atlas tilesets.
+     */
+    tileImages: ReadonlyMap<number, TiledImage>;
+    /** Local tile id → animation (only animated tiles present). */
+    animations: ReadonlyMap<number, TiledAnimation>;
+    /** Local tile id → custom properties (only tiles that have any). */
+    tileProperties: ReadonlyMap<number, Record<string, unknown>>;
+}
+
+/** One placed tile of a tile layer, in item space (integers = cell centers). */
+export interface TiledCell {
+    x: number;
+    y: number;
+    /**
+     * World-unit size of the square box the tile draws in — the larger of the
+     * tile's pixel dimensions over the map grid. 1 for grid-sized tiles; the
+     * sprite keeps its own aspect inside the box.
+     */
+    size: number;
+    tileset: TiledTileset;
+    /** The image this cell draws from — the atlas, or the tile's own image. */
+    image: TiledImage;
+    /** Source rect inside {@link image} (margin/spacing applied). */
+    sprite: SpriteRect;
+    flipX: boolean;
+    flipY: boolean;
+    /** Degrees, clockwise — from the GID diagonal-flip decode. */
+    rotate: number;
+    /** Shared animation object when this cell's tile is animated. */
+    animation?: TiledAnimation;
+    /** Custom properties of the tileset tile, if any. */
+    properties?: Record<string, unknown>;
+}
+
+/** Identity payload every produced object item carries in `data`. */
+export interface TiledObjectData {
+    id: number;
+    name: string;
+    /** Tiled object type/class ("" when unset). */
+    type: string;
+    properties: Record<string, unknown>;
+}
+
+export type TiledObjectShape =
+    | { kind: "rect"; points: Coords[] }
+    | { kind: "polygon"; points: Coords[] }
+    | { kind: "polyline"; points: Coords[] }
+    | { kind: "ellipse"; center: Coords; radiusX: number; radiusY: number }
+    | { kind: "point"; at: Coords }
+    | {
+          kind: "text";
+          /** Item-space anchor, already resolved from the box and alignment. */
+          at: Coords;
+          text: string;
+          /** Font em height in world units, so labels scale with the map. */
+          size: number;
+          /** Omitted when the map does not name one (the renderer's default wins). */
+          fontFamily?: string;
+          color: string;
+          align: TextAlign;
+          baseline: TextBaseline;
+          /** Degrees, clockwise, around the anchor. */
+          rotate: number;
+      }
+    | {
+          kind: "tile";
+          /** Item-space center of the drawn tile. */
+          center: Coords;
+          /** World-unit size of the square box the tile draws in (see {@link TiledCell.size}). */
+          size: number;
+          tileset: TiledTileset;
+          image: TiledImage;
+          sprite: SpriteRect;
+          flipX: boolean;
+          flipY: boolean;
+          rotate: number;
+      };
+
+export interface TiledObject {
+    data: TiledObjectData;
+    shape: TiledObjectShape;
+    visible: boolean;
+}
+
+export interface TiledTileLayerData {
+    kind: "tiles";
+    name: string;
+    opacity: number;
+    cells: TiledCell[];
+    properties: Record<string, unknown>;
+}
+
+export interface TiledObjectLayerData {
+    kind: "objects";
+    name: string;
+    opacity: number;
+    objects: TiledObject[];
+    properties: Record<string, unknown>;
+}
+
+export interface TiledImageLayerData {
+    kind: "image";
+    name: string;
+    opacity: number;
+    image: TiledImage;
+    /**
+     * Item-space position of the image's TOP-LEFT corner. The drawn size needs
+     * the image's pixel dimensions, so the mount resolves it after loading
+     * (`image.width`/`height` when the file recorded them, else the loaded
+     * image's own size).
+     */
+    topLeft: Coords;
+    properties: Record<string, unknown>;
+}
+
+export type TiledLayer = TiledTileLayerData | TiledObjectLayerData | TiledImageLayerData;
+
+export interface TiledMap {
+    columns: number;
+    rows: number;
+    /** px per cell in the source assets. */
+    tileSize: number;
+    tilesets: TiledTileset[];
+    /**
+     * Every distinct image the map references — tileset atlases, per-tile
+     * images of image-collection tilesets, and image layers — in first-use
+     * order. Load these and key them by `source`.
+     */
+    images: TiledImage[];
+    /** Flattened (groups resolved), in draw order, invisible layers removed. */
+    layers: TiledLayer[];
+    /** The map's `backgroundcolor`, ready for the engine's `backgroundColor`. */
+    backgroundColor?: string;
+    properties: Record<string, unknown>;
+    /** Non-fatal skips and quirks encountered while parsing. */
+    warnings: string[];
+}
