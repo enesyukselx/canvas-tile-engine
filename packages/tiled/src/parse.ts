@@ -30,7 +30,9 @@ export interface ParseTiledMapOptions {
 
 function propsToRecord(props: TmjProperty[] | undefined): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    if (props) for (const p of props) out[p.name] = p.value;
+    for (const p of props ?? []) {
+        out[p.name] = p.value;
+    }
     return out;
 }
 
@@ -104,7 +106,9 @@ function normalizeTileset(raw: TmjTileset, firstgid: number, mapTileSize: number
 /** Owning tileset of a GID: the last tileset whose firstgid <= gid. */
 function tilesetForGid(gid: number, tilesets: TiledTileset[]): TiledTileset {
     for (let i = tilesets.length - 1; i >= 0; i--) {
-        if (gid >= tilesets[i].firstgid) return tilesets[i];
+        if (gid >= tilesets[i].firstgid) {
+            return tilesets[i];
+        }
     }
     throw new Error(`${PKG}: GID ${gid} does not belong to any tileset.`);
 }
@@ -115,7 +119,9 @@ function normalizeObject(
     tilesets: TiledTileset[],
     warnings: string[],
 ): TiledObject | null {
-    if (o.visible === false) return null;
+    if (o.visible === false) {
+        return null;
+    }
 
     const label = o.name ? `"${o.name}"` : `#${o.id}`;
     if (o.text !== undefined) {
@@ -254,7 +260,9 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
 
     const walk = (rawLayers: TmjLayer[], parentOpacity: number) => {
         for (const layer of rawLayers) {
-            if (layer.visible === false) continue;
+            if (layer.visible === false) {
+                continue;
+            }
             const name = layer.name ?? "(unnamed)";
             if ((layer.offsetx ?? 0) !== 0 || (layer.offsety ?? 0) !== 0) {
                 throw new Error(
@@ -275,7 +283,9 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                 const gids = decodeLayerData(layer, raw.width * raw.height);
                 const cells: TiledCell[] = [];
                 for (let i = 0; i < gids.length; i++) {
-                    if (gids[i] === 0) continue;
+                    if (gids[i] === 0) {
+                        continue;
+                    }
                     const { gid, flipX, flipY, rotate } = decodeGid(gids[i]);
                     const tileset = tilesetForGid(gid, tilesets);
                     const localId = gid - tileset.firstgid;
@@ -289,9 +299,13 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                         rotate,
                     };
                     const animation = tileset.animations.get(localId);
-                    if (animation) cell.animation = animation;
+                    if (animation) {
+                        cell.animation = animation;
+                    }
                     const properties = tileset.tileProperties.get(localId);
-                    if (properties) cell.properties = properties;
+                    if (properties) {
+                        cell.properties = properties;
+                    }
                     cells.push(cell);
                 }
                 layers.push({
@@ -308,7 +322,9 @@ export async function parseTiledMap(json: unknown, options?: ParseTiledMapOption
                 const objects: TiledObject[] = [];
                 for (const o of layer.objects ?? []) {
                     const normalized = normalizeObject(o, tileSize, tilesets, warnings);
-                    if (normalized) objects.push(normalized);
+                    if (normalized) {
+                        objects.push(normalized);
+                    }
                 }
                 layers.push({
                     kind: "objects",

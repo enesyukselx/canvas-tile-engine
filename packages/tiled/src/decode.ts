@@ -10,7 +10,9 @@ function base64ToBytes(b64: string): Uint8Array {
     }
     const bin = atob(clean);
     const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    for (let i = 0; i < bin.length; i++) {
+        bytes[i] = bin.charCodeAt(i);
+    }
     return bytes;
 }
 
@@ -45,9 +47,11 @@ export function decodeLayerData(layer: TmjLayer, expectedLength: number): Uint32
             );
         }
         let bytes = base64ToBytes(data);
-        if (compression === "zlib") bytes = unzlibSync(bytes);
-        else if (compression === "gzip") bytes = gunzipSync(bytes);
-        else if (compression !== "") {
+        if (compression === "zlib") {
+            bytes = unzlibSync(bytes);
+        } else if (compression === "gzip") {
+            bytes = gunzipSync(bytes);
+        } else if (compression !== "") {
             throw new Error(`@canvas-tile-engine/tiled: layer "${name}" uses unknown compression "${compression}".`);
         }
         if (bytes.byteLength % 4 !== 0) {
@@ -57,7 +61,9 @@ export function decodeLayerData(layer: TmjLayer, expectedLength: number): Uint32
         // explicit regardless of platform endianness.
         const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         gids = new Uint32Array(bytes.byteLength / 4);
-        for (let i = 0; i < gids.length; i++) gids[i] = view.getUint32(i * 4, true);
+        for (let i = 0; i < gids.length; i++) {
+            gids[i] = view.getUint32(i * 4, true);
+        }
     }
 
     if (gids.length !== expectedLength) {

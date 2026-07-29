@@ -43,11 +43,21 @@ export function tileLayerToItems<TImage>(
             img: imageFor(images, cell.tileset),
             sprite: cell.animation ? cell.animation.frames[0] : cell.sprite,
         };
-        if (cell.flipX) item.flipX = true;
-        if (cell.flipY) item.flipY = true;
-        if (cell.rotate !== 0) item.rotate = cell.rotate;
-        if (layer.opacity !== 1) item.opacity = layer.opacity;
-        if (cell.properties) item.data = cell.properties;
+        if (cell.flipX) {
+            item.flipX = true;
+        }
+        if (cell.flipY) {
+            item.flipY = true;
+        }
+        if (cell.rotate !== 0) {
+            item.rotate = cell.rotate;
+        }
+        if (layer.opacity !== 1) {
+            item.opacity = layer.opacity;
+        }
+        if (cell.properties) {
+            item.data = cell.properties;
+        }
 
         if (cell.animation) {
             let group = groups.get(cell.animation);
@@ -123,7 +133,9 @@ export function objectLayerToItems<TImage>(
 
     const styleFor = (data: TiledObjectData): PathStyle | undefined => {
         const style = options.pathStyle;
-        if (typeof style === "function") return style(data) ?? DEFAULT_PATH_STYLE;
+        if (typeof style === "function") {
+            return style(data) ?? DEFAULT_PATH_STYLE;
+        }
         return style ?? DEFAULT_PATH_STYLE;
     };
 
@@ -162,9 +174,15 @@ export function objectLayerToItems<TImage>(
                     sprite: shape.sprite,
                     data,
                 };
-                if (shape.flipX) item.flipX = true;
-                if (shape.flipY) item.flipY = true;
-                if (shape.rotate !== 0) item.rotate = shape.rotate;
+                if (shape.flipX) {
+                    item.flipX = true;
+                }
+                if (shape.flipY) {
+                    item.flipY = true;
+                }
+                if (shape.rotate !== 0) {
+                    item.rotate = shape.rotate;
+                }
                 tiles.push(item);
                 break;
             }

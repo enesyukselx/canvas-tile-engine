@@ -80,15 +80,21 @@ export async function mountTiledMap<TMount, TImage>(
                     fps: group.animation.fps,
                 });
                 animator.start((frame) => {
-                    for (const item of group.items) item.sprite = frame;
+                    for (const item of group.items) {
+                        item.sprite = frame;
+                    }
                     engine.render();
                 });
                 animators.push(animator);
             });
         } else {
             const { paths, markers, tiles } = objectLayerToItems(layer, images, options);
-            if (paths.length > 0) layerHandles.push(engine.drawPath(paths, engineLayer, { id: `${idBase}:paths` }));
-            if (tiles.length > 0) layerHandles.push(engine.drawImage(tiles, engineLayer, { id: `${idBase}:tiles` }));
+            if (paths.length > 0) {
+                layerHandles.push(engine.drawPath(paths, engineLayer, { id: `${idBase}:paths` }));
+            }
+            if (tiles.length > 0) {
+                layerHandles.push(engine.drawImage(tiles, engineLayer, { id: `${idBase}:tiles` }));
+            }
             if (markers.length > 0) {
                 layerHandles.push(engine.drawCircle(markers, engineLayer, { id: `${idBase}:markers` }));
             }
@@ -101,12 +107,18 @@ export async function mountTiledMap<TMount, TImage>(
         map,
         handles,
         destroy() {
-            if (destroyed) return;
+            if (destroyed) {
+                return;
+            }
             destroyed = true;
-            for (const animator of animators) animator.stop();
+            for (const animator of animators) {
+                animator.stop();
+            }
             // Removing a static registration also drops its offscreen cache.
             for (const layerHandles of handles.values()) {
-                for (const handle of layerHandles) engine.removeDrawHandle(handle);
+                for (const handle of layerHandles) {
+                    engine.removeDrawHandle(handle);
+                }
             }
             engine.render();
         },

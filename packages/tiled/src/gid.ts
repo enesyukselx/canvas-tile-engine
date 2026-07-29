@@ -41,8 +41,14 @@ export function decodeGid(raw: number): DecodedGid {
     if (!d) {
         return { gid, flipX: h, flipY: v, rotate: 0 };
     }
-    if (h && v) return { gid, flipX: true, flipY: false, rotate: 90 };
-    if (h) return { gid, flipX: false, flipY: false, rotate: 90 };
-    if (v) return { gid, flipX: false, flipY: false, rotate: 270 };
+    if (h && v) {
+        return { gid, flipX: true, flipY: false, rotate: 90 };
+    }
+    if (h) {
+        return { gid, flipX: false, flipY: false, rotate: 90 };
+    }
+    if (v) {
+        return { gid, flipX: false, flipY: false, rotate: 270 };
+    }
     return { gid, flipX: false, flipY: true, rotate: 90 };
 }

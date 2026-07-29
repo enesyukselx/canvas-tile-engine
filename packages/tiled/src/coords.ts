@@ -17,7 +17,9 @@ export function pxPointToWorld(p: { x: number; y: number }, tileSize: number): C
 
 /** Rotate `p` around `anchor` by `deg` clockwise (screen coords, y-down). */
 export function rotateAround(p: Coords, anchor: Coords, deg: number): Coords {
-    if (deg === 0) return p;
+    if (deg === 0) {
+        return p;
+    }
     const rad = (deg * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
