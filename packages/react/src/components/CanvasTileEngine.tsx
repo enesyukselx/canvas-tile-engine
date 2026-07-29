@@ -1,21 +1,23 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { CanvasTileEngine as CanvasTileEngineCore } from "@canvas-tile-engine/core";
-import { EngineContext, type EngineContextValue } from "../context/EngineContext";
+import { EngineContext, type EngineContextValue } from "../context";
 import type { CanvasTileEngineProps } from "../types";
 
 // Import draw components for compound pattern
-import { Rect } from "./draw/Rect";
-import { Circle } from "./draw/Circle";
-import { Image } from "./draw/Image";
-import { Sprite } from "./draw/Sprite";
-import { GridLines } from "./draw/GridLines";
-import { Line } from "./draw/Line";
-import { Text } from "./draw/Text";
-import { Path } from "./draw/Path";
-import { StaticRect } from "./draw/StaticRect";
-import { StaticCircle } from "./draw/StaticCircle";
-import { StaticImage } from "./draw/StaticImage";
-import { DrawFunction } from "./draw/DrawFunction";
+import {
+    Rect,
+    Circle,
+    Image,
+    Sprite,
+    GridLines,
+    Line,
+    Text,
+    Path,
+    StaticRect,
+    StaticCircle,
+    StaticImage,
+    DrawFunction,
+} from "./draw";
 
 /**
  * React component that renders a CanvasTileEngine.
