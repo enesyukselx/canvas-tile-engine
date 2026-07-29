@@ -25,8 +25,8 @@ import {
     computeOriginOffset,
     traceRoundedPath,
     traceCommands,
-    pathCommandsBounds,
     itemsBounds,
+    pathItemBounds,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
@@ -450,36 +450,8 @@ export class CanvasDraw<
     ): DrawHandle {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
-        // Conservative world bounds per item for culling, computed once:
-        // control-point hull for command paths, vertex bounds for polylines.
-        const itemBounds = items.map((item) => {
-            if (item.commands !== undefined) {
-                return pathCommandsBounds(item.commands);
-            }
-            const points = item.points;
-            if (!points || points.length < 2) {
-                return null;
-            }
-            let minX = Infinity;
-            let minY = Infinity;
-            let maxX = -Infinity;
-            let maxY = -Infinity;
-            for (const p of points) {
-                if (p.x < minX) {
-                    minX = p.x;
-                }
-                if (p.y < minY) {
-                    minY = p.y;
-                }
-                if (p.x > maxX) {
-                    maxX = p.x;
-                }
-                if (p.y > maxY) {
-                    maxY = p.y;
-                }
-            }
-            return { minX, minY, maxX, maxY };
-        });
+        // Conservative world bounds per item for culling, computed once.
+        const itemBounds = items.map((item) => pathItemBounds(item));
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             for (let n = 0; n < items.length; n++) {

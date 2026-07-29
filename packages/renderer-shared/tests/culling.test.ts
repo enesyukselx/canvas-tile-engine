@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasTileEngineConfig, PathItem } from "@canvas-tile-engine/core";
+import type { CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { getViewportBounds, isVisible } from "../src/geometry/culling";
-import { pathItemBounds } from "../src/geometry/pathBounds";
 
 // 100x100 px at scale 10 = 10x10 world units, plus the 1-unit tile buffer.
 const config = { size: { width: 100, height: 100 }, scale: 10 } as Required<CanvasTileEngineConfig>;
@@ -45,50 +44,5 @@ describe("isVisible", () => {
     it("culls on both axes independently", () => {
         expect(isVisible(5, 20, 0.5, { x: 0, y: 0 }, config)).toBe(false);
         expect(isVisible(-5, 5, 0.5, { x: 0, y: 0 }, config)).toBe(false);
-    });
-});
-
-describe("pathItemBounds", () => {
-    it("boxes polyline vertices", () => {
-        const item: PathItem = {
-            points: [
-                { x: 2, y: 5 },
-                { x: -3, y: 1 },
-                { x: 4, y: -2 },
-            ],
-        };
-        expect(pathItemBounds(item)).toEqual({ minX: -3, maxX: 4, minY: -2, maxY: 5 });
-    });
-
-    it("returns null for geometry that cannot be drawn", () => {
-        expect(pathItemBounds({ points: [] })).toBeNull();
-        expect(pathItemBounds({ points: [{ x: 1, y: 1 }] })).toBeNull();
-        expect(pathItemBounds({} as PathItem)).toBeNull();
-        expect(pathItemBounds({ commands: [] })).toBeNull();
-    });
-
-    it("uses the control-point hull for command paths", () => {
-        const item: PathItem = {
-            commands: [
-                { type: "moveTo", x: 0, y: 0 },
-                { type: "quadraticCurveTo", cpx: 5, cpy: 10, x: 10, y: 0 },
-            ],
-        };
-        // The curve never leaves its hull, so the control point sets maxY.
-        expect(pathItemBounds(item)).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 10 });
-    });
-
-    it("prefers commands over points when both are present", () => {
-        const item: PathItem = {
-            commands: [
-                { type: "moveTo", x: 0, y: 0 },
-                { type: "lineTo", x: 1, y: 1 },
-            ],
-            points: [
-                { x: 100, y: 100 },
-                { x: 200, y: 200 },
-            ],
-        };
-        expect(pathItemBounds(item)).toEqual({ minX: 0, maxX: 1, minY: 0, maxY: 1 });
     });
 });
