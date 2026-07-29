@@ -228,7 +228,7 @@ const png = await renderToBuffer({
 | [references/react-native.md](references/react-native.md) | RN component, Skia types, layout sizing, touch behavior, custom Skia drawing, platform differences. |
 | [references/server.md](references/server.md) | `renderToBuffer`, low-level `RendererServer`, fonts, output formats, differences from browser renderers. |
 | [references/sprites.md](references/sprites.md) | `sprite` source rects, `SpriteSheet`, `SpriteAnimator`, the React `<Sprite>` component. |
-| [references/tiled.md](references/tiled.md) | `@canvas-tile-engine/tiled`: parseTiledMap/mountTiledMap, supported .tmj subset, object hit testing, tile animations, pure mappers. |
+| [references/tiled.md](references/tiled.md) | `@canvas-tile-engine/tiled`: parseTiledMap/mountTiledMap, what comes through vs warns vs rejects, camera wiring, object hit testing, text objects, tile animations, pure mappers. |
 | [references/performance.md](references/performance.md) | Renderer choice, culling/spatial index internals, static caches, WebGL specifics (`invalidateTexture`, overlay layering caveat). |
 | [references/recipes.md](references/recipes.md) | Complete end-to-end builds: game map, minimap sync, pixel painter, RN board, OG-image endpoint, responsive fullscreen map. |
 
