@@ -16,11 +16,17 @@ const DEG = Math.PI / 180;
 function arcSweep(startRad: number, endRad: number, ccw: boolean): number {
     let sweep = endRad - startRad;
     if (!ccw) {
-        if (sweep <= 0) sweep = (sweep % TWO_PI) + TWO_PI;
-        else if (sweep > TWO_PI) sweep = TWO_PI;
+        if (sweep <= 0) {
+            sweep = (sweep % TWO_PI) + TWO_PI;
+        } else if (sweep > TWO_PI) {
+            sweep = TWO_PI;
+        }
     } else {
-        if (sweep >= 0) sweep = (sweep % TWO_PI) - TWO_PI;
-        else if (sweep < -TWO_PI) sweep = -TWO_PI;
+        if (sweep >= 0) {
+            sweep = (sweep % TWO_PI) - TWO_PI;
+        } else if (sweep < -TWO_PI) {
+            sweep = -TWO_PI;
+        }
     }
     return sweep;
 }
@@ -86,7 +92,9 @@ export function flattenPathCommands(commands: PathCommand[], maxSegment: number)
             }
             case "quadraticCurveTo": {
                 const from = current[current.length - 1] ?? { x: cmd.cpx, y: cmd.cpy };
-                if (current.length === 0) point(from.x, from.y);
+                if (current.length === 0) {
+                    point(from.x, from.y);
+                }
                 const hull =
                     Math.hypot(cmd.cpx - from.x, cmd.cpy - from.y) + Math.hypot(cmd.x - cmd.cpx, cmd.y - cmd.cpy);
                 const n = steps(hull);
@@ -102,7 +110,9 @@ export function flattenPathCommands(commands: PathCommand[], maxSegment: number)
             }
             case "bezierCurveTo": {
                 const from = current[current.length - 1] ?? { x: cmd.cp1x, y: cmd.cp1y };
-                if (current.length === 0) point(from.x, from.y);
+                if (current.length === 0) {
+                    point(from.x, from.y);
+                }
                 const hull =
                     Math.hypot(cmd.cp1x - from.x, cmd.cp1y - from.y) +
                     Math.hypot(cmd.cp2x - cmd.cp1x, cmd.cp2y - cmd.cp1y) +
@@ -150,10 +160,18 @@ export function pathCommandsBounds(
     let maxX = -Infinity;
     let maxY = -Infinity;
     const add = (x: number, y: number) => {
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
+        if (x < minX) {
+            minX = x;
+        }
+        if (y < minY) {
+            minY = y;
+        }
+        if (x > maxX) {
+            maxX = x;
+        }
+        if (y > maxY) {
+            maxY = y;
+        }
     };
     for (const cmd of commands) {
         switch (cmd.type) {
@@ -178,6 +196,8 @@ export function pathCommandsBounds(
                 break;
         }
     }
-    if (minX === Infinity) return null;
+    if (minX === Infinity) {
+        return null;
+    }
     return { minX, minY, maxX, maxY };
 }

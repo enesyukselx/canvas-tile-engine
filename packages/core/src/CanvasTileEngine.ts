@@ -3,9 +3,10 @@ import { Config } from "./modules/Config";
 import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
-import { HitTester, HitResult, HitTestOptions, HitTestRectOptions } from "./modules/HitTester";
+import { HitTester, HitResult, HitTestOptions, HitTestRectOptions, HitItem } from "./modules/HitTester";
 import { DEFAULT_VALUES } from "./constants";
-import { validateCoords, validateFitBounds, validateScale } from "./utils/validateConfig";
+import { validateCoords, validateScale } from "./utils/validateConfig";
+import { fitScale } from "./utils/fitScale";
 import { snapCenterToGrid } from "./utils/viewport";
 import {
     Bounds,
@@ -38,7 +39,11 @@ import {
     TextDrawOptions,
     LineDrawOptions,
     PathDrawOptions,
+    ImageDrawOptions,
+    StaticDrawOptions,
     StyleOf,
+    VisibleOf,
+    InteractiveOf,
     ShapeDecorationStyle,
     TextDecorationStyle,
     LineDecorationStyle,
@@ -586,27 +591,31 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * area visible, clamped to the scale limits. Animated by default; not
      * related to setBounds, which restricts camera movement.
      * @param bounds Rectangle to fit. Every edge must be finite.
-     * @param options `padding` in world units (default 0), `durationMs`
-     * (default 500, 0 = instant), and `onComplete`.
+     * @param options `padding` in world units (default 0) or `paddingPx` in
+     * screen pixels (wins over `padding`), `durationMs` (default 500,
+     * 0 = instant), and `onComplete`.
      * @throws {ConfigValidationError} If an edge is not finite, min >= max on
-     * an axis, or padding is negative.
+     * an axis, or a padding value is negative.
      * @example
      * ```ts
      * // Show the whole board with one cell of margin
      * engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+     *
+     * // 24px of air around any selection, small or huge
+     * engine.fitBounds(selectionBounds, { paddingPx: 24 });
      *
      * // Jump to a selection instantly
      * engine.fitBounds(selectionBounds, { durationMs: 0 });
      * ```
      */
     fitBounds(bounds: Bounds, options: FitBoundsOptions = {}) {
-        const { padding = 0, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
-        validateFitBounds(bounds, padding);
+        const { padding = 0, paddingPx, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
 
         const size = this.viewport.getSize();
-        const fitWidth = bounds.maxX - bounds.minX + padding * 2;
-        const fitHeight = bounds.maxY - bounds.minY + padding * 2;
-        const rawScale = Math.min(size.width / fitWidth, size.height / fitHeight);
+        // Shared with the config-time helper (it also validates), so the
+        // scale a caller derives from fitScale() is exactly the scale this
+        // method targets before clamping.
+        const rawScale = fitScale(bounds, size, { padding, paddingPx });
         const targetScale = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, rawScale));
         const center = {
             x: (bounds.minX + bounds.maxX) / 2,
@@ -689,18 +698,26 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * clean state.
      */
     private replacePreviousDraw(id: string | undefined) {
-        if (id === undefined) return;
+        if (id === undefined) {
+            return;
+        }
         const prev = this.drawIds.get(id);
-        if (!prev) return;
+        if (!prev) {
+            return;
+        }
         this.drawIds.delete(id);
         this.drawIdByHandle.delete(prev.handle.id);
         this.renderer.getDrawAPI().removeDrawHandle(prev.handle);
         this.hitTester.remove(prev.handle);
-        if (prev.cacheKey !== undefined) this.renderer.getDrawAPI().clearStaticCache(prev.cacheKey);
+        if (prev.cacheKey !== undefined) {
+            this.renderer.getDrawAPI().clearStaticCache(prev.cacheKey);
+        }
     }
 
     private trackDrawId(id: string | undefined, handle: DrawHandle, cacheKey?: string) {
-        if (id === undefined) return;
+        if (id === undefined) {
+            return;
+        }
         this.drawIds.set(id, { handle, cacheKey });
         this.drawIdByHandle.set(handle.id, id);
     }
@@ -711,14 +728,18 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     private untrackDrawHandle(handle: DrawHandle) {
         const id = this.drawIdByHandle.get(handle.id);
-        if (id === undefined) return;
+        if (id === undefined) {
+            return;
+        }
         this.drawIdByHandle.delete(handle.id);
         const entry = this.drawIds.get(id);
         this.drawIds.delete(id);
         // A removed static registration leaves its offscreen cache orphaned —
         // and silently stale if the same cacheKey is later re-registered with
         // different items — so drop the cache with the registration.
-        if (entry?.cacheKey !== undefined) this.renderer.getDrawAPI().clearStaticCache(entry.cacheKey);
+        if (entry?.cacheKey !== undefined) {
+            this.renderer.getDrawAPI().clearStaticCache(entry.cacheKey);
+        }
     }
 
     /**
@@ -727,9 +748,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param items Rectangle definitions.
      * @param layer Layer order (lower draws first).
      * @param options Optional `id` (re-registering with the same id replaces
-     * the previous registration) and `styleOf` (paint-time decoration: the
+     * the previous registration), `styleOf` (paint-time decoration: the
      * returned fields overlay the item's `style` each frame without
-     * re-registering — mutate your state and call `render()`).
+     * re-registering — mutate your state and call `render()`), `visibleOf`
+     * (per-item show/hide, same live-read model; a hidden item neither paints
+     * nor hit-tests), and `interactiveOf` (per-item hit-test opt-out).
      */
     drawRect<TData = unknown>(
         items: Rect<TData> | Array<Rect<TData>>,
@@ -739,10 +762,16 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.replacePreviousDraw(options?.id);
         // TData only narrows the callback's item type for callers; renderers
         // hand back items from this same registration, so widening is safe.
-        const handle = this.renderer
-            .getDrawAPI()
-            .drawRect(items, layer, { styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined });
-        this.hitTester.register(handle, "rect", items, layer);
+        const handle = this.renderer.getDrawAPI().drawRect(items, layer, {
+            styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Rect> | undefined,
+        });
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "rect", items, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
+        }
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -757,11 +786,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * acts as the registration id: calling again with the same key replaces
      * the previous registration and invalidates its cache.
      * @param layer Layer order (lower draws first).
+     * @param options Optional `hitTest: false` to keep the registration out
+     * of hit testing (decorative content).
      */
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1, options?: StaticDrawOptions): DrawHandle {
         this.replacePreviousDraw(cacheKey);
         const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
-        this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true });
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true });
+        }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
     }
@@ -775,11 +808,20 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * acts as the registration id: calling again with the same key replaces
      * the previous registration and invalidates its cache.
      * @param layer Layer order (lower draws first).
+     * @param options Optional `hitTest: false` to keep the registration out
+     * of hit testing (decorative content).
      */
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticCircle(
+        items: Array<Circle>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: StaticDrawOptions,
+    ): DrawHandle {
         this.replacePreviousDraw(cacheKey);
         const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
-        this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true });
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true });
+        }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
     }
@@ -794,11 +836,20 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * acts as the registration id: calling again with the same key replaces
      * the previous registration and invalidates its cache.
      * @param layer Layer order (lower draws first).
+     * @param options Optional `hitTest: false` to keep the registration out
+     * of hit testing (decorative content).
      */
-    drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(
+        items: Array<ImageItem<TImage>>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: StaticDrawOptions,
+    ): DrawHandle {
         this.replacePreviousDraw(cacheKey);
         const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
-        this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true });
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true });
+        }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
     }
@@ -819,10 +870,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param style Line style overrides.
      * @param layer Layer order.
      * @param options Optional `id` (re-registering with the same id replaces
-     * the previous registration) and `styleOf` (paint-time decoration overlaid
+     * the previous registration), `styleOf` (paint-time decoration overlaid
      * on the call-level `style` per item — also the way to give individual
-     * lines their own color). Decorations cannot change `lineWidth`: the
-     * hit-test area derives from the registration-time stroke width.
+     * lines their own color), `visibleOf` (per-item show/hide; a hidden line
+     * neither paints nor hit-tests), and `interactiveOf` (per-item hit-test
+     * opt-out). Decorations cannot change `lineWidth`: the hit-test area
+     * derives from the registration-time stroke width.
      */
     drawLine<TData = unknown>(
         items: Array<Line<TData>> | Line<TData>,
@@ -833,8 +886,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawLine(items, style, layer, {
             styleOf: options?.styleOf as StyleOf<Line, LineDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Line> | undefined,
         });
-        this.hitTester.register(handle, "line", items, layer, { style });
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "line", items, layer, {
+                style,
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
+        }
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -844,9 +904,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param items Circle definitions.
      * @param layer Layer order.
      * @param options Optional `id` (re-registering with the same id replaces
-     * the previous registration) and `styleOf` (paint-time decoration: the
+     * the previous registration), `styleOf` (paint-time decoration: the
      * returned fields overlay the item's `style` each frame without
-     * re-registering — mutate your state and call `render()`).
+     * re-registering — mutate your state and call `render()`), `visibleOf`
+     * (per-item show/hide, same live-read model; a hidden item neither paints
+     * nor hit-tests), and `interactiveOf` (per-item hit-test opt-out).
      */
     drawCircle<TData = unknown>(
         items: Circle<TData> | Array<Circle<TData>>,
@@ -856,8 +918,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawCircle(items, layer, {
             styleOf: options?.styleOf as StyleOf<Circle, ShapeDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Circle> | undefined,
         });
-        this.hitTester.register(handle, "circle", items, layer);
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "circle", items, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
+        }
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -894,9 +962,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: TextDrawOptions<TData>,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer
-            .getDrawAPI()
-            .drawText(items, layer, { styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined });
+        const handle = this.renderer.getDrawAPI().drawText(items, layer, {
+            styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<Text> | undefined,
+        });
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -938,8 +1007,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const list = Array.isArray(items) ? items : [items];
         const handle = this.renderer.getDrawAPI().drawPath(list, layer, {
             styleOf: options?.styleOf as StyleOf<PathItem, PathDecorationStyle> | undefined,
+            visibleOf: options?.visibleOf as VisibleOf<PathItem> | undefined,
         });
-        this.hitTester.register(handle, "path", list, layer);
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "path", list, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
+        }
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -949,17 +1024,28 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * Supports rotation via the `rotate` property (degrees, positive = clockwise).
      * @param items Image definitions.
      * @param layer Layer order.
-     * @param options Optional `id`: re-registering with the same id replaces
-     * the previous registration instead of accumulating alongside it.
+     * @param options Optional `id` (re-registering with the same id replaces
+     * the previous registration), `visibleOf` (per-item show/hide, read live
+     * each frame; a hidden item neither paints nor hit-tests), and
+     * `interactiveOf` (per-item hit-test opt-out). Images carry no `style`,
+     * so there is no `styleOf` — appearance changes go through item fields
+     * like `opacity` (mutate + `render()`).
      */
-    drawImage(
-        items: Array<ImageItem<TImage>> | ImageItem<TImage>,
+    drawImage<TData = unknown>(
+        items: Array<ImageItem<TImage, TData>> | ImageItem<TImage, TData>,
         layer: number = 1,
-        options?: DrawOptions,
+        options?: ImageDrawOptions<TImage, TData>,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawImage(items, layer);
-        this.hitTester.register(handle, "image", items, layer);
+        const handle = this.renderer.getDrawAPI().drawImage(items, layer, {
+            visibleOf: options?.visibleOf as VisibleOf<ImageItem<TImage>> | undefined,
+        });
+        if (options?.hitTest !== false) {
+            this.hitTester.register(handle, "image", items, layer, {
+                visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
+                interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+            });
+        }
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -1043,10 +1129,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.renderer.getDrawAPI().clearLayer(layer);
         this.hitTester.clearLayer(layer);
         for (const [id, entry] of this.drawIds) {
-            if (entry.handle.layer !== layer) continue;
+            if (entry.handle.layer !== layer) {
+                continue;
+            }
             this.drawIds.delete(id);
             this.drawIdByHandle.delete(entry.handle.id);
-            if (entry.cacheKey !== undefined) this.renderer.getDrawAPI().clearStaticCache(entry.cacheKey);
+            if (entry.cacheKey !== undefined) {
+                this.renderer.getDrawAPI().clearStaticCache(entry.cacheKey);
+            }
         }
     }
 
@@ -1149,7 +1239,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     private resolveHitOptions(opts?: HitTestOptions): HitTestOptions | undefined {
-        if (!opts || opts.paddingPx === undefined) return opts;
+        if (!opts || opts.paddingPx === undefined) {
+            return opts;
+        }
         const { paddingPx, ...rest } = opts;
         return {
             ...rest,

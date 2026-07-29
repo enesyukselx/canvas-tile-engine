@@ -1,6 +1,6 @@
 {
     "name": "@canvas-tile-engine/react-native",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "React Native bindings for Canvas Tile Engine - interactive 2D grid-based maps with Skia",
     "author": "Enes Yüksel",
     "license": "MIT",
@@ -47,8 +47,8 @@
         "format:check": "oxfmt --check"
     },
     "peerDependencies": {
-        "@canvas-tile-engine/core": ">=0.4.0",
-        "@canvas-tile-engine/renderer-skia": ">=0.1.0",
+        "@canvas-tile-engine/core": ">=0.10.0",
+        "@canvas-tile-engine/renderer-skia": ">=0.5.0",
         "@shopify/react-native-skia": ">=2.0.0-next.0",
         "react": ">=18.0.0",
         "react-native": ">=0.78.0",

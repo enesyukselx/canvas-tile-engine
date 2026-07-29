@@ -12,6 +12,12 @@ export interface StaticImageProps {
     items: ImageItem<SkImage>[];
     cacheKey: string;
     layer?: number;
+    /**
+     * Set to `false` to keep these items out of hit testing — the
+     * `pointer-events: none` of the draw API, for decorative content like
+     * terrain tiles. Default `true`.
+     */
+    hitTest?: boolean;
 }
 
 /**
@@ -22,7 +28,7 @@ export interface StaticImageProps {
  * this over `Image` for large item sets that don't change — per-frame cost is
  * independent of item count.
  */
-export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1 }: StaticImageProps) {
+export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1, hitTest }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();
     const prevCacheKeyRef = useRef<string>(cacheKey);
     const prevItemsRef = useRef(items);
@@ -42,7 +48,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
         }
         prevItemsRef.current = items;
 
-        const handle = engine.drawStaticImage(items, cacheKey, layer);
+        const handle = engine.drawStaticImage(items, cacheKey, layer, { hitTest });
         requestRender();
 
         return () => {
@@ -53,7 +59,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
                 requestRender();
             }
         };
-    }, [engine, items, cacheKey, layer, requestRender]);
+    }, [engine, items, cacheKey, layer, hitTest, requestRender]);
 
     useEffect(() => {
         return () => {

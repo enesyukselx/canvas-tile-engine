@@ -22,16 +22,21 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import { CanvasDraw } from "./modules/CanvasDraw";
-import { Layer } from "./modules/Layer";
-import { CoordinateOverlayRenderer } from "./modules/CoordinateOverlayRenderer";
-import { CanvasDebug } from "./modules/CanvasDebug";
-import { EventBinder } from "./modules/EventBinder";
-import { ResizeWatcher } from "./modules/ResizeWatcher";
-import { ResponsiveWatcher } from "./modules/ResponsiveWatcher";
-import { ImageLoader } from "./modules/ImageLoader";
-import { SizeController } from "./modules/SizeController";
-import { initStyles } from "./utils/canvas";
+import {
+    CoordinateOverlayRenderer,
+    DebugOverlay,
+    DrawContext,
+    Layer,
+} from "@canvas-tile-engine/renderer-shared/canvas2d";
+import {
+    EventBinder,
+    ImageLoader,
+    ResizeWatcher,
+    ResponsiveWatcher,
+    SizeController,
+    initStyles,
+} from "@canvas-tile-engine/renderer-shared/dom";
+import { BrowserCanvasDraw, BrowserContext2D, createBrowserCanvasDraw } from "./modules/createCanvasDraw";
 
 export class RendererCanvas implements IRenderer {
     /** Transform helpers handed to the onDraw hook. */
@@ -46,11 +51,11 @@ export class RendererCanvas implements IRenderer {
     private camera!: ICamera;
     private config!: Config;
     private viewport!: ViewportState;
-    private layers!: Layer;
-    private drawAPI!: CanvasDraw;
+    private layers!: Layer<DrawContext<BrowserContext2D>>;
+    private drawAPI!: BrowserCanvasDraw;
     private transformer!: CoordinateTransformer;
-    private coordinateOverlayRenderer!: CoordinateOverlayRenderer;
-    private debugOverlay?: CanvasDebug;
+    private coordinateOverlayRenderer!: CoordinateOverlayRenderer<CanvasRenderingContext2D>;
+    private debugOverlay?: DebugOverlay<CanvasRenderingContext2D>;
 
     // Event handling
     private gestureProcessor!: GestureProcessor;
@@ -78,56 +83,72 @@ export class RendererCanvas implements IRenderer {
         return this.gestureProcessor?.onClick;
     }
     set onClick(cb: onClickCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onClick = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onClick = cb;
+        }
     }
 
     get onRightClick(): onRightClickCallback | undefined {
         return this.gestureProcessor?.onRightClick;
     }
     set onRightClick(cb: onRightClickCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onRightClick = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onRightClick = cb;
+        }
     }
 
     get onHover(): onHoverCallback | undefined {
         return this.gestureProcessor?.onHover;
     }
     set onHover(cb: onHoverCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onHover = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onHover = cb;
+        }
     }
 
     get onMouseDown(): onMouseDownCallback | undefined {
         return this.gestureProcessor?.onMouseDown;
     }
     set onMouseDown(cb: onMouseDownCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseDown = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseDown = cb;
+        }
     }
 
     get onMouseUp(): onMouseUpCallback | undefined {
         return this.gestureProcessor?.onMouseUp;
     }
     set onMouseUp(cb: onMouseUpCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseUp = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseUp = cb;
+        }
     }
 
     get onMouseLeave(): onMouseLeaveCallback | undefined {
         return this.gestureProcessor?.onMouseLeave;
     }
     set onMouseLeave(cb: onMouseLeaveCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onMouseLeave = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onMouseLeave = cb;
+        }
     }
 
     get onZoom(): onZoomCallback | undefined {
         return this.gestureProcessor?.onZoom;
     }
     set onZoom(cb: onZoomCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onZoom = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onZoom = cb;
+        }
     }
 
     get onWheel(): onWheelCallback | undefined {
         return this.gestureProcessor?.onWheel;
     }
     set onWheel(cb: onWheelCallback | undefined) {
-        if (this.gestureProcessor) this.gestureProcessor.onWheel = cb;
+        if (this.gestureProcessor) {
+            this.gestureProcessor.onWheel = cb;
+        }
     }
 
     /** Callback fired when camera position changes (drag/zoom). */
@@ -160,7 +181,7 @@ export class RendererCanvas implements IRenderer {
         this.viewport = deps.viewport;
         this.camera = deps.camera;
         this.layers = new Layer();
-        this.drawAPI = new CanvasDraw(this.layers, deps.transformer, deps.camera);
+        this.drawAPI = createBrowserCanvasDraw(this.layers, deps.transformer, deps.camera);
 
         this.applyCanvasSize();
 
@@ -172,7 +193,7 @@ export class RendererCanvas implements IRenderer {
         );
 
         if (this.config.get().debug?.enabled) {
-            this.debugOverlay = new CanvasDebug(this.canvasContext, this.camera, this.config, this.viewport);
+            this.debugOverlay = new DebugOverlay(this.canvasContext, this.camera, this.config, this.viewport);
             // Start FPS loop if fps hud is enabled
             if (this.config.get().debug?.hud?.fps) {
                 this.debugOverlay.setFpsUpdateCallback(() => this.render());
@@ -209,7 +230,7 @@ export class RendererCanvas implements IRenderer {
         this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
         this.sizeController = new SizeController(
             this.canvasWrapper,
-            this.canvas,
+            [this.canvas],
             this.camera,
             this.viewport,
             this.config,
@@ -220,7 +241,9 @@ export class RendererCanvas implements IRenderer {
     // ─── Event Setup ───
 
     setupEvents(): void {
-        if (this.eventsAttached) return;
+        if (this.eventsAttached) {
+            return;
+        }
         this.eventBinder.attach();
         this.eventsAttached = true;
 
@@ -235,7 +258,7 @@ export class RendererCanvas implements IRenderer {
             }
             this.responsiveWatcher = new ResponsiveWatcher(
                 this.canvasWrapper,
-                this.canvas,
+                [this.canvas],
                 this.camera,
                 this.viewport,
                 this.config,
@@ -256,7 +279,7 @@ export class RendererCanvas implements IRenderer {
             // Non-responsive mode with resize enabled - use ResizeWatcher
             this.resizeWatcher = new ResizeWatcher(
                 this.canvasWrapper,
-                this.canvas,
+                [this.canvas],
                 this.viewport,
                 this.camera,
                 this.config,
@@ -296,7 +319,9 @@ export class RendererCanvas implements IRenderer {
     private handleContextMenu = (e: MouseEvent): void => {
         // Claim the event only when right-click handling is opted into;
         // otherwise the browser context menu must keep working.
-        if (!this.config.get().eventHandlers.rightClick) return;
+        if (!this.config.get().eventHandlers.rightClick) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleRightClick(this.normalizePointer(e));
     };
@@ -305,7 +330,9 @@ export class RendererCanvas implements IRenderer {
         // Primary button only: the right button belongs to the context-menu
         // path (onRightClick) and the middle button to the browser
         // (autoscroll) — neither should start a drag or fire onMouseDown.
-        if (e.button !== 0) return;
+        if (e.button !== 0) {
+            return;
+        }
         this.gestureProcessor.handlePointerDown(this.normalizePointer(e));
     };
 
@@ -316,7 +343,9 @@ export class RendererCanvas implements IRenderer {
     private handleMouseUp = (e: MouseEvent): void => {
         // Primary button only, so releasing a secondary button mid-drag
         // does not end the primary-button drag or fire onMouseUp.
-        if (e.button !== 0) return;
+        if (e.button !== 0) {
+            return;
+        }
         this.gestureProcessor.handlePointerUp(this.normalizePointer(e));
     };
 
@@ -326,7 +355,9 @@ export class RendererCanvas implements IRenderer {
 
     private handleWheel = (e: WheelEvent): void => {
         // Without zoom opted in, the wheel must keep scrolling the page.
-        if (!this.config.get().eventHandlers.zoom) return;
+        if (!this.config.get().eventHandlers.zoom) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleWheel(this.normalizePointer(e), e.deltaY);
     };
@@ -344,13 +375,17 @@ export class RendererCanvas implements IRenderer {
     }
 
     private handleTouchStart = (e: TouchEvent): void => {
-        if (!this.touchInteractionsEnabled()) return;
+        if (!this.touchInteractionsEnabled()) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.touches));
     };
 
     private handleTouchMove = (e: TouchEvent): void => {
-        if (!this.touchInteractionsEnabled()) return;
+        if (!this.touchInteractionsEnabled()) {
+            return;
+        }
         e.preventDefault();
         this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.touches));
     };

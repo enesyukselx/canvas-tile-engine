@@ -38,6 +38,8 @@ canvas-tile-engine/
 │   ├── renderer-webgl/       # @canvas-tile-engine/renderer-webgl - WebGL renderer + 2D overlay
 │   ├── renderer-skia/        # @canvas-tile-engine/renderer-skia - React Native Skia renderer
 │   ├── renderer-server/      # @canvas-tile-engine/renderer-server - headless Node.js renderer
+│   ├── renderer-shared/      # @canvas-tile-engine/renderer-shared - private internal modules
+│   │                         #   shared between renderers (bundled by consumers, not published)
 │   ├── react/                # @canvas-tile-engine/react - React bindings (hook + components)
 │   └── react-native/         # @canvas-tile-engine/react-native - React Native bindings
 │
@@ -54,7 +56,7 @@ canvas-tile-engine/
 └── .changeset/               # Changesets release management
 ```
 
-Renderer packages implement the `IRenderer`/`IDrawAPI`/`IImageLoader` contracts from core. Each renderer package is self-contained by design: shared-looking DOM modules (EventBinder, ImageLoader, watchers, Layer) are intentionally copied per renderer rather than extracted into a shared package - do not add cross-package imports of internal modules.
+Renderer packages implement the `IRenderer`/`IDrawAPI`/`IImageLoader` contracts from core. Modules shared between renderers live in the private `@canvas-tile-engine/renderer-shared` package (`canvas2d` and `dom` entry points). Consumers depend on it via `devDependencies` and bundle its TypeScript source with tsup (`noExternal`), so published packages stay self-contained and gain no new runtime dependency. A module belongs in `renderer-shared` only when at least two renderers consume it - do not add speculative helpers there, do not import renderer internals across packages any other way, and never import `renderer-shared` from application code or examples (its API has no semver guarantees).
 
 ## 🔧 Prerequisites
 
@@ -112,7 +114,7 @@ pnpm --filter @canvas-tile-engine/core test:coverage
 pnpm --filter @canvas-tile-engine/core typecheck
 ```
 
-Package names: `core`, `react`, `react-native`, `renderer-canvas`, `renderer-webgl`, `renderer-skia`, `renderer-server` (all under the `@canvas-tile-engine/` scope).
+Package names: `core`, `react`, `react-native`, `renderer-canvas`, `renderer-webgl`, `renderer-skia`, `renderer-server`, `renderer-shared` (all under the `@canvas-tile-engine/` scope).
 
 > **Note:** Packages resolve their workspace dependencies from built `dist/` output. If you change core and work on a dependent package, keep `pnpm dev:lib` running (or rebuild core) so the dependent picks up your changes.
 
@@ -178,6 +180,7 @@ drawRect(items: Rect | Array<Rect>, layer: number = 1): DrawHandle
 
 - Implement the `IRenderer` / `IDrawAPI` / `IImageLoader` interfaces from core
 - Keep rendering logic in dedicated modules under `src/modules/`
+- Code consumed by two or more renderers goes to `packages/renderer-shared` (see Project Structure)
 - Prefer the existing renderer and draw API patterns over new abstractions
 
 **React / React Native packages:**
@@ -218,6 +221,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 | `r-webgl`      | Changes to @canvas-tile-engine/renderer-webgl   |
 | `r-skia`       | Changes to @canvas-tile-engine/renderer-skia    |
 | `r-server`     | Changes to @canvas-tile-engine/renderer-server  |
+| `renderer-shared` | Changes to the internal shared renderer package |
 | `docs`         | Documentation changes                           |
 | `examples`     | Example projects                                |
 
@@ -233,7 +237,7 @@ pnpm changeset
 
 Pick the affected packages and bump type (patch/minor/major), then describe the change - this text becomes the CHANGELOG entry. Commit the generated file under `.changeset/` with your PR.
 
-PRs that only touch docs, examples, CI, or internal tooling do not need a changeset.
+PRs that only touch docs, examples, CI, or internal tooling do not need a changeset. Changes in `renderer-shared` are not versioned themselves (the package is private), but if they change renderer behavior or published `dist` output, add a changeset for each affected renderer package.
 
 **Adding a changeset does not publish anything.** It is only a pending note. On push to `master`, the release workflow collects pending changesets into a single "Version Packages" PR, where they accumulate across merged PRs. Nothing reaches npm until a maintainer merges that PR - only then are versions bumped, CHANGELOGs updated, packages published, and git tags pushed. Release timing is entirely up to the maintainer.
 
@@ -296,6 +300,16 @@ describe("Camera", () => {
 ```
 
 Renderer packages currently have thin test coverage - tests accompanying renderer changes are especially welcome.
+
+### Pixel snapshot tests
+
+`renderer-server/tests/snapshots/` renders real scenes through `renderToBuffer` and compares them against committed PNG baselines (`__baselines__/`) with a small perceptual tolerance. Because the Canvas2D pipeline is shared, these snapshots also guard the browser renderer's drawing code.
+
+- A failing snapshot writes a visual diff to `__diffs__/` (gitignored) - inspect it before deciding.
+- Intended rendering changes: regenerate baselines with `UPDATE_SNAPSHOTS=1 pnpm --filter @canvas-tile-engine/renderer-server test -- --run` and commit the updated PNGs with the PR.
+- Bumping `@napi-rs/canvas` may legitimately shift anti-aliased pixels; regenerate baselines in the bump PR.
+- Text scenes must use the registered fixture font (`tests/fixtures/`), never system fonts - system fonts differ per machine and break determinism.
+- Baseline-free invariants (determinism, static-vs-dynamic cache equality) live in `invariants.test.ts`; they never need updating.
 
 ## 📚 Documentation
 

@@ -177,32 +177,28 @@ engine.onHover = (c) => {
 
 ## Pattern: hover highlight
 
-Replace one retained handle instead of accumulating draw calls:
+A registration id replaces the previous draw call instead of accumulating -
+no handle bookkeeping (core >= 0.10; on older cores swap a `DrawHandle` via
+`removeDrawHandle` instead):
 
 ```ts
-import type { DrawHandle } from "@canvas-tile-engine/core";
-let hoverHandle: DrawHandle | undefined;
-
 engine.onHover = (coords) => {
-    if (hoverHandle) engine.removeDrawHandle(hoverHandle);
-    hoverHandle = engine.drawRect(
+    engine.drawRect(
         {
             x: coords.snapped.x,
             y: coords.snapped.y,
             size: 1,
             style: { fillStyle: "rgba(56, 189, 248, 0.25)" },
         },
-        10,
-    ); // high layer -> on top
+        10, // high layer -> on top
+        { id: "hover" }, // same id -> replaces the previous highlight
+    );
     engine.render();
 };
 
 engine.onMouseLeave = () => {
-    if (hoverHandle) {
-        engine.removeDrawHandle(hoverHandle);
-        hoverHandle = undefined;
-        engine.render();
-    }
+    engine.drawRect([], 10, { id: "hover" }); // replace with nothing
+    engine.render();
 };
 ```
 
@@ -211,15 +207,13 @@ engine.onMouseLeave = () => {
 ```ts
 let painting = false;
 const painted = new Set<string>();
-let paintHandle: DrawHandle | undefined;
 
 function redrawPaintLayer() {
-    if (paintHandle) engine.removeDrawHandle(paintHandle);
     const rects = Array.from(painted).map((key) => {
         const [x, y] = key.split(",").map(Number);
         return { x, y, size: 1, style: { fillStyle: "#38bdf8" } };
     });
-    paintHandle = engine.drawRect(rects, 2);
+    engine.drawRect(rects, 2, { id: "paint" });
     engine.render();
 }
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasTileEngine } from "../../src/CanvasTileEngine";
+import { fitScale } from "../../src/utils/fitScale";
 import type { CanvasTileEngineConfig, Coords, IRenderer } from "../../src/types";
 
 type Mount = Record<string, never>;
@@ -208,6 +209,51 @@ describe("CanvasTileEngine", () => {
             expect(e.getScale()).toBeCloseTo(800 / 120);
         });
 
+        it("paddingPx shrinks the viewport instead of growing the bounds", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 40, durationMs: 0 });
+            // min((800 - 80) / 100, (600 - 80) / 50) = 7.2
+            expect(e.getScale()).toBeCloseTo(7.2);
+        });
+
+        it("paddingPx keeps the same pixel margin regardless of content size", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 40, durationMs: 0 });
+            const small = e.getScale();
+            // 10x larger content, same paddingPx: margin stays 40px, so the
+            // scale is exactly 10x smaller (world padding would need a manual
+            // 10x to achieve this).
+            e.fitBounds({ minX: 0, maxX: 1000, minY: 0, maxY: 500 }, { paddingPx: 40, durationMs: 0 });
+            expect(e.getScale()).toBeCloseTo(small / 10);
+        });
+
+        it("paddingPx wins over world padding", () => {
+            const e = createEngine(wideLimits);
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { padding: 10, paddingPx: 40, durationMs: 0 });
+            expect(e.getScale()).toBeCloseTo(7.2); // not 800 / 120
+        });
+
+        it("clamps a paddingPx that would consume the viewport", () => {
+            const e = createEngine(wideLimits);
+            // 2 * 500 exceeds both viewport axes; the fit area floors at 1px
+            // per axis and the result rides the scale limits instead of
+            // going negative or non-finite.
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { paddingPx: 500, durationMs: 0 });
+            expect(e.getScale()).toBe(0.01); // wideLimits minScale
+        });
+
+        it("lands exactly on the scale fitScale() derives (shared math, no drift)", () => {
+            const e = createEngine(wideLimits);
+            const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 50 };
+            const size = { width: 800, height: 600 };
+
+            e.fitBounds(bounds, { paddingPx: 24, durationMs: 0 });
+            expect(e.getScale()).toBe(fitScale(bounds, size, { paddingPx: 24 }));
+
+            e.fitBounds(bounds, { padding: 3, durationMs: 0 });
+            expect(e.getScale()).toBe(fitScale(bounds, size, { padding: 3 }));
+        });
+
         it("clamps the scale to the limits", () => {
             engine.fitBounds({ minX: 0, maxX: 1, minY: 0, maxY: 1 }, { durationMs: 0 });
             expect(engine.getScale()).toBe(2); // maxScale
@@ -245,6 +291,8 @@ describe("CanvasTileEngine", () => {
             expect(() => engine.fitBounds({ minX: 0, maxX: Infinity, minY: 0, maxY: 10 })).toThrow();
             expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: NaN })).toThrow();
             expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { padding: -1 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { paddingPx: -1 })).toThrow();
+            expect(() => engine.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 }, { paddingPx: NaN })).toThrow();
         });
     });
 
@@ -449,6 +497,42 @@ describe("CanvasTileEngine", () => {
             // 0.3 world + 0.4px / scale 2 = 0.5 -> effective radius 0.75 covers 0.7
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3, paddingPx: 0.4 })).toBeDefined();
             expect(e.hitTestFirst({ x: 1.2, y: 0.5 }, { padding: 0.3 })).toBeUndefined();
+        });
+
+        it("hitTest: false keeps a registration out of every hit query", () => {
+            const e = createEngineWithDrawAPI();
+            // Decorative floor under an interactive unit at the same cell
+            e.drawRect({ x: 2, y: 2, size: 1 }, 0, { hitTest: false });
+            e.drawCircle({ x: 2, y: 2, size: 1 }, 2);
+
+            const hits = e.hitTest({ x: 2.5, y: 2.5 });
+            expect(hits).toHaveLength(1);
+            expect(hits[0].kind).toBe("circle");
+
+            // Marquee over the cell sees the unit, not the floor
+            const marquee = e.hitTestRect({ minX: 1.8, maxX: 3.2, minY: 1.8, maxY: 3.2 });
+            expect(marquee).toHaveLength(1);
+            expect(marquee[0].kind).toBe("circle");
+        });
+
+        it("static draws accept hitTest: false too", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawStaticRect([{ x: 1, y: 1, size: 1 }], "terrain", 0, { hitTest: false });
+            expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeUndefined();
+        });
+
+        it("id-replace toggles hit participation in both directions", () => {
+            const e = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor" });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+
+            // Same id, now opted out: the stale hit entry must not survive
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor", hitTest: false });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+
+            // And opting back in re-registers
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { id: "floor" });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
         });
     });
 
@@ -665,6 +749,171 @@ describe("CanvasTileEngine", () => {
 
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledTimes(1);
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
+        });
+    });
+
+    describe("visibleOf / interactiveOf per-item callbacks", () => {
+        function createEngineWithDrawAPI() {
+            let seq = 0;
+            const drawAPI = {
+                drawRect: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`rect-${seq++}`),
+                    layer,
+                })),
+                drawCircle: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`circle-${seq++}`),
+                    layer,
+                })),
+                drawText: vi.fn((_items: unknown, layer: number = 2, _options?: unknown) => ({
+                    id: Symbol(`text-${seq++}`),
+                    layer,
+                })),
+                drawLine: vi.fn((_items: unknown, _style: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`line-${seq++}`),
+                    layer,
+                })),
+                drawPath: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`path-${seq++}`),
+                    layer,
+                })),
+                drawImage: vi.fn((_items: unknown, layer: number = 1, _options?: unknown) => ({
+                    id: Symbol(`image-${seq++}`),
+                    layer,
+                })),
+                removeDrawHandle: vi.fn(),
+                clearLayer: vi.fn(),
+                clearAll: vi.fn(),
+                clearStaticCache: vi.fn(),
+            };
+            const renderer = createMockRenderer();
+            (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
+            return { e: new CanvasTileEngine<Mount>({}, baseConfig, renderer), drawAPI };
+        }
+
+        const testImg = { width: 10, height: 10 } as unknown as HTMLImageElement;
+
+        it("threads visibleOf through to the renderer draw API on every draw kind", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const visible = () => true;
+
+            e.drawRect({ x: 1, y: 1, size: 1 }, 1, { visibleOf: visible });
+            expect(drawAPI.drawRect.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawCircle({ x: 1, y: 1, size: 1 }, 1, { visibleOf: visible });
+            expect(drawAPI.drawCircle.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawText({ x: 1, y: 1, text: "a" }, 2, { visibleOf: visible });
+            expect(drawAPI.drawText.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawLine({ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }, undefined, 1, { visibleOf: visible });
+            expect(drawAPI.drawLine.mock.calls[0][3]).toEqual({ visibleOf: visible });
+
+            e.drawPath(
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 1, y: 1 },
+                    ],
+                },
+                1,
+                { visibleOf: visible },
+            );
+            expect(drawAPI.drawPath.mock.calls[0][2]).toEqual({ visibleOf: visible });
+
+            e.drawImage({ x: 1, y: 1, size: 1, img: testImg }, 1, { visibleOf: visible });
+            expect(drawAPI.drawImage.mock.calls[0][2]).toEqual({ visibleOf: visible });
+        });
+
+        it("visibleOf reads live state: hiding an item drops it from hit queries without re-registering", () => {
+            const { e } = createEngineWithDrawAPI();
+            const hidden = new Set<string>();
+            e.drawRect(
+                [
+                    { x: 2, y: 2, size: 1, data: "a" },
+                    { x: 5, y: 5, size: 1, data: "b" },
+                ],
+                1,
+                { visibleOf: (item) => !hidden.has(item.data!) },
+            );
+
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+
+            hidden.add("a");
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+            expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeDefined();
+        });
+
+        it("interactiveOf false keeps an item painted but lets queries fall through to items below", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1);
+            e.drawRect({ x: 2, y: 2, size: 1 }, 2, { interactiveOf: () => false });
+
+            const hits = e.hitTest({ x: 2.5, y: 2.5 });
+            expect(hits).toHaveLength(1);
+            expect(hits[0].layer).toBe(1);
+        });
+
+        it("an item hidden by visibleOf never hits, even when interactiveOf returns true", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawRect({ x: 2, y: 2, size: 1 }, 1, { visibleOf: () => false, interactiveOf: () => true });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+        });
+
+        it("hitTestRect respects both callbacks", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawRect(
+                [
+                    { x: 2, y: 2, size: 1, data: "deco" },
+                    { x: 5, y: 5, size: 1, data: "unit" },
+                ],
+                1,
+                { interactiveOf: (item) => item.data !== "deco" },
+            );
+            e.drawCircle({ x: 7, y: 7, size: 1 }, 1, { visibleOf: () => false });
+
+            const marquee = e.hitTestRect({ minX: 0, maxX: 10, minY: 0, maxY: 10 });
+            expect(marquee).toHaveLength(1);
+            expect(marquee[0].item.data).toBe("unit");
+        });
+
+        it("applies to image kind too", () => {
+            const { e } = createEngineWithDrawAPI();
+            const hidden = new Set<string>();
+            e.drawImage(
+                [
+                    { x: 2, y: 2, size: 1, img: testImg, data: "a" },
+                    { x: 5, y: 5, size: 1, img: testImg, data: "b" },
+                ],
+                1,
+                { visibleOf: (item) => !hidden.has(item.data!), interactiveOf: (item) => item.data !== "b" },
+            );
+
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeDefined();
+            hidden.add("a");
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+            // "b" stays visible but interactiveOf keeps it out of queries.
+            expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeUndefined();
+        });
+
+        it("applies to line and path kinds too", () => {
+            const { e } = createEngineWithDrawAPI();
+            e.drawLine({ from: { x: 0, y: 2 }, to: { x: 4, y: 2 } }, undefined, 1, { visibleOf: () => false });
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
+
+            e.drawPath(
+                {
+                    points: [
+                        { x: 5, y: 5 },
+                        { x: 8, y: 5 },
+                        { x: 8, y: 8 },
+                    ],
+                    closed: true,
+                    style: { fillStyle: "#000" },
+                },
+                1,
+                { interactiveOf: () => false },
+            );
+            expect(e.hitTestFirst({ x: 7.5, y: 6 })).toBeUndefined();
         });
     });
 });

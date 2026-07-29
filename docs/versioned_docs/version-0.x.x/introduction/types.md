@@ -4,11 +4,14 @@ sidebar_position: 5
 
 # Types Reference
 
-Core types are exported from `@canvas-tile-engine/core` and re-exported by the React packages where useful.
+These types are defined in `@canvas-tile-engine/core` and re-exported by the `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native` bindings (which also add `EngineHandle`). Import them from whichever package your app already depends on — a React or React Native app does not need a direct `core` dependency for types.
 
 ```ts
+// Vanilla / server: import from core
 import type { Rect, Circle, Text, Line, PathItem, PathStyle, ImageItem, Coords } from "@canvas-tile-engine/core";
-import type { EngineHandle } from "@canvas-tile-engine/react";
+
+// React / React Native: import the same types (plus EngineHandle) from the binding
+import type { Rect, PathItem, PathCommand, LineStyle, DrawHandle, EngineHandle } from "@canvas-tile-engine/react";
 ```
 
 ## Draw Objects
@@ -131,6 +134,29 @@ type ImageItem<TImage = HTMLImageElement> = {
 
 `sprite` crops a sub-rectangle from a spritesheet image before drawing.
 
+### `DrawOptions`
+
+```ts
+type DrawOptions = {
+    id?: string;
+};
+```
+
+Optional last parameter of every draw method. `id` gives the registration a stable identity: re-registering with the same id replaces the previous registration (draw callback plus hit-test entries) instead of accumulating. Ids share one namespace across draw kinds and layers; static draw methods use their `cacheKey` as the id instead.
+
+### `StyleOf` and Decoration Styles
+
+```ts
+type StyleOf<TItem, TStyle> = (item: TItem) => TStyle | undefined;
+
+type ShapeDecorationStyle = NonNullable<DrawObject["style"]>; // Rect / Circle
+type TextDecorationStyle = NonNullable<Text["style"]>;
+type LineDecorationStyle = Omit<LineStyle, "lineWidth" | "lineWidthPx">;
+type PathDecorationStyle = Omit<PathStyle, "lineWidth" | "lineWidthPx" | "cornerRadius" | "cornerRadiusPx">;
+```
+
+The dynamic draw methods additionally accept `styleOf` in their options (`RectDrawOptions`, `CircleDrawOptions`, `TextDrawOptions`, `LineDrawOptions`, `PathDrawOptions` — each extends `DrawOptions`). The callback runs per item on every frame at paint time; returned fields overlay the item's own `style` for that frame, `undefined` leaves it untouched. Line and path decorations exclude stroke width (and corner radius), because those feed hit-test geometry resolved at registration time.
+
 ## Sprite Helpers
 
 ```ts
@@ -176,6 +202,25 @@ type onZoomCallback = (scale: number) => void;
 ```
 
 `coords.raw` is the exact world coordinate. `coords.snapped` is floored to the grid cell.
+
+### `onWheelCallback` And `WheelInfo`
+
+Fires for wheel (desktop) and pinch (touch) zoom gestures (requires `eventHandlers.zoom`). The first three arguments match the pointer callbacks; a fourth describes the gesture:
+
+```ts
+type onWheelCallback = (
+    coords: { raw: Coords; snapped: Coords },
+    mouse: { raw: Coords; snapped: Coords },
+    client: { raw: Coords; snapped: Coords },
+    wheel: WheelInfo,
+) => void;
+
+type WheelInfo = {
+    deltaY: number; // negative = zoom in; synthesized for pinch
+    direction: "in" | "out";
+    source: "wheel" | "pinch";
+};
+```
 
 ### `onDrawCallback`
 

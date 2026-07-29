@@ -73,8 +73,20 @@ export interface Bounds {
 
 /** Options for the engine's `fitBounds` method. */
 export interface FitBoundsOptions {
-    /** Extra world-unit margin added on every side of the rectangle. Default 0. */
+    /**
+     * Extra world-unit margin added on every side of the rectangle. Scales
+     * with the content: 10x larger bounds need a 10x larger padding for the
+     * same framing. Ignored when {@link paddingPx} is set. Default 0.
+     */
     padding?: number;
+    /**
+     * Screen-pixel margin kept free on every side of the viewport,
+     * independent of the content's world size — "20px of air" frames a
+     * 3-cell selection and a 10k-cell board identically. Takes precedence
+     * over {@link padding}. A value too large for the viewport is clamped so
+     * the fit stays valid.
+     */
+    paddingPx?: number;
     /** Animation duration in ms (default 500). Use 0 for an instant jump. */
     durationMs?: number;
     /** Fired when the fit completes (synchronously when instant). */
@@ -161,7 +173,11 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
         layer?: number,
         options?: RendererDrawOptions<Text, TextDecorationStyle>,
     ): DrawHandle;
-    drawImage(items: ImageItem<TImage> | ImageItem<TImage>[], layer?: number): DrawHandle;
+    drawImage(
+        items: ImageItem<TImage> | ImageItem<TImage>[],
+        layer?: number,
+        options?: RendererImageDrawOptions<TImage>,
+    ): DrawHandle;
     /** Receives fully normalized items: the engine converts every accepted
      * `drawPath` input (including the legacy `Coords[]` forms) before
      * delegating, so renderers only implement the item form. */
@@ -198,12 +214,43 @@ export interface DrawHandle {
 export type StyleOf<TItem, TStyle> = (item: TItem) => TStyle | undefined;
 
 /**
+ * Per-item visibility callback. Runs at paint time on every frame (and at
+ * hit-query time for hit-tested kinds): return `false` to skip the item for
+ * that frame — it is neither painted nor hit-testable; `true`/`undefined`
+ * keeps it. Like {@link StyleOf} it reads external state live: mutate a
+ * filter set and call `render()` — the items are never re-registered and
+ * the spatial index never rebuilds.
+ */
+export type VisibleOf<TItem> = (item: TItem) => boolean | undefined;
+
+/**
+ * Per-item hit-test opt-out — the item-level counterpart of
+ * {@link DrawOptions.hitTest}. Runs at hit-query time: return `false` to keep
+ * the item out of `hitTest`/`hitTestFirst`/`hitTestRect` while it stays
+ * painted (queries fall through to items below it); `true`/`undefined`
+ * keeps it interactive. Items hidden by `visibleOf` never hit-test,
+ * regardless of this callback. Reads external state live, like
+ * {@link StyleOf}.
+ */
+export type InteractiveOf<TItem> = (item: TItem) => boolean | undefined;
+
+/**
  * Paint-time options the engine threads into a renderer's `IDrawAPI` draw
- * methods. Only `styleOf` reaches renderers — registration concerns (`id`)
- * are resolved in the engine.
+ * methods. Only `styleOf` and `visibleOf` reach renderers — registration
+ * concerns (`id`) and hit-test concerns (`interactiveOf`) are resolved in
+ * the engine.
  */
 export interface RendererDrawOptions<TItem, TStyle> {
     styleOf?: StyleOf<TItem, TStyle>;
+    visibleOf?: VisibleOf<TItem>;
+}
+
+/**
+ * Paint-time options for `drawImage` — images carry no `style`, so only
+ * `visibleOf` reaches renderers.
+ */
+export interface RendererImageDrawOptions<TImage> {
+    visibleOf?: VisibleOf<ImageItem<TImage>>;
 }
 
 /** Decoration fields for `Rect`/`Circle` — the full shape style (stroke width
@@ -241,24 +288,54 @@ export interface DrawOptions {
      * a new registration (remove with the returned handle or `clearLayer`).
      */
     id?: string;
+    /**
+     * Set to `false` to keep this registration out of hit testing — the
+     * `pointer-events: none` of the draw API. Decorative content (floor
+     * tiles, background images, zone overlays) declared once at registration
+     * stops leaking into every `hitTest`/`hitTestFirst`/`hitTestRect` query,
+     * and large decorative sets skip hit-registry bookkeeping entirely.
+     * Default `true`. Text and custom draw functions never enter hit testing
+     * regardless of this flag.
+     */
+    hitTest?: boolean;
+}
+
+/** Options for the static draw helpers (`drawStaticRect`, ...). Their
+ * `cacheKey` already plays the registration-id role, so only the hit-test
+ * opt-out applies. */
+export interface StaticDrawOptions {
+    /** Set to `false` to keep this registration out of hit testing; see
+     * {@link DrawOptions.hitTest}. */
+    hitTest?: boolean;
 }
 
 /** Options for {@link CanvasTileEngine.drawRect}. */
 export interface RectDrawOptions<TData = unknown> extends DrawOptions {
     /** Paint-time decoration; see {@link StyleOf}. */
     styleOf?: StyleOf<Rect<TData>, ShapeDecorationStyle>;
+    /** Per-item visibility; see {@link VisibleOf}. */
+    visibleOf?: VisibleOf<Rect<TData>>;
+    /** Per-item hit-test opt-out; see {@link InteractiveOf}. */
+    interactiveOf?: InteractiveOf<Rect<TData>>;
 }
 
 /** Options for {@link CanvasTileEngine.drawCircle}. */
 export interface CircleDrawOptions<TData = unknown> extends DrawOptions {
     /** Paint-time decoration; see {@link StyleOf}. */
     styleOf?: StyleOf<Circle<TData>, ShapeDecorationStyle>;
+    /** Per-item visibility; see {@link VisibleOf}. */
+    visibleOf?: VisibleOf<Circle<TData>>;
+    /** Per-item hit-test opt-out; see {@link InteractiveOf}. */
+    interactiveOf?: InteractiveOf<Circle<TData>>;
 }
 
-/** Options for {@link CanvasTileEngine.drawText}. */
+/** Options for {@link CanvasTileEngine.drawText}. Text never enters hit
+ * testing, so there is no `interactiveOf`. */
 export interface TextDrawOptions<TData = unknown> extends DrawOptions {
     /** Paint-time decoration; see {@link StyleOf}. */
     styleOf?: StyleOf<Text<TData>, TextDecorationStyle>;
+    /** Per-item visibility; see {@link VisibleOf}. */
+    visibleOf?: VisibleOf<Text<TData>>;
 }
 
 /**
@@ -269,6 +346,20 @@ export interface TextDrawOptions<TData = unknown> extends DrawOptions {
 export interface LineDrawOptions<TData = unknown> extends DrawOptions {
     /** Paint-time decoration; see {@link StyleOf}. */
     styleOf?: StyleOf<Line<TData>, LineDecorationStyle>;
+    /** Per-item visibility; see {@link VisibleOf}. */
+    visibleOf?: VisibleOf<Line<TData>>;
+    /** Per-item hit-test opt-out; see {@link InteractiveOf}. */
+    interactiveOf?: InteractiveOf<Line<TData>>;
+}
+
+/** Options for {@link CanvasTileEngine.drawImage}. Images carry no `style`,
+ * so there is no `styleOf` — appearance changes go through item fields like
+ * `opacity` (read live at paint time; mutate + `render()`). */
+export interface ImageDrawOptions<TImage = unknown, TData = unknown> extends DrawOptions {
+    /** Per-item visibility; see {@link VisibleOf}. */
+    visibleOf?: VisibleOf<ImageItem<TImage, TData>>;
+    /** Per-item hit-test opt-out; see {@link InteractiveOf}. */
+    interactiveOf?: InteractiveOf<ImageItem<TImage, TData>>;
 }
 
 /** Options for {@link CanvasTileEngine.drawPath}. */
@@ -280,6 +371,10 @@ export interface PathDrawOptions<TData = unknown> extends DrawOptions {
      * stroke to interior.
      */
     styleOf?: StyleOf<PathItem<TData>, PathDecorationStyle>;
+    /** Per-item visibility; see {@link VisibleOf}. */
+    visibleOf?: VisibleOf<PathItem<TData>>;
+    /** Per-item hit-test opt-out; see {@link InteractiveOf}. */
+    interactiveOf?: InteractiveOf<PathItem<TData>>;
 }
 
 /**

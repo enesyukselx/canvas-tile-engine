@@ -16,7 +16,11 @@ export class SkiaCoordinateOverlayRenderer {
     private textPaint: SkPaint;
     private font?: SkFont;
 
-    constructor(private camera: ICamera, private config: Config, private viewport: ViewportState) {
+    constructor(
+        private camera: ICamera,
+        private config: Config,
+        private viewport: ViewportState,
+    ) {
         this.borderPaint = Skia.Paint();
         this.borderPaint.setColor(Skia.Color(`rgba(0, 0, 0, ${COORDINATE_OVERLAY.BORDER_OPACITY})`));
 
@@ -40,15 +44,15 @@ export class SkiaCoordinateOverlayRenderer {
                 COORDINATE_OVERLAY.BORDER_WIDTH,
                 height - COORDINATE_OVERLAY.BORDER_WIDTH,
                 width,
-                COORDINATE_OVERLAY.BORDER_WIDTH
+                COORDINATE_OVERLAY.BORDER_WIDTH,
             ),
-            this.borderPaint
+            this.borderPaint,
         );
 
         // Adjust font size based on scale (min 8px, max 12px)
         const fontSize = Math.min(
             COORDINATE_OVERLAY.MAX_FONT_SIZE,
-            Math.max(COORDINATE_OVERLAY.MIN_FONT_SIZE, this.camera.scale * COORDINATE_OVERLAY.FONT_SIZE_SCALE_FACTOR)
+            Math.max(COORDINATE_OVERLAY.MIN_FONT_SIZE, this.camera.scale * COORDINATE_OVERLAY.FONT_SIZE_SCALE_FACTOR),
         );
         const font = this.getFont(fontSize);
 
@@ -58,7 +62,13 @@ export class SkiaCoordinateOverlayRenderer {
 
         // Draw Y coordinates (left side)
         for (let i = 0 - (this.camera.y % 1); i <= visibleAreaHeightInCords + 1; i++) {
-            this.drawCenteredText(canvas, Math.round(this.camera.y + i).toString(), 10, cordGap * i + cordGap / 2, font);
+            this.drawCenteredText(
+                canvas,
+                Math.round(this.camera.y + i).toString(),
+                10,
+                cordGap * i + cordGap / 2,
+                font,
+            );
         }
 
         // Draw X coordinates (bottom)
@@ -68,7 +78,7 @@ export class SkiaCoordinateOverlayRenderer {
                 Math.round(this.camera.x + i).toString(),
                 cordGap * i + cordGap / 2,
                 height - 10,
-                font
+                font,
             );
         }
     }

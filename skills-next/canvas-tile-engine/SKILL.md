@@ -78,6 +78,13 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    rebuild. Identify items via `item.data`. Line/path decorations cannot
    change `lineWidth`/`cornerRadius` (hit-test geometry, type-enforced);
    statics do not support `styleOf` (caches replay a recorded image).
+   Siblings with the same live-read model: `visibleOf: (item) => boolean |
+   undefined` (`false` = skip the item for the frame - not painted, not
+   hit-testable; use for category filters instead of a filtered array) and
+   `interactiveOf` (`false` = painted but transparent to hit queries, the
+   per-item `hitTest: false`; not on `drawText`). Both also exist on
+   `drawImage`, which has no `styleOf`. A `visibleOf`-hidden item never
+   hit-tests, regardless of `interactiveOf`.
 5. **Layers are z-order.** Lower layer numbers draw first (underneath).
    Defaults: grid lines 0, shapes/images 1, text 2. Any integer works.
 6. **All interaction is opt-in.** Every `eventHandlers` flag defaults to
@@ -198,6 +205,15 @@ const png = await renderToBuffer({
   registration (`removeDrawHandle`/`clearLayer`/`clearAll`) also drops the
   cache. On older versions nothing auto-invalidates: changing item data
   requires `clearStaticCache(cacheKey)` + `clearLayer` + re-register.
+- **`styleOf` limits differ by primitive**: Rect/Circle/Text decorations may
+  change the full style (width included - shape borders never feed hit
+  geometry). Line and Path decorations are color + dash only: no
+  `lineWidth`/`lineWidthPx` (Path also no `cornerRadius*`), because the hit
+  corridor derives from those at registration time. The types enforce this
+  only for inline object literals - non-literal returns and plain JS bypass
+  the check silently - so never route width changes through `styleOf`;
+  re-register instead. Path quirk: decorating an unfilled path with
+  `fillStyle` paints the fill but hit testing stays on the stroke.
 - **Do not roll your own culling, spatial index, pan/zoom math, or DPR
   handling** - the engine does all of it.
 

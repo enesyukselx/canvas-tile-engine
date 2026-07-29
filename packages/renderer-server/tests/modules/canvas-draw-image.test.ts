@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import type { Image, SKRSContext2D } from "@napi-rs/canvas";
-import { CanvasDraw, type OffscreenCanvasFactory } from "../../src/modules/CanvasDraw";
-import { Layer } from "../../src/modules/Layer";
+import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
+import {
+    CanvasDraw,
+    Layer,
+    type DrawContext,
+    type OffscreenCanvasFactory,
+} from "@canvas-tile-engine/renderer-shared/canvas2d";
 
 // Minimal fake 2D context that records globalAlpha at every drawImage() call.
 function makeImageRecordingCtx() {
@@ -23,11 +27,11 @@ function makeImageRecordingCtx() {
 function setup() {
     const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer();
-    const createOffscreen: OffscreenCanvasFactory = () => {
+    const layers = new Layer<DrawContext<SKRSContext2D>>();
+    const createOffscreen: OffscreenCanvasFactory<SKRSContext2D, Canvas> = () => {
         throw new Error("not used in these tests");
     };
-    const draw = new CanvasDraw(layers, transformer, camera, createOffscreen);
+    const draw = new CanvasDraw<SKRSContext2D, Image, Canvas>(layers, transformer, camera, createOffscreen);
     const config = { size: { width: 100, height: 100 }, scale: 10 } as never;
     const render = (ctx: SKRSContext2D) =>
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });

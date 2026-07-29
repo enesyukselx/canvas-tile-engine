@@ -16,6 +16,7 @@ import {
     resolveLineWidthPx,
     resolveSizeWorld,
     resolveLineDashPx,
+    overlayLineStyle,
     resolveCornerRadiusPx,
     flattenPathCommands,
     pathCommandsBounds,
@@ -24,6 +25,8 @@ import {
     roundedPolyline,
     roundedRing,
     resolveRadiusPx,
+    resolveOrigin,
+    computeOriginOffset,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
@@ -31,11 +34,13 @@ import type {
     LineDecorationStyle,
     PathDecorationStyle,
     RendererDrawOptions,
+    RendererImageDrawOptions,
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
-import { Layer } from "./Layer";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { GLRenderer } from "./gl/GLRenderer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
 
@@ -53,6 +58,16 @@ const CIRCLE_STROKE_SEGMENTS = 48;
  * raw draw functions are delegated to the 2D overlay context.
  * @internal
  */
+/**
+ * Drawing context passed to every layer callback.
+ *
+ * Primitives (rects, circles, images, lines) are issued through the batched
+ * {@link GLRenderer} (`gl`), while text and user-supplied draw functions use the
+ * stacked 2D overlay context (`ctx`), which mirrors the Canvas2D renderer API.
+ * @internal
+ */
+export type WebGLDrawContext = DrawContext<CanvasRenderingContext2D> & { gl: GLRenderer };
+
 export class WebGLDraw {
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
@@ -62,7 +77,7 @@ export class WebGLDraw {
     private colorParser = new ColorParser();
 
     constructor(
-        private layers: Layer,
+        private layers: Layer<WebGLDrawContext>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
     ) {}
@@ -115,6 +130,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -129,19 +145,24 @@ export class WebGLDraw {
             const lines: LineInstance[] = [];
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 const size = item.size ?? 1;
                 const w = item.width ?? size;
                 const h = item.height ?? size;
-                const origin = this.resolveOrigin(item.origin);
+                const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                    continue;
+                }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxW = w * this.camera.scale;
                 const pxH = h * this.camera.scale;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxW, pxH, origin, this.camera);
+                const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
                 const cx = drawX + pxW / 2;
                 const cy = drawY + pxH / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
@@ -169,6 +190,7 @@ export class WebGLDraw {
                         rotation,
                         this.colorParser.parse(style.strokeStyle),
                         resolveLineWidthPx(style, this.camera.scale),
+                        resolveLineDashPx(style, this.camera.scale),
                     );
                 }
             }
@@ -185,6 +207,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -208,18 +231,23 @@ export class WebGLDraw {
             const lines: LineInstance[] = [];
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-                const origin = this.resolveOrigin(item.origin);
+                const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                    continue;
+                }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
                 const radius = pxSize / 2;
-                const { x: drawX, y: drawY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: drawX, y: drawY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
                 const cx = drawX + radius;
                 const cy = drawY + radius;
 
@@ -243,6 +271,7 @@ export class WebGLDraw {
                         radius,
                         this.colorParser.parse(style.strokeStyle),
                         resolveLineWidthPx(style, this.camera.scale),
+                        resolveLineDashPx(style, this.camera.scale),
                     );
                 }
             }
@@ -260,6 +289,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
@@ -268,24 +298,36 @@ export class WebGLDraw {
             const lines: LineInstance[] = [];
 
             for (const item of list) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                    continue;
+                }
 
                 let itemColor = color;
+                let itemWidth = lineWidth;
                 let itemDash = dash;
                 const deco = styleOf?.(item);
-                if (deco) {
-                    const merged = { ...style, ...deco };
+                if (deco || item.style) {
+                    // Width resolves from the registration-time layers only
+                    // (call style + item.style) — the same layers hit testing
+                    // reads — so a smuggled decoration width cannot desync
+                    // paint from hit. Color and dash take the full merge.
+                    const registration = overlayLineStyle(style, item.style);
+                    const merged = overlayLineStyle(registration, deco);
                     itemColor = this.colorParser.parse(merged.strokeStyle ?? "#000");
+                    itemWidth = resolveLineWidthPx(registration, this.camera.scale);
                     itemDash = resolveLineDashPx(merged, this.camera.scale);
                 }
 
                 const a = this.transformer.worldToScreen(item.from.x, item.from.y);
                 const b = this.transformer.worldToScreen(item.to.x, item.to.y);
                 // Each Line item is its own subpath: the dash phase restarts.
-                this.pushSegment(lines, a, b, itemColor, lineWidth, itemDash, 0);
+                this.pushSegment(lines, a, b, itemColor, itemWidth, itemDash, 0);
             }
 
             gl.drawLines(lines);
@@ -299,6 +341,7 @@ export class WebGLDraw {
     ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -312,6 +355,9 @@ export class WebGLDraw {
             ctx.save();
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 const size = item.size ?? 1;
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
@@ -319,13 +365,17 @@ export class WebGLDraw {
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                    continue;
+                }
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
                 ctx.font = `${pxSize}px ${family}`;
 
-                if (style?.fillStyle) ctx.fillStyle = style.fillStyle;
+                if (style?.fillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                }
                 ctx.textAlign = style?.textAlign ?? "center";
                 ctx.textBaseline = style?.textBaseline ?? "middle";
 
@@ -353,21 +403,34 @@ export class WebGLDraw {
         options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
     ): DrawHandle {
         const styleOf = options?.styleOf;
+        const visibleOf = options?.visibleOf;
         // Conservative world bounds per item for culling, computed once:
         // control-point hull for command paths, vertex bounds for polylines.
         const itemBounds = items.map((item) => {
-            if (item.commands !== undefined) return pathCommandsBounds(item.commands);
+            if (item.commands !== undefined) {
+                return pathCommandsBounds(item.commands);
+            }
             const points = item.points;
-            if (!points || points.length < 2) return null;
+            if (!points || points.length < 2) {
+                return null;
+            }
             let minX = Infinity;
             let minY = Infinity;
             let maxX = -Infinity;
             let maxY = -Infinity;
             for (const p of points) {
-                if (p.x < minX) minX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y > maxY) maxY = p.y;
+                if (p.x < minX) {
+                    minX = p.x;
+                }
+                if (p.y < minY) {
+                    minY = p.y;
+                }
+                if (p.x > maxX) {
+                    maxX = p.x;
+                }
+                if (p.y > maxY) {
+                    maxY = p.y;
+                }
             }
             return { minX, minY, maxX, maxY };
         });
@@ -381,7 +444,9 @@ export class WebGLDraw {
         const subpathsFor = (n: number, item: PathItem): Subpath[] => {
             const scale = this.camera.scale;
             const cached = flatCache[n];
-            if (cached && scale >= cached.scale / 2 && scale <= cached.scale * 2) return cached.subpaths;
+            if (cached && scale >= cached.scale / 2 && scale <= cached.scale * 2) {
+                return cached.subpaths;
+            }
             const subpaths = flattenPathCommands(item.commands!, ARC_SEGMENT_LENGTH / scale);
             flatCache[n] = { scale, subpaths };
             return subpaths;
@@ -393,12 +458,16 @@ export class WebGLDraw {
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
-                if (!bounds) continue;
+                if (!bounds || visibleOf?.(item) === false) {
+                    continue;
+                }
 
                 const centerX = (bounds.minX + bounds.maxX) / 2;
                 const centerY = (bounds.minY + bounds.maxY) / 2;
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) continue;
+                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                    continue;
+                }
 
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
@@ -414,7 +483,9 @@ export class WebGLDraw {
                     }));
                 } else {
                     const closed = item.closed === true;
-                    const radiusPx = resolveCornerRadiusPx(style, this.camera.scale);
+                    // Registration-time only (the layer hit testing reads);
+                    // the decoration types' exclusion is only type-level.
+                    const radiusPx = resolveCornerRadiusPx(item.style, this.camera.scale);
                     const pts = item.points!.map((p) => this.transformer.worldToScreen(p.x, p.y));
                     // Corner rounding flattens into a denser polyline, so dash
                     // tessellation and fills run over it unchanged. Closed
@@ -437,7 +508,9 @@ export class WebGLDraw {
 
                 if (style?.strokeStyle !== undefined || !filled) {
                     const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
-                    const lineWidth = resolveLineWidthPx(style, this.camera.scale);
+                    // Width from item.style: registration-time only, matching
+                    // the hit corridor (decoration exclusion is type-level).
+                    const lineWidth = resolveLineWidthPx(item.style, this.camera.scale);
                     const dash = resolveLineDashPx(style, this.camera.scale);
 
                     for (const sub of subpaths) {
@@ -460,8 +533,13 @@ export class WebGLDraw {
         });
     }
 
-    drawImage(items: Array<ImageItem> | ImageItem, layer: number = 1): DrawHandle {
+    drawImage(
+        items: Array<ImageItem> | ImageItem,
+        layer: number = 1,
+        options?: RendererImageDrawOptions<HTMLImageElement>,
+    ): DrawHandle {
         const list = Array.isArray(items) ? items : [items];
+        const visibleOf = options?.visibleOf;
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
@@ -484,14 +562,21 @@ export class WebGLDraw {
             const images: ImageInstance[] = [];
 
             for (const item of visibleItems) {
+                if (visibleOf?.(item) === false) {
+                    continue;
+                }
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-                const origin = this.resolveOrigin(item.origin);
+                const origin = resolveOrigin(item.origin);
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) continue;
+                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                    continue;
+                }
 
                 const texture = gl.getTexture(item.img);
-                if (!texture) continue;
+                if (!texture) {
+                    continue;
+                }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
@@ -505,10 +590,13 @@ export class WebGLDraw {
                 const aspect = srcW / srcH;
                 let drawW = pxSize;
                 let drawH = pxSize;
-                if (aspect > 1) drawH = pxSize / aspect;
-                else drawW = pxSize * aspect;
+                if (aspect > 1) {
+                    drawH = pxSize / aspect;
+                } else {
+                    drawW = pxSize * aspect;
+                }
 
-                const { x: baseX, y: baseY } = this.computeOriginOffset(pos, pxSize, pxSize, origin, this.camera);
+                const { x: baseX, y: baseY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
                 const offsetX = baseX + (pxSize - drawW) / 2;
                 const offsetY = baseY + (pxSize - drawH) / 2;
                 const rotation = (item.rotate ?? 0) * (Math.PI / 180);
@@ -635,18 +723,6 @@ export class WebGLDraw {
 
     // ─── Geometry helpers ───
 
-    private resolveOrigin(origin: { mode?: string; x?: number; y?: number } | undefined): {
-        mode: "cell" | "self";
-        x: number;
-        y: number;
-    } {
-        return {
-            mode: origin?.mode === "self" ? "self" : "cell",
-            x: origin?.x ?? 0.5,
-            y: origin?.y ?? 0.5,
-        };
-    }
-
     /**
      * Normalize a radius value to per-corner radii [topLeft, topRight,
      * bottomRight, bottomLeft], following `ctx.roundRect` semantics: shorter
@@ -654,7 +730,9 @@ export class WebGLDraw {
      * radii are scaled down proportionally.
      */
     private resolveRadius(radius: number | number[] | undefined, pxSize: number): [number, number, number, number] {
-        if (radius === undefined) return [0, 0, 0, 0];
+        if (radius === undefined) {
+            return [0, 0, 0, 0];
+        }
 
         let tl: number, tr: number, br: number, bl: number;
         if (Array.isArray(radius)) {
@@ -692,33 +770,14 @@ export class WebGLDraw {
         return [tl * scale, tr * scale, br * scale, bl * scale];
     }
 
-    private computeOriginOffset(
-        pos: Coords,
-        pxW: number,
-        pxH: number,
-        origin: { mode: "cell" | "self"; x: number; y: number },
-        camera: ICamera,
-    ) {
-        if (origin.mode === "cell") {
-            const cell = camera.scale;
-            return {
-                x: pos.x - cell / 2 + origin.x * cell - pxW / 2,
-                y: pos.y - cell / 2 + origin.y * cell - pxH / 2,
-            };
-        }
-
-        return {
-            x: pos.x - origin.x * pxW,
-            y: pos.y - origin.y * pxH,
-        };
-    }
-
     /**
      * Emulate the Canvas2D `applyLineWidth` alpha trick: sub-pixel widths render
      * as a 1px line with proportionally reduced opacity.
      */
     private resolveStroke(color: RGBA, lineWidth: number): { width: number; color: RGBA } {
-        if (lineWidth >= 1) return { width: lineWidth, color };
+        if (lineWidth >= 1) {
+            return { width: lineWidth, color };
+        }
         const alpha = Math.max(0, Math.min(lineWidth, 1));
         return {
             width: 1,
@@ -745,7 +804,9 @@ export class WebGLDraw {
         }
         const segments: Array<{ a: Coords; b: Coords }> = [];
         const next = appendDashedSegment(segments, a, b, dash, phase);
-        for (const s of segments) this.pushLine(lines, s.a, s.b, color, lineWidth);
+        for (const s of segments) {
+            this.pushLine(lines, s.a, s.b, color, lineWidth);
+        }
         return next;
     }
 
@@ -770,6 +831,7 @@ export class WebGLDraw {
         rotation: number,
         color: RGBA,
         lineWidth: number,
+        dash?: number[],
     ) {
         const cos = Math.cos(rotation);
         const sin = Math.sin(rotation);
@@ -783,6 +845,19 @@ export class WebGLDraw {
         const tr = corner(hw, -hh);
         const br = corner(hw, hh);
         const bl = corner(-hw, hh);
+
+        if (dash) {
+            // Walk the perimeter as one closed polyline so the dash phase
+            // flows continuously around the corners. The solid path's
+            // corner-coverage extensions are skipped: they would distort the
+            // pattern, and dashed outlines have gaps by design anyway.
+            let phase = 0;
+            phase = this.pushSegment(lines, tl, tr, color, lineWidth, dash, phase);
+            phase = this.pushSegment(lines, tr, br, color, lineWidth, dash, phase);
+            phase = this.pushSegment(lines, br, bl, color, lineWidth, dash, phase);
+            this.pushSegment(lines, bl, tl, color, lineWidth, dash, phase);
+            return;
+        }
 
         // Horizontal edges are extended by half the stroke width and vertical
         // edges shrunk by the same amount, so the corner squares are covered
@@ -808,7 +883,26 @@ export class WebGLDraw {
         radius: number,
         color: RGBA,
         lineWidth: number,
+        dash?: number[],
     ) {
+        if (dash) {
+            // Thread the dash phase through the chord polyline so the pattern
+            // flows continuously around the circle. No miter extensions: they
+            // would distort the pattern, and dashed outlines gap by design.
+            let phase = 0;
+            let prev: Coords = { x: cx + radius, y: cy };
+            for (let i = 1; i <= CIRCLE_STROKE_SEGMENTS; i++) {
+                const angle = (i / CIRCLE_STROKE_SEGMENTS) * Math.PI * 2;
+                const curr: Coords = {
+                    x: cx + Math.cos(angle) * radius,
+                    y: cy + Math.sin(angle) * radius,
+                };
+                phase = this.pushSegment(lines, prev, curr, color, lineWidth, dash, phase);
+                prev = curr;
+            }
+            return;
+        }
+
         // Extend each chord by the miter length so adjacent segments meet
         // without gaps on the outside of the joint.
         const ext = (Math.max(lineWidth, 1) / 2) * Math.tan(Math.PI / CIRCLE_STROKE_SEGMENTS);

@@ -15,16 +15,6 @@ try.
 npx skills add enesyukselx/canvas-tile-engine
 ```
 
-### Claude Code plugin marketplace
-
-```
-/plugin marketplace add enesyukselx/canvas-tile-engine
-/plugin install canvas-tile-engine@canvas-tile-engine
-```
-
-Updates ship with the repository: run `/plugin marketplace update
-canvas-tile-engine` to pull the latest version.
-
 ### Manual copy
 
 ```bash
@@ -69,7 +59,7 @@ repository root lists it as a marketplace entry.
 
 ## Versioning
 
-Written against `@canvas-tile-engine/core@0.9.x` and the renderer/binding
+Written against `@canvas-tile-engine/core@0.10.x` and the renderer/binding
 packages published alongside it. The plugin manifest omits a `version` field,
 so every commit to this repository is picked up as a new version. If a future
 major release changes the API, update the reference files from the docs at

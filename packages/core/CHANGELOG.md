@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.0
+
+### Minor Changes
+
+- e79724c: feat: id-based draw registration replace
+
+  - Every engine draw method (`drawRect`, `drawCircle`, `drawImage`, `drawText`, `drawPath`, `drawLine`, `drawGridLines`, `addDrawFunction`) now accepts an optional `options: { id }` last parameter. Re-registering with the same `id` atomically replaces the previous registration (draw callback plus hit-test entries) instead of accumulating alongside it, making state-driven redraw code idempotent without handle bookkeeping. Ids share one namespace across draw kinds and layers; within a layer, a replaced registration re-enters at the end of the draw order.
+  - Static draw methods (`drawStaticRect`/`drawStaticCircle`/`drawStaticImage`) treat their `cacheKey` as the registration id: calling again with the same key replaces the previous registration and invalidates its offscreen cache. Previously both registrations accumulated, and a stale cache could be blitted when the new items had unchanged world bounds and scale.
+  - Removing a static registration (`removeDrawHandle`, `clearLayer`) now also drops its offscreen cache, and `clearAll` clears all static caches — no more orphaned caches or stale reuse after re-registering the same key.
+
+- dae6f9b: feat: styleOf — paint-time decoration without re-registration
+
+  - The dynamic engine draw methods (`drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`) accept an optional `styleOf` callback in their `options`. It runs per item on every frame at paint time; the returned fields overlay the item's own `style` for that frame (`undefined` leaves the item untouched). Because it resolves at paint time it reads external state live: mutate a selection/hover set and call `render()` — items are never re-registered and the spatial index never rebuilds, turning selection updates from O(n) alloc + index rebuild into an O(1) state change plus repaint.
+  - Decoration types are narrowed where style feeds hit-test geometry: `Line` and `PathItem` decorations exclude `lineWidth`/`lineWidthPx` (and `cornerRadius`/`cornerRadiusPx` for paths), which are resolved at registration time. Rect/circle/text decorations allow the full style. For `drawLine`, `styleOf` overlays the call-level `style` per item — also the first way to give individual lines their own color. Paint order is preserved on every renderer: array order stays z-order (Canvas2D renderers batch undecorated runs contiguously and stroke decorated lines in place), matching hit-test's "later item wins" priority.
+  - React and React Native: the `Rect`, `Circle`, `Text`, `Line`, and `Path` components accept a `styleOf` prop. It is read through a ref, so its identity may change on every render at no cost (inline arrows are fine); a change only repaints. `useMemo` discipline now applies to `items` (geometry) only. The imperative `EngineHandle` draw methods also accept the new `options` parameter (including `id`).
+  - Static draw methods intentionally do not support `styleOf`: caches replay a recorded picture, so per-frame decoration cannot apply. Changing styles is dynamic content — use the dynamic methods with `styleOf`, or an overlay registration.
+
 ## 0.9.0
 
 ### Minor Changes

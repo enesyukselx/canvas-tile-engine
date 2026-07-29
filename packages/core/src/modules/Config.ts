@@ -4,7 +4,9 @@ import { validateConfig, validateBounds, validateScaleLimits } from "../utils/va
 
 /** Normalize the zoom setting so consumers only see a mode or `false` (`true` means `"pointer"`). */
 function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
-    if (zoom === true) return "pointer";
+    if (zoom === true) {
+        return "pointer";
+    }
     return zoom || false;
 }
 

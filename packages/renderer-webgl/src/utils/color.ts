@@ -30,10 +30,14 @@ export class ColorParser {
      * Falls back to opaque white for unparseable input.
      */
     parse(color: string | undefined): RGBA {
-        if (!color) return WHITE;
+        if (!color) {
+            return WHITE;
+        }
 
         const cached = this.cache.get(color);
-        if (cached) return cached;
+        if (cached) {
+            return cached;
+        }
 
         const rgba = this.compute(color);
         this.cache.set(color, rgba);

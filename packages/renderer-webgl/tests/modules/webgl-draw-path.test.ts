@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, Coords, ICamera } from "@canvas-tile-engine/core";
-import { WebGLDraw } from "../../src/modules/WebGLDraw";
-import { Layer } from "../../src/modules/Layer";
+import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
+import { Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import type { RGBA } from "../../src/utils/color";
 import type { GLRenderer, LineInstance } from "../../src/modules/gl/GLRenderer";
 
@@ -24,7 +24,7 @@ function makeRecordingGL() {
 function setup() {
     const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer();
+    const layers = new Layer<WebGLDrawContext>();
     const draw = new WebGLDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale: 10 } as never;
     const ctx = { save() {}, restore() {} } as unknown as CanvasRenderingContext2D;
@@ -166,7 +166,7 @@ describe("WebGLDraw command paths", () => {
     it("re-flattens when the camera scale drifts beyond the 2x bucket", () => {
         const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera & { scale: number };
         const transformer = new CoordinateTransformer(camera);
-        const layers = new Layer();
+        const layers = new Layer<WebGLDrawContext>();
         const draw = new WebGLDraw(layers, transformer, camera);
         const config = { size: { width: 2000, height: 2000 }, scale: 10 } as never;
         const ctx = { save() {}, restore() {} } as unknown as CanvasRenderingContext2D;
@@ -198,5 +198,27 @@ describe("WebGLDraw command paths", () => {
         const high = makeRecordingGL();
         render(high.gl);
         expect(high.lines.length).toBeGreaterThan(lowCount * 2);
+    });
+});
+
+describe("smuggled decoration geometry", () => {
+    it("resolves stroke width and corner radius from the registration-time item style", () => {
+        const { draw, render } = setup();
+        const { gl, lines } = makeRecordingGL();
+
+        // Non-literal returns bypass TS excess-property checks; geometry
+        // values must come from the layers hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12, cornerRadiusPx: 30 };
+        draw.drawPath([{ points: square, closed: true, style: { strokeStyle: "#f00", lineWidthPx: 4 } }], 1, {
+            styleOf: () => smuggled,
+        });
+        render(gl);
+
+        // 4 sharp edges (no smuggled rounding densifying the outline), all
+        // at the item width.
+        expect(lines).toHaveLength(4);
+        for (const line of lines) {
+            expect(line.width).toBe(4);
+        }
     });
 });

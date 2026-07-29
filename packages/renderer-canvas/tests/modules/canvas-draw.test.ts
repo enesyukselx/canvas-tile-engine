@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { CanvasDraw } from "../../src/modules/CanvasDraw";
-import { Layer } from "../../src/modules/Layer";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
 
 // Minimal fake 2D context that records state at every stroke()/fill() call.
 function makeRecordingCtx() {
@@ -34,8 +34,8 @@ function makeRecordingCtx() {
 function setup() {
     const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer();
-    const draw = new CanvasDraw(layers, transformer, camera);
+    const layers = new Layer<DrawContext<BrowserContext2D>>();
+    const draw = createBrowserCanvasDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale: 10 } as never;
     const render = (ctx: CanvasRenderingContext2D) =>
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
@@ -153,12 +153,16 @@ function makeDashRecordingCtx() {
     const ctx = {
         lineWidth: 1,
         globalAlpha: 1,
+        fillStyle: "#000",
         strokeStyle: "#000",
         save() {},
         restore() {},
         beginPath() {},
+        rect() {},
+        arc() {},
         moveTo() {},
         lineTo() {},
+        fill() {},
         setLineDash(pattern: number[]) {
             dashes.push(pattern);
         },
@@ -210,6 +214,41 @@ describe("CanvasDraw line dash", () => {
 
         expect(dashes).toEqual([]);
         expect(strokes()).toBe(1);
+    });
+
+    it("dashes rect borders with the same unit contract and resets after the stroke", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8, 0.4] } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([[8, 4], []]);
+    });
+
+    it("dashes circle borders and prefers lineDashPx over lineDash", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawCircle(
+            [{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8], lineDashPx: [6, 3] } }],
+            1,
+        );
+        render(ctx);
+
+        expect(dashes).toEqual([[6, 3], []]);
+    });
+
+    it("keeps rect/circle borders solid when no dash is given", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes, strokes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00" } }], 1);
+        draw.drawCircle([{ x: 3, y: 3, size: 1, style: { fillStyle: "#0f0", strokeStyle: "#f00" } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([]);
+        expect(strokes()).toBe(2);
     });
 });
 
@@ -326,8 +365,8 @@ function makeTextRecordingCtx() {
 function setupAtScale(scale: number) {
     const camera = { x: 0, y: 0, scale } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer();
-    const draw = new CanvasDraw(layers, transformer, camera);
+    const layers = new Layer<DrawContext<BrowserContext2D>>();
+    const draw = createBrowserCanvasDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale } as never;
     const render = (ctx: CanvasRenderingContext2D) =>
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
@@ -518,6 +557,44 @@ describe("CanvasDraw path items", () => {
 
         expect(ops.filter((op) => op === "stroke")).toHaveLength(2);
         expect(ops.filter((op) => op === "beginPath")).toHaveLength(2);
+    });
+
+    it("ignores width and cornerRadius smuggled into a styleOf decoration", () => {
+        const { draw, render } = setup(); // scale 10
+        const widths: number[] = [];
+        let arcs = 0;
+        const ctx = {
+            lineWidth: 1,
+            globalAlpha: 1,
+            strokeStyle: "#000",
+            fillStyle: "#000",
+            save() {},
+            restore() {},
+            beginPath() {},
+            moveTo() {},
+            lineTo() {},
+            arc() {
+                arcs++;
+            },
+            closePath() {},
+            setLineDash() {},
+            fill() {},
+            stroke() {
+                widths.push(ctx.lineWidth);
+            },
+        };
+
+        // Non-literal returns bypass TS excess-property checks — the exact
+        // hole this guards: geometry-feeding values must resolve from the
+        // registration-time item style hit testing reads.
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12, cornerRadiusPx: 30 };
+        draw.drawPath([{ points: square, closed: true, style: { strokeStyle: "#f00", lineWidthPx: 4 } }], 1, {
+            styleOf: () => smuggled,
+        });
+        render(ctx as unknown as CanvasRenderingContext2D);
+
+        expect(widths).toEqual([4]); // item width, not the smuggled 12
+        expect(arcs).toBe(0); // no smuggled corner rounding
     });
 });
 
@@ -803,9 +880,46 @@ describe("styleOf paint-time decoration", () => {
         });
         render(ctx);
 
-        // First stroke is the batched pass with the call-level style, then the
+        // First stroke is the batched run with the call-level style, then the
         // decorated item strokes on its own.
         expect(strokes).toEqual(["#123", "#f00"]);
+    });
+
+    it("preserves array paint order when a decorated line comes before a plain one", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeStyleRecordingCtx();
+
+        const items = [
+            { from: { x: 0, y: 0 }, to: { x: 2, y: 2 }, data: { id: 0 } },
+            { from: { x: 1, y: 0 }, to: { x: 3, y: 2 }, data: { id: 1 } },
+        ];
+        draw.drawLine(items, { strokeStyle: "#123" }, 1, {
+            styleOf: (item) => ((item.data as { id: number }).id === 0 ? { strokeStyle: "#f00" } : undefined),
+        });
+        render(ctx);
+
+        // The decorated item is FIRST in the array, so it must paint first —
+        // the plain line after it draws on top, matching hit-test priority.
+        expect(strokes).toEqual(["#f00", "#123"]);
+    });
+
+    it("batches contiguous undecorated runs around decorated items without reordering", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeStyleRecordingCtx();
+
+        const items = [
+            { from: { x: 0, y: 0 }, to: { x: 1, y: 1 }, data: { id: 0 } },
+            { from: { x: 1, y: 0 }, to: { x: 2, y: 1 }, data: { id: 1 } },
+            { from: { x: 2, y: 0 }, to: { x: 3, y: 1 }, data: { id: 2 } },
+            { from: { x: 3, y: 0 }, to: { x: 4, y: 1 }, data: { id: 3 } },
+        ];
+        draw.drawLine(items, { strokeStyle: "#123" }, 1, {
+            styleOf: (item) => ((item.data as { id: number }).id === 1 ? { strokeStyle: "#f00" } : undefined),
+        });
+        render(ctx);
+
+        // 4 items, 3 strokes: run(#0) -> decorated(#1) -> run(#2, #3).
+        expect(strokes).toEqual(["#123", "#f00", "#123"]);
     });
 
     it("decorates paths at paint time, including the fill toggle staying visual-only", () => {
@@ -831,5 +945,113 @@ describe("styleOf paint-time decoration", () => {
 
         expect(fills).toEqual(["#f00"]);
         expect(strokes).toEqual(["#0f0"]);
+    });
+});
+
+// Fake 2D context recording stroke style/width/dash at every stroke() call.
+function makeLineStyleRecordingCtx() {
+    const strokes: Array<{ strokeStyle: string; lineWidth: number; dash: number[] }> = [];
+    let currentDash: number[] = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        setLineDash(pattern: number[]) {
+            currentDash = pattern;
+        },
+        stroke() {
+            strokes.push({ strokeStyle: ctx.strokeStyle, lineWidth: ctx.lineWidth, dash: currentDash });
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, strokes };
+}
+
+// Per-item line style contract shared by all renderers: item.style overlays
+// the call-level style field by field; styleOf decorations overlay both.
+describe("CanvasDraw per-item line style", () => {
+    it("strokes styled items solo with merged style while plain runs keep batching", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: 1, y: 0 } },
+                { from: { x: 0, y: 1 }, to: { x: 1, y: 1 }, style: { strokeStyle: "#f00", lineWidthPx: 6 } },
+                { from: { x: 0, y: 2 }, to: { x: 1, y: 2 } },
+                { from: { x: 0, y: 3 }, to: { x: 1, y: 3 } },
+            ],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+        );
+        render(ctx);
+
+        // flush(plain run) + solo(styled) + flush(trailing run) = 3 strokes
+        expect(strokes.map((s) => [s.strokeStyle, s.lineWidth])).toEqual([
+            ["#00f", 2],
+            ["#f00", 6],
+            ["#00f", 2],
+        ]);
+    });
+
+    it("resolves item world lineWidth and lineDash by the camera scale", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidth: 0.5, lineDash: [0.8, 0.4] } },
+                { from: { x: 0, y: 1 }, to: { x: 1, y: 1 } }, // batch style, solid
+            ],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+        );
+        render(ctx);
+
+        expect(strokes[0].lineWidth).toBe(5); // 0.5 world * scale 10
+        expect(strokes[0].dash).toEqual([8, 4]);
+        expect(strokes[1].lineWidth).toBe(2); // batch width restored
+        expect(strokes[1].dash).toEqual([]);
+    });
+
+    it("ignores a width smuggled into a styleOf decoration (paint stays hit-consistent)", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        // Non-literal returns bypass TS excess-property checks — the exact
+        // hole a runtime guard must cover. The decoration's color applies;
+        // its width must not (hit testing never sees decorations).
+        const smuggled = { strokeStyle: "#0f0", lineWidthPx: 12 };
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { lineWidthPx: 4 } }],
+            { strokeStyle: "#00f", lineWidthPx: 2 },
+            1,
+            { styleOf: () => smuggled },
+        );
+        render(ctx);
+
+        expect(strokes).toHaveLength(1);
+        expect(strokes[0].strokeStyle).toBe("#0f0"); // decoration color applies
+        expect(strokes[0].lineWidth).toBe(4); // item width, not the smuggled 12
+    });
+
+    it("styleOf decorations overlay the item's own style", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+        draw.drawLine(
+            [{ from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, style: { strokeStyle: "#f00" } }],
+            { strokeStyle: "#00f" },
+            1,
+            { styleOf: () => ({ strokeStyle: "#0f0" }) },
+        );
+        render(ctx);
+
+        expect(strokes).toHaveLength(1);
+        expect(strokes[0].strokeStyle).toBe("#0f0");
     });
 });

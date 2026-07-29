@@ -21,7 +21,9 @@ export function appendDashedSegment(
 ): number {
     const total = pattern.reduce((sum, v) => sum + v, 0);
     const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length === 0 || total <= 0) return phase;
+    if (length === 0 || total <= 0) {
+        return phase;
+    }
 
     const ux = (b.x - a.x) / length;
     const uy = (b.y - a.y) / length;

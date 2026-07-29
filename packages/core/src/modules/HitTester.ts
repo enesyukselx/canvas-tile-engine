@@ -10,8 +10,9 @@ import {
 } from "../utils/pathGeometry";
 import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
-import { resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
+import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { resolveSizeWorld } from "../utils/itemSize";
+import { resolveOrigin, computeOriginOffset } from "../utils/origin";
 import { SpatialIndex } from "./SpatialIndex";
 
 /** Primitive kinds that participate in hit testing. */
@@ -59,7 +60,8 @@ export type HitTestRectOptions = {
     mode?: "intersect" | "contain";
 };
 
-type HitItem = Rect | Circle | ImageItem<unknown> | PathItem | Line;
+/** Union of item shapes a hit entry can hold. @internal */
+export type HitItem = Rect | Circle | ImageItem<unknown> | PathItem | Line;
 type BoxedItem = Rect | Circle | ImageItem<unknown>;
 
 type HitEntry = {
@@ -76,8 +78,15 @@ type HitEntry = {
     /** Static draw calls replay at a recorded scale, so `sizePx` is ignored
      * for them — the hit box must match what is actually drawn. */
     ignoreSizePx?: boolean;
-    /** Call-level stroke style (line entries only; path items carry their own). */
+    /** Call-level stroke style (line entries only; path items carry their
+     * own). Per-item `Line.style` overlays it at test time. */
     style?: LineStyle;
+    /** Per-item visibility, evaluated live at query time: an item whose
+     * callback returns `false` is not painted, so it must not hit either. */
+    visibleOf?: (item: HitItem) => boolean | undefined;
+    /** Per-item hit-test opt-out, evaluated live at query time. A hidden
+     * item (`visibleOf` false) never hits regardless of this callback. */
+    interactiveOf?: (item: HitItem) => boolean | undefined;
     /** Lazy R-Tree over item anchors, built on the first query of a large entry. */
     index?: SpatialIndex<BoxedItem> | null;
     /** Item object -> position in `items`, built alongside the lazy index. */
@@ -128,7 +137,12 @@ export class HitTester {
         kind: HitKind,
         items: HitItem | HitItem[],
         layer: number,
-        opts?: { style?: LineStyle; ignoreSizePx?: boolean },
+        opts?: {
+            style?: LineStyle;
+            ignoreSizePx?: boolean;
+            visibleOf?: (item: HitItem) => boolean | undefined;
+            interactiveOf?: (item: HitItem) => boolean | undefined;
+        },
     ): void {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
@@ -137,9 +151,13 @@ export class HitTester {
             for (const item of list) {
                 const rect = item as Rect;
                 const extent = Math.max(rect.size ?? 1, rect.width ?? 0, rect.height ?? 0);
-                if (extent > maxSize) maxSize = extent;
+                if (extent > maxSize) {
+                    maxSize = extent;
+                }
                 const sizePx = (item as Circle).sizePx ?? 0;
-                if (sizePx > maxSizePx) maxSizePx = sizePx;
+                if (sizePx > maxSizePx) {
+                    maxSizePx = sizePx;
+                }
             }
         }
         this.entries.set(handle.id, {
@@ -152,6 +170,8 @@ export class HitTester {
             maxSizePx,
             ignoreSizePx: opts?.ignoreSizePx,
             style: opts?.style,
+            visibleOf: opts?.visibleOf,
+            interactiveOf: opts?.interactiveOf,
         });
     }
 
@@ -161,7 +181,9 @@ export class HitTester {
 
     clearLayer(layer: number): void {
         for (const [id, entry] of this.entries) {
-            if (entry.layer === layer) this.entries.delete(id);
+            if (entry.layer === layer) {
+                this.entries.delete(id);
+            }
         }
     }
 
@@ -175,7 +197,9 @@ export class HitTester {
         const padding = Math.max(0, opts?.padding ?? 0);
 
         for (const entry of this.entries.values()) {
-            if (opts?.layer !== undefined && entry.layer !== opts.layer) continue;
+            if (opts?.layer !== undefined && entry.layer !== opts.layer) {
+                continue;
+            }
 
             // Paths and lines have no single anchor point for the R-Tree;
             // they always linear-scan (typically few, geometry-heavy items).
@@ -192,7 +216,9 @@ export class HitTester {
                 const pad = 0.5 + entry.maxSize + sizePxPad + padding;
                 const candidates = entry.index!.query(point.x - pad, point.y - pad, point.x + pad, point.y + pad);
                 for (const item of candidates) {
-                    if (!this.testItem(point, item, entry, padding)) continue;
+                    if (!this.testItem(point, item, entry, padding)) {
+                        continue;
+                    }
                     results.push({
                         item,
                         kind: entry.kind,
@@ -205,7 +231,9 @@ export class HitTester {
             } else {
                 for (let i = 0; i < entry.items.length; i++) {
                     const item = entry.items[i];
-                    if (!this.testItem(point, item, entry, padding)) continue;
+                    if (!this.testItem(point, item, entry, padding)) {
+                        continue;
+                    }
                     results.push({
                         item,
                         kind: entry.kind,
@@ -231,7 +259,9 @@ export class HitTester {
     }
 
     private ensureIndex(entry: HitEntry): void {
-        if (entry.index !== undefined) return;
+        if (entry.index !== undefined) {
+            return;
+        }
         // Only anchor-positioned kinds reach here (see `indexable` in hitTest).
         entry.index = SpatialIndex.fromArray(entry.items as BoxedItem[]);
         entry.indexMap = new Map(entry.items.map((item, i) => [item, i]));
@@ -253,40 +283,50 @@ export class HitTester {
         const rect = item as Rect;
         const w = kind === "rect" ? (rect.width ?? size) : size;
         const h = kind === "rect" ? (rect.height ?? size) : size;
-        const mode = item.origin?.mode === "self" ? "self" : "cell";
-        const ox = item.origin?.x ?? 0.5;
-        const oy = item.origin?.y ?? 0.5;
+        const origin = resolveOrigin(item.origin);
+        // World-unit call (renderers use px, cellSize = camera.scale); here a
+        // cell is exactly 1 world unit, so cellSize = 1.
+        const { x: left, y: top } = computeOriginOffset({ x: item.x, y: item.y }, w, h, origin, 1);
 
-        // World-unit mirror of the renderers' computeOriginOffset (px = world * scale)
-        const left = mode === "cell" ? item.x - 0.5 + ox - w / 2 : item.x - ox * w;
-        const top = mode === "cell" ? item.y - 0.5 + oy - h / 2 : item.y - oy * h;
-
-        if (kind !== "image") return { left, top, w, h };
+        if (kind !== "image") {
+            return { left, top, w, h };
+        }
 
         // Images are aspect-fit inside the size box (mirror of the draw path)
         const image = item as ImageItem<unknown>;
         const dims = this.imageDims(image);
-        if (!dims) return { left, top, w: size, h: size };
+        if (!dims) {
+            return { left, top, w: size, h: size };
+        }
 
         const aspect = dims.w / dims.h;
         let fitW = size;
         let fitH = size;
-        if (aspect > 1) fitH = size / aspect;
-        else fitW = size * aspect;
+        if (aspect > 1) {
+            fitH = size / aspect;
+        } else {
+            fitW = size * aspect;
+        }
 
         return { left: left + (size - fitW) / 2, top: top + (size - fitH) / 2, w: fitW, h: fitH };
     }
 
     /** Source dimensions: the sprite frame when set, else the image itself. */
     private imageDims(item: ImageItem<unknown>): { w: number; h: number } | null {
-        if (item.sprite) return { w: item.sprite.w, h: item.sprite.h };
+        if (item.sprite) {
+            return { w: item.sprite.w, h: item.sprite.h };
+        }
         // Platform image handles differ: DOM/napi expose width/height as numbers,
         // Skia's SkImage exposes them as methods. Duck-type both.
         const img = item.img as { width?: number | (() => number); height?: number | (() => number) } | undefined;
-        if (!img) return null;
+        if (!img) {
+            return null;
+        }
         const w = typeof img.width === "function" ? img.width() : img.width;
         const h = typeof img.height === "function" ? img.height() : img.height;
-        if (typeof w !== "number" || typeof h !== "number" || !w || !h) return null;
+        if (typeof w !== "number" || typeof h !== "number" || !w || !h) {
+            return null;
+        }
         return { w, h };
     }
 
@@ -319,7 +359,9 @@ export class HitTester {
     private commandSubpaths(item: PathItem & { commands: PathCommand[] }): Subpath[] {
         const scale = this.getScale();
         const cached = this.flattenCache.get(item);
-        if (cached && scale >= cached.scale / 2 && scale <= cached.scale * 2) return cached.subpaths;
+        if (cached && scale >= cached.scale / 2 && scale <= cached.scale * 2) {
+            return cached.subpaths;
+        }
         const subpaths = flattenPathCommands(item.commands, ARC_SEGMENT_LENGTH / scale);
         this.flattenCache.set(item, { scale, subpaths });
         return subpaths;
@@ -328,7 +370,9 @@ export class HitTester {
     /** Command paths: hit-test the same flattened geometry WebGL draws. */
     private testCommandPath(point: Coords, item: PathItem & { commands: PathCommand[] }, padding: number): boolean {
         const subpaths = this.commandSubpaths(item);
-        if (subpaths.length === 0) return false;
+        if (subpaths.length === 0) {
+            return false;
+        }
 
         const filled = item.style?.fillStyle !== undefined;
         if (
@@ -338,12 +382,15 @@ export class HitTester {
                 subpaths.map((sub) => sub.points),
                 item.fillRule,
             )
-        )
+        ) {
             return true;
+        }
 
         const threshold = this.strokeHalfWorld(item.style) + padding;
         for (const sub of subpaths) {
-            if (distanceToPolyline(point, sub.points, sub.closed) <= threshold) return true;
+            if (distanceToPolyline(point, sub.points, sub.closed) <= threshold) {
+                return true;
+            }
         }
         return false;
     }
@@ -353,7 +400,9 @@ export class HitTester {
             return this.testCommandPath(point, item as PathItem & { commands: PathCommand[] }, padding);
         }
         const points = item.points;
-        if (!points || points.length < 2) return false;
+        if (!points || points.length < 2) {
+            return false;
+        }
 
         // Test against the same rounded outline the renderers draw: corner
         // radii resolve to screen pixels, so convert to world units with the
@@ -368,7 +417,9 @@ export class HitTester {
                 : points;
 
         const filled = item.style?.fillStyle !== undefined;
-        if (filled && pointInRing(point, outline, item.fillRule)) return true;
+        if (filled && pointInRing(point, outline, item.fillRule)) {
+            return true;
+        }
         const closed = filled || item.closed === true;
         return distanceToPolyline(point, outline, closed) <= this.strokeHalfWorld(item.style) + padding;
     }
@@ -389,7 +440,9 @@ export class HitTester {
         const results: Array<HitResult & { seq: number }> = [];
 
         for (const entry of this.entries.values()) {
-            if (opts?.layer !== undefined && entry.layer !== opts.layer) continue;
+            if (opts?.layer !== undefined && entry.layer !== opts.layer) {
+                continue;
+            }
 
             const indexable = entry.kind !== "path" && entry.kind !== "line";
             if (indexable && entry.items.length > SPATIAL_INDEX_THRESHOLD) {
@@ -403,7 +456,9 @@ export class HitTester {
                     rect.maxY + pad,
                 );
                 for (const item of candidates) {
-                    if (!this.testItemRect(rect, item, entry, mode)) continue;
+                    if (!this.testItemRect(rect, item, entry, mode)) {
+                        continue;
+                    }
                     results.push({
                         item,
                         kind: entry.kind,
@@ -416,7 +471,9 @@ export class HitTester {
             } else {
                 for (let i = 0; i < entry.items.length; i++) {
                     const item = entry.items[i];
-                    if (!this.testItemRect(rect, item, entry, mode)) continue;
+                    if (!this.testItemRect(rect, item, entry, mode)) {
+                        continue;
+                    }
                     results.push({
                         item,
                         kind: entry.kind,
@@ -443,7 +500,9 @@ export class HitTester {
             { x: box.left, y: box.top + box.h },
         ];
         const rotate = (item as Rect).rotate ?? 0;
-        if (rotate === 0) return corners;
+        if (rotate === 0) {
+            return corners;
+        }
         const cx = box.left + box.w / 2;
         const cy = box.top + box.h / 2;
         const rad = (rotate * Math.PI) / 180;
@@ -461,7 +520,9 @@ export class HitTester {
             return this.commandSubpaths(item as PathItem & { commands: PathCommand[] });
         }
         const points = item.points;
-        if (!points || points.length < 2) return [];
+        if (!points || points.length < 2) {
+            return [];
+        }
         const scale = this.getScale();
         const radiusWorld = resolveCornerRadiusPx(item.style, scale) / scale;
         const closed = item.closed === true;
@@ -474,25 +535,43 @@ export class HitTester {
         return [{ points: outline, closed }];
     }
 
+    /** Per-item gate shared by point and rect queries: hidden items never
+     * hit (only `false` opts out — `undefined` means visible/interactive). */
+    private itemHittable(item: HitItem, entry: HitEntry): boolean {
+        if (entry.visibleOf?.(item) === false || entry.interactiveOf?.(item) === false) {
+            return false;
+        }
+        return true;
+    }
+
     private testItemRect(rect: RectRegion, item: HitItem, entry: HitEntry, mode: "intersect" | "contain"): boolean {
+        if (!this.itemHittable(item, entry)) {
+            return false;
+        }
         const kind = entry.kind;
 
         if (kind === "line") {
             const line = item as Line;
-            if (mode === "contain") return pointInRect(line.from, rect) && pointInRect(line.to, rect);
+            if (mode === "contain") {
+                return pointInRect(line.from, rect) && pointInRect(line.to, rect);
+            }
             return segmentIntersectsRect(line.from, line.to, rect);
         }
 
         if (kind === "path") {
             const pathItem = item as PathItem;
             const subpaths = this.pathSubpaths(pathItem);
-            if (subpaths.length === 0) return false;
+            if (subpaths.length === 0) {
+                return false;
+            }
             if (mode === "contain") {
                 return subpaths.every((sub) => sub.points.every((p) => pointInRect(p, rect)));
             }
             const filled = pathItem.style?.fillStyle !== undefined;
             for (const sub of subpaths) {
-                if (ringIntersectsRect(sub.points, rect, sub.closed || filled)) return true;
+                if (ringIntersectsRect(sub.points, rect, sub.closed || filled)) {
+                    return true;
+                }
             }
             // No outline touch: the rectangle may still sit fully inside a
             // filled region. A corner check via pointInRings respects holes —
@@ -522,16 +601,29 @@ export class HitTester {
 
         // rect / image: the (possibly rotated) drawn box as a convex quad
         const corners = this.boxCorners(item as BoxedItem, kind, !entry.ignoreSizePx);
-        if (mode === "contain") return corners.every((c) => pointInRect(c, rect));
+        if (mode === "contain") {
+            return corners.every((c) => pointInRect(c, rect));
+        }
         // Outline touch covers partial overlap and quad-inside-rect; the
         // remaining case is the rectangle fully inside the quad.
         return ringIntersectsRect(corners, rect) || pointInRing({ x: rect.minX, y: rect.minY }, corners);
     }
 
     private testItem(point: Coords, item: HitItem, entry: HitEntry, padding: number): boolean {
+        if (!this.itemHittable(item, entry)) {
+            return false;
+        }
         const kind = entry.kind;
-        if (kind === "path") return this.testPath(point, item as PathItem, padding);
-        if (kind === "line") return this.testLine(point, item as Line, entry.style, padding);
+        if (kind === "path") {
+            return this.testPath(point, item as PathItem, padding);
+        }
+        if (kind === "line") {
+            // Per-item style overlays the call-level style field by field —
+            // the same merge the renderers paint with — so an item with its
+            // own lineWidth gets a matching hit threshold.
+            const line = item as Line;
+            return this.testLine(point, line, overlayLineStyle(entry.style, line.style), padding);
+        }
 
         const box = this.boxFor(item as BoxedItem, kind, !entry.ignoreSizePx);
 

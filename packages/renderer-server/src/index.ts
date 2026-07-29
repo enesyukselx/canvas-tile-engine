@@ -14,7 +14,7 @@ export { SERVER_MOUNT } from "./types";
 export type { ServerMount, ImageFormat } from "./types";
 
 // Types only — internal classes are not exported
-export type { DrawHandle } from "./modules/Layer";
+export type { DrawHandle } from "@canvas-tile-engine/core";
 
 // Re-export native canvas types for convenience
 export type { Image, Canvas, SKRSContext2D } from "@napi-rs/canvas";

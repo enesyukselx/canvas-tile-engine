@@ -45,6 +45,8 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | `items`   | `Circle \| Circle[]`           | **Required** | Shape definitions (for `<Circle>`).                                                                  |
 | `layer`   | `number`                       | `1`          | Rendering layer.                                                                                     |
 | `styleOf` | `(item) => style \| undefined` | -            | Paint-time decoration for selection/hover; see [Styling by State](#styling-by-state-styleof). |
+| `visibleOf` | `(item) => boolean \| undefined` | -          | Per-item show/hide: `false` skips the item (not painted, not hit-testable); see [Visibility and Interactivity by State](#visibility-and-interactivity-by-state-visibleof--interactiveof). |
+| `interactiveOf` | `(item) => boolean \| undefined` | -      | Per-item hit-test opt-out: `false` keeps the item painted but transparent to hit queries.            |
 
 **Rect / Circle Properties:**
 
@@ -67,6 +69,8 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 - `strokeStyle`: Border color
 - `lineWidth`: Border width in world units; scales with zoom like the shape
 - `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
+- `lineDash`: Border dash pattern in world units; dashes scale with zoom. Canvas2D `setLineDash` semantics; omit for a solid border
+- `lineDashPx`: Border dash pattern in screen pixels, independent of zoom; wins over `lineDash`
 
 ```tsx
 <CanvasTileEngine
@@ -155,10 +159,12 @@ Draw straight lines between two points.
 | Prop      | Type                           | Default      | Description                                                                                                      |
 | :-------- | :----------------------------- | :----------- | :--------------------------------------------------------------------------------------------------------------- |
 | `items`   | `Line \| Line[]`               | **Required** | Line definitions.                                                                                                |
-| `style`   | `LineStyle`                    | -            | Line style (shared by all items).                                                                                |
-| `styleOf` | `(item) => style \| undefined` | -            | Per-item decoration overlaid on `style` (color/dash only); see [Styling by State](#styling-by-state-styleof). |
+| `style`   | `LineStyle`                    | -            | Default line style; an item's own `style` overrides it per item.                                                 |
+| `styleOf` | `(item) => style \| undefined` | -            | Per-item decoration overlaid on both (color/dash only); see [Styling by State](#styling-by-state-styleof). |
+| `visibleOf` | `(item) => boolean \| undefined` | -          | Per-item show/hide: `false` skips the item (not painted, not hit-testable).                                    |
+| `interactiveOf` | `(item) => boolean \| undefined` | -      | Per-item hit-test opt-out: `false` keeps the item painted but transparent to hit queries.                      |
 
-**Line Properties:** `{ from: { x, y }, to: { x, y } }`
+**Line Properties:** `{ from: { x, y }, to: { x, y }, style?: LineStyle, data?: TData }` — an item's `style` overrides the `style` prop unit pair by unit pair and, being registration-time, may change the stroke width (hit testing follows it).
 
 ```tsx
 {
@@ -171,12 +177,12 @@ Draw straight lines between two points.
 />;
 
 {
-    /* Multiple lines */
+    /* Mixed styles in one batch: item style overrides the prop default */
 }
 <CanvasTileEngine.Line
     items={[
         { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
-        { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
+        { from: { x: 5, y: 0 }, to: { x: 0, y: 5 }, style: { strokeStyle: "#f59e0b", lineWidthPx: 4 } },
     ]}
     style={{ strokeStyle: "red", lineWidthPx: 2 }}
     layer={1}
@@ -192,6 +198,8 @@ Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `
 | `items`   | `PathItem \| PathItem[]`       | **Required** | Path definitions.                                                                                                       |
 | `layer`   | `number`                       | `1`          | Rendering layer.                                                                                                        |
 | `styleOf` | `(item) => style \| undefined` | -            | Paint-time decoration (no stroke width / corner radius); see [Styling by State](#styling-by-state-styleof).      |
+| `visibleOf` | `(item) => boolean \| undefined` | -          | Per-item show/hide: `false` skips the item (not painted, not hit-testable).                                           |
+| `interactiveOf` | `(item) => boolean \| undefined` | -      | Per-item hit-test opt-out: `false` keeps the item painted but transparent to hit queries.                             |
 
 **`PathItem`:** `{ commands?, points?, closed?, fillRule?, style?, data? }` — `commands` is a Canvas2D-style command list (curves, arcs, multiple subpaths, holes); `points` is the polyline form. See the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full `PathCommand`, property, and `PathStyle` tables. Filled paths hit-test on their interior (holes excluded), unfilled ones on the stroke itself.
 
@@ -278,6 +286,7 @@ Render text at world coordinates. Text size scales with zoom.
 | `items`   | `Text \| Text[]`               | **Required** | Text definitions.                                                                                    |
 | `layer`   | `number`                       | `2`          | Rendering layer.                                                                                     |
 | `styleOf` | `(item) => style \| undefined` | -            | Paint-time decoration for selection/hover; see [Styling by State](#styling-by-state-styleof). |
+| `visibleOf` | `(item) => boolean \| undefined` | -          | Per-item show/hide: `false` skips the item for the frame (text never hit-tests, so there is no `interactiveOf`). |
 
 **Text Properties:**
 
@@ -367,6 +376,10 @@ Draw images scaled to world units.
 | :------ | :------------------------- | :----------- | :----------------- |
 | `items` | `ImageItem \| ImageItem[]` | **Required** | Image definitions. |
 | `layer` | `number`                   | `1`          | Rendering layer.   |
+| `visibleOf` | `(item) => boolean \| undefined` | -    | Per-item show/hide: `false` skips the item (not painted, not hit-testable) — marker category filters without a new `items` array. |
+| `interactiveOf` | `(item) => boolean \| undefined` | - | Per-item hit-test opt-out: `false` keeps the item painted but transparent to hit queries. |
+
+There is no `styleOf` — images carry no `style`; appearance changes go through item fields like `opacity`, which renderers read live at paint time.
 
 **ImageItem Properties:**
 
@@ -616,7 +629,40 @@ The two props now split cleanly:
 - `items` changed → geometry changed → re-register (keep it stable with `useMemo`/state).
 - `styleOf` changed → appearance changed → repaint only, zero rebuild.
 
-Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths) — those feed hit-test geometry resolved at registration time, and the types enforce it. Static components (`<StaticRect>` etc.) do not take `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply.
+What a decoration may change differs by primitive. Each rule is right for its own hit-test geometry, but the differences are easy to miss if you assume "it's all `styleOf`, it all behaves the same":
+
+| Primitive     | May change                                       | May not change                                       | Per-item width/geometry instead |
+| :------------ | :----------------------------------------------- | :--------------------------------------------------- | :------------------------------ |
+| Rect / Circle | full style, `lineWidth`/`lineWidthPx` included   | -                                                    | already allowed here            |
+| Text          | full text style                                  | -                                                    | -                               |
+| Line          | `strokeStyle`, `lineDash`/`lineDashPx`           | `lineWidth`/`lineWidthPx`                            | re-register with the new width  |
+| Path          | `strokeStyle`, dash, `fillStyle` (see below)     | `lineWidth`/`lineWidthPx`, `cornerRadius`/`cornerRadiusPx` | re-register with the new values |
+
+Why the split: a rect/circle border never feeds hit-test geometry (the hit area is the box/disc), so decorating its width is safe. A line/path hit corridor derives from the stroke width — and a path outline from its corner radius — resolved at registration time, so a paint-time change would silently desync what you see from what you can click. Path quirk from the same family: decorating an unfilled path with `fillStyle` paints the fill, but hit testing stays on the stroke.
+
+Static components (`<StaticRect>` etc.) do not take `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply.
+
+## Visibility and Interactivity by State (`visibleOf` / `interactiveOf`)
+
+The same live-read model extends to visibility and hit testing. Both props are read through refs like `styleOf` — inline arrows are fine, identity changes never re-register:
+
+- `visibleOf`: return `false` to skip an item for the frame. It is neither painted nor hit-testable, and hit queries fall through to whatever is underneath. Use it for category filters and toggles instead of deriving a filtered `items` array (which would re-register and rebuild the spatial index).
+- `interactiveOf`: return `false` to keep an item painted but out of `hitTest`/`hitTestFirst`/`hitTestRect` — the per-item version of `hitTest={false}`, for decorative items mixed into an interactive set or disabled entries that should stop reacting without disappearing. Not on `<Text>` (text never hit-tests).
+
+```tsx
+const [hiddenCategories, setHiddenCategories] = useState<ReadonlySet<string>>(new Set());
+const [disabled, setDisabled] = useState<ReadonlySet<string>>(new Set());
+
+<CanvasTileEngine.Rect
+    items={markers}
+    layer={1}
+    visibleOf={(m) => !hiddenCategories.has(m.data.category)}
+    interactiveOf={(m) => !disabled.has(m.data.id)}
+    styleOf={(m) => (disabled.has(m.data.id) ? { fillStyle: "#9ca3af" } : undefined)}
+/>;
+```
+
+They compose with a simple rule: `visibleOf: false` wins — a hidden item never hit-tests, regardless of `interactiveOf`. Static components take neither prop, for the same reason they don't take `styleOf`.
 
 ## Dynamic Content
 
@@ -625,7 +671,7 @@ When geometry actually changes (items added, removed, or moved), React's declara
 :::tip Performance
 
 - Use `useMemo` for computed items arrays to avoid unnecessary re-renders
-- Route selection/hover styling through `styleOf`, not through derived `items` arrays
+- Route selection/hover styling through `styleOf` — and show/hide through `visibleOf` — not through derived `items` arrays
 - For truly static content, use `<StaticRect>`, `<StaticCircle>`, or `<StaticImage>`
 - The engine automatically batches renders when multiple components update in the same frame
   :::

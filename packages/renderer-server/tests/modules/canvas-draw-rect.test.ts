@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import type { SKRSContext2D } from "@napi-rs/canvas";
-import { CanvasDraw, type OffscreenCanvasFactory } from "../../src/modules/CanvasDraw";
-import { Layer } from "../../src/modules/Layer";
+import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
+import {
+    CanvasDraw,
+    Layer,
+    type DrawContext,
+    type OffscreenCanvasFactory,
+} from "@canvas-tile-engine/renderer-shared/canvas2d";
 
 // Fake 2D context recording every rect(x, y, w, h) call.
 function makeRectRecordingCtx() {
@@ -29,11 +33,11 @@ function makeRectRecordingCtx() {
 function setup() {
     const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer();
-    const createOffscreen: OffscreenCanvasFactory = () => {
+    const layers = new Layer<DrawContext<SKRSContext2D>>();
+    const createOffscreen: OffscreenCanvasFactory<SKRSContext2D, Canvas> = () => {
         throw new Error("not used in these tests");
     };
-    const draw = new CanvasDraw(layers, transformer, camera, createOffscreen);
+    const draw = new CanvasDraw<SKRSContext2D, Image, Canvas>(layers, transformer, camera, createOffscreen);
     const config = { size: { width: 100, height: 100 }, scale: 10 } as never;
     const render = (ctx: SKRSContext2D) =>
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
@@ -79,5 +83,61 @@ describe("CanvasDraw non-square rects", () => {
 
         expect(rects).toHaveLength(1);
         expect(rects[0].w).toBe(300);
+    });
+});
+
+// Fake 2D context recording setLineDash calls and strokes for dash tests.
+function makeDashRecordingCtx() {
+    const dashes: number[][] = [];
+    let strokeCount = 0;
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        fillStyle: "#000",
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        rect() {},
+        arc() {},
+        fill() {},
+        setLineDash(pattern: number[]) {
+            dashes.push(pattern);
+        },
+        stroke() {
+            strokeCount++;
+        },
+    };
+    return { ctx: ctx as unknown as SKRSContext2D, dashes, strokes: () => strokeCount };
+}
+
+// Dash unit contract shared by all renderers: lineDash is world units
+// (px = value * scale), lineDashPx is screen pixels and wins.
+describe("CanvasDraw dashed rect/circle borders", () => {
+    it("dashes rect borders and resets after the stroke", () => {
+        const { draw, render } = setup(); // scale 10
+        const { ctx, dashes } = makeDashRecordingCtx();
+
+        draw.drawRect([{ x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8, 0.4] } }], 1);
+        render(ctx);
+
+        expect(dashes).toEqual([[8, 4], []]);
+    });
+
+    it("dashes circle borders preferring lineDashPx and stays solid without a dash", () => {
+        const { draw, render } = setup();
+        const { ctx, dashes, strokes } = makeDashRecordingCtx();
+
+        draw.drawCircle(
+            [
+                { x: 1, y: 1, size: 1, style: { strokeStyle: "#f00", lineDash: [0.8], lineDashPx: [6, 3] } },
+                { x: 3, y: 3, size: 1, style: { strokeStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(dashes).toEqual([[6, 3], []]);
+        expect(strokes()).toBe(2);
     });
 });

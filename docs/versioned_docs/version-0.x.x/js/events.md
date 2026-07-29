@@ -58,12 +58,8 @@ engine.onRightClick = (coords, mouse, client) => {
 Triggered when the pointer moves over the canvas while not dragging, if `eventHandlers.hover` is enabled.
 
 ```ts
-let hoverHandle: DrawHandle | undefined;
-
 engine.onHover = (coords) => {
-    if (hoverHandle) engine.removeDrawHandle(hoverHandle);
-
-    hoverHandle = engine.drawRect(
+    engine.drawRect(
         {
             x: coords.snapped.x,
             y: coords.snapped.y,
@@ -71,13 +67,14 @@ engine.onHover = (coords) => {
             style: { fillStyle: "rgba(56, 189, 248, 0.25)" },
         },
         10,
+        { id: "hover" }, // same id -> replaces the previous highlight
     );
 
     engine.render();
 };
 ```
 
-For high-frequency hover work, prefer replacing one previous `DrawHandle` or clearing a dedicated layer over accumulating draw calls.
+For high-frequency hover work, always replace — via a registration `id` as above, by removing the previous `DrawHandle`, or by clearing a dedicated layer — rather than accumulating draw calls.
 
 ### `onMouseDown` And `onMouseUp`
 
@@ -109,11 +106,8 @@ Triggered when the pointer leaves the canvas. Use it to clear transient UI state
 ```ts
 engine.onMouseLeave = () => {
     selecting = false;
-    if (hoverHandle) {
-        engine.removeDrawHandle(hoverHandle);
-        hoverHandle = undefined;
-        engine.render();
-    }
+    engine.drawRect([], 10, { id: "hover" }); // replace the highlight with nothing
+    engine.render();
 };
 ```
 

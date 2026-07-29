@@ -139,31 +139,46 @@ after mount.
 
 ### Draw methods
 
-All return a `DrawHandle` (`{ id: symbol, layer: number }`). Full item shapes
-and semantics: [drawing.md](drawing.md).
+All return a `DrawHandle` (`{ id: symbol, layer: number }`) and accept an
+optional `options?` last parameter (core >= 0.10) with two fields:
+
+- `id?: string` - re-registering with the same `id` atomically replaces the
+  previous registration (draw callback + hit-test entries) instead of
+  accumulating. Ids share one namespace across draw kinds and layers; a
+  replaced registration re-enters at the end of its layer's draw order.
+  Static draws take no `id` - their `cacheKey` is the id.
+- `styleOf?: (item) => partialStyle | undefined` (dynamic `drawRect`,
+  `drawCircle`, `drawText`, `drawLine`, `drawPath` only) - paint-time
+  decoration: runs per item every frame; returned fields overlay the item's
+  own `style` for that frame. Reads external state live (mutate a selection
+  set + `render()`, nothing re-registers). Line/path decorations exclude
+  `lineWidth`/`lineWidthPx` (and `cornerRadius*` for paths) - hit-test
+  geometry is registration-time. Not available on statics or `drawImage`.
+
+Full item shapes and semantics: [drawing.md](drawing.md).
 
 | Signature | Default layer |
 | :-- | :-- |
-| `drawRect(items: Rect \| Rect[], layer?)` | 1 |
-| `drawCircle(items: Circle \| Circle[], layer?)` | 1 |
-| `drawImage(items: ImageItem \| ImageItem[], layer?)` | 1 |
-| `drawText(items: Text \| Text[], layer?)` | 2 |
-| `drawLine(items: Line \| Line[], style?: LineStyle, layer?)` | 1 |
-| `drawPath(items: PathItem \| PathItem[], layer?)` | 1 |
-| `drawGridLines(cellSize: number, lineWidth = 1, strokeStyle = "black", layer = 0)` | 0 |
+| `drawRect(items: Rect \| Rect[], layer?, options?)` | 1 |
+| `drawCircle(items: Circle \| Circle[], layer?, options?)` | 1 |
+| `drawImage(items: ImageItem \| ImageItem[], layer?, options?)` | 1 |
+| `drawText(items: Text \| Text[], layer?, options?)` | 2 |
+| `drawLine(items: Line \| Line[], style?: LineStyle, layer?, options?)` | 1 |
+| `drawPath(items: PathItem \| PathItem[], layer?, options?)` | 1 |
+| `drawGridLines(cellSize: number, lineWidth = 1, strokeStyle = "black", layer = 0, options?)` | 0 |
 | `drawStaticRect(items: Rect[], cacheKey: string, layer?)` | 1 |
 | `drawStaticCircle(items: Circle[], cacheKey: string, layer?)` | 1 |
 | `drawStaticImage(items: ImageItem[], cacheKey: string, layer?)` | 1 |
-| `addDrawFunction(fn: (ctx, topLeft: Coords, config) => void, layer?)` | 1 |
+| `addDrawFunction(fn: (ctx, topLeft: Coords, config) => void, layer?, options?)` | 1 |
 
 ### Draw management
 
 | Signature | Notes |
 | :-- | :-- |
-| `removeDrawHandle(handle: DrawHandle): void` | Remove one registered draw callback. |
-| `clearLayer(layer: number): void` | Remove every callback on a layer. |
-| `clearAll(): void` | Remove all callbacks on all layers. |
-| `clearStaticCache(cacheKey?: string): void` | Drop one or all pre-rendered static caches (forces rebuild next frame). |
+| `removeDrawHandle(handle: DrawHandle): void` | Remove one registered draw callback (a tracked static registration's cache is dropped too). |
+| `clearLayer(layer: number): void` | Remove every callback on a layer (drops static caches registered on it). |
+| `clearAll(): void` | Remove all callbacks on all layers and drop all static caches. |
+| `clearStaticCache(cacheKey?: string): void` | Drop one or all pre-rendered static caches (forces rebuild next frame). Rarely needed since core 0.10 - same-key re-register invalidates automatically. |
 
 ### Hit testing
 
