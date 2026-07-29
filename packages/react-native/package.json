@@ -59,6 +59,7 @@
         "@canvas-tile-engine/renderer-skia": "workspace:^"
     },
     "devDependencies": {
+        "@canvas-tile-engine/react-shared": "workspace:^",
         "@types/react": "^19.0.0",
         "react": "^19.0.0",
         "react-native": "^0.78.0",

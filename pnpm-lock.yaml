@@ -444,6 +444,9 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@canvas-tile-engine/react-shared':
+        specifier: workspace:^
+        version: link:../react-shared
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -475,6 +478,9 @@ importers:
         specifier: '>=2.0.0-next.0'
         version: 2.6.9(react-native@0.78.3(@babel/core@7.28.5)(@babel/preset-env@7.29.7(@babel/core@7.28.5))(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)
     devDependencies:
+      '@canvas-tile-engine/react-shared':
+        specifier: workspace:^
+        version: link:../react-shared
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.17
@@ -487,6 +493,18 @@ importers:
       react-native-gesture-handler:
         specifier: ^2.24.0
         version: 2.24.0(react-native@0.78.3(@babel/core@7.28.5)(@babel/preset-env@7.29.7(@babel/core@7.28.5))(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)
+
+  packages/react-shared:
+    devDependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:^
+        version: link:../core
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.27
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
 
   packages/renderer-canvas:
     dependencies:
