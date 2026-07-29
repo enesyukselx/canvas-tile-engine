@@ -538,6 +538,9 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@canvas-tile-engine/renderer-shared':
+        specifier: workspace:^
+        version: link:../renderer-shared
       '@shopify/react-native-skia':
         specifier: ^2.6.9
         version: 2.6.9(react-native@0.78.3(@babel/core@7.28.5)(@babel/preset-env@7.29.7(@babel/core@7.28.5))(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)
