@@ -159,26 +159,81 @@ describe("draw components", () => {
         expect(styleA).not.toHaveBeenCalled();
     });
 
-    it("StaticRect drops the stale cache on items change and clears it on key change and unmount", () => {
+    it("reads interactiveOf through a ref: identity changes neither re-register nor repaint", () => {
         const engine = createFakeHandle();
-        const { rerender, unmount } = renderWith(engine, <StaticRect items={[TILE]} cacheKey="k1" />);
+        const items = [TILE];
+        const interactiveA = vi.fn(() => true);
+        const interactiveB = vi.fn(() => false);
 
-        expect(engine.drawStaticRect).toHaveBeenCalledTimes(1);
-        expect(engine.clearStaticCache).not.toHaveBeenCalled();
+        const { rerender, requestRender } = renderWith(engine, <Rect items={items} interactiveOf={interactiveA} />);
+        expect(engine.drawRect).toHaveBeenCalledTimes(1);
+        const options = engine.drawRect.mock.calls[0][2];
+        const repaintsBefore = requestRender.mock.calls.length;
 
-        // Same key, new items identity: the renderer only rebuilds on a cache
-        // miss, so the stale cache must be dropped explicitly.
-        rerender(<StaticRect items={[TILE]} cacheKey="k1" />);
-        expect(engine.clearStaticCache).toHaveBeenCalledWith("k1");
-        expect(engine.drawStaticRect).toHaveBeenCalledTimes(2);
+        rerender(<Rect items={items} interactiveOf={interactiveB} />);
 
-        // Key change: the previous key's cache is cleared.
-        engine.clearStaticCache.mockClear();
-        rerender(<StaticRect items={[TILE]} cacheKey="k2" />);
-        expect(engine.clearStaticCache).toHaveBeenCalledWith("k1");
+        // Unlike styleOf/visibleOf there is no repaint either: hit queries
+        // read the ref at query time, so nothing on the canvas changes.
+        expect(engine.drawRect).toHaveBeenCalledTimes(1);
+        expect(requestRender.mock.calls.length).toBe(repaintsBefore);
+
+        // The registered wrapper resolves to the latest prop at query time.
+        expect(options?.interactiveOf?.(TILE)).toBe(false);
+        expect(interactiveB).toHaveBeenCalledWith(TILE);
+        expect(interactiveA).not.toHaveBeenCalled();
+    });
+
+    // All three Static* components carry the same cache lifecycle in separate
+    // files; parametrizing keeps them from drifting apart.
+    const staticCases = [
+        ["StaticRect", "drawStaticRect", (key: string) => <StaticRect items={[TILE]} cacheKey={key} />],
+        ["StaticCircle", "drawStaticCircle", (key: string) => <StaticCircle items={[{ x: 1, y: 1 }]} cacheKey={key} />],
+        [
+            "StaticImage",
+            "drawStaticImage",
+            (key: string) => <StaticImage items={[{ x: 0, y: 0, img: "img" }]} cacheKey={key} />,
+        ],
+    ] as const;
+
+    it.each(staticCases)(
+        "%s drops the stale cache on items change and clears it on key change and unmount",
+        (_name, method, makeUi) => {
+            const engine = createFakeHandle();
+            const { rerender, unmount } = renderWith(engine, makeUi("k1"));
+
+            expect(engine[method]).toHaveBeenCalledTimes(1);
+            expect(engine.clearStaticCache).not.toHaveBeenCalled();
+
+            // Same key, new items identity: the renderer only rebuilds on a
+            // cache miss, so the stale cache must be dropped explicitly.
+            rerender(makeUi("k1"));
+            expect(engine.clearStaticCache).toHaveBeenCalledWith("k1");
+            expect(engine[method]).toHaveBeenCalledTimes(2);
+
+            // Key change: the previous key's cache is cleared.
+            engine.clearStaticCache.mockClear();
+            rerender(makeUi("k2"));
+            expect(engine.clearStaticCache).toHaveBeenCalledWith("k1");
+
+            unmount();
+            expect(engine.clearStaticCache).toHaveBeenLastCalledWith("k2");
+        },
+    );
+
+    const emptyStaticCases = [
+        ["StaticRect", "drawStaticRect", () => <StaticRect items={[]} cacheKey="k" />],
+        ["StaticCircle", "drawStaticCircle", () => <StaticCircle items={[]} cacheKey="k" />],
+        ["StaticImage", "drawStaticImage", () => <StaticImage items={[]} cacheKey="k" />],
+    ] as const;
+
+    it.each(emptyStaticCases)("%s registers nothing for empty items", (_name, method, makeUi) => {
+        const engine = createFakeHandle();
+        const { unmount } = renderWith(engine, makeUi());
+
+        expect(engine[method]).not.toHaveBeenCalled();
 
         unmount();
-        expect(engine.clearStaticCache).toHaveBeenLastCalledWith("k2");
+        expect(engine.removeDrawHandle).not.toHaveBeenCalled();
     });
 
     it("Sprite clones caller items so the animation never mutates them", () => {

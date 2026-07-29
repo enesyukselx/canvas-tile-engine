@@ -129,6 +129,62 @@ describe("useEngineHandle", () => {
         expect(seen[seen.length - 1]).toBe(engineB);
     });
 
+    // Mechanical forwarding matrix: every handle method must call the engine
+    // method OF THE SAME NAME with the same arguments. Each row builds an
+    // engine exposing only that one method, so forwarding to the wrong method
+    // (the classic copy-paste slip in this boilerplate) throws instead of
+    // silently hitting a sibling mock.
+    const noop = () => {};
+    const FORWARDED: Array<[string, unknown[]]> = [
+        ["render", []],
+        ["getCenter", []],
+        ["getVisibleBounds", []],
+        ["setCenter", [{ x: 1, y: 2 }]],
+        ["goCenter", [3, 4, 250, noop]],
+        ["getSize", []],
+        ["getScale", []],
+        ["setScale", [2]],
+        ["goScale", [1.5, 100, noop]],
+        ["zoomIn", [1.2]],
+        ["zoomOut", [1.3]],
+        ["setScaleLimits", [0.5, 8]],
+        ["getConfig", []],
+        ["setBounds", [{ minX: 0, maxX: 9, minY: 0, maxY: 9 }]],
+        ["fitBounds", [{ minX: 0, maxX: 4, minY: 0, maxY: 4 }, {}]],
+        ["setEventHandlers", [{ click: true }]],
+        ["addDrawFunction", [noop, 3]],
+        ["drawRect", [[TILE], 2, {}]],
+        ["drawStaticRect", [[TILE], "cache", 2, {}]],
+        ["drawCircle", [[{ x: 1, y: 1 }], 2, {}]],
+        ["drawStaticCircle", [[{ x: 1, y: 1 }], "cache", 2, {}]],
+        ["drawLine", [[{ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }], { lineWidth: 1 }, 2, {}]],
+        ["drawText", [[{ x: 0, y: 0, text: "t" }], 2, {}]],
+        ["drawPath", [[{ points: [{ x: 0, y: 0 }] }], 2, {}]],
+        ["drawImage", [[{ x: 0, y: 0, img: "img" }], 2, {}]],
+        ["drawStaticImage", [[{ x: 0, y: 0, img: "img" }], "cache", 2, {}]],
+        ["drawGridLines", [1, 2, "red", 3]],
+        ["clearLayer", [2]],
+        ["clearAll", []],
+        ["clearStaticCache", ["cache"]],
+        ["removeDrawHandle", [{ id: Symbol("h"), layer: 1 }]],
+        ["hitTest", [{ x: 1, y: 1 }, {}]],
+        ["hitTestFirst", [{ x: 1, y: 1 }, {}]],
+        ["hitTestRect", [{ minX: 0, maxX: 1, minY: 0, maxY: 1 }, {}]],
+    ];
+
+    it.each(FORWARDED)("forwards %s to the engine method of the same name", (method, args) => {
+        const engineMethod = vi.fn(() => ({ id: Symbol("result"), layer: 1 }));
+        const { result } = renderHook(() => useEngineHandle<unknown, unknown, unknown>());
+
+        act(() => result.current._setInstance(asEngine({ [method]: engineMethod })));
+
+        const handleMethod = result.current[method as keyof Handle] as (...call: unknown[]) => unknown;
+        handleMethod(...args);
+
+        expect(engineMethod).toHaveBeenCalledTimes(1);
+        expect(engineMethod).toHaveBeenCalledWith(...args);
+    });
+
     it("merges buildExtras onto the handle and keeps getters live", () => {
         const { result } = renderHook(() =>
             useEngineHandle<unknown, unknown, unknown, { peek: () => Engine | null }>((instanceRef) => ({
