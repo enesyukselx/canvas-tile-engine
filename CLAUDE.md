@@ -163,7 +163,7 @@ Key public contracts:
 
 `renderer-shared` (internal, not published):
 
-- Two entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types; `renderer-webgl`'s 2D overlay also consumes its Layer, CoordinateOverlayRenderer, and DebugOverlay) and `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too).
+- Three entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types; `renderer-webgl`'s 2D overlay also consumes its Layer, CoordinateOverlayRenderer, and DebugOverlay), `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too), and `@canvas-tile-engine/renderer-shared/geometry` (the viewport cull rect and per-item visibility test, consumed by all four renderers — pure functions, no context or platform types). Geometry that application code also needs lives in core instead (`itemsBounds`, `pathItemBounds`), not here.
 - No build step: `exports` points at `src/*.ts` and consumers bundle the source with tsup (`noExternal`).
 - Consumers depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files; the `workspace:^` publishing rule does not apply to it.
 - Never import it from application code or examples; its API has no semver guarantees.

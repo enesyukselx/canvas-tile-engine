@@ -8,6 +8,9 @@ export default defineConfig({
     minify: true,
     clean: true,
     external: ["@shopify/react-native-skia", "react", "react-native"],
+    // renderer-shared is private and never published: bundle its source in,
+    // or the published package would import a package that is not on npm.
+    noExternal: [/^@canvas-tile-engine\/renderer-shared/],
     // Emit .cjs/.mjs so the output matches package.json's `exports` map
     // (default tsup output is index.js/index.mjs, leaving `require` pointing
     // at a non-existent dist/index.cjs).

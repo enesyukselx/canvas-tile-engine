@@ -14,7 +14,6 @@ import {
     SpatialIndex,
     SpriteRect,
     Text,
-    VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveSizeWorld,
     resolveLineDashPx,
@@ -25,10 +24,12 @@ import {
     computeOriginOffset,
     traceRoundedPath,
     traceCommands,
-    pathCommandsBounds,
+    itemsBounds,
+    pathItemBounds,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    AnchoredItem,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -38,6 +39,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "./Layer";
+import { getViewportBounds, isVisible } from "../geometry/culling";
 import { applyLineWidth } from "./applyLineWidth";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
 
@@ -86,33 +88,6 @@ export class CanvasDraw<
         private createOffscreen: OffscreenCanvasFactory<TContext, TCanvas> | null,
     ) {}
 
-    private isVisible(
-        x: number,
-        y: number,
-        sizeWorld: number,
-        topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>,
-    ) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        const minX = topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER;
-        const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
-        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
-    }
-
-    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        return {
-            minX: topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER,
-            minY: topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER,
-            maxX: topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER,
-            maxY: topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER,
-        };
-    }
-
     /**
      * Register a generic draw callback; receives raw context, current coords, and config.
      * @param fn Callback invoked during render.
@@ -141,7 +116,7 @@ export class CanvasDraw<
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -162,7 +137,7 @@ export class CanvasDraw<
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -257,7 +232,7 @@ export class CanvasDraw<
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -323,7 +298,7 @@ export class CanvasDraw<
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -349,7 +324,7 @@ export class CanvasDraw<
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -390,7 +365,7 @@ export class CanvasDraw<
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -409,7 +384,7 @@ export class CanvasDraw<
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
                     continue;
                 }
 
@@ -448,36 +423,8 @@ export class CanvasDraw<
     ): DrawHandle {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
-        // Conservative world bounds per item for culling, computed once:
-        // control-point hull for command paths, vertex bounds for polylines.
-        const itemBounds = items.map((item) => {
-            if (item.commands !== undefined) {
-                return pathCommandsBounds(item.commands);
-            }
-            const points = item.points;
-            if (!points || points.length < 2) {
-                return null;
-            }
-            let minX = Infinity;
-            let minY = Infinity;
-            let maxX = -Infinity;
-            let maxY = -Infinity;
-            for (const p of points) {
-                if (p.x < minX) {
-                    minX = p.x;
-                }
-                if (p.y < minY) {
-                    minY = p.y;
-                }
-                if (p.x > maxX) {
-                    maxX = p.x;
-                }
-                if (p.y > maxY) {
-                    maxY = p.y;
-                }
-            }
-            return { minX, minY, maxX, maxY };
-        });
+        // Conservative world bounds per item for culling, computed once.
+        const itemBounds = items.map((item) => pathItemBounds(item));
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             for (let n = 0; n < items.length; n++) {
@@ -490,7 +437,7 @@ export class CanvasDraw<
                 const centerX = (bounds.minX + bounds.maxX) / 2;
                 const centerY = (bounds.minY + bounds.maxY) / 2;
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -591,7 +538,7 @@ export class CanvasDraw<
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -611,7 +558,7 @@ export class CanvasDraw<
                 const origin = resolveOrigin(item.origin);
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -747,12 +694,7 @@ export class CanvasDraw<
      * Handles bounds calculation, canvas creation, and rebuild logic.
      */
     private getOrCreateStaticCache<
-        T extends {
-            x: number;
-            y: number;
-            size?: number;
-            width?: number;
-            height?: number;
+        T extends AnchoredItem & {
             radius?: number | number[];
             origin?: { mode?: "cell" | "self"; x?: number; y?: number };
         },
@@ -769,39 +711,17 @@ export class CanvasDraw<
             return null;
         }
 
-        if (items.length === 0) {
+        const box = itemsBounds(items);
+        if (!box) {
             return null;
         }
 
-        // Calculate world bounds from items
-        let minX = Infinity,
-            maxX = -Infinity,
-            minY = Infinity,
-            maxY = -Infinity;
-
-        for (const item of items) {
-            const size = item.size ?? 1;
-            const w = item.width ?? size;
-            const h = item.height ?? size;
-            if (item.x - w / 2 < minX) {
-                minX = item.x - w / 2;
-            }
-            if (item.x + w / 2 > maxX) {
-                maxX = item.x + w / 2;
-            }
-            if (item.y - h / 2 < minY) {
-                minY = item.y - h / 2;
-            }
-            if (item.y + h / 2 > maxY) {
-                maxY = item.y + h / 2;
-            }
-        }
-
-        // Add padding
-        minX -= 1;
-        minY -= 1;
-        maxX += 1;
-        maxY += 1;
+        // One world unit of padding absorbs origin offsets and rotation, which
+        // itemsBounds leaves out.
+        const minX = box.minX - 1;
+        const minY = box.minY - 1;
+        const maxX = box.maxX + 1;
+        const maxY = box.maxY + 1;
 
         const worldWidth = maxX - minX;
         const worldHeight = maxY - minY;

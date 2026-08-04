@@ -343,13 +343,58 @@ const config = {
 Only `maxScale` stays manual by design: it is a content-resolution quality
 cap (asset px density, label readability), which no bounds can imply.
 
+### `itemsBounds` - the rectangle `fitBounds`/`fitScale` ask for
+
+`itemsBounds(items)` returns `{ minX, maxX, minY, maxY }` enclosing a list of
+items, or `null` when nothing in the list has bounds. Use it instead of
+hand-rolling a min/max reduce before `fitBounds`/`fitScale`.
+
+EVERY item kind fits in one list, mixed freely - no filtering needed, so
+`hitTest`/`hitTestRect` results go straight in:
+
+| Kind                              | Box |
+| --------------------------------- | --- |
+| `Rect`, `Circle`, `Text`, `Image` | `width ?? size` x `height ?? size` world units (default 1), centered on the anchor |
+| `Line`                            | its two endpoints |
+| `PathItem`                        | vertex box for `points`, control-point hull for `commands` |
+
+Returns `Bounds | null`, and `fitBounds`/`fitScale` take a non-null `Bounds`, so
+the guard is part of the call - it is NOT a one-liner:
+
+```ts
+import { itemsBounds } from "@canvas-tile-engine/core";
+
+// Marquee selection -> frame it (rects, lines and paths in one list)
+const picked = engine.hitTestRect(marquee, { mode: "contain" }).map((h) => h.item);
+const bounds = itemsBounds(picked);
+if (bounds) {
+    engine.fitBounds(bounds, { paddingPx: 24 });
+}
+```
+
+Skipping the guard (`itemsBounds(tiles)!`) is only safe for a set you know is
+non-empty; anything from a selection or a hit test can be empty.
+
+Items that draw nothing are skipped, not counted: a path with fewer than two
+points, an empty command list, an object with no geometry.
+
+Deliberately camera-independent, so it leaves out `origin` offsets and `rotate`
+(both stay within half an item of the box - add `padding` for slack),
+`sizePx`/`fontPx` (no world extent without a scale), and measured text: a
+`Text` item contributes its `size` box, NOT its glyph extents - core has no
+font metrics, so a long label reaches past this box. Null is a real case:
+guard it, do not pass it straight through.
+
+`pathItemBounds(item)` is the single-path building block, exported for the same
+job on one `PathItem` (null when it draws nothing).
+
 ## Exported types and classes (import from `@canvas-tile-engine/core`)
 
 Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`,
-`SpatialIndex`, `Config`, `ViewportState`, `CoordinateTransformer`,
+`itemsBounds`, `pathItemBounds`, `SpatialIndex`, `Config`, `ViewportState`, `CoordinateTransformer`,
 `GestureProcessor`, `AnimationController`.
 
-Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `DrawObject`, `Rect`,
+Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `BoundedItem`, `DrawObject`, `Rect`,
 `Circle`, `Text`, `Line`, `PathItem`, `PathStyle`, `ImageItem<TImage>`, `SpriteRect`,
 `SpriteSheetOptions`, `SpriteAnimation`, `EventHandlers`, `ZoomMode`,
 `DrawHandle`, `LineStyle`, `TextAlign`, `TextBaseline`, `IRenderer`,
