@@ -18,6 +18,14 @@ export { cornerArc } from "./utils/pathCorners";
 export { traceRoundedPath, traceCommands, type PathTraceTarget, type CommandTraceTarget } from "./utils/tracePath";
 export { roundedPolyline, roundedRing, ARC_SEGMENT_LENGTH } from "./utils/pathFlatten";
 export { resolveSizePx, resolveSizeWorld } from "./utils/itemSize";
+export {
+    itemsBounds,
+    pathItemBounds,
+    type AnchoredItem,
+    type BoundedItem,
+    type EndpointItem,
+    type OutlineItem,
+} from "./utils/itemBounds";
 export { resolveOrigin, computeOriginOffset, type Origin, type RawOrigin } from "./utils/origin";
 export { flattenPathCommands, pathCommandsBounds, type Subpath } from "./utils/flattenPath";
 export type { CornerArc } from "./utils/pathCorners";

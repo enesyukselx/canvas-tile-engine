@@ -25,10 +25,12 @@ import {
     traceRoundedPath,
     traceCommands,
     pathCommandsBounds,
+    itemsBounds,
     type CommandTraceTarget,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    AnchoredItem,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -764,7 +766,7 @@ export class SkiaDraw {
      * Register a layer callback that replays a cached picture of `items` under
      * the current camera transform, recording it first if `cacheKey` is new.
      */
-    private addStaticPictureLayer<T extends { x: number; y: number; size?: number }>(
+    private addStaticPictureLayer<T extends AnchoredItem>(
         cacheKey: string,
         items: T[],
         layer: number,
@@ -796,37 +798,24 @@ export class SkiaDraw {
     }
 
     /** Record `items` into a picture using a camera fixed at (0, 0) and the current scale. */
-    private recordStaticPicture<T extends { x: number; y: number; size?: number }>(
+    private recordStaticPicture<T extends AnchoredItem>(
         items: T[],
         paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
     ): { picture: SkPicture; recordScale: number } {
         const recordScale = this.camera.scale;
 
         // Cull rect covering all items, padded by one world unit for origin
-        // offsets and rotation — same bounds heuristic as the Canvas2D cache.
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        for (const item of items) {
-            const half = (item.size ?? 1) / 2;
-            if (item.x - half < minX) {
-                minX = item.x - half;
-            }
-            if (item.x + half > maxX) {
-                maxX = item.x + half;
-            }
-            if (item.y - half < minY) {
-                minY = item.y - half;
-            }
-            if (item.y + half > maxY) {
-                maxY = item.y + half;
-            }
-        }
-        minX -= 1;
-        minY -= 1;
-        maxX += 1;
-        maxY += 1;
+        // offsets and rotation — same bounds heuristic as the Canvas2D cache,
+        // and now the same helper, so per-axis width/height cannot be missed
+        // (a wide rect used to record outside its own cull rect).
+        // An empty list never reaches here (addStaticPictureLayer returns
+        // early); the fallback keeps the rect finite rather than NaN if that
+        // ever changes.
+        const box = itemsBounds(items) ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+        const minX = box.minX - 1;
+        const minY = box.minY - 1;
+        const maxX = box.maxX + 1;
+        const maxY = box.maxY + 1;
 
         const recorder = Skia.PictureRecorder();
         const canvas = recorder.beginRecording(

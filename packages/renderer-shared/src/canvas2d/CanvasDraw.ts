@@ -26,9 +26,11 @@ import {
     traceRoundedPath,
     traceCommands,
     pathCommandsBounds,
+    itemsBounds,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    AnchoredItem,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -747,12 +749,7 @@ export class CanvasDraw<
      * Handles bounds calculation, canvas creation, and rebuild logic.
      */
     private getOrCreateStaticCache<
-        T extends {
-            x: number;
-            y: number;
-            size?: number;
-            width?: number;
-            height?: number;
+        T extends AnchoredItem & {
             radius?: number | number[];
             origin?: { mode?: "cell" | "self"; x?: number; y?: number };
         },
@@ -769,39 +766,17 @@ export class CanvasDraw<
             return null;
         }
 
-        if (items.length === 0) {
+        const box = itemsBounds(items);
+        if (!box) {
             return null;
         }
 
-        // Calculate world bounds from items
-        let minX = Infinity,
-            maxX = -Infinity,
-            minY = Infinity,
-            maxY = -Infinity;
-
-        for (const item of items) {
-            const size = item.size ?? 1;
-            const w = item.width ?? size;
-            const h = item.height ?? size;
-            if (item.x - w / 2 < minX) {
-                minX = item.x - w / 2;
-            }
-            if (item.x + w / 2 > maxX) {
-                maxX = item.x + w / 2;
-            }
-            if (item.y - h / 2 < minY) {
-                minY = item.y - h / 2;
-            }
-            if (item.y + h / 2 > maxY) {
-                maxY = item.y + h / 2;
-            }
-        }
-
-        // Add padding
-        minX -= 1;
-        minY -= 1;
-        maxX += 1;
-        maxY += 1;
+        // One world unit of padding absorbs origin offsets and rotation, which
+        // itemsBounds leaves out.
+        const minX = box.minX - 1;
+        const minY = box.minY - 1;
+        const maxX = box.maxX + 1;
+        const maxY = box.maxY + 1;
 
         const worldWidth = maxX - minX;
         const worldHeight = maxY - minY;
