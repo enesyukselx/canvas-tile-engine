@@ -58,12 +58,17 @@ plays the same role.
 `styleOf` details: available on dynamic `drawRect`/`drawCircle`/`drawText`/
 `drawLine`/`drawPath` (not statics, not `drawImage`). Identify items via
 `item.data`; return `undefined` for undecorated items (the common case). For
-`drawLine` the decoration overlays the call-level `style` per item - the way
-to give individual lines their own color. Type-enforced limits: Line and
+`drawLine` the decoration overlays both the call-level `style` and the
+item's own `style` per item - use item styles for static per-line looks and
+`styleOf` for state-driven ones. Rect/Circle decorations cover the full
+shape style, so a dashed selection frame is one decoration away:
+`styleOf: (s) => selected.has(s.data.id) ? { strokeStyle: "#f59e0b",
+lineDashPx: [6, 4] } : undefined`. Type-enforced limits: Line and
 Path decorations exclude `lineWidth`/`lineWidthPx` (Path also `cornerRadius`/
-`cornerRadiusPx`) because hit-test geometry resolves at registration time;
-relatedly, decorating an unfilled path with `fillStyle` paints a fill but hit
-testing still targets the stroke.
+`cornerRadiusPx`) because hit-test geometry resolves at registration time -
+for lines, a per-item width belongs in the item's registration-time `style`
+instead (hit testing follows it); relatedly, decorating an unfilled path
+with `fillStyle` paints a fill but hit testing still targets the stroke.
 
 What a decoration may change, per primitive (each rule matches that
 primitive's hit-test geometry - do NOT assume "all styleOf behaves the
@@ -80,6 +85,34 @@ Rect/circle borders never feed hit geometry (hit area = box/disc), so
 decorating their width is safe; line/path hit corridors derive from width
 (paths also corner radius) at registration time, so a paint-time change
 would desync visuals from hit areas.
+
+`styleOf` siblings with the same live-read model:
+
+```ts
+// visibleOf: per-item show/hide. false = skip the item for the frame -
+// neither painted nor hit-testable (queries fall through to items below).
+// PREFERRED over a filtered items copy for category filters/toggles.
+const hidden = new Set<string>();
+engine.drawRect(markers, 1, {
+    id: "markers",
+    visibleOf: (m) => !hidden.has(m.data.category),
+});
+hidden.add("shops");
+engine.render(); // shops disappear and stop hit-testing; nothing re-registers
+
+// interactiveOf: per-item hit-test opt-out (the item-level hitTest: false).
+// false = still painted, but hitTest/hitTestFirst/hitTestRect skip it.
+engine.drawCircle(badges, 2, { interactiveOf: () => false }); // decorative
+```
+
+`visibleOf` exists on the five `styleOf` methods plus `drawImage`;
+`interactiveOf` on the hit-tested five (not `drawText` - text never
+hit-tests). Composition rule: a `visibleOf`-hidden item never hit-tests,
+regardless of `interactiveOf` (need an invisible-but-tappable area? use
+`hitTest`'s `padding`/`paddingPx` instead). Neither is available on
+statics. `drawImage` still has no `styleOf` - images carry no `style`;
+state-driven appearance goes through item fields like `opacity`
+(mutate + `render()`, read live at paint time).
 
 ## Layers
 
@@ -119,6 +152,8 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
         strokeStyle?: string;
         lineWidth?: number;    // border width in WORLD units (scales with zoom)
         lineWidthPx?: number;  // border width in screen px (zoom-independent); wins over lineWidth
+        lineDash?: number[];   // border dash pattern in WORLD units (scales with zoom); Canvas2D setLineDash semantics
+        lineDashPx?: number[]; // border dash pattern in screen px (zoom-independent); wins over lineDash
     };
     rotate?: number;          // degrees, positive = clockwise (Rect/Image only)
     radius?: number | number[]; // corner radius in WORLD units, scales with zoom (Rect only);
@@ -139,7 +174,8 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
 
 Styles: if `fillStyle` is set the shape is filled; if `strokeStyle` is set it
 is stroked; both work together. Any CSS color string works (`"#22c55e"`,
-`"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`).
+`"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`). `lineDash`/`lineDashPx`
+dash the border (selection frames, ghost placements); omit for solid.
 
 ## Primitives
 
@@ -299,14 +335,28 @@ engine.drawPath({ commands: [
  PathStyle = LineStyle fields + fillStyle? +
 cornerRadius? (world) / cornerRadiusPx? (px, wins) for tangent-arc corner
 rounding. Fill-only items draw no outline; unstyled items stroke a hairline.
-Line keeps its call-level style argument, and Line
-items accept `data?` now that lines surface in hit results. LineStyle =
+Line keeps its call-level style argument as the batch DEFAULT; a Line item's
+own `style?: LineStyle` overrides it per item, unit pair by unit pair (an
+item setting either width or dash field replaces that whole pair, so an
+item's world `lineWidth` is never shadowed by the batch `lineWidthPx`).
+Item styles are registration-time, so unlike styleOf they may change the
+width - hit testing follows the item's own width. Line items also accept
+`data?` (surfaced in hit results). LineStyle =
 { strokeStyle?, lineWidth? (world), lineWidthPx?, lineDash? (world),
 lineDashPx? }. UNIT RULE (matches Text size/fontPx): plain numbers are world
 units and scale with zoom; *Px variants are screen pixels and take
 precedence. GridLines lineWidth stays px by design. Path fills are exact on
 every renderer, both fill rules and self-intersecting outlines included
 (WebGL uses a two-pass stencil-then-cover fill).
+
+```ts
+// Mixed-style batch in ONE call: item style overrides the call-level default
+engine.drawLine([
+    { from: { x: 0, y: 0 }, to: { x: 8, y: 0 } },                                   // batch style
+    { from: { x: 0, y: 1 }, to: { x: 8, y: 1 }, style: { strokeStyle: "#f59e0b", lineWidthPx: 4 } },
+    { from: { x: 0, y: 2 }, to: { x: 8, y: 2 }, style: { lineDashPx: [6, 3] } },
+], { strokeStyle: "#94a3b8", lineWidthPx: 1 }, 1);
+```
 
 ### Grid lines
 
