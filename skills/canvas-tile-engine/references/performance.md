@@ -24,8 +24,10 @@ Consequences for generated code:
   positions change, re-register (new handle / layer swap). If only styles
   change, use `styleOf` (paint-time overlay, zero rebuild; core >= 0.10) or
   mutation + `render()`; sprite frame changes are mutation + `render()`.
+  Show/hide is `visibleOf` + `render()` - never a filtered array copy.
 - Keep item arrays referentially stable in React - a new array identity
-  rebuilds the index. The `styleOf` prop is exempt (read through a ref).
+  rebuilds the index. The `styleOf`/`visibleOf`/`interactiveOf` props are
+  exempt (read through refs).
 
 ## Choosing a renderer
 
