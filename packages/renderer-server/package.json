@@ -61,7 +61,7 @@
     },
     "dependencies": {
         "@canvas-tile-engine/core": "workspace:^",
-        "@napi-rs/canvas": "^0.1.60"
+        "@napi-rs/canvas": "^1.0.3"
     },
     "devDependencies": {
         "@canvas-tile-engine/renderer-shared": "workspace:^",
