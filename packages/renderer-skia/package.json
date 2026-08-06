@@ -60,8 +60,8 @@
         "@canvas-tile-engine/core": "workspace:^"
     },
     "devDependencies": {
-        "@shopify/react-native-skia": "^2.6.9",
+        "@shopify/react-native-skia": "^2.10.1",
         "react": "^19.0.0",
-        "react-native": "^0.78.0"
+        "react-native": "^0.86.2"
     }
 }
