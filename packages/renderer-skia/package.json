@@ -61,7 +61,7 @@
     },
     "devDependencies": {
         "@shopify/react-native-skia": "^2.6.9",
-        "react": "^19.0.0",
+        "react": "^19.2.8",
         "react-native": "^0.78.0"
     }
 }
