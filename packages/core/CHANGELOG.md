@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.11.0
+
+### Minor Changes
+
+- d35db27: feat: fitScale — content-driven scale limits
+
+  - New pure config-time helper `fitScale(bounds, size, options?)`: the scale (pixels per world unit) at which a world rectangle exactly fits a viewport — the `gridToSize` of free-form content. Derive `scale`/`minScale` from content bounds instead of hand-tuning constants that need recalibration whenever the content size changes; only `maxScale` stays a deliberate choice (a content-resolution quality cap no bounds can imply). Options mirror `fitBounds`: `padding` (world units) or `paddingPx` (screen pixels, wins). The result is unclamped — apply your own min/max policy.
+  - `fitBounds` now delegates its target-scale computation to the same shared implementation, so a scale derived from `fitScale` is exactly the scale `fitBounds` targets before scale-limit clamping — the two cannot drift.
+  - Re-exported from `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native` alongside `gridToSize` (with the `FitScaleOptions` type).
+
+- 3696d8c: feat: fitBounds paddingPx — screen-pixel fit margin
+
+  `fitBounds` options accept `paddingPx`, a screen-pixel margin kept free on every side of the viewport. The existing world-unit `padding` grows the fitted area, so its visual margin scales with the content — frame a 10x larger board and the padding must be manually scaled 10x to keep the same look. `paddingPx` shrinks the viewport instead: "24px of air" frames a 3-cell selection and a 10k-cell board identically, which is what fit-to-selection UI almost always wants (and how map libraries specify fit padding).
+
+  Follows the engine-wide unit convention (`lineWidth`/`lineWidthPx`, `hitTest`'s `padding`/`paddingPx`): plain value is world units, the `*Px` variant is screen pixels and wins when both are set. Validation matches `padding` (non-negative finite, `ConfigValidationError` otherwise); a `paddingPx` too large for the viewport clamps to at least 1px of fit area per axis and the result rides the scale limits.
+
+- 77d471c: feat: hitTest: false — per-registration hit-testing opt-out
+
+  - Every engine draw method's options (and a new `options` parameter on the static draw helpers) accept `hitTest: false`, keeping that registration out of `hitTest`/`hitTestFirst`/`hitTestRect` — the `pointer-events: none` of the draw API. Decorative content (floor tiles, background images, zone overlays) is declared once at registration instead of being filtered at every query site, so a marquee over the board selects units, not the floor.
+  - Opted-out registrations skip hit-registry bookkeeping entirely: large decorative sets stop paying the hit-side spatial-index cost. Re-registering under the same `id`/`cacheKey` with the flag changed toggles participation atomically.
+  - React and React Native: all draw components that participate in hit testing (`Rect`, `Circle`, `Image`, `Sprite`, `Line`, `Path`, `StaticRect`, `StaticCircle`, `StaticImage`) accept a `hitTest` prop, and the imperative handle's `drawImage`/`drawStatic*` signatures take the new options parameter.
+  - Purely core-side mechanics — no renderer package is involved. Text and custom draw functions never entered hit testing and are unaffected.
+
+- 2670beb: feat: per-item Line style
+
+  - `Line` items accept an optional `style?: LineStyle`, overriding the call-level `drawLine` style per item — mixed-style batches no longer need one `drawLine` call per style, and the last primitive without item-level styling joins the Rect/Circle/Path/Text convention. The call-level style stays as the batch default; `styleOf` decorations still overlay both at paint time.
+  - Because item styles are registration-time (unlike paint-time `styleOf` decorations), they may change `lineWidth`/`lineWidthPx`: hit testing resolves the item's own stroke width, so a thick line gets a matching hit area — the first way to give individual lines their own width. Renderers resolve the painted width from these same registration-time layers only, so a width smuggled past the decoration types at runtime (JS callers, non-literal returns) can never desync the painted stroke from the hit corridor.
+  - Styles overlay unit pair by unit pair via the new shared `overlayLineStyle` helper (exported from core): a layer that sets either field of a pair (`lineWidth`/`lineWidthPx`, `lineDash`/`lineDashPx`) replaces the whole pair, so an item's world-unit value is never shadowed by the batch's `*Px` value. This also fixes a latent `styleOf` merge bug where a dash decoration could be shadowed by a call-level `lineDashPx`.
+  - Renderer batching is preserved: runs of lines on the shared batch style still collapse into a single stroke (Canvas2D/server); items with their own style stroke solo, exactly like decorated items already did. WebGL maps overrides onto its per-instance color/width/dash; Skia mutates and restores the shared stroke paint.
+
+- b9b2e0e: refactor: dedupe origin-offset math into `resolveOrigin`/`computeOriginOffset`, newly exported from `@canvas-tile-engine/core` and shared by all renderers and hit testing. No behavior change.
+- c5c51a2: feat: dashed borders for Rect and Circle
+
+  - `DrawObject.style` (used by `drawRect`, `drawCircle`, and their static variants) accepts `lineDash` and `lineDashPx`, completing the stroke unit convention the shapes already follow for `lineWidth`/`lineWidthPx`: `lineDash` is world units and scales with zoom, `lineDashPx` is screen pixels and wins when both are set. Semantics match Canvas2D `setLineDash` (odd-length patterns repeat; empty, negative, or zero-sum patterns fall back to solid) — the same contract `Line` and `Path` styles already use.
+  - All four renderers apply the pattern to shape borders: Canvas2D and server via `setLineDash` around the stroke, Skia via a dash path effect on the stroke paint, WebGL by tessellating the border into dash sub-segments on the CPU — the dash phase flows continuously around rect corners and circle outlines.
+  - Because the fields live on `DrawObject.style`, they are also available in `styleOf` decorations: a dashed selection or hover outline is a paint-time state change, no re-registration.
+  - Static draw variants support dashed borders too. World-unit `lineDash` holds everywhere; `lineDashPx` follows the same static-path rules as `lineWidthPx` (Canvas2D/server caches rebuild per scale so it stays pixel-accurate; Skia pictures bake it at the record scale — use dynamic draws when a zoom-independent px pattern must hold).
+
+- c561670: Add `visibleOf` and `interactiveOf` per-item callbacks alongside `styleOf`.
+
+  - `visibleOf(item)`: return `false` to skip an item for the frame — it is neither painted nor hit-testable. Like `styleOf`, it reads external state live: mutate a filter set and call `render()` without re-registering or rebuilding the spatial index. Available on `drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`, and `drawImage` (dynamic draws only, like `styleOf`).
+  - `interactiveOf(item)`: return `false` to keep an item out of `hitTest`/`hitTestFirst`/`hitTestRect` while it stays painted — the per-item counterpart of `hitTest: false`. Queries fall through to items below it. Items hidden by `visibleOf` never hit-test, regardless of this callback. Available on the hit-tested kinds (`drawRect`, `drawCircle`, `drawImage`, `drawLine`, `drawPath`).
+
+  `drawImage` gains an options object (`ImageDrawOptions`) carrying `id`, `hitTest`, and the two new callbacks; it still has no `styleOf` — images carry no `style`, appearance changes go through item fields like `opacity` (read live at paint time).
+
+  The React and React Native `Rect`, `Circle`, `Image`, `Line`, `Text`, and `Path` components accept matching `visibleOf`/`interactiveOf` props (`Text`: `visibleOf` only), read through refs like `styleOf` so identity changes never re-register.
+
 ## 0.10.0
 
 ### Minor Changes

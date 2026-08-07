@@ -1,5 +1,48 @@
 # @canvas-tile-engine/renderer-skia
 
+## 0.6.0
+
+### Minor Changes
+
+- 2670beb: feat: per-item Line style
+
+  - `Line` items accept an optional `style?: LineStyle`, overriding the call-level `drawLine` style per item — mixed-style batches no longer need one `drawLine` call per style, and the last primitive without item-level styling joins the Rect/Circle/Path/Text convention. The call-level style stays as the batch default; `styleOf` decorations still overlay both at paint time.
+  - Because item styles are registration-time (unlike paint-time `styleOf` decorations), they may change `lineWidth`/`lineWidthPx`: hit testing resolves the item's own stroke width, so a thick line gets a matching hit area — the first way to give individual lines their own width. Renderers resolve the painted width from these same registration-time layers only, so a width smuggled past the decoration types at runtime (JS callers, non-literal returns) can never desync the painted stroke from the hit corridor.
+  - Styles overlay unit pair by unit pair via the new shared `overlayLineStyle` helper (exported from core): a layer that sets either field of a pair (`lineWidth`/`lineWidthPx`, `lineDash`/`lineDashPx`) replaces the whole pair, so an item's world-unit value is never shadowed by the batch's `*Px` value. This also fixes a latent `styleOf` merge bug where a dash decoration could be shadowed by a call-level `lineDashPx`.
+  - Renderer batching is preserved: runs of lines on the shared batch style still collapse into a single stroke (Canvas2D/server); items with their own style stroke solo, exactly like decorated items already did. WebGL maps overrides onto its per-instance color/width/dash; Skia mutates and restores the shared stroke paint.
+
+- c5c51a2: feat: dashed borders for Rect and Circle
+
+  - `DrawObject.style` (used by `drawRect`, `drawCircle`, and their static variants) accepts `lineDash` and `lineDashPx`, completing the stroke unit convention the shapes already follow for `lineWidth`/`lineWidthPx`: `lineDash` is world units and scales with zoom, `lineDashPx` is screen pixels and wins when both are set. Semantics match Canvas2D `setLineDash` (odd-length patterns repeat; empty, negative, or zero-sum patterns fall back to solid) — the same contract `Line` and `Path` styles already use.
+  - All four renderers apply the pattern to shape borders: Canvas2D and server via `setLineDash` around the stroke, Skia via a dash path effect on the stroke paint, WebGL by tessellating the border into dash sub-segments on the CPU — the dash phase flows continuously around rect corners and circle outlines.
+  - Because the fields live on `DrawObject.style`, they are also available in `styleOf` decorations: a dashed selection or hover outline is a paint-time state change, no re-registration.
+  - Static draw variants support dashed borders too. World-unit `lineDash` holds everywhere; `lineDashPx` follows the same static-path rules as `lineWidthPx` (Canvas2D/server caches rebuild per scale so it stays pixel-accurate; Skia pictures bake it at the record scale — use dynamic draws when a zoom-independent px pattern must hold).
+
+- c561670: Add `visibleOf` and `interactiveOf` per-item callbacks alongside `styleOf`.
+
+  - `visibleOf(item)`: return `false` to skip an item for the frame — it is neither painted nor hit-testable. Like `styleOf`, it reads external state live: mutate a filter set and call `render()` without re-registering or rebuilding the spatial index. Available on `drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`, and `drawImage` (dynamic draws only, like `styleOf`).
+  - `interactiveOf(item)`: return `false` to keep an item out of `hitTest`/`hitTestFirst`/`hitTestRect` while it stays painted — the per-item counterpart of `hitTest: false`. Queries fall through to items below it. Items hidden by `visibleOf` never hit-test, regardless of this callback. Available on the hit-tested kinds (`drawRect`, `drawCircle`, `drawImage`, `drawLine`, `drawPath`).
+
+  `drawImage` gains an options object (`ImageDrawOptions`) carrying `id`, `hitTest`, and the two new callbacks; it still has no `styleOf` — images carry no `style`, appearance changes go through item fields like `opacity` (read live at paint time).
+
+  The React and React Native `Rect`, `Circle`, `Image`, `Line`, `Text`, and `Path` components accept matching `visibleOf`/`interactiveOf` props (`Text`: `visibleOf` only), read through refs like `styleOf` so identity changes never re-register.
+
+### Patch Changes
+
+- b9b2e0e: refactor: dedupe origin-offset math into `resolveOrigin`/`computeOriginOffset`, newly exported from `@canvas-tile-engine/core` and shared by all renderers and hit testing. No behavior change.
+- 22167f8: fix: path decorations can no longer change painted stroke width or corner radius
+
+  `PathDecorationStyle` excludes `lineWidth*`/`cornerRadius*` because hit-test geometry resolves at registration time — but that guard is type-level only, and TypeScript's excess-property check does not fire on non-literal returns (or in plain JS). A width or corner radius smuggled into a `styleOf` decoration was applied when painting while hit testing kept the registration-time values: a silent visual/interaction desync. Renderers now resolve geometry-feeding values (stroke width, corner radius) from the registration-time `item.style` only — the same layer hit testing reads — so the desync is structurally impossible. Decoration color, dash, and fill behavior are unchanged.
+
+- Updated dependencies [d35db27]
+- Updated dependencies [3696d8c]
+- Updated dependencies [77d471c]
+- Updated dependencies [2670beb]
+- Updated dependencies [b9b2e0e]
+- Updated dependencies [c5c51a2]
+- Updated dependencies [c561670]
+  - @canvas-tile-engine/core@0.11.0
+
 ## 0.5.0
 
 ### Minor Changes

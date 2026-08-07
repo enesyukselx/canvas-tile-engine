@@ -77,6 +77,13 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    rebuild. Identify items via `item.data`. Line/path decorations cannot
    change `lineWidth`/`cornerRadius` (hit-test geometry, type-enforced);
    statics do not support `styleOf` (caches replay a recorded image).
+   Siblings with the same live-read model: `visibleOf: (item) => boolean |
+   undefined` (`false` = skip the item for the frame - not painted, not
+   hit-testable; use for category filters instead of a filtered array) and
+   `interactiveOf` (`false` = painted but transparent to hit queries, the
+   per-item `hitTest: false`; not on `drawText`). Both also exist on
+   `drawImage`, which has no `styleOf`. A `visibleOf`-hidden item never
+   hit-tests, regardless of `interactiveOf`.
 5. **Layers are z-order.** Lower layer numbers draw first (underneath).
    Defaults: grid lines 0, shapes/images 1, text 2. Any integer works.
 6. **All interaction is opt-in.** Every `eventHandlers` flag defaults to

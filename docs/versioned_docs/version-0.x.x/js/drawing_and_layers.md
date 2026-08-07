@@ -71,6 +71,8 @@ Every draw method accepts an optional `options` object as its last parameter. It
 - `strokeStyle`: Border color
 - `lineWidth`: Border width in world units; scales with zoom like the shape
 - `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
+- `lineDash`: Border dash pattern in world units; dashes scale with zoom. Canvas2D `setLineDash` semantics; omit for a solid border
+- `lineDashPx`: Border dash pattern in screen pixels, independent of zoom; wins over `lineDash`
 
 ```typescript
 // Draw a blue square on layer 1
@@ -132,6 +134,17 @@ engine.drawRect(
     1,
 );
 
+// Dashed selection outline (screen-pixel dashes stay crisp at every zoom)
+engine.drawRect(
+    {
+        x: 14,
+        y: 5,
+        size: 1,
+        style: { strokeStyle: "#f59e0b", lineWidthPx: 2, lineDashPx: [6, 4] },
+    },
+    1,
+);
+
 // Draw a red circle on layer 2
 engine.drawCircle(
     {
@@ -166,10 +179,12 @@ drawLine(items: Line | Line[], style?: LineStyle, layer?: number, options?: Draw
 
 **Line Properties:**
 
-| Property | Type       | Description        |
-| :------- | :--------- | :----------------- |
-| `from`   | `{ x, y }` | Start coordinates. |
-| `to`     | `{ x, y }` | End coordinates.   |
+| Property | Type        | Description                                                                                                   |
+| :------- | :---------- | :------------------------------------------------------------------------------------------------------------ |
+| `from`   | `{ x, y }`  | Start coordinates.                                                                                            |
+| `to`     | `{ x, y }`  | End coordinates.                                                                                              |
+| `style`  | `LineStyle` | Per-item override of the call-level style — mixed-style batches in one call. May change the width (see below). |
+| `data`   | `TData`     | Arbitrary app data; carried through to `hitTest` results.                                                     |
 
 ```typescript
 // Single line
@@ -179,13 +194,24 @@ engine.drawLine(
     1,
 );
 
-// Multiple lines
+// Multiple lines sharing the call-level style
 engine.drawLine(
     [
         { from: { x: 0, y: 0 }, to: { x: 5, y: 5 } },
         { from: { x: 5, y: 0 }, to: { x: 0, y: 5 } },
     ],
     { strokeStyle: "red", lineWidthPx: 2 },
+    1,
+);
+
+// Mixed styles in one call: item style overrides the call-level default
+engine.drawLine(
+    [
+        { from: { x: 0, y: 0 }, to: { x: 8, y: 0 } }, // call-level style
+        { from: { x: 0, y: 1 }, to: { x: 8, y: 1 }, style: { strokeStyle: "#f59e0b", lineWidthPx: 4 } },
+        { from: { x: 0, y: 2 }, to: { x: 8, y: 2 }, style: { lineDashPx: [6, 3] } },
+    ],
+    { strokeStyle: "#94a3b8", lineWidthPx: 1 },
     1,
 );
 ```
@@ -201,6 +227,8 @@ engine.drawLine(
 | `lineDashPx`  | px    | Zoom-independent dash pattern; wins over `lineDash`.                    |
 
 Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat).
+
+An item's `style` overrides the call-level style unit pair by unit pair: an item that sets either width field (or either dash field) replaces that whole pair, so an item's world-unit `lineWidth` is never shadowed by the call-level `lineWidthPx`. Because item styles are read at registration time (unlike `styleOf` decorations), they may change the stroke width — hit testing follows the item's own width.
 
 Lines participate in hit testing: a click/tap within half the stroke width of a segment hits it (with a minimum tap width for hairlines). An optional `data` field on each line carries through to hit results.
 
@@ -753,8 +781,8 @@ Rules of thumb:
 
 - Identify items through `item.data` (the same convention as `hitTest` results); most items should return `undefined`.
 - The returned object **overlays** the item's `style` — return only the fields that change (`{ fillStyle: "blue" }` keeps the item's stroke).
-- Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths): those feed hit-test geometry resolved at registration time, and the types enforce it. A width change is a geometry change — re-register for that.
-- For `drawLine`, `styleOf` overlays the call-level `style` per item, which also makes it the way to give individual lines their own color.
+- Line and path decorations cannot change `lineWidth`/`lineWidthPx` (or `cornerRadius` for paths): those feed hit-test geometry resolved at registration time, and the types enforce it. A width change is a geometry change — for lines, put it in the item's own `style` (registration-time, so hit testing follows); otherwise re-register.
+- For `drawLine`, `styleOf` overlays both the call-level `style` and the item's own `style` per item — use item styles for static per-line looks and `styleOf` for state-driven ones (selection, hover).
 - Static draw methods do not support `styleOf`: their cache replays a recorded image, so per-frame decoration cannot apply. Changing styles is dynamic content.
 
 What a decoration may change differs by primitive. Each rule is right for its own hit-test geometry, but the differences are easy to miss if you assume "it's all `styleOf`, it all behaves the same":
@@ -767,6 +795,50 @@ What a decoration may change differs by primitive. Each rule is right for its ow
 | Path          | `strokeStyle`, dash, `fillStyle` (see below)     | `lineWidth`/`lineWidthPx`, `cornerRadius`/`cornerRadiusPx` | re-register with the new values |
 
 Why the split: a rect/circle border never feeds hit-test geometry (the hit area is the box/disc), so decorating its width is safe. A line/path hit corridor derives from the stroke width — and a path outline from its corner radius — resolved at registration time, so a paint-time change would silently desync what you see from what you can click. Path quirk from the same family: decorating an unfilled path with `fillStyle` paints the fill, but hit testing stays on the stroke.
+
+### Show/Hide by State (`options.visibleOf`)
+
+`visibleOf` is `styleOf`'s sibling for visibility. The dynamic draw methods (`drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`, and — unlike `styleOf` — `drawImage`) accept a `visibleOf` callback that runs per item: return `false` to skip the item for that frame — it is neither painted nor hit-testable. `true` or `undefined` keeps it. Like `styleOf`, it reads external state live, so toggling a category is a set mutation plus `render()` — no filtered array copy, no re-registration, no spatial index rebuild:
+
+```typescript
+const hiddenCategories = new Set<string>();
+
+engine.drawRect(markers, 1, {
+    id: "markers",
+    visibleOf: (marker) => !hiddenCategories.has(marker.data.category),
+});
+
+// Toggling a filter checkbox:
+hiddenCategories.add("shops");
+engine.render(); // shops disappear — and stop hit-testing — immediately
+```
+
+A hidden item never hits: `hitTest`/`hitTestFirst`/`hitTestRect` skip it and report whatever is underneath. Like `styleOf`, `visibleOf` is dynamic-only — static draw methods replay a recorded image, so per-frame visibility cannot apply.
+
+### Per-Item Hit-Test Opt-Out (`options.interactiveOf`)
+
+The hit-tested draw methods (`drawRect`, `drawCircle`, `drawImage`, `drawLine`, `drawPath`) also accept `interactiveOf`: return `false` to keep an item **painted but transparent to hit queries** — the per-item counterpart of the call-level `hitTest: false`. Queries fall through to items below it, so a decorative badge drawn on top of a unit no longer swallows the unit's clicks:
+
+```typescript
+engine.drawCircle(units, 1, { id: "units" });
+engine.drawCircle(badges, 2, {
+    id: "badges",
+    interactiveOf: () => false, // always decorative
+});
+// hitTestFirst over a badge now returns the unit under it
+```
+
+Or state-driven, e.g. disabled entries that should stop reacting without disappearing:
+
+```typescript
+engine.drawRect(seats, 1, {
+    id: "seats",
+    styleOf: (seat) => (disabled.has(seat.data.id) ? { fillStyle: "#9ca3af" } : undefined),
+    interactiveOf: (seat) => !disabled.has(seat.data.id),
+});
+```
+
+The two callbacks compose with a simple rule: `visibleOf: false` wins. A hidden item never hit-tests, regardless of what `interactiveOf` returns; `interactiveOf: false` only covers the "visible but not clickable" case. (Need the reverse — an invisible but tappable area? That is what `hitTest`'s `padding`/`paddingPx` options are for.)
 
 ### Remove a Single Draw Call (`DrawHandle`)
 
@@ -831,6 +903,7 @@ engine.render();
 | :---------------------- | :------------------------- | :----------------------- |
 | Camera pan/zoom         | ❌ No                      | User drags the map       |
 | Object color changes    | ❌ No — use `styleOf`      | Seat selection in cinema |
+| Object shown/hidden     | ❌ No — use `visibleOf`    | Category filter toggle   |
 | Object added/removed    | ✅ Yes — re-register (`id`) | Placing a tower          |
 | Object position changes | ✅ Yes — re-register (`id`) | Moving a unit            |
 | Loading new level       | ✅ Yes                     | Game level transition    |
@@ -838,7 +911,7 @@ engine.render();
 :::tip
 If your scene is **static** (objects don't change), you only need to call `drawX()` once at startup. The engine will re-render the same layer content when the camera moves.
 
-If your scene is **dynamic**, split the changes: appearance-only changes (selection, hover, highlight) go through `styleOf` + `render()` — no re-registration at all. Geometry changes (add/remove/move) register with an `id` and re-call `drawX(items, layer, { id })` + `render()`. Reach for `clearLayer()` when you want to wipe a whole layer regardless of what registered on it.
+If your scene is **dynamic**, split the changes: appearance-only changes (selection, hover, highlight) go through `styleOf` + `render()`, show/hide through `visibleOf` + `render()` — no re-registration at all. Geometry changes (add/remove/move) register with an `id` and re-call `drawX(items, layer, { id })` + `render()`. Reach for `clearLayer()` when you want to wipe a whole layer regardless of what registered on it.
 :::
 
 **Static Scene Example (Map):**
