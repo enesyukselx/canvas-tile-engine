@@ -258,9 +258,12 @@ Fits a world-space rectangle into the viewport: centers the view on the rectangl
 
 Returns `{ scale, fitted }` — the scale the fit targets after clamping, and whether the whole rectangle actually ends up visible. `fitted` is `false` only when `minScale` floors the fit, so the view shows less than you asked for; clamping at `maxScale` still shows all of it. Before mount the handle has no engine to fit, so it returns `undefined`.
 
+`bounds` is an area, not a range of cell indices. Cell `k` spans `[k-0.5, k+0.5]`, so a board of cells `0..31` covers `-0.5..31.5` and centers on `15.5`. Passing `0..32` fits the same 32-unit width but centers the view on `16`, half a cell off.
+
 ```tsx
 const showWholeBoard = () => {
-    engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+    // Cells 0..31 cover -0.5..31.5
+    engine.fitBounds({ minX: -0.5, maxX: 31.5, minY: -0.5, maxY: 31.5 }, { padding: 1 });
 };
 
 const zoomToSelection = (selection: { minX: number; maxX: number; minY: number; maxY: number }) => {

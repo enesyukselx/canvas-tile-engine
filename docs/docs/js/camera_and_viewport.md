@@ -206,9 +206,11 @@ if (!engine.fitBounds(boardBounds).fitted) {
 
 `padding` is world units: it grows the fitted area, so the visual margin stays proportional to the content (a 10x larger board needs a 10x larger padding for the same framing). `paddingPx` shrinks the viewport instead: "24px of air" frames a 3-cell selection and a 10k-cell board identically — the right choice for fit-to-selection UI. The same world/px pair as `hitTest`'s `padding`/`paddingPx`.
 
+`bounds` is an area, not a range of cell indices. Cell `k` spans `[k-0.5, k+0.5]`, so a board of cells `0..31` covers `-0.5..31.5` and centers on `15.5`. Passing `0..32` fits the same 32-unit width but centers the view on `16`, half a cell off.
+
 ```typescript
-// Show the whole 32x32 board with one cell of margin
-engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+// Show the whole 32x32 board (cells 0..31) with one cell of margin
+engine.fitBounds({ minX: -0.5, maxX: 31.5, minY: -0.5, maxY: 31.5 }, { padding: 1 });
 
 // 24px of air around any selection, small or huge
 engine.fitBounds(selectionBounds, { paddingPx: 24 });

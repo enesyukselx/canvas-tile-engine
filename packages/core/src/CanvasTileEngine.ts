@@ -602,8 +602,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * an axis, or a padding value is negative.
      * @example
      * ```ts
-     * // Show the whole board with one cell of margin
-     * engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+     * // Show a whole 32x32 board with one cell of margin. Bounds are an
+     * // area, not cell indices: cell k spans [k-0.5, k+0.5], so cells 0..31
+     * // cover -0.5..31.5 and the board centers on 15.5, not 16.
+     * engine.fitBounds({ minX: -0.5, maxX: 31.5, minY: -0.5, maxY: 31.5 }, { padding: 1 });
      *
      * // 24px of air around any selection, small or huge
      * engine.fitBounds(selectionBounds, { paddingPx: 24 });
