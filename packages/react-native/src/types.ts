@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { ViewStyle } from "react-native";
 import type {
     CanvasTileEngineConfig,
@@ -37,6 +36,7 @@ import type {
     PathDrawOptions,
 } from "@canvas-tile-engine/core";
 import type { RendererSkia } from "@canvas-tile-engine/renderer-skia";
+import type { CanvasTileEngineBaseProps } from "@canvas-tile-engine/react-shared";
 import type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
 export type {
@@ -83,10 +83,7 @@ export type {
  * `RendererSkia`, `style` is a React Native `ViewStyle` (no `className`), and
  * `onDraw` receives an `SkCanvas` instead of a 2D context.
  */
-export interface CanvasTileEngineProps {
-    /** Engine handle from useCanvasTileEngine hook (required) */
-    engine: EngineHandle;
-
+export interface CanvasTileEngineProps extends CanvasTileEngineBaseProps<EngineHandle> {
     /**
      * Renderer instance to use.
      *
@@ -111,71 +108,8 @@ export interface CanvasTileEngineProps {
      */
     config: CanvasTileEngineConfig;
 
-    /** Initial center coordinates. Read once on creation; use `engine.setCenter`/`engine.goCenter` to move later. */
-    center?: Coords;
-
     /** Additional styles for the wrapper View */
     style?: ViewStyle;
-
-    /** Draw components (Rect, Circle, Image, GridLines, etc.) */
-    children?: ReactNode;
-
-    /**
-     * Callback when center coordinates change (pan or zoom).
-     * @param coords - Center world coordinates: `{ x, y }`
-     */
-    onCoordsChange?: (coords: Coords) => void;
-
-    /**
-     * Callback when a tile is tapped.
-     * @param coords - World coordinates: `raw` (exact), `snapped` (floored to tile)
-     * @param mouse - Canvas-relative position: `raw` (exact), `snapped` (tile-aligned)
-     * @param client - Screen position: `raw` (exact), `snapped` (tile-aligned)
-     */
-    onClick?: onClickCallback;
-
-    /**
-     * Callback when a tile is long-pressed / right-clicked.
-     */
-    onRightClick?: onRightClickCallback;
-
-    /**
-     * Callback when hovering over tiles (where supported).
-     */
-    onHover?: onHoverCallback;
-
-    /**
-     * Callback on touch down.
-     */
-    onMouseDown?: onMouseDownCallback;
-
-    /**
-     * Callback on touch up.
-     */
-    onMouseUp?: onMouseUpCallback;
-
-    /**
-     * Callback when the touch leaves the canvas.
-     */
-    onMouseLeave?: onMouseLeaveCallback;
-
-    /**
-     * Callback after each draw frame, on top of all layers. Same signature as
-     * `DrawFunction` children: the Skia `SkCanvas`, top-left world coords,
-     * live config, and coordinate transform helpers.
-     */
-    onDraw?: onDrawCallback;
-
-    /**
-     * Callback on canvas resize.
-     */
-    onResize?: () => void;
-
-    /**
-     * Callback when zoom level changes (pinch).
-     * @param scale - The new scale value
-     */
-    onZoom?: onZoomCallback;
 
     /**
      * Callback for pinch zoom gestures (the touch counterpart of the web

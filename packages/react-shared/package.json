@@ -1,0 +1,31 @@
+{
+    "name": "@canvas-tile-engine/react-shared",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Internal shared React binding modules. Not published: consumers bundle this source via tsup (noExternal).",
+    "author": "Enes Yüksel",
+    "license": "MIT",
+    "sideEffects": false,
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "scripts": {
+        "build": "tsup",
+        "typecheck": "tsc --noEmit",
+        "lint": "oxlint",
+        "test": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
+    },
+    "devDependencies": {
+        "@canvas-tile-engine/core": "workspace:^",
+        "@testing-library/react": "^16.3.2",
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "jsdom": "^26.1.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    }
+}

@@ -120,34 +120,36 @@ removes its handle on unmount, and batches repaints through a single
 `requestAnimationFrame`. `items` props are compared BY REFERENCE - a new
 array identity re-registers the callback and rebuilds the spatial index for
 500+ items. Keep items in `useMemo` or state, never inline literals. The
-`styleOf` prop is the exception: it is read through a ref, so its identity
-may change every render at no cost (inline arrows are fine) and a change
-only repaints.
+`styleOf`/`visibleOf`/`interactiveOf` props are the exception: they are read
+through refs, so their identity may change every render at no cost (inline
+arrows are fine) and a change only repaints.
 
 | Component                         | Props (defaults)                                                                                                                      |
 | :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
-| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`                                                                                      |
-| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`                                                                                  |
-| `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`                                                                                        |
-| `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`, `styleOf?`                                                                                      |
-| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`                                                                 |
-| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`                                                                              |
+| `<CanvasTileEngine.Rect>`         | `items: Rect \| Rect[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                      |
+| `<CanvasTileEngine.Circle>`       | `items: Circle \| Circle[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                  |
+| `<CanvasTileEngine.Image>`        | `items: ImageItem \| ImageItem[]`, `layer = 1`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                                        |
+| `<CanvasTileEngine.Text>`         | `items: Text \| Text[]`, `layer = 2`, `styleOf?`, `visibleOf?`                                                                        |
+| `<CanvasTileEngine.Line>`         | `items: Line \| Line[]`, `style?: LineStyle`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                 |
+| `<CanvasTileEngine.Path>`         | `items: PathItem \| PathItem[]`, `layer = 1`, `styleOf?`, `visibleOf?`, `interactiveOf?`, `hitTest?`                                              |
 | `<CanvasTileEngine.GridLines>`    | `cellSize: number`, `lineWidth = 1`, `strokeStyle = "black"`, `layer = 0`                                                             |
-| `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`                                                                                      |
-| `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`                                                                                    |
-| `<CanvasTileEngine.StaticImage>`  | `items: ImageItem[]`, `cacheKey: string`, `layer = 1`                                                                                 |
-| `<CanvasTileEngine.Sprite>`       | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?` |
+| `<CanvasTileEngine.StaticRect>`   | `items: Rect[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                      |
+| `<CanvasTileEngine.StaticCircle>` | `items: Circle[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                    |
+| `<CanvasTileEngine.StaticImage>`  | `items: ImageItem[]`, `cacheKey: string`, `layer = 1`, `hitTest?`                                                                                 |
+| `<CanvasTileEngine.Sprite>`       | `items: ImageItem \| ImageItem[]`, `frames: SpriteRect[]`, `fps: number`, `loop = true`, `playing = true`, `layer = 1`, `onComplete?`, `hitTest?` |
 | `<CanvasTileEngine.DrawFunction>` | `children: (ctx, topLeft, config, transform) => void`, `layer = 1`                                                                    |
 
 Item shapes are identical to the core draw API: [drawing.md](drawing.md).
-Sprite semantics: [sprites.md](sprites.md).
+Sprite semantics: [sprites.md](sprites.md). `hitTest={false}` keeps a
+component's items out of `hitTest`/`hitTestRect` queries (decorative floors,
+terrain, overlays) — the `pointer-events: none` of the draw components.
 
 All the types and helpers these components and handles use are re-exported from
 `@canvas-tile-engine/react` — import them from the binding instead of reaching
 into `@canvas-tile-engine/core`. That includes the draw-object types (`Rect`,
 `Circle`, `Text`, `Line`, `LineStyle`, `ImageItem`, `PathItem`, `PathStyle`,
 `PathCommand`, `Coords`), the imperative `DrawHandle`, every `on*Callback`
-type plus `WheelInfo`, and the `gridToSize` / `pathCommandsBounds` helpers.
+type plus `WheelInfo`, and the `gridToSize` / `fitScale` / `pathCommandsBounds` helpers.
 
 Static components clear their cache automatically when `items` gets a new
 array identity (or when `cacheKey` changes) — no manual `clearStaticCache`
@@ -187,6 +189,15 @@ Contract: `items` changed = geometry changed = re-register (memoize it);
 `item.data`. Line/Path decorations exclude `lineWidth*` (Path also
 `cornerRadius*`) - hit-test geometry is registration-time. Statics take no
 `styleOf`.
+
+Same live-read model for visibility and hit testing: `visibleOf={(item) =>
+boolean | undefined}` (`false` = skip the item for the frame - not painted,
+not hit-testable; use for category filters instead of a filtered array) and
+`interactiveOf` (`false` = painted but transparent to hit queries, the
+per-item `hitTest={false}`; not on `<Text>`). Both exist on `<Image>` too
+(which has no `styleOf` - images carry no `style`). A `visibleOf`-hidden
+item never hit-tests, regardless of `interactiveOf`. Statics take neither
+prop.
 
 ## Updating drawn data
 

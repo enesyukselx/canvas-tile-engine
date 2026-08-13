@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.9.0
+
+### Minor Changes
+
+- d35db27: feat: fitScale — content-driven scale limits
+
+  - New pure config-time helper `fitScale(bounds, size, options?)`: the scale (pixels per world unit) at which a world rectangle exactly fits a viewport — the `gridToSize` of free-form content. Derive `scale`/`minScale` from content bounds instead of hand-tuning constants that need recalibration whenever the content size changes; only `maxScale` stays a deliberate choice (a content-resolution quality cap no bounds can imply). Options mirror `fitBounds`: `padding` (world units) or `paddingPx` (screen pixels, wins). The result is unclamped — apply your own min/max policy.
+  - `fitBounds` now delegates its target-scale computation to the same shared implementation, so a scale derived from `fitScale` is exactly the scale `fitBounds` targets before scale-limit clamping — the two cannot drift.
+  - Re-exported from `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native` alongside `gridToSize` (with the `FitScaleOptions` type).
+
+- 77d471c: feat: hitTest: false — per-registration hit-testing opt-out
+
+  - Every engine draw method's options (and a new `options` parameter on the static draw helpers) accept `hitTest: false`, keeping that registration out of `hitTest`/`hitTestFirst`/`hitTestRect` — the `pointer-events: none` of the draw API. Decorative content (floor tiles, background images, zone overlays) is declared once at registration instead of being filtered at every query site, so a marquee over the board selects units, not the floor.
+  - Opted-out registrations skip hit-registry bookkeeping entirely: large decorative sets stop paying the hit-side spatial-index cost. Re-registering under the same `id`/`cacheKey` with the flag changed toggles participation atomically.
+  - React and React Native: all draw components that participate in hit testing (`Rect`, `Circle`, `Image`, `Sprite`, `Line`, `Path`, `StaticRect`, `StaticCircle`, `StaticImage`) accept a `hitTest` prop, and the imperative handle's `drawImage`/`drawStatic*` signatures take the new options parameter.
+  - Purely core-side mechanics — no renderer package is involved. Text and custom draw functions never entered hit testing and are unaffected.
+
+- c561670: Add `visibleOf` and `interactiveOf` per-item callbacks alongside `styleOf`.
+
+  - `visibleOf(item)`: return `false` to skip an item for the frame — it is neither painted nor hit-testable. Like `styleOf`, it reads external state live: mutate a filter set and call `render()` without re-registering or rebuilding the spatial index. Available on `drawRect`, `drawCircle`, `drawText`, `drawLine`, `drawPath`, and `drawImage` (dynamic draws only, like `styleOf`).
+  - `interactiveOf(item)`: return `false` to keep an item out of `hitTest`/`hitTestFirst`/`hitTestRect` while it stays painted — the per-item counterpart of `hitTest: false`. Queries fall through to items below it. Items hidden by `visibleOf` never hit-test, regardless of this callback. Available on the hit-tested kinds (`drawRect`, `drawCircle`, `drawImage`, `drawLine`, `drawPath`).
+
+  `drawImage` gains an options object (`ImageDrawOptions`) carrying `id`, `hitTest`, and the two new callbacks; it still has no `styleOf` — images carry no `style`, appearance changes go through item fields like `opacity` (read live at paint time).
+
+  The React and React Native `Rect`, `Circle`, `Image`, `Line`, `Text`, and `Path` components accept matching `visibleOf`/`interactiveOf` props (`Text`: `visibleOf` only), read through refs like `styleOf` so identity changes never re-register.
+
+### Patch Changes
+
+- eaa6523: Internal refactor: the engine handle hook, engine context, and all compound draw components now come from the private `@canvas-tile-engine/react-shared` package shared with `@canvas-tile-engine/react-native` (bundled into dist, no new dependency). Public API and behavior are unchanged.
+- Updated dependencies [d35db27]
+- Updated dependencies [3696d8c]
+- Updated dependencies [77d471c]
+- Updated dependencies [2670beb]
+- Updated dependencies [b9b2e0e]
+- Updated dependencies [c5c51a2]
+- Updated dependencies [c561670]
+  - @canvas-tile-engine/core@0.11.0
+
 ## 0.8.0
 
 ### Minor Changes

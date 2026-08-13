@@ -33,13 +33,20 @@ type Rect = {
     y: number;
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number };
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        lineWidth?: number;
+        lineWidthPx?: number;
+        lineDash?: number[];
+        lineDashPx?: number[];
+    };
     rotate?: number;
     radius?: number | number[];
 };
 ```
 
-`size`, `radius`, and `style.lineWidth` are world units and scale with zoom, so borders and corner rounding stay proportional to the shape. `style.lineWidthPx` is a zoom-independent width in screen pixels and takes precedence over `lineWidth` (the same pattern as `Text`'s `size`/`fontPx`). `rotate` is degrees, clockwise.
+`size`, `radius`, `style.lineWidth`, and `style.lineDash` are world units and scale with zoom, so borders, corner rounding, and dash patterns stay proportional to the shape. `style.lineWidthPx` and `style.lineDashPx` are zoom-independent screen-pixel variants and take precedence over their world counterparts (the same pattern as `Text`'s `size`/`fontPx`). Dash patterns follow Canvas2D `setLineDash` semantics; omit them for a solid border. `rotate` is degrees, clockwise.
 
 ### `Circle`
 
@@ -49,9 +56,18 @@ type Circle = {
     y: number;
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
-    style?: { fillStyle?: string; strokeStyle?: string; lineWidth?: number; lineWidthPx?: number };
+    style?: {
+        fillStyle?: string;
+        strokeStyle?: string;
+        lineWidth?: number;
+        lineWidthPx?: number;
+        lineDash?: number[];
+        lineDashPx?: number[];
+    };
 };
 ```
+
+The style fields follow the same unit convention as `Rect`.
 
 ### `Text`
 
@@ -80,6 +96,8 @@ type Text = {
 type Line = {
     from: Coords;
     to: Coords;
+    style?: LineStyle; // per-item override of drawLine's call-level style
+    data?: TData; // app data, returned on hitTest results
 };
 
 type PathItem<TData = unknown> = {
@@ -100,7 +118,7 @@ type LineStyle = {
 };
 ```
 
-`PathItem` describes a free-form path (open polyline, closed outline, or filled shape); `PathStyle` extends the `LineStyle` fields with `fillStyle` and `cornerRadius`/`cornerRadiusPx`. `drawLine` takes a `LineStyle` as its second argument; dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around path corners.
+`PathItem` describes a free-form path (open polyline, closed outline, or filled shape); `PathStyle` extends the `LineStyle` fields with `fillStyle` and `cornerRadius`/`cornerRadiusPx`. `drawLine` takes a `LineStyle` as its second argument as the batch default; a `Line` item's own `style` overrides it per item, unit pair by unit pair (an item that sets either width or dash field replaces that whole pair, so a world-unit value is never shadowed by the batch's `*Px` value). Because item styles are registration-time, they may change `lineWidth`/`lineWidthPx` — hit testing follows the item's own width. Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around path corners.
 
 ### `ImageItem<TImage>`
 
@@ -156,6 +174,15 @@ type PathDecorationStyle = Omit<PathStyle, "lineWidth" | "lineWidthPx" | "corner
 ```
 
 The dynamic draw methods additionally accept `styleOf` in their options (`RectDrawOptions`, `CircleDrawOptions`, `TextDrawOptions`, `LineDrawOptions`, `PathDrawOptions` — each extends `DrawOptions`). The callback runs per item on every frame at paint time; returned fields overlay the item's own `style` for that frame, `undefined` leaves it untouched. Line and path decorations exclude stroke width (and corner radius), because those feed hit-test geometry resolved at registration time.
+
+### `VisibleOf` and `InteractiveOf`
+
+```ts
+type VisibleOf<TItem> = (item: TItem) => boolean | undefined;
+type InteractiveOf<TItem> = (item: TItem) => boolean | undefined;
+```
+
+Per-item siblings of `StyleOf`, accepted in the same options objects and read live the same way. `visibleOf` returning `false` skips the item for the frame — it is neither painted nor hit-testable. `interactiveOf` returning `false` keeps the item painted but transparent to `hitTest`/`hitTestFirst`/`hitTestRect` (the per-item counterpart of `hitTest: false`); queries fall through to items below. `true`/`undefined` keeps the default in both. A hidden item never hit-tests, regardless of `interactiveOf`. `visibleOf` exists on all six dynamic draw options (including `ImageDrawOptions`); `interactiveOf` on the hit-tested five (`TextDrawOptions` has no `interactiveOf` — text never enters hit testing). `ImageDrawOptions` carries no `styleOf`: images have no `style`, appearance changes go through item fields like `opacity` (read live at paint time; mutate + `render()`).
 
 ## Sprite Helpers
 

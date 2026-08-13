@@ -60,12 +60,17 @@ pnpm --filter @canvas-tile-engine/core typecheck
 # React
 pnpm --filter @canvas-tile-engine/react dev
 pnpm --filter @canvas-tile-engine/react build
+pnpm --filter @canvas-tile-engine/react test
 pnpm --filter @canvas-tile-engine/react typecheck
 
 # React Native
 pnpm --filter @canvas-tile-engine/react-native dev
 pnpm --filter @canvas-tile-engine/react-native build
 pnpm --filter @canvas-tile-engine/react-native typecheck
+
+# React shared internals
+pnpm --filter @canvas-tile-engine/react-shared test
+pnpm --filter @canvas-tile-engine/react-shared typecheck
 
 # Renderers
 pnpm --filter @canvas-tile-engine/renderer-canvas test
@@ -98,6 +103,7 @@ For example development against local package changes, run `pnpm dev:lib` in one
 - `packages/core/` - `@canvas-tile-engine/core`: renderer-agnostic engine, config, camera, gestures, draw API contracts, sprites, and spatial indexing.
 - `packages/react/` - `@canvas-tile-engine/react`: React bindings with `useCanvasTileEngine` and compound draw components.
 - `packages/react-native/` - `@canvas-tile-engine/react-native`: React Native bindings with the same component API, mounted through Skia.
+- `packages/react-shared/` - `@canvas-tile-engine/react-shared`: private internal package with modules shared between the React binding packages. Not published; consumers bundle its TypeScript source.
 - `packages/renderer-canvas/` - `@canvas-tile-engine/renderer-canvas`: HTML Canvas2D renderer.
 - `packages/renderer-webgl/` - `@canvas-tile-engine/renderer-webgl`: WebGL renderer with a Canvas2D overlay.
 - `packages/renderer-skia/` - `@canvas-tile-engine/renderer-skia`: React Native Skia renderer.
@@ -175,9 +181,18 @@ Key public contracts:
 `@canvas-tile-engine/react-native`:
 
 - Mirrors the React API and component names.
+- `engine.getConfig()` returns the same default snapshot as the web hook before mount (never `undefined`).
 - Uses `RendererSkia`; styling is `ViewStyle`; image handles are `SkImage`.
 - `config.size` is a placeholder because the native component measures its `View` with `onLayout`.
 - Native touch input feeds the same callback names; do not document separate gesture event names unless the public API adds them.
+
+`react-shared` (internal, not published):
+
+- Single entry point (`@canvas-tile-engine/react-shared`) with everything shared by `react` and `react-native`: the `useEngineHandle` hook core plus `EngineHandleBase` (generic over mount/image/draw-context types), `EngineContext`/`useEngineContext`, all 12 compound draw components, and `CanvasTileEngineBaseProps`. The platform packages pin the generics (`HTMLImageElement` vs `SkImage`/`SkCanvas`), layer platform-only handle members (`_containerRef`, `resize`) via `useEngineHandle`'s `buildExtras` parameter, and keep only their mount components (`CanvasTileEngine.tsx`) and entry re-exports.
+- Consumers bundle its TypeScript source with tsup (`noExternal`) and depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files.
+- Unlike `renderer-shared` it DOES have a build step, but a types-only one: `tsup` with `dts: { only: true }` emits a single flat `dist/index.d.ts` that the package's top-level `types` field points at. This exists because the consumers' bundled d.ts must inline the shared public types (`EngineHandleBase` etc.) via `dts: { resolve: [...] }`, and tsup's dts bundler resolves only the top-level `types` field and cannot follow relative `.ts` imports inside node_modules — a flat declaration file sidesteps both limits. `exports` still points at `src/index.ts`, so typecheck and JS bundling use live source.
+- Never import it from application code or examples; its API has no semver guarantees.
+- When shared code changes behavior, add changesets for `react` and `react-native` (the private package itself is not versioned).
 
 ## Key Patterns
 

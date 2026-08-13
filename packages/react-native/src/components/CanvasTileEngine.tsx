@@ -11,22 +11,24 @@ import {
 } from "@shopify/react-native-skia";
 import { CanvasTileEngine as CanvasTileEngineCore, type NormalizedPointer } from "@canvas-tile-engine/core";
 import type { SkiaMount } from "@canvas-tile-engine/renderer-skia";
-import { EngineContext, type EngineContextValue } from "../context/EngineContext";
+import { EngineContext, type EngineContextValue } from "../context";
 import type { CanvasTileEngineProps } from "../types";
 
 // Draw components for the compound pattern
-import { Rect } from "./draw/Rect";
-import { Circle } from "./draw/Circle";
-import { Image } from "./draw/Image";
-import { Sprite } from "./draw/Sprite";
-import { GridLines } from "./draw/GridLines";
-import { Line } from "./draw/Line";
-import { Text } from "./draw/Text";
-import { Path } from "./draw/Path";
-import { StaticRect } from "./draw/StaticRect";
-import { StaticCircle } from "./draw/StaticCircle";
-import { StaticImage } from "./draw/StaticImage";
-import { DrawFunction } from "./draw/DrawFunction";
+import {
+    Rect,
+    Circle,
+    Image,
+    Sprite,
+    GridLines,
+    Line,
+    Text,
+    Path,
+    StaticRect,
+    StaticCircle,
+    StaticImage,
+    DrawFunction,
+} from "./draw";
 
 // Tap heuristics: a touch that moves less than this (dp) and lasts less than
 // this (ms) is treated as a tap/click.
