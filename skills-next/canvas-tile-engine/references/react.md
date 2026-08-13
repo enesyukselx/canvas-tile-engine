@@ -55,7 +55,12 @@ function Map() {
 
 - For dynamic changes use runtime APIs instead: `engine.setBounds`,
   `engine.setEventHandlers`, `engine.setCenter`, `engine.goCenter`,
-  `engine.setScale`, `engine.goScale`, `engine.setScaleLimits` `engine.resize`.
+  `engine.setScale`, `engine.goScale`, `engine.setScaleLimits` `engine.resize`,
+  `engine.setReducedMotion`.
+- `engine.setReducedMotion(value)` / `engine.getReducedMotion()`: `"auto"`
+  (default) follows the platform. When in effect, goCenter/goScale/fitBounds/
+  resize land instantly, OVERRIDING any durationMs. `SpriteAnimator` and app
+  drawing are OUT of scope. `getReducedMotion()` is `false` before mount.
 - Event callback props CAN change freely - they are kept fresh via refs
   without re-creating the engine.
 - The engine is destroyed automatically on unmount.

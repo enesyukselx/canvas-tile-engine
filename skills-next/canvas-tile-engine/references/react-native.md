@@ -97,6 +97,19 @@ mount-once `config`/`renderer`/`center`, `isReady` gating, referentially
 stable `items`, the same 12 compound components with the same props, static
 caching, layers.
 
+## Reduced motion
+
+Wired automatically - apps do NOT subscribe to anything. The binding reads
+`AccessibilityInfo.isReduceMotionEnabled()` on mount and tracks
+`reduceMotionChanged`, feeding the `"auto"` slot. When the OS setting is on,
+`goCenter` / `goScale` / `fitBounds` / `resize` land instantly, OVERRIDING any
+`durationMs` passed.
+
+`engine.setReducedMotion(false)` forces animation on regardless of the OS;
+`engine.getReducedMotion()` reads the resolved value (`false` before mount).
+`SpriteAnimator` and custom `DrawFunction` drawing are OUT of scope - stop
+those yourself.
+
 ## Skia re-exports (import from the RN package, not @shopify/react-native-skia)
 
 ```tsx

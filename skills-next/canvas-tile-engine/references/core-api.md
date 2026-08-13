@@ -54,6 +54,9 @@ type CanvasTileEngineConfig = {
     };
     bounds?: { minX: number; maxX: number; minY: number; maxY: number };
                                        // camera limits; use +/-Infinity per axis
+    accessibility?: {
+        reducedMotion?: boolean | "auto"; // default "auto" = follow the platform
+    };                                 // OVERRIDES an explicit durationMs; escape is false
     coordinates?: {                    // coordinate labels around the viewport edge
         enabled?: boolean;             // default false
         shownScaleRange?: { min: number; max: number }; // default {0, Infinity}
@@ -135,6 +138,8 @@ after mount.
 | `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
 | `fitBounds(bounds, opts?): { scale, fitted }` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. `bounds` is an AREA, not cell indices: cell k spans [k-0.5, k+0.5], so a board of cells 0..31 is `{ minX: -0.5, maxX: 31.5, ... }` and centers on 15.5 - passing 0..32 fits the same width but centers half a cell off. Returns the targeted scale and `fitted` - `false` ONLY when `minScale` floors the fit, so the whole rectangle is NOT visible; `maxScale` clamping keeps `fitted: true`. The React/RN handle returns `undefined` before mount. |
 | `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. |
+| `setReducedMotion(value): void` | `value: boolean \| "auto"` (default `"auto"` = follow platform). Collapses engine-driven camera animation to instant. OVERRIDES an explicitly passed `durationMs` - there is NO per-call escape, the escape is `false`. Covers goCenter/goScale/fitBounds/resize ONLY; `SpriteAnimator` and app drawing are OUT of scope (call `animator.stop()` yourself for SC 2.2.2). |
+| `getReducedMotion(): boolean` | The RESOLVED value in effect. `getConfig().accessibility.reducedMotion` reports the PREFERENCE instead, which may be `"auto"`. Handle returns `false` before mount. |
 | `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |
 
 ### Draw methods

@@ -271,6 +271,28 @@ const zoomToSelection = (selection: { minX: number; maxX: number; minY: number; 
 };
 ```
 
+### `setReducedMotion(value)` / `getReducedMotion()`
+
+Replace the reduced-motion preference, and read the value in effect.
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `value` | `boolean \| "auto"` | `"auto"` (default) follows the platform; `true`/`false` are explicit choices the platform cannot override. |
+
+```tsx
+const engine = useCanvasTileEngine();
+
+// Respect the OS setting — already the default, shown for clarity
+engine.setReducedMotion("auto");
+
+const instant = engine.getReducedMotion();
+```
+
+When in effect, `goCenter`, `goScale`, `fitBounds` and `resize` land instantly, overriding any `durationMs` you pass. `SpriteAnimator` and your own drawing are out of scope.
+
+The platform signal is wired for you: `prefers-reduced-motion` on the web, `AccessibilityInfo` on React Native. `getReducedMotion()` returns `false` before mount, where there is no engine and no signal yet, so it is only meaningful once `engine.isReady`.
+
+
 ### Example: Zoom Controls
 
 ```tsx
