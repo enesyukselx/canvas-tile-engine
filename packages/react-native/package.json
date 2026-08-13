@@ -43,6 +43,8 @@
         "dev": "tsup --watch",
         "typecheck": "tsc --noEmit",
         "lint": "oxlint",
+        "test": "vitest",
+        "test:coverage": "vitest run --coverage",
         "format": "oxfmt",
         "format:check": "oxfmt --check"
     },
@@ -60,8 +62,12 @@
     },
     "devDependencies": {
         "@canvas-tile-engine/react-shared": "workspace:^",
+        "@testing-library/react": "^16.3.2",
         "@types/react": "^19.0.0",
-        "react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "jsdom": "^26.1.0",
+        "react": "19.0.0",
+        "react-dom": "19.0.0",
         "react-native": "^0.78.0",
         "react-native-gesture-handler": "^2.24.0"
     }
