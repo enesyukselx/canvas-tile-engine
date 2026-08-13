@@ -5,7 +5,14 @@ import { CanvasTileEngine } from "../../src/components/CanvasTileEngine";
 import { useCanvasTileEngine, type EngineHandle } from "../../src/hooks/useCanvasTileEngine";
 import { useEngineContext } from "../../src/context";
 import { createFakeRenderer } from "../helpers/fakeRenderer";
-import { emitLayout, resetReactNativeMock, viewProps } from "../mocks/react-native";
+import {
+    emitLayout,
+    emitReduceMotionChanged,
+    reduceMotionListenerCount,
+    resetReactNativeMock,
+    setReduceMotionEnabled,
+    viewProps,
+} from "../mocks/react-native";
 import { canvasProps, createdPictures, presentedPictures, resetSkiaMock } from "../mocks/react-native-skia";
 import { resetGestureMock } from "../mocks/react-native-gesture-handler";
 
@@ -307,5 +314,77 @@ describe("CanvasTileEngine mount component (React Native)", () => {
         render(<Harness />);
 
         expect(viewProps[viewProps.length - 1].style).toEqual([{ flex: 1, overflow: "hidden" }, { borderRadius: 12 }]);
+    });
+
+    describe("reduced motion", () => {
+        function mount() {
+            const fake = createFakeRenderer();
+            let captured: EngineHandle | null = null;
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                captured = engine;
+                return <CanvasTileEngine engine={engine} config={CONFIG} renderer={fake.renderer} />;
+            }
+
+            const utils = render(<Harness />);
+            return {
+                fake,
+                get engine() {
+                    return captured!;
+                },
+                ...utils,
+            };
+        }
+
+        // The signal is async and the engine is created lazily on first
+        // layout, so the value that resolved first has to be replayed into it.
+        it("replays a signal that arrived before the engine existed", async () => {
+            setReduceMotionEnabled(true);
+            const { engine } = mount();
+            await act(async () => {});
+
+            act(() => emitLayout(300, 200));
+
+            expect(engine.getReducedMotion()).toBe(true);
+        });
+
+        it("tracks a change after mount", async () => {
+            const { engine } = mount();
+            await act(async () => {});
+            act(() => emitLayout(300, 200));
+
+            expect(engine.getReducedMotion()).toBe(false);
+
+            act(() => emitReduceMotionChanged(true));
+            expect(engine.getReducedMotion()).toBe(true);
+
+            act(() => emitReduceMotionChanged(false));
+            expect(engine.getReducedMotion()).toBe(false);
+        });
+
+        it("lets an explicit app preference outrank the platform", async () => {
+            setReduceMotionEnabled(true);
+            const { engine } = mount();
+            await act(async () => {});
+            act(() => emitLayout(300, 200));
+
+            act(() => engine.setReducedMotion(false));
+
+            expect(engine.getReducedMotion()).toBe(false);
+            act(() => emitReduceMotionChanged(true));
+            expect(engine.getReducedMotion()).toBe(false);
+        });
+
+        it("unsubscribes on unmount", async () => {
+            const { unmount } = mount();
+            await act(async () => {});
+
+            expect(reduceMotionListenerCount()).toBe(1);
+
+            unmount();
+
+            expect(reduceMotionListenerCount()).toBe(0);
+        });
     });
 });

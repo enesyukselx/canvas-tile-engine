@@ -167,6 +167,21 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     /** Update the min/max scale limits at runtime, clamping the current scale into the new range */
     setScaleLimits(minScale: number, maxScale: number): void;
 
+    /**
+     * Replace the reduced-motion preference. `"auto"` (the default) follows
+     * the platform: `prefers-reduced-motion` on the web, `AccessibilityInfo`
+     * on React Native. When in effect, every engine-driven camera animation
+     * lands instantly — including one given an explicit `durationMs`.
+     */
+    setReducedMotion(value: boolean | "auto"): void;
+
+    /**
+     * Whether reduced motion is currently in effect, preference resolved
+     * against the platform signal. `false` before mount, where there is no
+     * engine and no signal yet.
+     */
+    getReducedMotion(): boolean;
+
     /** Get current config */
     getConfig(): Required<CanvasTileEngineConfig>;
 
@@ -400,6 +415,14 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
 
             setScaleLimits(minScale: number, maxScale: number) {
                 instanceRef.current?.setScaleLimits(minScale, maxScale);
+            },
+
+            setReducedMotion(value: boolean | "auto") {
+                instanceRef.current?.setReducedMotion(value);
+            },
+
+            getReducedMotion() {
+                return instanceRef.current?.getReducedMotion() ?? false;
             },
 
             getConfig() {
