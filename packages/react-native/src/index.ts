@@ -73,8 +73,16 @@ export {
     CanvasTileEngine as CanvasTileEngineCore,
     gridToSize,
     fitScale,
+    itemsBounds,
+    pathItemBounds,
     pathCommandsBounds,
     SpriteSheet,
     SpriteAnimator,
 } from "@canvas-tile-engine/core";
-export type { FitScaleOptions, SpriteRect, SpriteSheetOptions, SpriteAnimation } from "@canvas-tile-engine/core";
+export type {
+    BoundedItem,
+    FitScaleOptions,
+    SpriteRect,
+    SpriteSheetOptions,
+    SpriteAnimation,
+} from "@canvas-tile-engine/core";
