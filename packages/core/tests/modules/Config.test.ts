@@ -403,4 +403,107 @@ describe("Config", () => {
             expect(config.get().bounds.maxX).toBe(100);
         });
     });
+
+    describe("reduced motion", () => {
+        it('defaults the preference to "auto", which resolves to false with no platform signal', () => {
+            const config = new Config(minimalConfig);
+
+            expect(config.get().accessibility.reducedMotion).toBe("auto");
+            expect(config.getReducedMotion()).toBe(false);
+            expect(config.effectiveDuration(500)).toBe(500);
+        });
+
+        it("collapses every duration once reduced motion is in effect", () => {
+            const config = new Config({ ...minimalConfig, accessibility: { reducedMotion: true } });
+
+            expect(config.getReducedMotion()).toBe(true);
+            expect(config.effectiveDuration(500)).toBe(0);
+            expect(config.effectiveDuration(0)).toBe(0);
+        });
+
+        it('resolves "auto" from the platform signal', () => {
+            const config = new Config(minimalConfig);
+
+            config._setPlatformReducedMotion(true);
+            expect(config.getReducedMotion()).toBe(true);
+
+            config._setPlatformReducedMotion(false);
+            expect(config.getReducedMotion()).toBe(false);
+        });
+
+        // The load-bearing pair: a platform subscription must never be able to
+        // override what the app explicitly asked for.
+        it("keeps an explicit false even when the platform says reduce", () => {
+            const config = new Config({ ...minimalConfig, accessibility: { reducedMotion: false } });
+
+            config._setPlatformReducedMotion(true);
+
+            expect(config.getReducedMotion()).toBe(false);
+            expect(config.effectiveDuration(500)).toBe(500);
+        });
+
+        it("keeps an explicit true even when the platform says do not reduce", () => {
+            const config = new Config({ ...minimalConfig, accessibility: { reducedMotion: true } });
+
+            config._setPlatformReducedMotion(false);
+
+            expect(config.getReducedMotion()).toBe(true);
+        });
+
+        // A persisted getConfig() snapshot must not turn "follow the OS" into
+        // a permanent choice when it is replayed into a new engine.
+        it("reports the preference as configured, not the resolved value", () => {
+            const config = new Config(minimalConfig);
+
+            config._setPlatformReducedMotion(true);
+
+            expect(config.getReducedMotion()).toBe(true);
+            expect(config.get().accessibility.reducedMotion).toBe("auto");
+        });
+
+        it("setReducedMotion replaces the preference and the snapshot", () => {
+            const config = new Config(minimalConfig);
+            const before = config.get();
+
+            config.setReducedMotion(true);
+
+            expect(config.getReducedMotion()).toBe(true);
+            expect(config.get().accessibility.reducedMotion).toBe(true);
+            expect(before.accessibility.reducedMotion).toBe("auto"); // old reference keeps its value
+            expect(config.get()).not.toBe(before);
+        });
+
+        it("_setPlatformReducedMotion does not replace the snapshot", () => {
+            const config = new Config(minimalConfig);
+            const before = config.get();
+
+            config._setPlatformReducedMotion(true);
+
+            expect(config.get()).toBe(before);
+        });
+
+        it("freezes the accessibility snapshot and reads behavior from the private slot", () => {
+            const config = new Config(minimalConfig);
+            const snapshot = config.get();
+
+            expect(Object.isFrozen(snapshot.accessibility)).toBe(true);
+            // Modules are strict mode, so writing through the snapshot throws
+            // rather than silently succeeding — and resolution is unaffected.
+            expect(() => {
+                (snapshot.accessibility as { reducedMotion: unknown }).reducedMotion = true;
+            }).toThrow();
+            expect(config.getReducedMotion()).toBe(false);
+        });
+
+        it("rejects an invalid preference from the constructor and the setter alike", () => {
+            expect(
+                () => new Config({ ...minimalConfig, accessibility: { reducedMotion: "reduce" as never } }),
+            ).toThrow();
+
+            const config = new Config(minimalConfig);
+            expect(() => config.setReducedMotion("reduce" as never)).toThrow();
+            expect(() => config.setReducedMotion(1 as never)).toThrow();
+            expect(config.get().accessibility.reducedMotion).toBe("auto"); // unchanged after a rejected set
+        });
+    });
 });

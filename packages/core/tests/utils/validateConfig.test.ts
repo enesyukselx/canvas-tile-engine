@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     validateConfig,
+    validateReducedMotion,
     validateBounds,
     validateCoords,
     validateScale,
@@ -397,5 +398,28 @@ describe("validateScaleLimits", () => {
 
     it("throws when minScale is greater than maxScale", () => {
         expect(() => validateScaleLimits(3, 2)).toThrow("minScale (3) cannot be greater than maxScale (2)");
+    });
+
+    describe("validateReducedMotion", () => {
+        it('accepts true, false and "auto"', () => {
+            expect(() => validateReducedMotion(true)).not.toThrow();
+            expect(() => validateReducedMotion(false)).not.toThrow();
+            expect(() => validateReducedMotion("auto")).not.toThrow();
+        });
+
+        it("rejects anything else", () => {
+            expect(() => validateReducedMotion("reduce")).toThrow('must be true, false, or "auto"');
+            expect(() => validateReducedMotion("true")).toThrow();
+            expect(() => validateReducedMotion(1)).toThrow();
+            expect(() => validateReducedMotion(null)).toThrow();
+            expect(() => validateReducedMotion(undefined)).toThrow();
+        });
+
+        it("is reached through validateConfig only when the field is present", () => {
+            const base = { scale: 1, size: { width: 800, height: 600 } };
+            expect(() => validateConfig(base)).not.toThrow();
+            expect(() => validateConfig({ ...base, accessibility: {} })).not.toThrow();
+            expect(() => validateConfig({ ...base, accessibility: { reducedMotion: "reduce" as never } })).toThrow();
+        });
     });
 });

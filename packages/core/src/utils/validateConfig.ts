@@ -118,9 +118,25 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
         throw configError(`eventHandlers.zoom must be a boolean, "pointer" or "center", got ${zoom}`);
     }
 
+    // Accessibility validation
+    if (config.accessibility?.reducedMotion !== undefined) {
+        validateReducedMotion(config.accessibility.reducedMotion);
+    }
+
     // Bounds validation
     if (config.bounds) {
         validateBounds(config.bounds);
+    }
+}
+
+/**
+ * Validate a reduced-motion preference. Shared by the constructor and
+ * `Config.setReducedMotion` so both reject identically.
+ * @throws {ConfigValidationError} If the value is not `true`, `false` or `"auto"`.
+ */
+export function validateReducedMotion(value: unknown): void {
+    if (typeof value !== "boolean" && value !== "auto") {
+        throw configError(`accessibility.reducedMotion must be true, false, or "auto", got ${String(value)}`);
     }
 }
 

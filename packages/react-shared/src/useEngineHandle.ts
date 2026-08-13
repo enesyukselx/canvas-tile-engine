@@ -81,6 +81,11 @@ const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
         enabled: false,
         shownScaleRange: { min: 0, max: Infinity },
     },
+    // The preference default, not the resolved value: this snapshot must match
+    // what the real engine reports once mounted.
+    accessibility: {
+        reducedMotion: "auto",
+    },
     debug: {
         enabled: false,
         hud: {

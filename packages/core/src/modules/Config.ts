@@ -1,6 +1,6 @@
-import { CanvasTileEngineConfig, EventHandlers, ZoomMode } from "../types";
+import { CanvasTileEngineConfig, EventHandlers, MotionPolicy, ReducedMotionSetting, ZoomMode } from "../types";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
-import { validateConfig, validateBounds, validateScaleLimits } from "../utils/validateConfig";
+import { validateConfig, validateBounds, validateScaleLimits, validateReducedMotion } from "../utils/validateConfig";
 
 /** Normalize the zoom setting so consumers only see a mode or `false` (`true` means `"pointer"`). */
 function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
@@ -13,8 +13,21 @@ function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
 /**
  * Normalizes and stores grid engine configuration with safe defaults.
  */
-export class Config {
+export class Config implements MotionPolicy {
     private config: Required<CanvasTileEngineConfig>;
+
+    /**
+     * The app's reduced-motion preference, and the platform's signal, kept in
+     * two slots on purpose: the platform is consulted only while the
+     * preference is `"auto"`, so a `prefers-reduced-motion` listener or a
+     * React Native `AccessibilityInfo` subscription can never clobber an
+     * explicit app choice.
+     *
+     * Class-field initializer so the platform slot exists before a renderer's
+     * watcher can push into it during engine construction.
+     */
+    private motionPreference: ReducedMotionSetting = "auto";
+    private platformReducedMotion = false;
 
     /**
      * Create a config store with defaults merged from the provided partial config.
@@ -23,6 +36,10 @@ export class Config {
      */
     constructor(config: CanvasTileEngineConfig) {
         validateConfig(config);
+
+        // Resolved once: `Required<>` is shallow, so the snapshot's own
+        // `reducedMotion` stays optional and cannot type the preference slot.
+        const reducedMotion: ReducedMotionSetting = config.accessibility?.reducedMotion ?? "auto";
 
         const base: Required<CanvasTileEngineConfig> = {
             scale: config.scale,
@@ -64,6 +81,8 @@ export class Config {
                 shownScaleRange: config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity },
             },
 
+            accessibility: { reducedMotion },
+
             debug: {
                 enabled: config.debug?.enabled ?? false,
                 hud: {
@@ -83,10 +102,12 @@ export class Config {
                 },
             },
         };
+        this.motionPreference = reducedMotion;
         this.config = Object.freeze({
             ...base,
             size: Object.freeze(base.size),
             eventHandlers: Object.freeze(base.eventHandlers),
+            accessibility: Object.freeze(base.accessibility),
             bounds: Object.freeze(base.bounds),
             coordinates: Object.freeze({
                 ...base.coordinates,
@@ -161,5 +182,56 @@ export class Config {
             ...this.config,
             bounds: Object.freeze({ ...bounds }),
         });
+    }
+
+    /**
+     * The reduced-motion value actually in effect. `"auto"` defers to the
+     * platform signal, which is `false` until something pushes one — so a
+     * platform with no signal (Node, a custom renderer) animates normally.
+     */
+    getReducedMotion(): boolean {
+        return this.motionPreference === "auto" ? this.platformReducedMotion : this.motionPreference;
+    }
+
+    /**
+     * The duration an animation should actually run for. Reduced motion
+     * collapses every duration to 0, including one the caller passed
+     * explicitly.
+     */
+    effectiveDuration(durationMs: number): number {
+        return this.getReducedMotion() ? 0 : durationMs;
+    }
+
+    /**
+     * Replace the app's reduced-motion preference at runtime.
+     *
+     * The snapshot keeps reporting the preference as configured, never the
+     * resolved value, so persisting and replaying `getConfig()` cannot turn
+     * `"auto"` into a permanent choice.
+     * @throws {ConfigValidationError} If the value is not `true`, `false` or `"auto"`.
+     */
+    setReducedMotion(value: ReducedMotionSetting) {
+        validateReducedMotion(value);
+
+        this.motionPreference = value;
+        this.config = Object.freeze({
+            ...this.config,
+            accessibility: Object.freeze({ ...this.config.accessibility, reducedMotion: value }),
+        });
+    }
+
+    /**
+     * Record the platform's reduced-motion signal. Consulted only while the
+     * preference is `"auto"`, so this can never override an explicit app
+     * choice.
+     *
+     * Deliberately does not rebuild the snapshot: this can fire during engine
+     * construction and on every OS setting change, and the snapshot reports
+     * the preference, not the resolution.
+     * @internal Called by the DOM renderers' `prefers-reduced-motion` watcher
+     * and by the React Native binding's `AccessibilityInfo` subscription.
+     */
+    _setPlatformReducedMotion(value: boolean) {
+        this.platformReducedMotion = value;
     }
 }
