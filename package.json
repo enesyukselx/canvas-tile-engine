@@ -31,17 +31,17 @@
         "node": ">=20.19.0"
     },
     "dependencies": {
-        "concurrently": "^10.0.3",
+        "concurrently": "^10.0.4",
         "tsup": "^8.5.1",
         "typescript": "^5.9.3"
     },
     "devDependencies": {
-        "@changesets/cli": "^2.31.0",
+        "@changesets/cli": "^2.31.1",
         "@types/node": "^25.3.3",
-        "@vitest/coverage-v8": "^4.1.9",
-        "oxfmt": "^0.57.0",
-        "oxlint": "^1.72.0",
-        "turbo": "^2.10.2",
-        "vitest": "^4.1.9"
+        "@vitest/coverage-v8": "^4.1.10",
+        "oxfmt": "^0.63.0",
+        "oxlint": "^1.78.0",
+        "turbo": "^2.10.9",
+        "vitest": "^4.1.10"
     }
 }
