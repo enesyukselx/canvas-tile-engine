@@ -285,6 +285,42 @@ describe("CanvasTileEngine", () => {
             expect(onComplete).toHaveBeenCalled();
         });
 
+        it("an instant fit cancels an in-flight animation instead of losing to it", () => {
+            // Node has no rAF, so the animated path would otherwise complete
+            // synchronously and the race could not happen at all. Drive the
+            // frame queue by hand instead.
+            const frames = new Map<number, FrameRequestCallback>();
+            let nextFrameId = 1;
+            vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+                const id = nextFrameId++;
+                frames.set(id, cb);
+                return id;
+            });
+            vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+
+            try {
+                const e = createEngine(wideLimits);
+                e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { durationMs: 500 });
+                expect(frames.size).toBeGreaterThan(0); // the animation really is in flight
+
+                e.fitBounds({ minX: 200, maxX: 300, minY: 400, maxY: 450 }, { durationMs: 0 });
+                const scale = e.getScale();
+                const center = e.getCenter();
+
+                // Drain everything the cancelled animation had queued.
+                for (const [id, frame] of [...frames]) {
+                    frames.delete(id);
+                    frame(performance.now() + 16);
+                }
+
+                expect(e.getScale()).toBe(scale);
+                expect(e.getCenter().x).toBeCloseTo(center.x);
+                expect(e.getCenter().y).toBeCloseTo(center.y);
+            } finally {
+                vi.unstubAllGlobals();
+            }
+        });
+
         it("rejects invalid bounds and padding", () => {
             expect(() => engine.fitBounds({ minX: 10, maxX: 0, minY: 0, maxY: 10 })).toThrow();
             expect(() => engine.fitBounds({ minX: 0, maxX: 0, minY: 0, maxY: 10 })).toThrow();

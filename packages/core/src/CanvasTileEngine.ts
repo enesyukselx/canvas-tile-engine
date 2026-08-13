@@ -623,6 +623,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         };
 
         if (durationMs <= 0) {
+            // An instant fit has to win. This branch writes the camera
+            // directly instead of going through the AnimationController, so
+            // unlike goCenter/goScale (whose animate* calls cancel first) it
+            // has to cancel for itself: a move or zoom animation still in
+            // flight from an earlier call keeps writing its interpolated
+            // values on the next frame and drags the view back off target.
+            this.animationController.cancelMove();
+            this.animationController.cancelZoom();
             const prevScale = this.camera.scale;
             this.camera.setScale(targetScale);
             // Center after the scale change so the final center is exact
