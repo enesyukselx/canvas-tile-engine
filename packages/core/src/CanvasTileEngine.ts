@@ -13,6 +13,7 @@ import {
     Coords,
     CanvasTileEngineConfig,
     FitBoundsOptions,
+    FitBoundsResult,
     onClickCallback,
     onRightClickCallback,
     onDrawCallback,
@@ -594,6 +595,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param options `padding` in world units (default 0) or `paddingPx` in
      * screen pixels (wins over `padding`), `durationMs` (default 500,
      * 0 = instant), and `onComplete`.
+     * @returns The scale the fit targets and whether the whole rectangle
+     * actually ends up visible — `fitted: false` means `minScale` floored the
+     * fit, so the view shows less than was asked for.
      * @throws {ConfigValidationError} If an edge is not finite, min >= max on
      * an axis, or a padding value is negative.
      * @example
@@ -606,9 +610,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      *
      * // Jump to a selection instantly
      * engine.fitBounds(selectionBounds, { durationMs: 0 });
+     *
+     * // Tell the user when the board cannot fit at the configured minScale
+     * if (!engine.fitBounds(boardBounds).fitted) {
+     *     showOverviewHint();
+     * }
      * ```
      */
-    fitBounds(bounds: Bounds, options: FitBoundsOptions = {}) {
+    fitBounds(bounds: Bounds, options: FitBoundsOptions = {}): FitBoundsResult {
         const { padding = 0, paddingPx, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
 
         const size = this.viewport.getSize();
@@ -617,6 +626,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         // method targets before clamping.
         const rawScale = fitScale(bounds, size, { padding, paddingPx });
         const targetScale = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, rawScale));
+        // Clamping up (minScale) means the area no longer fits; clamping down
+        // (maxScale) still shows all of it, just with room to spare. Both
+        // operands come from the same clamp, so this comparison is exact.
+        const result: FitBoundsResult = { scale: targetScale, fitted: targetScale <= rawScale };
         const center = {
             x: (bounds.minX + bounds.maxX) / 2,
             y: (bounds.minY + bounds.maxY) / 2,
@@ -639,7 +652,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             this.notifyZoomIfChanged(prevScale);
             this.handleCameraChange();
             onComplete?.();
-            return;
+            return result;
         }
 
         // Concurrent move and zoom animations cooperate: the zoom step
@@ -652,6 +665,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             (prevScale) => this.notifyZoomIfChanged(prevScale),
             onComplete,
         );
+        return result;
     }
 
     /**

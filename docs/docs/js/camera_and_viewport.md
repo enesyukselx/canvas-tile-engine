@@ -195,6 +195,15 @@ Fits a world-space rectangle into the viewport: centers the view on the rectangl
 | `options.durationMs` | `number` | Animation duration in ms. Default `500`; `0` = instant. |
 | `options.onComplete` | `function` | Called when the fit completes. |
 
+Returns `{ scale, fitted }`: the scale the fit targets after clamping, and whether the whole rectangle actually ends up visible. `fitted` is `false` only when `minScale` floors the fit — the area needs a smaller scale than the configured minimum, so the view shows less than you asked for. Clamping at `maxScale` leaves the rectangle fully visible (just with room around it), so that stays `true`.
+
+```typescript
+if (!engine.fitBounds(boardBounds).fitted) {
+    // minScale is too high to show the whole board — lower the limit or
+    // tell the user they are seeing part of it.
+}
+```
+
 `padding` is world units: it grows the fitted area, so the visual margin stays proportional to the content (a 10x larger board needs a 10x larger padding for the same framing). `paddingPx` shrinks the viewport instead: "24px of air" frames a 3-cell selection and a 10k-cell board identically — the right choice for fit-to-selection UI. The same world/px pair as `hitTest`'s `padding`/`paddingPx`.
 
 ```typescript

@@ -285,6 +285,32 @@ describe("CanvasTileEngine", () => {
             expect(onComplete).toHaveBeenCalled();
         });
 
+        it("reports the applied scale and that the area fits", () => {
+            const e = createEngine(wideLimits);
+            const result = e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { durationMs: 0 });
+            expect(result).toEqual({ scale: 8, fitted: true });
+        });
+
+        it("reports fitted: false when minScale keeps the area from fitting", () => {
+            // 20000 world units wide at minScale 0.5 needs 10000px of viewport.
+            const result = engine.fitBounds(
+                { minX: -10000, maxX: 10000, minY: -10000, maxY: 10000 },
+                { durationMs: 0 },
+            );
+            expect(result).toEqual({ scale: 0.5, fitted: false });
+            expect(engine.getScale()).toBe(0.5);
+        });
+
+        it("stays fitted when maxScale caps the zoom — the area is still fully visible", () => {
+            const result = engine.fitBounds({ minX: 0, maxX: 1, minY: 0, maxY: 1 }, { durationMs: 0 });
+            expect(result).toEqual({ scale: 2, fitted: true });
+        });
+
+        it("reports the same result on the animated path", () => {
+            const e = createEngine(wideLimits);
+            expect(e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 })).toEqual({ scale: 8, fitted: true });
+        });
+
         it("an instant fit cancels an in-flight animation instead of losing to it", () => {
             // Node has no rAF, so the animated path would otherwise complete
             // synchronously and the race could not happen at all. Drive the

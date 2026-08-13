@@ -6,6 +6,7 @@ import type {
     Bounds,
     EventHandlers,
     FitBoundsOptions,
+    FitBoundsResult,
     DrawHandle,
     HitResult,
     HitTestOptions,
@@ -167,8 +168,16 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     /** Set map boundaries */
     setBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void;
 
-    /** Fit a world rectangle into the viewport (centers and rescales, clamped to scale limits) */
-    fitBounds(bounds: { minX: number; maxX: number; minY: number; maxY: number }, options?: FitBoundsOptions): void;
+    /**
+     * Fit a world rectangle into the viewport (centers and rescales, clamped
+     * to scale limits). Returns what the fit did — `fitted: false` means
+     * `minScale` floored it, so the whole rectangle is not visible — or
+     * `undefined` before mount, when there is no engine to fit.
+     */
+    fitBounds(
+        bounds: { minX: number; maxX: number; minY: number; maxY: number },
+        options?: FitBoundsOptions,
+    ): FitBoundsResult | undefined;
 
     /** Dynamically update event handlers at runtime */
     setEventHandlers(handlers: Partial<EventHandlers>): void;
@@ -397,7 +406,7 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
             },
 
             fitBounds(bounds, options) {
-                instanceRef.current?.fitBounds(bounds, options);
+                return instanceRef.current?.fitBounds(bounds, options);
             },
 
             setEventHandlers(handlers) {

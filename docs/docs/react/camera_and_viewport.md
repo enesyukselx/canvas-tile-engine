@@ -256,6 +256,8 @@ Fits a world-space rectangle into the viewport: centers the view on the rectangl
 
 `padding` keeps the margin proportional to the content; `paddingPx` keeps it a fixed number of screen pixels regardless of how large the fitted area is — the right choice for fit-to-selection UI (same world/px pair as `hitTest`'s `padding`/`paddingPx`).
 
+Returns `{ scale, fitted }` — the scale the fit targets after clamping, and whether the whole rectangle actually ends up visible. `fitted` is `false` only when `minScale` floors the fit, so the view shows less than you asked for; clamping at `maxScale` still shows all of it. Before mount the handle has no engine to fit, so it returns `undefined`.
+
 ```tsx
 const showWholeBoard = () => {
     engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
