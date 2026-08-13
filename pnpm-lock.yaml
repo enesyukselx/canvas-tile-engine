@@ -561,6 +561,9 @@ importers:
       '@canvas-tile-engine/core':
         specifier: workspace:^
         version: link:../core
+      jsdom:
+        specifier: ^26.1.0
+        version: 26.1.0
 
   packages/renderer-skia:
     dependencies:
