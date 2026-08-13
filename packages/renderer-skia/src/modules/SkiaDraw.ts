@@ -12,7 +12,6 @@ import {
     Rect,
     SpatialIndex,
     Text,
-    VISIBILITY_BUFFER,
     resolveLineWidthPx,
     resolveSizePx,
     resolveSizeWorld,
@@ -24,8 +23,8 @@ import {
     computeOriginOffset,
     traceRoundedPath,
     traceCommands,
-    pathCommandsBounds,
     itemsBounds,
+    pathItemBounds,
     type CommandTraceTarget,
     DrawTransform,
 } from "@canvas-tile-engine/core";
@@ -55,6 +54,7 @@ import {
     type SkPicture,
     type SkRect,
 } from "@shopify/react-native-skia";
+import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
 import { Layer } from "./Layer";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
@@ -102,33 +102,6 @@ export class SkiaDraw {
         this.imagePaint.setAntiAlias(true);
     }
 
-    private isVisible(
-        x: number,
-        y: number,
-        sizeWorld: number,
-        topLeft: Coords,
-        config: Required<CanvasTileEngineConfig>,
-    ) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        const minX = topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER;
-        const minY = topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxX = topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER;
-        const maxY = topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER;
-        return x + sizeWorld >= minX && x - sizeWorld <= maxX && y + sizeWorld >= minY && y - sizeWorld <= maxY;
-    }
-
-    private getViewportBounds(topLeft: Coords, config: Required<CanvasTileEngineConfig>) {
-        const viewW = config.size.width / config.scale;
-        const viewH = config.size.height / config.scale;
-        return {
-            minX: topLeft.x - VISIBILITY_BUFFER.TILE_BUFFER,
-            minY: topLeft.y - VISIBILITY_BUFFER.TILE_BUFFER,
-            maxX: topLeft.x + viewW + VISIBILITY_BUFFER.TILE_BUFFER,
-            maxY: topLeft.y + viewH + VISIBILITY_BUFFER.TILE_BUFFER,
-        };
-    }
-
     addDrawFunction(
         fn: (
             canvas: SkCanvas,
@@ -156,7 +129,7 @@ export class SkiaDraw {
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -168,7 +141,7 @@ export class SkiaDraw {
                 const size = item.size ?? 1;
                 const extent = Math.max(item.width ?? size, item.height ?? size) / 2;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extent, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, extent, topLeft, config)) {
                     continue;
                 }
 
@@ -250,7 +223,7 @@ export class SkiaDraw {
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -268,7 +241,7 @@ export class SkiaDraw {
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 
@@ -345,7 +318,7 @@ export class SkiaDraw {
                 const centerX = (item.from.x + item.to.x) / 2;
                 const centerY = (item.from.y + item.to.y) / 2;
                 const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -394,7 +367,7 @@ export class SkiaDraw {
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
                 : list;
@@ -410,7 +383,7 @@ export class SkiaDraw {
                 // fontPx is zoom-independent; its world-space extent shrinks as scale grows
                 const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
                     continue;
                 }
 
@@ -476,36 +449,8 @@ export class SkiaDraw {
     ): DrawHandle {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
-        // Conservative world bounds per item for culling, computed once:
-        // control-point hull for command paths, vertex bounds for polylines.
-        const itemBounds = items.map((item) => {
-            if (item.commands !== undefined) {
-                return pathCommandsBounds(item.commands);
-            }
-            const points = item.points;
-            if (!points || points.length < 2) {
-                return null;
-            }
-            let minX = Infinity;
-            let minY = Infinity;
-            let maxX = -Infinity;
-            let maxY = -Infinity;
-            for (const p of points) {
-                if (p.x < minX) {
-                    minX = p.x;
-                }
-                if (p.y < minY) {
-                    minY = p.y;
-                }
-                if (p.x > maxX) {
-                    maxX = p.x;
-                }
-                if (p.y > maxY) {
-                    maxY = p.y;
-                }
-            }
-            return { minX, minY, maxX, maxY };
-        });
+        // Conservative world bounds per item for culling, computed once.
+        const itemBounds = items.map((item) => pathItemBounds(item));
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
             for (let n = 0; n < items.length; n++) {
@@ -518,7 +463,7 @@ export class SkiaDraw {
                 const centerX = (bounds.minX + bounds.maxX) / 2;
                 const centerY = (bounds.minY + bounds.maxY) / 2;
                 const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!this.isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
                     continue;
                 }
 
@@ -591,7 +536,7 @@ export class SkiaDraw {
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
         return this.layers.add(layer, ({ canvas, config, topLeft }) => {
-            const bounds = this.getViewportBounds(topLeft, config);
+            const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
                 ? spatialIndex.query(
@@ -609,7 +554,7 @@ export class SkiaDraw {
                 // sizePx wins over size, resolved against the live scale
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
 
-                if (!spatialIndex && !this.isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
                     continue;
                 }
 

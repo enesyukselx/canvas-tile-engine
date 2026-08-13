@@ -8,7 +8,8 @@
     "sideEffects": false,
     "exports": {
         "./canvas2d": "./src/canvas2d/index.ts",
-        "./dom": "./src/dom/index.ts"
+        "./dom": "./src/dom/index.ts",
+        "./geometry": "./src/geometry/index.ts"
     },
     "scripts": {
         "typecheck": "tsc --noEmit",
