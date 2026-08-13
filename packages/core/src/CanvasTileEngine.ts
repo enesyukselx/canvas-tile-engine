@@ -562,9 +562,15 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /**
      * Record the platform's reduced-motion signal. Consulted only while the
      * preference is `"auto"`.
-     * @internal Called by the DOM renderers' `prefers-reduced-motion` watcher
-     * and by the React Native binding's `AccessibilityInfo` subscription.
-     * Application code should use {@link setReducedMotion}.
+     * Called by the DOM renderers' `prefers-reduced-motion` watcher and by
+     * the React Native binding's `AccessibilityInfo` subscription.
+     *
+     * Deliberately carries no internal-tag annotation: core builds with
+     * `stripInternal: true`, which would delete this method from the
+     * published .d.ts — and every caller lives in another package. Even
+     * naming the tag inside this comment would strip it. The underscore is
+     * the marker instead. Not part of the supported API; application code
+     * should use {@link setReducedMotion}.
      */
     _setPlatformReducedMotion(value: boolean) {
         this.config._setPlatformReducedMotion(value);

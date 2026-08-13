@@ -29,6 +29,7 @@ import {
     ImageLoader,
     ResizeWatcher,
     ResponsiveWatcher,
+    ReducedMotionWatcher,
     SizeController,
     initStyles,
 } from "@canvas-tile-engine/renderer-shared/dom";
@@ -79,6 +80,7 @@ export class RendererWebGL implements IRenderer {
     private eventBinder!: EventBinder;
     private resizeWatcher?: ResizeWatcher;
     private responsiveWatcher?: ResponsiveWatcher;
+    private reducedMotionWatcher?: ReducedMotionWatcher;
     private eventsAttached = false;
 
     // Size control
@@ -288,6 +290,11 @@ export class RendererWebGL implements IRenderer {
         }
         this.eventBinder.attach();
         this.eventsAttached = true;
+
+        // Unconditional: reduced motion is an accessibility preference,
+        // not one of the opt-in eventHandlers.
+        this.reducedMotionWatcher = new ReducedMotionWatcher(this.config);
+        this.reducedMotionWatcher.start();
 
         if (this.config.get().responsive) {
             if (this.config.get().eventHandlers?.resize) {
@@ -548,6 +555,8 @@ export class RendererWebGL implements IRenderer {
         this.resizeWatcher = undefined;
         this.responsiveWatcher?.stop();
         this.responsiveWatcher = undefined;
+        this.reducedMotionWatcher?.stop();
+        this.reducedMotionWatcher = undefined;
 
         // Cancel animations
         this.animationController.cancelAll();

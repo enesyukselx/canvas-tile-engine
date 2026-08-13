@@ -228,8 +228,15 @@ export class Config implements MotionPolicy {
      * Deliberately does not rebuild the snapshot: this can fire during engine
      * construction and on every OS setting change, and the snapshot reports
      * the preference, not the resolution.
-     * @internal Called by the DOM renderers' `prefers-reduced-motion` watcher
-     * and by the React Native binding's `AccessibilityInfo` subscription.
+     * Called by the DOM renderers' `prefers-reduced-motion` watcher and by
+     * the React Native binding's `AccessibilityInfo` subscription.
+     *
+     * Deliberately carries no internal-tag annotation: core builds with
+     * `stripInternal: true`, which would delete this method from the
+     * published .d.ts — and every caller lives in another package. Even
+     * naming the tag inside this comment would strip it. The underscore is
+     * the marker instead. Not part of the supported API; application code
+     * should use {@link setReducedMotion}.
      */
     _setPlatformReducedMotion(value: boolean) {
         this.platformReducedMotion = value;
