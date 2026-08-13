@@ -20,6 +20,7 @@
         "format:check": "oxfmt --check"
     },
     "devDependencies": {
-        "@canvas-tile-engine/core": "workspace:^"
+        "@canvas-tile-engine/core": "workspace:^",
+        "jsdom": "^26.1.0"
     }
 }

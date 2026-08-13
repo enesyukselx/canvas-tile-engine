@@ -168,6 +168,7 @@ Key public contracts:
 - Consumers depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files; the `workspace:^` publishing rule does not apply to it.
 - Never import it from application code or examples; its API has no semver guarantees.
 - When shared code changes behavior, add changesets for the affected renderer packages (the private package itself is not versioned).
+- Tests run on `environment: "node"` deliberately — `geometry` and `canvas2d` must stay platform-free for `renderer-server` and React Native Skia, and the node environment is what asserts they never reach for `window`/`document`. Do not flip the package to jsdom. A test that needs a real DOM opts in per file with a `// @vitest-environment jsdom` docblock (see `tests/init-styles.test.ts`).
 
 ### React Packages
 
@@ -185,6 +186,7 @@ Key public contracts:
 - Uses `RendererSkia`; styling is `ViewStyle`; image handles are `SkImage`.
 - `config.size` is a placeholder because the native component measures its `View` with `onLayout`.
 - Native touch input feeds the same callback names; do not document separate gesture event names unless the public API adds them.
+- Tests run under vitest with `react-native`, `react-native-gesture-handler`, and `@shopify/react-native-skia` aliased to mocks in `tests/mocks/`; jsdom only supplies React's host substrate. Two config lines are load-bearing and must not be "cleaned up": `resolve.dedupe: ["react", "react-dom"]` (react-shared is consumed as source and links its own react@18) and the exact `19.0.0` pins for `react`/`react-dom` (React 19 requires both at the same version). The `tests` directory is in the tsconfig `include` on purpose — tsc against the real native types is what pins the mocks to reality.
 
 `react-shared` (internal, not published):
 
