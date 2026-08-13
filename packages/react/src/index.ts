@@ -67,6 +67,7 @@ export {
 export type {
     BoundedItem,
     FitScaleOptions,
+    FitBoundsResult,
     SpriteRect,
     SpriteSheetOptions,
     SpriteAnimation,

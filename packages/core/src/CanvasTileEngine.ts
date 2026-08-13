@@ -13,6 +13,7 @@ import {
     Coords,
     CanvasTileEngineConfig,
     FitBoundsOptions,
+    FitBoundsResult,
     onClickCallback,
     onRightClickCallback,
     onDrawCallback,
@@ -594,21 +595,31 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * @param options `padding` in world units (default 0) or `paddingPx` in
      * screen pixels (wins over `padding`), `durationMs` (default 500,
      * 0 = instant), and `onComplete`.
+     * @returns The scale the fit targets and whether the whole rectangle
+     * actually ends up visible — `fitted: false` means `minScale` floored the
+     * fit, so the view shows less than was asked for.
      * @throws {ConfigValidationError} If an edge is not finite, min >= max on
      * an axis, or a padding value is negative.
      * @example
      * ```ts
-     * // Show the whole board with one cell of margin
-     * engine.fitBounds({ minX: 0, maxX: 32, minY: 0, maxY: 32 }, { padding: 1 });
+     * // Show a whole 32x32 board with one cell of margin. Bounds are an
+     * // area, not cell indices: cell k spans [k-0.5, k+0.5], so cells 0..31
+     * // cover -0.5..31.5 and the board centers on 15.5, not 16.
+     * engine.fitBounds({ minX: -0.5, maxX: 31.5, minY: -0.5, maxY: 31.5 }, { padding: 1 });
      *
      * // 24px of air around any selection, small or huge
      * engine.fitBounds(selectionBounds, { paddingPx: 24 });
      *
      * // Jump to a selection instantly
      * engine.fitBounds(selectionBounds, { durationMs: 0 });
+     *
+     * // Tell the user when the board cannot fit at the configured minScale
+     * if (!engine.fitBounds(boardBounds).fitted) {
+     *     showOverviewHint();
+     * }
      * ```
      */
-    fitBounds(bounds: Bounds, options: FitBoundsOptions = {}) {
+    fitBounds(bounds: Bounds, options: FitBoundsOptions = {}): FitBoundsResult {
         const { padding = 0, paddingPx, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
 
         const size = this.viewport.getSize();
@@ -617,12 +628,24 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         // method targets before clamping.
         const rawScale = fitScale(bounds, size, { padding, paddingPx });
         const targetScale = Math.min(this.camera.maxScale, Math.max(this.camera.minScale, rawScale));
+        // Clamping up (minScale) means the area no longer fits; clamping down
+        // (maxScale) still shows all of it, just with room to spare. Both
+        // operands come from the same clamp, so this comparison is exact.
+        const result: FitBoundsResult = { scale: targetScale, fitted: targetScale <= rawScale };
         const center = {
             x: (bounds.minX + bounds.maxX) / 2,
             y: (bounds.minY + bounds.maxY) / 2,
         };
 
         if (durationMs <= 0) {
+            // An instant fit has to win. This branch writes the camera
+            // directly instead of going through the AnimationController, so
+            // unlike goCenter/goScale (whose animate* calls cancel first) it
+            // has to cancel for itself: a move or zoom animation still in
+            // flight from an earlier call keeps writing its interpolated
+            // values on the next frame and drags the view back off target.
+            this.animationController.cancelMove();
+            this.animationController.cancelZoom();
             const prevScale = this.camera.scale;
             this.camera.setScale(targetScale);
             // Center after the scale change so the final center is exact
@@ -631,7 +654,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             this.notifyZoomIfChanged(prevScale);
             this.handleCameraChange();
             onComplete?.();
-            return;
+            return result;
         }
 
         // Concurrent move and zoom animations cooperate: the zoom step
@@ -644,6 +667,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             (prevScale) => this.notifyZoomIfChanged(prevScale),
             onComplete,
         );
+        return result;
     }
 
     /**

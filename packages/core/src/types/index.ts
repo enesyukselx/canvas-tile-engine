@@ -93,6 +93,22 @@ export interface FitBoundsOptions {
     onComplete?: () => void;
 }
 
+/** What {@link CanvasTileEngine.fitBounds} did, so a caller can tell a real
+ * fit from one the scale limits cut short. */
+export interface FitBoundsResult {
+    /** The scale the fit targets, after clamping to `minScale`/`maxScale`. */
+    scale: number;
+    /**
+     * Whether the whole padded rectangle actually ends up visible.
+     *
+     * `false` only when `minScale` floors the fit: the area needs a smaller
+     * scale than the configured minimum, so the view shows less than was
+     * asked for. Clamping at `maxScale` still leaves the rectangle fully
+     * visible (the view simply shows more around it), so that stays `true`.
+     */
+    fitted: boolean;
+}
+
 export interface ViewportBounds {
     left: number;
     top: number;
