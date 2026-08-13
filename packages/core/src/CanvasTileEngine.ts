@@ -1192,9 +1192,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * callbacks - origin anchoring, image aspect fit, and rotation are
      * handled internally.
      *
-     * Line, Path, and Text items are not hit-testable. Like rendering,
-     * results reflect item positions as of the draw call: mutating an
-     * item's position requires re-registration (style mutation is fine).
+     * Text, grid lines, and custom draw functions never enter hit testing.
+     * Like rendering, results reflect item positions as of the draw call:
+     * mutating an item's position requires re-registration (style mutation
+     * is fine).
      *
      * `padding` (world units) and `paddingPx` (screen pixels, zoom
      * independent) expand every item's hit geometry outward - generous
