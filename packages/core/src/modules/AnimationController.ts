@@ -1,4 +1,4 @@
-import { Coords } from "../types";
+import { Coords, MotionPolicy } from "../types";
 import { ICamera } from "./Camera";
 import { ViewportState } from "./ViewportState";
 import { DEFAULT_VALUES } from "../constants";
@@ -25,6 +25,13 @@ export class AnimationController {
         private camera: ICamera,
         private viewport: ViewportState,
         private onAnimationFrame: () => void,
+        /**
+         * Required, not optional: every animation path in the engine and in
+         * the renderers builds one of these, and a permissive default would
+         * let a renderer silently ignore the reduced-motion preference. The
+         * compile error is what keeps the four call sites consistent.
+         */
+        private motion: MotionPolicy,
     ) {}
 
     /**
@@ -43,8 +50,14 @@ export class AnimationController {
         // Cancel any existing move animation
         this.cancelMove();
 
+        // Reduced motion collapses the duration to 0 — including one the
+        // caller passed explicitly, which is the point of the preference.
+        // Kept separate from canAnimate(): preference and capability are
+        // different questions.
+        const duration = this.motion.effectiveDuration(durationMs);
+
         // Instant move if duration is 0/negative or frames can't be scheduled
-        if (durationMs <= 0 || !canAnimate()) {
+        if (duration <= 0 || !canAnimate()) {
             const size = this.viewport.getSize();
             this.camera.setCenter({ x: targetX, y: targetY }, size.width, size.height);
             this.onAnimationFrame();
@@ -58,7 +71,9 @@ export class AnimationController {
 
         const step = (currentTime: number) => {
             const elapsed = currentTime - startTime;
-            const progress = Math.min(1, elapsed / durationMs);
+            // Flipping the preference mid-flight ends the animation on its
+            // target rather than freezing it partway.
+            const progress = this.motion.getReducedMotion() ? 1 : Math.min(1, elapsed / duration);
 
             // Easing function (ease-in-out)
             const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
@@ -111,8 +126,10 @@ export class AnimationController {
             this.onAnimationFrame();
         };
 
+        const duration = this.motion.effectiveDuration(durationMs);
+
         // Instant change if duration is 0/negative or frames can't be scheduled
-        if (durationMs <= 0 || !canAnimate()) {
+        if (duration <= 0 || !canAnimate()) {
             applyScale(targetScale);
             onComplete?.();
             return;
@@ -123,7 +140,9 @@ export class AnimationController {
 
         const step = (currentTime: number) => {
             const elapsed = currentTime - startTime;
-            const progress = Math.min(1, elapsed / durationMs);
+            // Flipping the preference mid-flight ends the animation on its
+            // target rather than freezing it partway.
+            const progress = this.motion.getReducedMotion() ? 1 : Math.min(1, elapsed / duration);
 
             // Easing function (ease-in-out)
             const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
@@ -168,8 +187,10 @@ export class AnimationController {
         const prev = this.viewport.getSize();
         const center = this.camera.getCenter(prev.width, prev.height);
 
+        const duration = this.motion.effectiveDuration(durationMs);
+
         // Instant resize if duration is 0/negative or frames can't be scheduled
-        if (durationMs <= 0 || !canAnimate()) {
+        if (duration <= 0 || !canAnimate()) {
             onApplySize(targetWidth, targetHeight, center);
             onComplete?.();
             return;
@@ -183,7 +204,9 @@ export class AnimationController {
 
         const step = (currentTime: number) => {
             const elapsed = currentTime - startTime;
-            const progress = Math.min(1, elapsed / durationMs);
+            // Flipping the preference mid-flight ends the animation on its
+            // target rather than freezing it partway.
+            const progress = this.motion.getReducedMotion() ? 1 : Math.min(1, elapsed / duration);
 
             const nextW = startW + deltaW * progress;
             const nextH = startH + deltaH * progress;

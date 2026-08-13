@@ -264,7 +264,12 @@ export class RendererWebGL implements IRenderer {
         });
 
         // Initialize AnimationController and SizeController
-        this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
+        this.animationController = new AnimationController(
+            this.camera,
+            this.viewport,
+            () => this.render(),
+            this.config,
+        );
         this.sizeController = new SizeController(
             this.canvasWrapper,
             [this.canvas, this.overlayCanvas],
