@@ -12,7 +12,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@babel/runtime": "^7.25.0",
+        "@babel/runtime": "^8.0.0",
         "@canvas-tile-engine/core": "workspace:*",
         "@canvas-tile-engine/react-native": "workspace:*",
         "@canvas-tile-engine/renderer-skia": "workspace:*",
