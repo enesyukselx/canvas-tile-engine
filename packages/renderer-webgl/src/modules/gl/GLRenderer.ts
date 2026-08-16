@@ -117,6 +117,8 @@ export class GLRenderer {
     private textureBuffer: WebGLBuffer;
 
     private textures = new Map<TexImageSource, { texture: WebGLTexture; width: number; height: number }>();
+    /** Sources that threw on upload (not CORS-clean); retried only after {@link invalidateTexture}. */
+    private taintedSources = new WeakSet<TexImageSource>();
 
     private cssWidth = 0;
     private cssHeight = 0;
@@ -563,16 +565,47 @@ export class GLRenderer {
     }
 
     /**
+     * Upload `source` into the currently bound texture. Returns false when the
+     * source is origin-tainted: WebGL refuses those with a SecurityError, and
+     * one un-CORS-able tile must not take down the whole frame, so the caller
+     * skips drawing it instead. Warned about once per source to avoid flooding
+     * the console on every repaint.
+     */
+    private uploadTexture(source: TexImageSource): boolean {
+        const gl = this.gl;
+        try {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            return true;
+        } catch (err) {
+            if (!this.taintedSources.has(source)) {
+                this.taintedSources.add(source);
+                console.error(
+                    "WebGL cannot draw this image because it is not CORS-clean. Serve it with an Access-Control-Allow-Origin header, or load it through a renderer whose crossOrigin option is set.",
+                    source,
+                    err,
+                );
+            }
+            return false;
+        }
+    }
+
+    /**
      * Get (or lazily upload) a texture for an image source. Returns null if the
-     * source has no dimensions yet (e.g. an image that has not loaded). If the
-     * source's dimensions changed since upload (e.g. a resized canvas or a
-     * swapped img src), its pixels are re-uploaded automatically; same-size
-     * content mutations require {@link invalidateTexture}.
+     * source has no dimensions yet (e.g. an image that has not loaded) or if it
+     * is origin-tainted and cannot be uploaded. If the source's dimensions
+     * changed since upload (e.g. a resized canvas or a swapped img src), its
+     * pixels are re-uploaded automatically; same-size content mutations require
+     * {@link invalidateTexture}.
      */
     getTexture(source: TexImageSource): WebGLTexture | null {
         const width = (source as { width?: number }).width ?? 0;
         const height = (source as { height?: number }).height ?? 0;
         if (!width || !height) {
+            return null;
+        }
+
+        // Tainting never resolves on its own, so don't re-throw once per frame.
+        if (this.taintedSources.has(source)) {
             return null;
         }
 
@@ -583,7 +616,9 @@ export class GLRenderer {
                 return existing.texture;
             }
             gl.bindTexture(gl.TEXTURE_2D, existing.texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            if (!this.uploadTexture(source)) {
+                return null;
+            }
             existing.width = width;
             existing.height = height;
             return existing.texture;
@@ -599,7 +634,10 @@ export class GLRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+        if (!this.uploadTexture(source)) {
+            gl.deleteTexture(texture);
+            return null;
+        }
 
         this.textures.set(source, { texture, width, height });
         return texture;
@@ -607,6 +645,10 @@ export class GLRenderer {
 
     /** Drop the cached texture for a source so the next draw re-uploads its pixels. */
     invalidateTexture(source: TexImageSource) {
+        // A tainted source has no cached entry, so clear the mark before bailing
+        // out below; this is the only way to make it retry.
+        this.taintedSources.delete(source);
+
         const entry = this.textures.get(source);
         if (!entry) {
             return;
