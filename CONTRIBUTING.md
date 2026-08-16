@@ -94,6 +94,8 @@ Renderer packages implement the `IRenderer`/`IDrawAPI`/`IImageLoader` contracts 
 
 Root scripts delegate to `turbo run`, so tasks are cached and only affected packages rebuild.
 
+The docs site is not part of the pnpm workspace, so `pnpm install` does not cover it. If you are touching `docs/`, install its dependencies separately with `pnpm install:docs` (see [Documentation](#-documentation)).
+
 ## 💻 Development Workflow
 
 ### Working on a single package
@@ -313,17 +315,30 @@ Renderer packages currently have thin test coverage - tests accompanying rendere
 
 ## 📚 Documentation
 
-Documentation is built with [Docusaurus](https://docusaurus.io/) and lives in the `docs/` directory (its own npm project, not part of the pnpm workspace).
+Documentation is built with [Docusaurus](https://docusaurus.io/) and lives in the `docs/` directory. It is its own npm project with its own `docs/package-lock.json`, not a pnpm workspace member - a root `pnpm install` does not install its dependencies.
 
 ### Running docs locally
 
+Install the docs dependencies first (from the repo root, once per clone):
+
+```bash
+pnpm install:docs
+```
+
+Then start the dev server:
+
 ```bash
 cd docs
-npm install
 npm start
 ```
 
-Build check from the repo root: `pnpm build:docs`.
+Build checks from the repo root: `pnpm typecheck:docs` and `pnpm build:docs`.
+
+When you add or upgrade a docs dependency, run `npm install` inside `docs/` and commit the updated `docs/package-lock.json` alongside `docs/package.json`. CI installs with `npm ci`, which fails outright if the two disagree.
+
+### Docs CI
+
+`.github/workflows/docs.yml` runs on every push touching `docs/**`: `npm ci`, then `npm run typecheck`, then `npm run build`. The site sets `onBrokenLinks: "throw"`, so a broken internal doc link fails the build - and therefore CI - rather than shipping to canvastileengine.dev.
 
 ### Updating docs
 
