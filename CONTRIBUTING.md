@@ -104,8 +104,11 @@ Every package has the same script set - swap the filter name as needed:
 # Watch mode
 pnpm --filter @canvas-tile-engine/core dev
 
-# Tests (vitest, watch mode by default)
+# Tests (vitest, single run)
 pnpm --filter @canvas-tile-engine/core test
+
+# Tests (vitest, watch mode)
+pnpm --filter @canvas-tile-engine/core test:watch
 
 # Coverage
 pnpm --filter @canvas-tile-engine/core test:coverage
@@ -277,7 +280,10 @@ pnpm test
 # Run tests with coverage
 pnpm test:coverage
 
-# Run a single package's tests (vitest watch mode)
+# Run all tests in watch mode
+pnpm test:watch
+
+# Run a single package's tests
 pnpm --filter @canvas-tile-engine/core test
 ```
 
