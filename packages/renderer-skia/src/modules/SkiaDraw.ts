@@ -55,6 +55,7 @@ import {
     type SkRect,
 } from "@shopify/react-native-skia";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
+import { COLOR_CACHE_LIMIT, LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 import { Layer } from "./Layer";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
@@ -81,7 +82,7 @@ export class SkiaDraw {
     private strokePaint: SkPaint;
     private imagePaint: SkPaint;
     private fontCache = new Map<string, SkFont>();
-    private colorCache = new Map<string, SkColor>();
+    private colorCache = new LruCache<string, SkColor>(COLOR_CACHE_LIMIT);
     // Pre-recorded pictures for the drawStatic* variants, keyed by cacheKey.
     private staticPictureCache = new Map<string, { picture: SkPicture; recordScale: number }>();
 
@@ -809,6 +810,9 @@ export class SkiaDraw {
     /**
      * Parse a CSS color string once and reuse the result — `Skia.Color` is a
      * native parse per call, which adds up over thousands of items per frame.
+     *
+     * The cache is bounded: a `styleOf` that computes a color string per frame
+     * would otherwise add a permanent entry for every value it ever produced.
      */
     private color(value: string): SkColor {
         let parsed = this.colorCache.get(value);

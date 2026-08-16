@@ -3,6 +3,7 @@ import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
 import { SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "../../src/modules/Layer";
+import { COLOR_CACHE_LIMIT } from "@canvas-tile-engine/renderer-shared/cache";
 import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
 
 interface Op {
@@ -113,6 +114,29 @@ describe("color caching", () => {
 
         expect(colorParseCalls.filter((c) => c === "#ff0000")).toHaveLength(1);
         expect(colorParseCalls.filter((c) => c === "#00ff00")).toHaveLength(1);
+    });
+
+    // A `styleOf` that computes a color string per frame would otherwise leave
+    // one permanent cache entry behind per frame, for the renderer's lifetime.
+    it("bounds the cache, evicting the least recently used color", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        let hue = 0;
+        draw.drawRect({ x: 1, y: 1, size: 1 }, 1, {
+            styleOf: () => ({ fillStyle: `hsl(${hue}, 70%, 50%)` }),
+        });
+
+        for (; hue <= COLOR_CACHE_LIMIT; hue++) {
+            render(canvas);
+        }
+        expect(colorParseCalls).toHaveLength(COLOR_CACHE_LIMIT + 1);
+
+        // The first frame's color is the least recently used of the overflowing
+        // set, so drawing it again is a miss.
+        hue = 0;
+        render(canvas);
+        expect(colorParseCalls.filter((c) => c === "hsl(0, 70%, 50%)")).toHaveLength(2);
     });
 });
 
