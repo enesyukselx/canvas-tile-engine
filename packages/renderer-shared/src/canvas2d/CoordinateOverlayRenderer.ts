@@ -1,9 +1,20 @@
-import { Config, COORDINATE_OVERLAY, ICamera, ViewportState } from "@canvas-tile-engine/core";
+import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
+import {
+    COORDINATE_OVERLAY_STYLE,
+    coordinateOverlayBorders,
+    coordinateOverlayFontSize,
+    forEachCoordinateLabel,
+    shouldDrawCoordinateOverlay,
+} from "../scene";
 import type { Canvas2DContextLike } from "./types";
 
 /**
  * Renders a coordinate overlay (axes and labels) on top of the canvas.
  * Generic over the platform's 2D context type.
+ *
+ * Border geometry, font sizing and label positions come from the shared
+ * layout helpers so every renderer draws the same overlay; this class only
+ * paints what they return.
  * @internal
  */
 export class CoordinateOverlayRenderer<TContext extends Canvas2DContextLike> {
@@ -32,46 +43,20 @@ export class CoordinateOverlayRenderer<TContext extends Canvas2DContextLike> {
         // Save the current canvas state
         this.ctx.save();
 
-        // Set fill style to black with configured opacity
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${COORDINATE_OVERLAY.BORDER_OPACITY})`;
+        const size = this.viewport.getSize();
+        const { left, bottom } = coordinateOverlayBorders(size);
 
-        // Draw left border - 20px wide, full height
-        const { width, height } = this.viewport.getSize();
-        this.ctx.fillRect(0, 0, COORDINATE_OVERLAY.BORDER_WIDTH, height);
-
-        // Draw bottom border - full width, 20px high
-        this.ctx.fillRect(
-            COORDINATE_OVERLAY.BORDER_WIDTH,
-            height - COORDINATE_OVERLAY.BORDER_WIDTH,
-            width,
-            COORDINATE_OVERLAY.BORDER_WIDTH,
-        );
+        this.ctx.fillStyle = COORDINATE_OVERLAY_STYLE.borderColor;
+        this.ctx.fillRect(left.x, left.y, left.width, left.height);
+        this.ctx.fillRect(bottom.x, bottom.y, bottom.width, bottom.height);
 
         // Set text properties for coordinates
-        this.ctx.fillStyle = `rgba(255, 255, 255, ${COORDINATE_OVERLAY.TEXT_OPACITY})`;
-
-        // Adjust font size based on scale (min 8px, max 12px)
-        const fontSize = Math.min(
-            COORDINATE_OVERLAY.MAX_FONT_SIZE,
-            Math.max(COORDINATE_OVERLAY.MIN_FONT_SIZE, this.camera.scale * COORDINATE_OVERLAY.FONT_SIZE_SCALE_FACTOR),
-        );
-        this.ctx.font = `${fontSize}px Arial`;
+        this.ctx.fillStyle = COORDINATE_OVERLAY_STYLE.textColor;
+        this.ctx.font = `${coordinateOverlayFontSize(this.camera.scale)}px Arial`;
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
 
-        const cordGap = this.camera.scale;
-        const visibleAreaWidthInCords = width / cordGap;
-        const visibleAreaHeightInCords = height / cordGap;
-
-        // Draw Y coordinates (left side)
-        for (let i = 0 - (this.camera.y % 1); i <= visibleAreaHeightInCords + 1; i++) {
-            this.ctx.fillText(Math.round(this.camera.y + i).toString(), 10, cordGap * i + cordGap / 2);
-        }
-
-        // Draw X coordinates (bottom)
-        for (let i = 0 - (this.camera.x % 1); i <= visibleAreaWidthInCords + 1; i++) {
-            this.ctx.fillText(Math.round(this.camera.x + i).toString(), cordGap * i + cordGap / 2, height - 10);
-        }
+        forEachCoordinateLabel(this.camera, size, (text, x, y) => this.ctx.fillText(text, x, y));
 
         // Restore the canvas state
         this.ctx.restore();
@@ -83,18 +68,6 @@ export class CoordinateOverlayRenderer<TContext extends Canvas2DContextLike> {
      * @returns True if overlay is enabled and scale is within range.
      */
     shouldDraw(scale: number): boolean {
-        const coordsConfig = this.config.get().coordinates;
-
-        if (!coordsConfig.enabled) {
-            return false;
-        }
-
-        if (!coordsConfig.shownScaleRange) {
-            return false;
-        }
-
-        const { min, max } = coordsConfig.shownScaleRange;
-
-        return scale >= min && scale <= max;
+        return shouldDrawCoordinateOverlay(this.config.get(), scale);
     }
 }

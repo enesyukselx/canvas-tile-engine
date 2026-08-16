@@ -38,7 +38,7 @@ import type {
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
-import { DrawContext, Layer } from "./Layer";
+import { DrawContext, Layer } from "../scene/Layer";
 import { getViewportBounds, isVisible } from "../geometry/culling";
 import { applyLineWidth } from "./applyLineWidth";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";

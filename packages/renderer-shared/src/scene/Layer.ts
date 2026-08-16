@@ -13,14 +13,29 @@ export type DrawContext<TContext> = {
 export type DrawCallback<TDrawContext> = (dc: TDrawContext) => void;
 
 /**
- * Manages ordered draw callbacks for canvas rendering, generic over the full
- * draw context handed to callbacks. Plain Canvas2D renderers use
- * {@link DrawContext}; renderers with extra per-frame state (e.g. WebGL's
- * batched GL renderer alongside its 2D overlay) intersect their own fields
- * onto it.
+ * The save/restore surface {@link Layer} needs from a draw context — the only
+ * part of it the layer manager touches.
+ *
+ * Canvas2D contexts return nothing from `save()`; Skia returns the save depth
+ * and can restore straight back to it, which also unwinds any saves a callback
+ * forgot to pop. Layer uses whichever the context offers.
  * @internal
  */
-export class Layer<TDrawContext extends { ctx: { save(): void; restore(): void } }> {
+export interface LayerContext {
+    save(): void | number;
+    restore(): void;
+    restoreToCount?(count: number): void;
+}
+
+/**
+ * Manages ordered draw callbacks, generic over the full draw context handed to
+ * callbacks. Plain Canvas2D renderers use {@link DrawContext}; renderers with
+ * extra per-frame state (e.g. WebGL's batched GL renderer alongside its 2D
+ * overlay) intersect their own fields onto it. The Skia renderer uses it too —
+ * nothing here touches a drawing API beyond save/restore.
+ * @internal
+ */
+export class Layer<TDrawContext extends { ctx: LayerContext }> {
     private layers = new Map<number, { id: symbol; fn: DrawCallback<TDrawContext> }[]>();
 
     /**
@@ -77,9 +92,13 @@ export class Layer<TDrawContext extends { ctx: { save(): void; restore(): void }
                 continue;
             }
             for (const { fn } of fns) {
-                dc.ctx.save();
+                const count = dc.ctx.save();
                 fn(dc);
-                dc.ctx.restore();
+                if (typeof count === "number" && dc.ctx.restoreToCount) {
+                    dc.ctx.restoreToCount(count);
+                } else {
+                    dc.ctx.restore();
+                }
             }
         }
     }

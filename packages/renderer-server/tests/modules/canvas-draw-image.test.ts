@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
-import {
-    CanvasDraw,
-    Layer,
-    type DrawContext,
-    type OffscreenCanvasFactory,
-} from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CanvasDraw, type OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { Layer, type DrawContext } from "@canvas-tile-engine/renderer-shared/scene";
 
 // Minimal fake 2D context that records globalAlpha at every drawImage() call.
 function makeImageRecordingCtx() {

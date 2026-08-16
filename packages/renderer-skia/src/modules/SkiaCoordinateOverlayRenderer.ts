@@ -1,14 +1,23 @@
-import { COORDINATE_OVERLAY, type Config, type ICamera, type ViewportState } from "@canvas-tile-engine/core";
+import { type Config, type ICamera, type ViewportState } from "@canvas-tile-engine/core";
+import {
+    COORDINATE_OVERLAY_STYLE,
+    coordinateOverlayBorders,
+    coordinateOverlayFontSize,
+    forEachCoordinateLabel,
+    shouldDrawCoordinateOverlay,
+} from "@canvas-tile-engine/renderer-shared/scene";
 import { Skia, matchFont, type SkCanvas, type SkFont, type SkPaint } from "@shopify/react-native-skia";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
 /**
  * Renders a coordinate overlay (axes and labels) on top of the canvas.
  *
- * Mirrors the Canvas2D `CoordinateOverlayRenderer`. Unlike the DOM backend
- * there is no persistent 2D context to hold paints against; the canvas is
- * handed in fresh per frame via {@link draw}, so paints/fonts are cached on
- * the instance instead.
+ * Mirrors the Canvas2D `CoordinateOverlayRenderer`, and shares its layout:
+ * border geometry, font sizing and label positions come from the shared scene
+ * modules, leaving this class to paint them. Unlike the DOM backend there is
+ * no persistent 2D context to hold paints against; the canvas is handed in
+ * fresh per frame via {@link draw}, so paints/fonts are cached on the instance
+ * instead.
  * @internal
  */
 export class SkiaCoordinateOverlayRenderer {
@@ -22,65 +31,28 @@ export class SkiaCoordinateOverlayRenderer {
         private viewport: ViewportState,
     ) {
         this.borderPaint = Skia.Paint();
-        this.borderPaint.setColor(Skia.Color(`rgba(0, 0, 0, ${COORDINATE_OVERLAY.BORDER_OPACITY})`));
+        this.borderPaint.setColor(Skia.Color(COORDINATE_OVERLAY_STYLE.borderColor));
 
         this.textPaint = Skia.Paint();
         this.textPaint.setAntiAlias(true);
-        this.textPaint.setColor(Skia.Color(`rgba(255, 255, 255, ${COORDINATE_OVERLAY.TEXT_OPACITY})`));
+        this.textPaint.setColor(Skia.Color(COORDINATE_OVERLAY_STYLE.textColor));
     }
 
     /**
      * Draw overlay borders and coordinate labels based on current camera view.
      */
     draw(canvas: SkCanvas) {
-        const { width, height } = this.viewport.getSize();
+        const size = this.viewport.getSize();
+        const { left, bottom } = coordinateOverlayBorders(size);
 
-        // Left border - full height
-        canvas.drawRect(Skia.XYWHRect(0, 0, COORDINATE_OVERLAY.BORDER_WIDTH, height), this.borderPaint);
+        canvas.drawRect(Skia.XYWHRect(left.x, left.y, left.width, left.height), this.borderPaint);
+        canvas.drawRect(Skia.XYWHRect(bottom.x, bottom.y, bottom.width, bottom.height), this.borderPaint);
 
-        // Bottom border - full width
-        canvas.drawRect(
-            Skia.XYWHRect(
-                COORDINATE_OVERLAY.BORDER_WIDTH,
-                height - COORDINATE_OVERLAY.BORDER_WIDTH,
-                width,
-                COORDINATE_OVERLAY.BORDER_WIDTH,
-            ),
-            this.borderPaint,
-        );
+        const font = this.getFont(coordinateOverlayFontSize(this.camera.scale));
 
-        // Adjust font size based on scale (min 8px, max 12px)
-        const fontSize = Math.min(
-            COORDINATE_OVERLAY.MAX_FONT_SIZE,
-            Math.max(COORDINATE_OVERLAY.MIN_FONT_SIZE, this.camera.scale * COORDINATE_OVERLAY.FONT_SIZE_SCALE_FACTOR),
-        );
-        const font = this.getFont(fontSize);
-
-        const cordGap = this.camera.scale;
-        const visibleAreaWidthInCords = width / cordGap;
-        const visibleAreaHeightInCords = height / cordGap;
-
-        // Draw Y coordinates (left side)
-        for (let i = 0 - (this.camera.y % 1); i <= visibleAreaHeightInCords + 1; i++) {
-            this.drawCenteredText(
-                canvas,
-                Math.round(this.camera.y + i).toString(),
-                10,
-                cordGap * i + cordGap / 2,
-                font,
-            );
-        }
-
-        // Draw X coordinates (bottom)
-        for (let i = 0 - (this.camera.x % 1); i <= visibleAreaWidthInCords + 1; i++) {
-            this.drawCenteredText(
-                canvas,
-                Math.round(this.camera.x + i).toString(),
-                cordGap * i + cordGap / 2,
-                height - 10,
-                font,
-            );
-        }
+        forEachCoordinateLabel(this.camera, size, (text, x, y) => {
+            this.drawCenteredText(canvas, text, x, y, font);
+        });
     }
 
     /**
@@ -89,19 +61,7 @@ export class SkiaCoordinateOverlayRenderer {
      * @returns True if overlay is enabled and scale is within range.
      */
     shouldDraw(scale: number): boolean {
-        const coordsConfig = this.config.get().coordinates;
-
-        if (!coordsConfig.enabled) {
-            return false;
-        }
-
-        if (!coordsConfig.shownScaleRange) {
-            return false;
-        }
-
-        const { min, max } = coordsConfig.shownScaleRange;
-
-        return scale >= min && scale <= max;
+        return shouldDrawCoordinateOverlay(this.config.get(), scale);
     }
 
     /** Single cached font; the size is set per frame so labels scale continuously. */

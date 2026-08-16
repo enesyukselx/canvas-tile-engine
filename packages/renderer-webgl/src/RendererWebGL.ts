@@ -23,7 +23,8 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import { WebGLDraw, type WebGLDrawContext } from "./modules/WebGLDraw";
-import { CoordinateOverlayRenderer, DebugOverlay, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CoordinateOverlayRenderer, DebugOverlay } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import {
     EventBinder,
     ImageLoader,

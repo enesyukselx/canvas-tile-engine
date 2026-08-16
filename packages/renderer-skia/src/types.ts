@@ -1,4 +1,15 @@
+import type { DrawContext } from "@canvas-tile-engine/renderer-shared/scene";
 import type { SkCanvas } from "@shopify/react-native-skia";
+
+/**
+ * Drawing context passed to every layer callback. The Skia canvas is recorded
+ * into a picture once per frame, so callbacks draw immediately and in order.
+ *
+ * The shared layer manager calls the draw target `ctx` whatever the platform;
+ * Skia's is an `SkCanvas`, which callbacks destructure back out as `canvas`.
+ * @internal
+ */
+export type SkiaDrawContext = DrawContext<SkCanvas>;
 
 export interface SkiaSize {
     width: number;

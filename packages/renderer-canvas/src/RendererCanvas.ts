@@ -22,12 +22,8 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import {
-    CoordinateOverlayRenderer,
-    DebugOverlay,
-    DrawContext,
-    Layer,
-} from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CoordinateOverlayRenderer, DebugOverlay } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import {
     EventBinder,
     ImageLoader,

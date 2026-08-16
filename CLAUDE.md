@@ -154,6 +154,7 @@ Key public contracts:
 - Implements `IRenderer<SkiaMount, SkImage>`.
 - Most app code should use `@canvas-tile-engine/react-native`, which wires layout, gestures, and Skia presentation.
 - Static draw helpers record non-changing item sets into Skia pictures.
+- Consumes `renderer-shared/scene` for layer ordering, FPS sampling, and the debug-HUD / coordinate-overlay layout; `SkiaDebug` and `SkiaCoordinateOverlayRenderer` are paint adapters over it.
 
 `renderer-server`:
 
@@ -163,12 +164,13 @@ Key public contracts:
 
 `renderer-shared` (internal, not published):
 
-- Three entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types; `renderer-webgl`'s 2D overlay also consumes its Layer, CoordinateOverlayRenderer, and DebugOverlay), `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too), and `@canvas-tile-engine/renderer-shared/geometry` (the viewport cull rect and per-item visibility test, consumed by all four renderers — pure functions, no context or platform types). Geometry that application code also needs lives in core instead (`itemsBounds`, `pathItemBounds`), not here.
+- Four entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types; `renderer-webgl`'s 2D overlay also consumes its CoordinateOverlayRenderer and DebugOverlay), `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too), `@canvas-tile-engine/renderer-shared/geometry` (the viewport cull rect and per-item visibility test), and `@canvas-tile-engine/renderer-shared/scene` (per-frame plumbing: the `Layer` manager, the `FpsSampler`, and the debug-HUD / coordinate-overlay layout). The last two are consumed by all four renderers and are pure — no context or platform types. Geometry that application code also needs lives in core instead (`itemsBounds`, `pathItemBounds`), not here.
+- `scene` computes, renderers paint: `computeHudLayout` returns the HUD strings plus panel and line positions, and `coordinateOverlayBorders` / `forEachCoordinateLabel` return the overlay geometry, so each renderer is left with a thin paint adapter (`fillRect`/`fillText` vs `drawRect`/`drawText`). Skia's HUD is the same layout shifted by its own `HUD_TOP_OFFSET`, passed as the `topOffset` argument — do not reintroduce a private copy of the layout to move it. `Layer` is generic over the draw context and calls the target `ctx` on every platform; Skia's callbacks destructure it as `canvas` (`({ ctx: canvas }) => ...`), and Layer prefers `restoreToCount` when the context offers one.
 - No build step: `exports` points at `src/*.ts` and consumers bundle the source with tsup (`noExternal`).
 - Consumers depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files; the `workspace:^` publishing rule does not apply to it.
 - Never import it from application code or examples; its API has no semver guarantees.
 - When shared code changes behavior, add changesets for the affected renderer packages (the private package itself is not versioned).
-- Tests run on `environment: "node"` deliberately — `geometry` and `canvas2d` must stay platform-free for `renderer-server` and React Native Skia, and the node environment is what asserts they never reach for `window`/`document`. Do not flip the package to jsdom. A test that needs a real DOM opts in per file with a `// @vitest-environment jsdom` docblock (see `tests/init-styles.test.ts`).
+- Tests run on `environment: "node"` deliberately — `geometry`, `scene` and `canvas2d` must stay platform-free for `renderer-server` and React Native Skia, and the node environment is what asserts they never reach for `window`/`document`. Do not flip the package to jsdom. A test that needs a real DOM opts in per file with a `// @vitest-environment jsdom` docblock (see `tests/init-styles.test.ts`).
 
 ### React Packages
 

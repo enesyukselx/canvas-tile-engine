@@ -1,5 +1,6 @@
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { CanvasDraw, DrawContext, Layer, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CanvasDraw, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { createCanvas, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
 
 /** The shared Canvas2D pipeline instantiated for the @napi-rs/canvas platform. */

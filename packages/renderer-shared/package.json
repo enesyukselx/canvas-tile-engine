@@ -9,7 +9,8 @@
     "exports": {
         "./canvas2d": "./src/canvas2d/index.ts",
         "./dom": "./src/dom/index.ts",
-        "./geometry": "./src/geometry/index.ts"
+        "./geometry": "./src/geometry/index.ts",
+        "./scene": "./src/scene/index.ts"
     },
     "scripts": {
         "typecheck": "tsc --noEmit",

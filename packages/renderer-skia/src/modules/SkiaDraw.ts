@@ -55,7 +55,8 @@ import {
     type SkRect,
 } from "@shopify/react-native-skia";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
-import { Layer } from "./Layer";
+import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import type { SkiaDrawContext } from "../types";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
@@ -86,7 +87,7 @@ export class SkiaDraw {
     private staticPictureCache = new Map<string, { picture: SkPicture; recordScale: number }>();
 
     constructor(
-        private layers: Layer,
+        private layers: Layer<SkiaDrawContext>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
     ) {
@@ -111,7 +112,7 @@ export class SkiaDraw {
         ) => void,
         layer: number = 1,
     ): DrawHandle {
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             fn(canvas, topLeft, config, this.drawTransform);
         });
     }
@@ -128,7 +129,7 @@ export class SkiaDraw {
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -222,7 +223,7 @@ export class SkiaDraw {
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -300,7 +301,7 @@ export class SkiaDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             const baseColor = this.color(style?.strokeStyle ?? "#000000");
             const baseWidth = resolveLineWidthPx(style, this.camera.scale);
             this.strokePaint.setColor(baseColor);
@@ -366,7 +367,7 @@ export class SkiaDraw {
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -452,7 +453,7 @@ export class SkiaDraw {
         // Conservative world bounds per item for culling, computed once.
         const itemBounds = items.map((item) => pathItemBounds(item));
 
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
@@ -535,7 +536,7 @@ export class SkiaDraw {
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -637,7 +638,7 @@ export class SkiaDraw {
     }
 
     drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
-        return this.layers.add(layer, ({ canvas, config, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -728,7 +729,7 @@ export class SkiaDraw {
         }
         const { picture, recordScale } = entry;
 
-        return this.layers.add(layer, ({ canvas, topLeft }) => {
+        return this.layers.add(layer, ({ ctx: canvas, topLeft }) => {
             // worldToScreen(w) = (w + CELL_CENTER_OFFSET - topLeft) * scale, and
             // the picture was recorded with a camera at (0, 0, recordScale), so
             // the recorded coordinates only miss the -topLeft term and the

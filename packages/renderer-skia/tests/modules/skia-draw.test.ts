@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
 import { SkiaDraw } from "../../src/modules/SkiaDraw";
-import { Layer } from "../../src/modules/Layer";
+import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import type { SkiaDrawContext } from "../../src/types";
 import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
 
 interface Op {
@@ -20,12 +21,12 @@ function makeCanvas() {
 function setup(scale = 10) {
     const camera = { x: 0, y: 0, scale } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
-    const layers = new Layer();
+    const layers = new Layer<SkiaDrawContext>();
     const draw = new SkiaDraw(layers, transformer, camera);
     const config = { size: { width: 100, height: 100 }, scale } as never;
     const render = (canvas: SkCanvas) =>
         layers.drawAll({
-            canvas,
+            ctx: canvas,
             camera,
             transformer,
             config,

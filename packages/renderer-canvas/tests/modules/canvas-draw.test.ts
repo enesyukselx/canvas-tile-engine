@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
 
 // Minimal fake 2D context that records state at every stroke()/fill() call.
