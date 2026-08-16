@@ -2,6 +2,8 @@ name: "Typecheck + Lint Checks"
 
 on:
     push:
+        branches:
+            - master
         paths:
             - "packages/**"
             - "examples/**"
@@ -10,14 +12,30 @@ on:
             - "pnpm-lock.yaml"
             - "pnpm-workspace.yaml"
             - ".oxlintrc.json"
+    pull_request:
+        paths:
+            - "packages/**"
+            - "examples/**"
+            - "package.json"
+            - "turbo.json"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - ".oxlintrc.json"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
     checks:
         name: Typecheck - Lint
         runs-on: ubuntu-22.04
+        env:
+            TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         steps:
             - uses: actions/checkout@v6
               with:
-                  fetch-depth: 2
+                  fetch-depth: 0
             - uses: pnpm/action-setup@v4
               with:
                   version: 10.23.0
