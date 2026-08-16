@@ -1,0 +1,275 @@
+# AGENTS.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Canvas Tile Engine is a pnpm/Turborepo monorepo for building zoomable 2D grid surfaces: maps, game boards, minimaps, editors, pixel tools, and data-heavy spatial UIs.
+
+The engine is renderer-agnostic. `@canvas-tile-engine/core` owns camera state, coordinate transforms, event callback plumbing, draw APIs, sprites, viewport culling, static caches, and spatial indexing. Platform packages inject renderers for Canvas2D, WebGL, React Native Skia, and headless Node.js image output.
+
+## Commands
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build published packages
+pnpm build
+
+# Build docs
+pnpm build:docs
+
+# Run package watch mode plus the default vanilla example
+pnpm dev
+
+# Watch library packages only
+pnpm dev:lib
+
+# Run a specific example
+pnpm dev:example --example=<example-name>
+
+# Lint all packages
+pnpm lint
+
+# Type check all packages
+pnpm typecheck
+
+# Format all packages
+pnpm format
+
+# Check formatting
+pnpm format:check
+
+# Run tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
+
+# Run tests with coverage
+pnpm test:coverage
+```
+
+### Package-Specific Commands
+
+```bash
+# Core
+pnpm --filter @canvas-tile-engine/core dev
+pnpm --filter @canvas-tile-engine/core build
+pnpm --filter @canvas-tile-engine/core test
+pnpm --filter @canvas-tile-engine/core typecheck
+
+# React
+pnpm --filter @canvas-tile-engine/react dev
+pnpm --filter @canvas-tile-engine/react build
+pnpm --filter @canvas-tile-engine/react test
+pnpm --filter @canvas-tile-engine/react typecheck
+
+# React Native
+pnpm --filter @canvas-tile-engine/react-native dev
+pnpm --filter @canvas-tile-engine/react-native build
+pnpm --filter @canvas-tile-engine/react-native typecheck
+
+# React shared internals
+pnpm --filter @canvas-tile-engine/react-shared test
+pnpm --filter @canvas-tile-engine/react-shared typecheck
+
+# Renderers
+pnpm --filter @canvas-tile-engine/renderer-canvas test
+pnpm --filter @canvas-tile-engine/renderer-webgl test
+pnpm --filter @canvas-tile-engine/renderer-skia test
+pnpm --filter @canvas-tile-engine/renderer-server test
+pnpm --filter @canvas-tile-engine/renderer-shared test
+```
+
+### Examples
+
+```bash
+pnpm --filter vanilla-js-game-map dev
+pnpm --filter vanilla-js-spritesheet dev
+pnpm --filter react-game-map dev
+pnpm --filter react-responsive-game-map dev
+pnpm --filter react-pixel-paint dev
+pnpm --filter react-path-showcase dev
+pnpm --filter react-spritesheet dev
+pnpm --filter renderer-server-game-map start
+pnpm --filter renderer-server-path-showcase start
+```
+
+For example development against local package changes, run `pnpm dev:lib` in one terminal and the example command in another.
+
+## Architecture
+
+### Monorepo Structure
+
+- `packages/core/` - `@canvas-tile-engine/core`: renderer-agnostic engine, config, camera, gestures, draw API contracts, sprites, and spatial indexing.
+- `packages/react/` - `@canvas-tile-engine/react`: React bindings with `useCanvasTileEngine` and compound draw components.
+- `packages/react-native/` - `@canvas-tile-engine/react-native`: React Native bindings with the same component API, mounted through Skia.
+- `packages/react-shared/` - `@canvas-tile-engine/react-shared`: private internal package with modules shared between the React binding packages. Not published; consumers bundle its TypeScript source.
+- `packages/renderer-canvas/` - `@canvas-tile-engine/renderer-canvas`: HTML Canvas2D renderer.
+- `packages/renderer-webgl/` - `@canvas-tile-engine/renderer-webgl`: WebGL renderer with a Canvas2D overlay.
+- `packages/renderer-skia/` - `@canvas-tile-engine/renderer-skia`: React Native Skia renderer.
+- `packages/renderer-server/` - `@canvas-tile-engine/renderer-server`: headless Node.js renderer for PNG/JPEG/WebP buffers.
+- `packages/renderer-shared/` - `@canvas-tile-engine/renderer-shared`: private internal package with modules shared between renderers. Not published; consumers bundle its TypeScript source.
+- `examples/` - Vite, React, React Native, spritesheet, and server-rendering examples.
+- `docs/` - Docusaurus documentation site.
+
+### Core Package
+
+Main entry: `packages/core/src/CanvasTileEngine.ts`.
+
+Important modules:
+
+- `Camera.ts` - pan, zoom, bounds, and center management.
+- `Config.ts` - config normalization and defaults.
+- `ViewportState.ts` - viewport dimensions and DPR tracking.
+- `CoordinateTransformer.ts` - world/screen coordinate conversion.
+- `GestureProcessor.ts` - normalized pointer/touch/wheel input handling.
+- `AnimationController.ts` - smooth move, zoom, and resize animation support.
+- `SpatialIndex.ts` - RBush-backed viewport culling for large item sets.
+- `SpriteSheet.ts` and `SpriteAnimator.ts` - spritesheet frame calculation and animation scheduling.
+
+Key public contracts:
+
+- `IRenderer<TMount, TImage>` - renderer lifecycle and callback contract.
+- `IDrawAPI<TImage>` - drawing primitive interface implemented by renderers.
+- `IImageLoader<TImage>` - renderer-specific image loading.
+
+### Renderer Packages
+
+`renderer-canvas`:
+
+- Uses one HTML canvas and a Canvas2D context.
+- Supports DOM mouse/touch/wheel events, resize watchers, high-DPI sizing, coordinate overlay, debug HUD, and offscreen static caches.
+- `addDrawFunction` registers layer-ordered custom drawing and receives `CanvasRenderingContext2D`.
+
+`renderer-webgl`:
+
+- Creates a WebGL canvas plus a transparent Canvas2D overlay.
+- WebGL draws rects, circles, images, lines, paths, and grid lines.
+- Overlay draws text, coordinate overlay, debug HUD, `addDrawFunction`, and `onDraw`.
+- Static draw helpers delegate to dynamic drawing because WebGL already batches layer geometry.
+- `invalidateTexture(source)` exists for advanced same-size image/canvas content mutation cases.
+
+`renderer-skia`:
+
+- Implements `IRenderer<SkiaMount, SkImage>`.
+- Most app code should use `@canvas-tile-engine/react-native`, which wires layout, gestures, and Skia presentation.
+- Static draw helpers record non-changing item sets into Skia pictures.
+
+`renderer-server`:
+
+- Uses `@napi-rs/canvas` with no DOM and no interaction/event loop.
+- `renderToBuffer()` is the preferred one-shot API.
+- Supports PNG/JPEG/WebP output, font registration, image loading from paths, static caches, and custom drawing via `SKRSContext2D`.
+
+`renderer-shared` (internal, not published):
+
+- Three entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types; `renderer-webgl`'s 2D overlay also consumes its Layer, CoordinateOverlayRenderer, and DebugOverlay), `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too), and `@canvas-tile-engine/renderer-shared/geometry` (the viewport cull rect and per-item visibility test, consumed by all four renderers — pure functions, no context or platform types). Geometry that application code also needs lives in core instead (`itemsBounds`, `pathItemBounds`), not here.
+- No build step: `exports` points at `src/*.ts` and consumers bundle the source with tsup (`noExternal`).
+- Consumers depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files; the `workspace:^` publishing rule does not apply to it.
+- Never import it from application code or examples; its API has no semver guarantees.
+- When shared code changes behavior, add changesets for the affected renderer packages (the private package itself is not versioned).
+- Tests run on `environment: "node"` deliberately — `geometry` and `canvas2d` must stay platform-free for `renderer-server` and React Native Skia, and the node environment is what asserts they never reach for `window`/`document`. Do not flip the package to jsdom. A test that needs a real DOM opts in per file with a `// @vitest-environment jsdom` docblock (see `tests/init-styles.test.ts`).
+
+### React Packages
+
+`@canvas-tile-engine/react`:
+
+- Main component uses the compound pattern: `CanvasTileEngine.Rect`, `Circle`, `Image`, `Sprite`, `GridLines`, `Line`, `Text`, `Path`, `StaticRect`, `StaticCircle`, `StaticImage`, `DrawFunction`.
+- `useCanvasTileEngine()` returns a stable handle; methods no-op before mount and `isReady` indicates the real engine is attached.
+- `config`, `center`, and `renderer` are read on mount. Use runtime APIs for changes or remount with a new `key`.
+- Keep large `items` arrays stable with `useMemo` or state to avoid re-registering draw callbacks and rebuilding indexes.
+
+`@canvas-tile-engine/react-native`:
+
+- Mirrors the React API and component names.
+- `engine.getConfig()` returns the same default snapshot as the web hook before mount (never `undefined`).
+- Uses `RendererSkia`; styling is `ViewStyle`; image handles are `SkImage`.
+- `config.size` is a placeholder because the native component measures its `View` with `onLayout`.
+- Native touch input feeds the same callback names; do not document separate gesture event names unless the public API adds them.
+- Tests run under vitest with `react-native`, `react-native-gesture-handler`, and `@shopify/react-native-skia` aliased to mocks in `tests/mocks/`; jsdom only supplies React's host substrate. Two config lines are load-bearing and must not be "cleaned up": `resolve.dedupe: ["react", "react-dom"]` (react-shared is consumed as source and links its own react@18) and the exact `19.0.0` pins for `react`/`react-dom` (React 19 requires both at the same version). The `tests` directory is in the tsconfig `include` on purpose — tsc against the real native types is what pins the mocks to reality.
+
+`react-shared` (internal, not published):
+
+- Single entry point (`@canvas-tile-engine/react-shared`) with everything shared by `react` and `react-native`: the `useEngineHandle` hook core plus `EngineHandleBase` (generic over mount/image/draw-context types), `EngineContext`/`useEngineContext`, all 12 compound draw components, and `CanvasTileEngineBaseProps`. The platform packages pin the generics (`HTMLImageElement` vs `SkImage`/`SkCanvas`), layer platform-only handle members (`_containerRef`, `resize`) via `useEngineHandle`'s `buildExtras` parameter, and keep only their mount components (`CanvasTileEngine.tsx`) and entry re-exports.
+- Consumers bundle its TypeScript source with tsup (`noExternal`) and depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files.
+- Unlike `renderer-shared` it DOES have a build step, but a types-only one: `tsup` with `dts: { only: true }` emits a single flat `dist/index.d.ts` that the package's top-level `types` field points at. This exists because the consumers' bundled d.ts must inline the shared public types (`EngineHandleBase` etc.) via `dts: { resolve: [...] }`, and tsup's dts bundler resolves only the top-level `types` field and cannot follow relative `.ts` imports inside node_modules — a flat declaration file sidesteps both limits. `exports` still points at `src/index.ts`, so typecheck and JS bundling use live source.
+- Never import it from application code or examples; its API has no semver guarantees.
+- When shared code changes behavior, add changesets for `react` and `react-native` (the private package itself is not versioned).
+
+## Key Patterns
+
+### Renderer Injection
+
+```ts
+import { CanvasTileEngine } from "@canvas-tile-engine/core";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), center);
+```
+
+### React Usage
+
+```tsx
+import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const engine = useCanvasTileEngine();
+
+<CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()}>
+    <CanvasTileEngine.GridLines cellSize={1} layer={0} />
+    <CanvasTileEngine.Rect items={tiles} layer={1} />
+</CanvasTileEngine>;
+```
+
+### Server Rendering
+
+```ts
+import { renderToBuffer } from "@canvas-tile-engine/renderer-server";
+
+const png = await renderToBuffer({
+    config,
+    pixelRatio: 2,
+    draw: (engine) => {
+        engine.drawGridLines(1, 1, "#334155", 0);
+        engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#22c55e" } }, 1);
+    },
+});
+```
+
+## Keeping Changesets, Docs, and Skills in Sync
+
+For every edit, feature, or fix, check whether these need updating alongside the code:
+
+- `.changeset/` - required whenever a published package changes (behavior or public artifact). Run `pnpm changeset` and commit the generated file. Docs-, example-, or tooling-only changes do not need one.
+- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one. Unreleased changes go to `docs/docs/` only; `versioned_docs` is synced at release time. Only edit `versioned_docs` directly to fix documentation of already-published behavior.
+- `skills-next/canvas-tile-engine/` - update `SKILL.md` and its reference files when the change affects usage or the public API. This is the upcoming (unreleased) copy of the AI agent skill. Never edit `skills/canvas-tile-engine/` in feature PRs: it describes the published packages and is consumed directly from `master` (skills CLI, plugin marketplace), so it must only be synced from `skills-next` when cutting a release.
+
+## Releases (Changesets)
+
+Publishing is managed with Changesets (`.changeset/config.json`; private packages — docs, all examples, and `renderer-shared` — are excluded from versioning).
+
+- Any PR that changes a published package's behavior or public artifact must include a changeset: run `pnpm changeset`, pick the affected packages and bump type, describe the change (this text becomes the CHANGELOG entry).
+- On push to `master`, `.github/workflows/release.yml` (changesets/action) collects pending changesets into a "Version Packages" PR. Merging that PR bumps versions, updates CHANGELOGs, publishes to npm with `pnpm release`, and pushes git tags.
+- When cutting a release, also sync the published copies: carry the released changes from `docs/docs/` into `docs/versioned_docs/version-0.x.x/`, and copy `skills-next/canvas-tile-engine/` over `skills/canvas-tile-engine/`.
+- Internal deps between published packages use `workspace:^` (published as `^x.y.z`). Do not use `workspace:*` — it publishes as an exact pin.
+- Manual release (fallback): `pnpm changeset:version` then `pnpm release` (requires npm auth).
+
+## Repository Conventions
+
+- Use package scripts and root `turbo run` delegation. Do not add root scripts that manually chain package logic.
+- Prefer existing renderer and draw API patterns over new abstractions.
+- Use `apply_patch` for manual file edits.
+- Do not revert unrelated user changes.
+- Keep README/package docs consistent with `README.md` and package-level README files.
+- Use ASCII in docs unless the surrounding file already requires otherwise.
+
+## Commit Convention
+
+Follow Conventional Commits: `<type>(<scope>): <description>`.
+
+Common types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
+
+Common scopes: `core`, `react`, `react-native`, `r-canvas`, `r-webgl`, `r-skia`, `r-server`, `docs`, `examples`.
