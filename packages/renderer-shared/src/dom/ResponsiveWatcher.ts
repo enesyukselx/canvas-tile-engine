@@ -75,8 +75,15 @@ export class ResponsiveWatcher {
         const initialWidth = Math.round(wrapperRect.width);
         const initialHeight = Math.round(wrapperRect.height);
 
-        // Apply initial size
-        this.applySize(initialWidth, initialHeight, responsiveMode);
+        // A wrapper measuring zero (hidden tab, collapsed accordion,
+        // not-yet-opened modal, flex parent on first paint) must not reach
+        // applySize: preserve-viewport would divide by zero and permanently
+        // NaN the camera. Skip initial sizing here; the ResizeObserver below
+        // already fires when the wrapper transitions to a real size, so it
+        // picks up the initial application once dimensions are non-zero.
+        if (initialWidth > 0 && initialHeight > 0) {
+            this.applySize(initialWidth, initialHeight, responsiveMode);
+        }
 
         // Setup ResizeObserver to watch wrapper
         this.resizeObserver = new ResizeObserver((entries) => {
@@ -119,6 +126,13 @@ export class ResponsiveWatcher {
     }
 
     private applySize(width: number, height: number, mode: "preserve-scale" | "preserve-viewport") {
+        // Defensive: a zero-size call must never reach the camera math below
+        // (preserve-viewport divides by width, permanently NaN-ing the
+        // camera). Callers already guard this; this is a backstop.
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
         const dpr = this.viewport.dpr;
         const prev = this.viewport.getSize();
         const prevScale = this.camera.scale;

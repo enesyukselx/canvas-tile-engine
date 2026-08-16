@@ -297,4 +297,78 @@ describe("ResponsiveWatcher scale limits", () => {
             expect(state.scale).toBe(10);
         });
     });
+
+    describe("zero-size mount (issue #191)", () => {
+        it("does not corrupt the camera when preserve-viewport measures 0x0 on start", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            // Camera stays at its configured values instead of collapsing to 0/NaN
+            expect(state.scale).toBe(10);
+            expect(state.minScale).toBe(10);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers once the observer reports a real size after a 0x0 preserve-viewport mount", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            FakeResizeObserver.instance!.trigger(600, 480);
+
+            expect(state.scale).toBe(6);
+            expect(state.minScale).toBe(6);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("does not corrupt the camera when preserve-scale measures 0x0 on start", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-scale",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(state.scale).toBe(10);
+            expect(state.minScale).toBe(10);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers once the observer reports a real size after a 0x0 preserve-scale mount", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-scale",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+                bounds: { minX: 0, maxX: 100, minY: 0, maxY: 80 },
+            });
+            watcher.start();
+
+            FakeResizeObserver.instance!.trigger(500, 800);
+
+            expect(state.minScale).toBe(5);
+            expect(state.scale).toBe(10);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+    });
 });
