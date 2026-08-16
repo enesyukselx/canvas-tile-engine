@@ -77,7 +77,6 @@ type Text = {
     y: number;
     text: string;
     size?: number;
-    origin?: { mode?: "cell" | "self"; x?: number; y?: number };
     style?: {
         fillStyle?: string;
         fontFamily?: string;
@@ -136,7 +135,6 @@ type ImageItem<TImage = HTMLImageElement> = {
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
     rotate?: number;
-    radius?: number | number[];
     img: TImage;
     sprite?: SpriteRect;
 };
