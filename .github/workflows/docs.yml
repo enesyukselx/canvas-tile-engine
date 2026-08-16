@@ -1,0 +1,27 @@
+name: "Docs"
+
+# The docs site is its own npm project (not a pnpm workspace member), so this
+# workflow installs from `docs/package-lock.json` with `npm ci` - which also
+# verifies that the committed lockfile still matches `docs/package.json`.
+on:
+    push:
+        paths:
+            - "docs/**"
+            - ".github/workflows/docs.yml"
+jobs:
+    docs:
+        name: Typecheck - Build
+        runs-on: ubuntu-22.04
+        defaults:
+            run:
+                working-directory: docs
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 22
+                  cache: "npm"
+                  cache-dependency-path: "docs/package-lock.json"
+            - run: npm ci
+            - run: npm run typecheck
+            - run: npm run build

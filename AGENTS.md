@@ -17,8 +17,14 @@ pnpm install
 # Build published packages
 pnpm build
 
-# Build docs
+# Install docs dependencies (docs/ is a separate npm project, not in the pnpm workspace)
+pnpm install:docs
+
+# Build docs (requires pnpm install:docs first)
 pnpm build:docs
+
+# Type check docs
+pnpm typecheck:docs
 
 # Run package watch mode plus the default vanilla example
 pnpm dev
@@ -113,7 +119,7 @@ For example development against local package changes, run `pnpm dev:lib` in one
 - `packages/renderer-server/` - `@canvas-tile-engine/renderer-server`: headless Node.js renderer for PNG/JPEG/WebP buffers.
 - `packages/renderer-shared/` - `@canvas-tile-engine/renderer-shared`: private internal package with modules shared between renderers. Not published; consumers bundle its TypeScript source.
 - `examples/` - Vite, React, React Native, spritesheet, and server-rendering examples.
-- `docs/` - Docusaurus documentation site.
+- `docs/` - Docusaurus documentation site. A standalone npm project with its own `package-lock.json`; it is not listed in `pnpm-workspace.yaml`, so use `pnpm install:docs` (npm under the hood) before building it.
 
 ### Core Package
 
@@ -244,7 +250,7 @@ const png = await renderToBuffer({
 For every edit, feature, or fix, check whether these need updating alongside the code:
 
 - `.changeset/` - required whenever a published package changes (behavior or public artifact). Run `pnpm changeset` and commit the generated file. Docs-, example-, or tooling-only changes do not need one.
-- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one. Unreleased changes go to `docs/docs/` only; `versioned_docs` is synced at release time. Only edit `versioned_docs` directly to fix documentation of already-published behavior.
+- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one. Unreleased changes go to `docs/docs/` only; `versioned_docs` is synced at release time. Only edit `versioned_docs` directly to fix documentation of already-published behavior. Pushes touching `docs/**` run `.github/workflows/docs.yml` (`npm ci`, `npm run typecheck`, `npm run build`), so a broken link or a stale `docs/package-lock.json` fails CI.
 - `skills-next/canvas-tile-engine/` - update `SKILL.md` and its reference files when the change affects usage or the public API. This is the upcoming (unreleased) copy of the AI agent skill. Never edit `skills/canvas-tile-engine/` in feature PRs: it describes the published packages and is consumed directly from `master` (skills CLI, plugin marketplace), so it must only be synced from `skills-next` when cutting a release.
 
 ## Releases (Changesets)
