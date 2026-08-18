@@ -577,6 +577,9 @@ export class GLRenderer {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
             return true;
         } catch (err) {
+            if (!(err instanceof DOMException && err.name === "SecurityError")) {
+                throw err;
+            }
             if (!this.taintedSources.has(source)) {
                 this.taintedSources.add(source);
                 console.error(
