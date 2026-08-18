@@ -617,6 +617,8 @@ export class GLRenderer {
             }
             gl.bindTexture(gl.TEXTURE_2D, existing.texture);
             if (!this.uploadTexture(source)) {
+                gl.deleteTexture(existing.texture);
+                this.textures.delete(source);
                 return null;
             }
             existing.width = width;
