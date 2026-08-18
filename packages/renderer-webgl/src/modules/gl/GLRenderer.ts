@@ -577,7 +577,11 @@ export class GLRenderer {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
             return true;
         } catch (err) {
-            if (!(err instanceof DOMException && err.name === "SecurityError")) {
+            // Only tainting is recoverable. Browsers report it as a SecurityError
+            // DOMException, but match on the name alone so non-DOM WebGL hosts
+            // are covered too; anything else (context loss, a bad argument) is a
+            // real bug and must surface instead of being silently skipped.
+            if ((err as { name?: string } | null | undefined)?.name !== "SecurityError") {
                 throw err;
             }
             if (!this.taintedSources.has(source)) {
