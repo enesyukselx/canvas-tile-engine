@@ -37,7 +37,8 @@ export class FpsSampler {
         }
         this.running = true;
         this.lastFrameTime = performance.now();
-        this.tick();
+        requestAnimationFrame(() => this.tick());
+    }
     }
 
     /** Stop sampling. The last reading stays readable. */
