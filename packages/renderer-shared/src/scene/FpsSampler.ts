@@ -4,9 +4,10 @@ const FPS_SAMPLE_SIZE = 10;
  * Rolling-average frame rate counter, driven by its own `requestAnimationFrame`
  * loop so the reading keeps updating while the scene is idle.
  *
- * Platform-free on purpose: `requestAnimationFrame` and `performance.now` exist
- * in the browser, in React Native and in Node's global scope, and nothing here
- * touches a drawing context. Every renderer's debug HUD owns one of these and
+ * Free of drawing APIs, but not of platform globals: it needs
+ * `requestAnimationFrame`, which the browser and React Native provide and plain
+ * Node does not — `renderer-server` must never start one. Every renderer's
+ * debug HUD owns one of these and
  * reads {@link fps} while painting.
  * @internal
  */
