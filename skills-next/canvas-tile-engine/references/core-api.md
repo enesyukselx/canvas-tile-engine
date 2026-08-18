@@ -289,6 +289,25 @@ engine.drawImage({ x: 0, y: 0, size: 1, img }, 1);
 engine.render();
 ```
 
+### CORS on the browser renderers
+
+`RendererCanvas` and `RendererWebGL` request images with
+`crossOrigin="anonymous"` by default, which makes every image request a CORS
+request. Images served WITHOUT an `Access-Control-Allow-Origin` header then fail
+to load entirely (the error names the URL, not the missing header). Opt out per
+renderer:
+
+```ts
+new RendererCanvas({ crossOrigin: null });          // plain request, no CORS
+new RendererCanvas({ crossOrigin: "use-credentials" }); // CORS with cookies
+```
+
+Reach for `crossOrigin: null` when tiles/sprites come from a bucket, a CDN, or a
+third-party tile server that sends no CORS headers. It is safe on Canvas2D (the
+renderer never reads pixels back; the canvas is merely tainted), but on WebGL a
+tainted image cannot be uploaded as a texture and is skipped at draw time - so
+only opt out there if every image is same-origin.
+
 ## Utilities
 
 ### `gridToSize` - think in cells instead of pixels

@@ -58,6 +58,23 @@ import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 `RendererWebGL` draws geometry on the WebGL canvas and text/custom drawing/debug/coordinate overlay on a stacked 2D canvas. Text and custom draw functions therefore composite above WebGL primitives even when their layer number is lower. Ordering within each surface is still layer-based.
 :::
 
+## Renderer Options
+
+`RendererCanvas` and `RendererWebGL` take an optional options object:
+
+| Option | Type | Default | Description |
+| :-- | :-- | :-- | :-- |
+| `crossOrigin` | `"anonymous" \| "use-credentials" \| null` | `"anonymous"` | `crossOrigin` attribute for images loaded through `engine.images`. `null` drops the attribute, so images served without an `Access-Control-Allow-Origin` header still load. |
+
+```ts
+// Tiles from a CDN that does not send CORS headers
+new CanvasTileEngine(wrapper, config, new RendererCanvas({ crossOrigin: null }));
+```
+
+WebGL needs CORS-clean images to upload them as textures, so `crossOrigin: null` there causes cross-origin images to be skipped at draw time. See [Image Loader](../js/image_loader.md#cors-and-crossorigin).
+
+`RendererServer` takes `pixelRatio`; see [Server Rendering](../server/rendering.md). `RendererSkia` takes no options.
+
 ## Renderer Interface
 
 Renderers implement `IRenderer<TMount, TImage>` from `@canvas-tile-engine/core`.

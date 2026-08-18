@@ -38,6 +38,25 @@ import {
 } from "@canvas-tile-engine/renderer-shared/dom";
 import { BrowserCanvasDraw, BrowserContext2D, createBrowserCanvasDraw } from "./modules/createCanvasDraw";
 
+// crossOrigin is spelled out below rather than imported from renderer-shared:
+// that package is private, so a type reference to it would land in the
+// published d.ts and resolve to nothing for consumers.
+export interface RendererCanvasOptions {
+    /**
+     * `crossOrigin` attribute used for images loaded through `engine.images`.
+     * Default `"anonymous"`.
+     *
+     * The attribute makes every image request a CORS request, so images served
+     * without an `Access-Control-Allow-Origin` header — a plain bucket, a CDN,
+     * a third-party tile server — fail to load entirely. Pass `null` to request
+     * them as ordinary images instead; they then load fine and merely taint the
+     * canvas, which this renderer never reads back from.
+     *
+     * Use `"use-credentials"` for CORS requests that must carry cookies.
+     */
+    crossOrigin?: "anonymous" | "use-credentials" | null;
+}
+
 export class RendererCanvas implements IRenderer {
     /** Transform helpers handed to the onDraw hook. */
     private drawTransform: DrawTransform = {
@@ -69,13 +88,20 @@ export class RendererCanvas implements IRenderer {
     private animationController!: AnimationController;
 
     // Image loading
-    private imageLoader = new ImageLoader();
+    private imageLoader: ImageLoader;
 
     /** Optional user-provided draw hook executed after engine layers. */
     public onDraw?: onDrawCallback;
 
     /** Optional callback fired when canvas is resized. */
     public onResize?: () => void;
+
+    /**
+     * @param options See {@link RendererCanvasOptions}.
+     */
+    constructor(options: RendererCanvasOptions = {}) {
+        this.imageLoader = new ImageLoader({ crossOrigin: options.crossOrigin });
+    }
 
     // ─── Callback Getters/Setters (proxy to GestureProcessor) ───
 
