@@ -282,18 +282,25 @@ export class RendererWebGL implements IRenderer {
         );
 
         // Initialize EventBinder with normalized handlers
-        this.eventBinder = new EventBinder(this.canvas, {
-            click: this.handleClick,
-            contextmenu: this.handleContextMenu,
-            mousedown: this.handleMouseDown,
-            mousemove: this.handleMouseMove,
-            mouseup: this.handleMouseUp,
-            mouseleave: this.handleMouseLeave,
-            wheel: this.handleWheel,
-            touchstart: this.handleTouchStart,
-            touchmove: this.handleTouchMove,
-            touchend: this.handleTouchEnd,
-        });
+        this.eventBinder = new EventBinder(
+            this.canvas,
+            {
+                click: this.handleClick,
+                contextmenu: this.handleContextMenu,
+                mousedown: this.handleMouseDown,
+                mousemove: this.handleMouseMove,
+                mouseup: this.handleMouseUp,
+                mouseleave: this.handleMouseLeave,
+                wheel: this.handleWheel,
+                touchstart: this.handleTouchStart,
+                touchmove: this.handleTouchMove,
+                touchend: this.handleTouchEnd,
+                keydown: this.handleKeyDown,
+            },
+            // keydown binds to the wrapper: it is what carries tabindex, and a key
+            // event only fires on the focused element.
+            this.canvasWrapper,
+        );
 
         // Initialize AnimationController and SizeController
         this.animationController = new AnimationController(
@@ -397,6 +404,22 @@ export class RendererWebGL implements IRenderer {
     }
 
     // ─── Event Handlers (DOM → Normalize → GestureProcessor) ───
+
+    private handleKeyDown = (e: KeyboardEvent): void => {
+        // preventDefault ONLY for a key the engine actually consumed. Anything
+        // else — Tab, Escape, Home/End, screen-reader shortcuts — must reach
+        // the browser untouched, which is what keeps the surface escapable.
+        const consumed = this.gestureProcessor.handleKeyDown({
+            key: e.key,
+            shiftKey: e.shiftKey,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            altKey: e.altKey,
+        });
+        if (consumed) {
+            e.preventDefault();
+        }
+    };
 
     private handleClick = (e: MouseEvent): void => {
         this.gestureProcessor.handleClick(this.normalizePointer(e));

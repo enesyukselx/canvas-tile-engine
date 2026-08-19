@@ -65,6 +65,32 @@ export interface ProcessedCoords {
  * Canvas bounds for zoom calculation.
  * Compatible with DOMRect subset needed by Camera.zoom
  */
+/**
+ * A key press, normalized so core never touches a DOM `KeyboardEvent`.
+ * Mirrors `KeyboardEvent.key` semantics.
+ */
+export interface NormalizedKey {
+    /** The `KeyboardEvent.key` value, e.g. `"ArrowLeft"`, `"+"`, `"Enter"`, `" "`. */
+    key: string;
+    shiftKey?: boolean;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    altKey?: boolean;
+}
+
+/** Resolved keyboard behaviour for the current config. */
+interface KeyboardSettings {
+    pan: boolean;
+    zoom: boolean;
+    activate: boolean;
+    /** Pan step in screen pixels, already resolved from `pan`/`panPx`. */
+    stepPx: number;
+    zoomFactor: number;
+}
+
+const DEFAULT_KEYBOARD_PAN_PX = 80;
+const DEFAULT_KEYBOARD_ZOOM_FACTOR = 1.5;
+
 export interface CanvasBounds {
     left: number;
     top: number;
@@ -172,6 +198,126 @@ export class GestureProcessor {
         };
     }
 
+    // ─── Keyboard ──────────────────────────────────────────────
+
+    /**
+     * Resolve what the keyboard may do right now. `undefined` mirrors the
+     * pointer gates so keyboard grants nothing the app did not already grant;
+     * `true` forces everything on; `false` turns it off.
+     */
+    private keyboardSettings(): KeyboardSettings | null {
+        const handlers = this.config.get().eventHandlers;
+        const keyboard = handlers.keyboard;
+        if (keyboard === false) {
+            return null;
+        }
+
+        const forced = keyboard === true;
+        const options = typeof keyboard === "object" && keyboard !== null ? keyboard : {};
+        // World units convert through the live scale; the *Px form wins, per
+        // the convention used everywhere else in the API.
+        const stepPx =
+            options.panPx ?? (options.pan !== undefined ? options.pan * this.camera.scale : DEFAULT_KEYBOARD_PAN_PX);
+
+        return {
+            // `Required<>` is shallow, so these stay optional in the type
+            // even though Config always fills them.
+            pan: forced || handlers.drag === true,
+            zoom: forced || handlers.zoom !== false,
+            activate: forced || handlers.click === true,
+            stepPx,
+            zoomFactor: options.zoomFactor ?? DEFAULT_KEYBOARD_ZOOM_FACTOR,
+        };
+    }
+
+    /**
+     * Handle a key press. Returns `true` when the engine consumed the key, so
+     * the caller knows whether to `preventDefault` — nothing else is ever
+     * suppressed.
+     *
+     * `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are deliberately
+     * absent and must stay absent: leaving them to the browser is what keeps
+     * the surface escapable (SC 2.1.2). Any modifier combination is ignored so
+     * browser and screen-reader shortcuts keep working.
+     */
+    handleKeyDown = (event: NormalizedKey): boolean => {
+        if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+            return false;
+        }
+
+        const settings = this.keyboardSettings();
+        if (!settings) {
+            return false;
+        }
+
+        // `pan(dx, dy)` shifts the camera by `-d/scale`, so panning the view
+        // right means a negative delta.
+        const step = settings.stepPx;
+        switch (event.key) {
+            case "ArrowLeft":
+                return settings.pan && this.panBy(step, 0);
+            case "ArrowRight":
+                return settings.pan && this.panBy(-step, 0);
+            case "ArrowUp":
+                return settings.pan && this.panBy(0, step);
+            case "ArrowDown":
+                return settings.pan && this.panBy(0, -step);
+            case "+":
+            case "=":
+                return settings.zoom && this.zoomBy(settings.zoomFactor);
+            case "-":
+            case "_":
+                return settings.zoom && this.zoomBy(1 / settings.zoomFactor);
+            case "Enter":
+            case " ":
+                return settings.activate && this.activateAtCenter();
+            default:
+                return false;
+        }
+    };
+
+    private panBy(dx: number, dy: number): boolean {
+        this.camera.pan(dx, dy);
+        this.onCameraChange();
+        return true;
+    }
+
+    private zoomBy(factor: number): boolean {
+        const bounds = this.canvasBoundsGetter();
+        const prevScale = this.camera.scale;
+        this.camera.zoomByFactor(factor, bounds.width / 2, bounds.height / 2);
+        // Keyboard zoom reports through onZoom only, exactly like the
+        // programmatic zoomIn/zoomOut path. onWheel means "a wheel or pinch
+        // gesture happened", which this is not.
+        if (this.camera.scale !== prevScale) {
+            this.onZoom?.(this.camera.scale);
+        }
+        this.onCameraChange();
+        return true;
+    }
+
+    /**
+     * Fire the existing `onClick` at the viewport center — a crosshair picker
+     * for keyboard users. Every coordinate is truthful: the center really is
+     * where the activation points, so nothing is synthesized.
+     */
+    private activateAtCenter(): boolean {
+        if (!this.onClick) {
+            return false;
+        }
+        const bounds = this.canvasBoundsGetter();
+        const x = bounds.width / 2;
+        const y = bounds.height / 2;
+        const { coords, mouse, client } = this.processCoords({
+            x,
+            y,
+            clientX: bounds.left + x,
+            clientY: bounds.top + y,
+        });
+        this.onClick(coords, mouse, client, { source: "keyboard" });
+        return true;
+    }
+
     // ─── Single Pointer Handlers ───────────────────────────────
 
     handleClick = (pointer: NormalizedPointer): void => {
@@ -183,7 +329,7 @@ export class GestureProcessor {
             return;
         }
         const { coords, mouse, client } = this.processCoords(pointer);
-        this.onClick(coords, mouse, client);
+        this.onClick(coords, mouse, client, { source: "pointer" });
     };
 
     handleRightClick = (pointer: NormalizedPointer): void => {

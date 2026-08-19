@@ -29,7 +29,35 @@ type MouseEventCallback = (
     },
 ) => void;
 
-export type onClickCallback = MouseEventCallback;
+/** How a click was produced. */
+export interface ClickInfo {
+    /**
+     * `"keyboard"` for an Enter/Space activation, where the coordinates
+     * describe the viewport center rather than a pointer position.
+     */
+    source: "pointer" | "keyboard";
+}
+
+/**
+ * De-aliased from the shared pointer signature so it can carry {@link ClickInfo}.
+ * The parameter is trailing and optional, so an existing three-argument
+ * callback stays assignable.
+ */
+export type onClickCallback = (
+    coords: {
+        raw: Coords;
+        snapped: Coords;
+    },
+    mouse: {
+        raw: Coords;
+        snapped: Coords;
+    },
+    client: {
+        raw: Coords;
+        snapped: Coords;
+    },
+    info?: ClickInfo,
+) => void;
 
 export type onHoverCallback = MouseEventCallback;
 

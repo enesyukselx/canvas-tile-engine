@@ -144,6 +144,22 @@ export type CanvasTileEngineConfig = {
  */
 export type ZoomMode = "pointer" | "center";
 
+/** Step sizes for keyboard camera control. */
+export type KeyboardConfig = {
+    /**
+     * Pan step in world units — one cell per press with the default cell
+     * size. Ignored when {@link panPx} is set.
+     */
+    pan?: number;
+    /**
+     * Pan step in screen pixels, independent of zoom. Takes precedence over
+     * {@link pan}. Default 80, matching the step map libraries settled on.
+     */
+    panPx?: number;
+    /** Multiplicative zoom step for `+`/`-`. Default 1.5, matching `zoomIn`/`zoomOut`. */
+    zoomFactor?: number;
+};
+
 export type EventHandlers = {
     click?: boolean;
     rightClick?: boolean;
@@ -152,4 +168,22 @@ export type EventHandlers = {
     /** Zoom behavior: `false` disables zoom, `true` is shorthand for `"pointer"`. */
     zoom?: boolean | ZoomMode;
     resize?: boolean;
+    /**
+     * Keyboard camera control. DOM renderers only — React Native's core
+     * `View` has no key events, and the server renderer has no input loop.
+     *
+     * Left `undefined` (the default) it MIRRORS the pointer gates: arrows pan
+     * only if `drag` is on, `+`/`-` zoom only if `zoom` is on, and
+     * Enter/Space activate only if `click` is on. Keyboard therefore grants
+     * no capability the app did not already grant — which is what SC 2.1.1
+     * asks for — and is a genuine no-op on a deliberately static board.
+     *
+     * `true` forces all three on regardless; `false` forces them off. An
+     * object configures the step sizes while still mirroring the gates.
+     *
+     * `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are never
+     * captured and never will be, so the surface can never become a keyboard
+     * trap (SC 2.1.2).
+     */
+    keyboard?: boolean | KeyboardConfig;
 };

@@ -30,7 +30,10 @@ type NormalizedEventHandlers = Required<CanvasTileEngineConfig>["eventHandlers"]
  * `accessibility.focusable` default: a surface nobody can click, drag or zoom
  * has nothing for a keyboard user to reach, so it should not take a tab stop.
  */
-function hasPointerInteraction(handlers: NormalizedEventHandlers): boolean {
+function wantsFocus(handlers: NormalizedEventHandlers): boolean {
+    if (handlers.keyboard === true) {
+        return true; // explicitly keyboard-operable, so it needs a tab stop
+    }
     return handlers.click || handlers.rightClick || handlers.hover || handlers.drag || handlers.zoom !== false;
 }
 
@@ -41,7 +44,7 @@ function hasPointerInteraction(handlers: NormalizedEventHandlers): boolean {
  */
 function resolveAccessibility(input: AccessibilityConfig, handlers: NormalizedEventHandlers): AccessibilityConfig {
     const resolved: AccessibilityConfig = {
-        focusable: input.focusable ?? hasPointerInteraction(handlers),
+        focusable: input.focusable ?? wantsFocus(handlers),
         reducedMotion: input.reducedMotion ?? "auto",
     };
     if (input.label !== undefined) {
@@ -107,6 +110,9 @@ export class Config implements MotionPolicy {
             drag: config.eventHandlers?.drag ?? false,
             zoom: normalizeZoom(config.eventHandlers?.zoom),
             resize: config.eventHandlers?.resize ?? false,
+            // Kept as supplied: `undefined` means "mirror the gates above",
+            // which only the gesture layer can resolve.
+            keyboard: config.eventHandlers?.keyboard,
         };
         const accessibilityInput: AccessibilityConfig = { ...config.accessibility };
 
