@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
-import { SkiaDraw } from "../../src/modules/SkiaDraw";
+import { COLOR_CACHE_LIMIT, SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "../../src/modules/Layer";
-import { COLOR_CACHE_LIMIT } from "@canvas-tile-engine/renderer-shared/cache";
 import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
 
 interface Op {

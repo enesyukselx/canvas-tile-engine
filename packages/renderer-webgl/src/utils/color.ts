@@ -1,4 +1,4 @@
-import { COLOR_CACHE_LIMIT, LruCache } from "@canvas-tile-engine/renderer-shared/cache";
+import { LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 
 /**
  * A color as the four floats in [0, 1] that WebGL wants.
@@ -7,6 +7,25 @@ import { COLOR_CACHE_LIMIT, LruCache } from "@canvas-tile-engine/renderer-shared
 export type RGBA = [number, number, number, number];
 
 const WHITE: RGBA = [1, 1, 1, 1];
+
+/**
+ * Upper bound on the parsed-color cache.
+ *
+ * The cache is consulted once per visible item per frame, so the working set is
+ * whatever is on screen — not the whole item list. The bound has to clear that,
+ * because a bounded LRU whose working set overflows it does not degrade, it
+ * falls off a cliff: every lookup asks for the entry the previous frame evicted
+ * and the hit rate goes to zero. 4096 covers a dense viewport where `styleOf`
+ * gives every cell its own stable color, at roughly 150 bytes an entry (the key
+ * string, the tuple, the map slot) — under a megabyte held.
+ *
+ * It is deliberately half of `renderer-skia`'s bound. A miss here is an inline
+ * `parseFast` for the hex/`rgb()`/`hsl()` forms a computed `styleOf` builds, so
+ * overflowing costs arithmetic; Skia has no such path and pays a native call,
+ * so it buys more headroom with its memory. Keep the two sized independently.
+ * @internal
+ */
+export const COLOR_CACHE_LIMIT = 4096;
 
 const HASH = 35; // "#"
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/;
