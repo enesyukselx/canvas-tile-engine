@@ -241,11 +241,21 @@ function CanvasTileEngineBase({
 
     useEffect(() => {
         let cancelled = false;
+        let live = false;
+
+        // Subscribe before reading, and let a delivered event win: the read is
+        // async, so a flip that lands between the two would otherwise be lost
+        // (no listener yet) or clobbered (stale promise resolving last).
+        const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (enabled) => {
+            live = true;
+            applyReducedMotion(enabled);
+        });
+
         // Async, and it resolves after the first layout on a slow device — so
         // the value is also replayed when the engine is created below.
         AccessibilityInfo.isReduceMotionEnabled()
             .then((enabled) => {
-                if (!cancelled) {
+                if (!cancelled && !live) {
                     applyReducedMotion(enabled);
                 }
             })
@@ -253,7 +263,6 @@ function CanvasTileEngineBase({
                 // A platform without the query keeps "auto" meaning "animate".
             });
 
-        const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", applyReducedMotion);
         return () => {
             cancelled = true;
             subscription.remove();
