@@ -532,10 +532,26 @@ function CanvasTileEngineBase({
         return Gesture.Simultaneous(transport, blocker);
     }, [interactionsClaimed, onTouchesDown, onTouchesMove, onTouchesUp, onTouchesCancelled]);
 
+    // Read from the config prop rather than the engine: the View renders
+    // before the first layout creates the engine, and an unnamed surface in
+    // that window would be announced as nothing.
+    const a11y = config.accessibility;
+    const accessibilityRole = a11y?.role === "image" ? ("image" as const) : undefined;
+
     return (
         <EngineContext.Provider value={contextValue}>
             <GestureDetector gesture={gesture}>
-                <View style={[styles.fill, style]} onLayout={handleLayout}>
+                <View
+                    style={[styles.fill, style]}
+                    onLayout={handleLayout}
+                    // The measured View carries the identity, never the Skia
+                    // Canvas — the canvas is purely visual and marked
+                    // pointerEvents="none" below.
+                    accessible={a11y?.label !== undefined || undefined}
+                    accessibilityRole={accessibilityRole}
+                    accessibilityLabel={a11y?.label}
+                    accessibilityHint={a11y?.description}
+                >
                     {size.width > 0 &&
                         size.height > 0 && (
                             // pointerEvents="none": the canvas is purely visual — all

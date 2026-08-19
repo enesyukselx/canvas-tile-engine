@@ -387,4 +387,72 @@ describe("CanvasTileEngine mount component (React Native)", () => {
             expect(reduceMotionListenerCount()).toBe(0);
         });
     });
+
+    describe("accessibility surface", () => {
+        it("names the measured View, never the Skia canvas", () => {
+            const fake = createFakeRenderer();
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                return (
+                    <CanvasTileEngine
+                        engine={engine}
+                        config={{
+                            ...CONFIG,
+                            accessibility: { label: "Venue map", description: "Drag to pan", role: "image" },
+                        }}
+                        renderer={fake.renderer}
+                    />
+                );
+            }
+
+            render(<Harness />);
+            act(() => emitLayout(300, 200));
+
+            const view = viewProps[viewProps.length - 1];
+            expect(view.accessible).toBe(true);
+            expect(view.accessibilityLabel).toBe("Venue map");
+            expect(view.accessibilityHint).toBe("Drag to pan");
+            expect(view.accessibilityRole).toBe("image");
+            // Nothing accessible is passed to the Skia canvas — its props type
+            // carries no such field, so tsc is what enforces that here.
+        });
+
+        it("stays unannounced when no label is configured", () => {
+            const fake = createFakeRenderer();
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                return <CanvasTileEngine engine={engine} config={CONFIG} renderer={fake.renderer} />;
+            }
+
+            render(<Harness />);
+
+            const view = viewProps[viewProps.length - 1];
+            expect(view.accessible).toBeUndefined();
+            expect(view.accessibilityLabel).toBeUndefined();
+        });
+
+        it("drops a role React Native has no equivalent for", () => {
+            const fake = createFakeRenderer();
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                return (
+                    <CanvasTileEngine
+                        engine={engine}
+                        config={{ ...CONFIG, accessibility: { label: "Board", role: "region" } }}
+                        renderer={fake.renderer}
+                    />
+                );
+            }
+
+            render(<Harness />);
+
+            // "region" and "application" have no RN accessibilityRole; the
+            // label still lands, which is what actually gets announced.
+            expect(viewProps[viewProps.length - 1].accessibilityRole).toBeUndefined();
+            expect(viewProps[viewProps.length - 1].accessibilityLabel).toBe("Board");
+        });
+    });
 });
