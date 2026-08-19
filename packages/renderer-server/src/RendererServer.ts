@@ -19,7 +19,8 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import { createCanvas, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
-import { CoordinateOverlayRenderer, DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CoordinateOverlayRenderer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { createServerCanvasDraw, type ServerCanvasDraw } from "./modules/createCanvasDraw";
 import { ImageLoaderServer } from "./modules/ImageLoaderServer";
 import type { ImageFormat, ServerMount } from "./types";

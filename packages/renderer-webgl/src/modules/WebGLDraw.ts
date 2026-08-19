@@ -38,7 +38,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
-import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
 import { GLRenderer } from "./gl/GLRenderer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";

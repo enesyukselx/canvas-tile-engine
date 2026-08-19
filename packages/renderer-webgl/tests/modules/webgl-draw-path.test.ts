@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, Coords, ICamera } from "@canvas-tile-engine/core";
 import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
-import { Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import type { RGBA } from "../../src/utils/color";
 import type { GLRenderer, LineInstance } from "../../src/modules/gl/GLRenderer";
 

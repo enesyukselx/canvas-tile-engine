@@ -11,15 +11,22 @@ never appears in published `package.json` dependencies.
 
 - `@canvas-tile-engine/renderer-shared/canvas2d` - the Canvas2D drawing
   pipeline shared by `renderer-canvas` (browser) and `renderer-server`
-  (`@napi-rs/canvas`): draw modules, coordinate overlay, debug HUD, layer
-  management, and canvas utils, generic over the 2D context and image types.
-  `renderer-webgl`'s stacked 2D overlay consumes the Layer,
-  CoordinateOverlayRenderer, and DebugOverlay modules too.
+  (`@napi-rs/canvas`): draw modules, coordinate overlay, debug HUD, and canvas
+  utils, generic over the 2D context and image types. `renderer-webgl`'s
+  stacked 2D overlay consumes the CoordinateOverlayRenderer and DebugOverlay
+  modules too.
 - `@canvas-tile-engine/renderer-shared/dom` - browser plumbing shared by
   `renderer-canvas` and `renderer-webgl`: event binding, resize/responsive
   watchers, size control, and image loading. Sizing modules take a list of
   canvases so the WebGL renderer can drive its overlay canvas with the same
   code.
+- `@canvas-tile-engine/renderer-shared/geometry` - the world rectangle every
+  renderer culls against and the per-item visibility test. Pure functions, no
+  context or platform types.
+- `@canvas-tile-engine/renderer-shared/scene` - per-frame plumbing shared by
+  all four renderers: layer ordering, FPS sampling, and the layout (strings,
+  positions, sizes) of the debug HUD and the coordinate overlay. Nothing here
+  touches a drawing API, so each renderer is left with a thin paint adapter.
 
 Do not import from this package in application code; its API can change
 without semver guarantees.

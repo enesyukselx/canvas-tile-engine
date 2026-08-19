@@ -23,12 +23,12 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import { Skia, type SkCanvas, type SkImage, type SkPaint, type SkPicture } from "@shopify/react-native-skia";
-import { Layer } from "./modules/Layer";
+import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { SkiaDraw } from "./modules/SkiaDraw";
 import { SkiaImageLoader } from "./modules/SkiaImageLoader";
 import { SkiaCoordinateOverlayRenderer } from "./modules/SkiaCoordinateOverlayRenderer";
 import { SkiaDebug } from "./modules/SkiaDebug";
-import { SkiaMount } from "./types";
+import { SkiaMount, SkiaDrawContext } from "./types";
 
 /**
  * React Native Skia implementation of {@link IRenderer}.
@@ -50,7 +50,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     private config!: Config;
     private viewport!: ViewportState;
     private transformer!: CoordinateTransformer;
-    private layers!: Layer;
+    private layers!: Layer<SkiaDrawContext>;
     private drawAPI!: SkiaDraw;
     private bgPaint!: SkPaint;
     private coordinateOverlayRenderer!: SkiaCoordinateOverlayRenderer;
@@ -251,7 +251,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
 
         // Engine layers
         this.layers.drawAll({
-            canvas,
+            ctx: canvas,
             camera: this.camera,
             transformer: this.transformer,
             config,

@@ -18,7 +18,7 @@ export { RendererSkia } from "./RendererSkia";
 export type { SkiaMount, SkiaSize } from "./types";
 
 // Types only - internal classes not exported
-export type { DrawHandle } from "./modules/Layer";
+export type { DrawHandle } from "@canvas-tile-engine/core";
 
 // Re-export the Skia surface so consumers can write custom draw code without
 // importing from @shopify/react-native-skia directly. (The peer dependency

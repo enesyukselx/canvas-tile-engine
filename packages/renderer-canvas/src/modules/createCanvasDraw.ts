@@ -1,5 +1,6 @@
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
-import { CanvasDraw, DrawContext, Layer, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { CanvasDraw, OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 
 /** Browser 2D contexts the shared pipeline runs on: the visible canvas plus offscreen static caches. */
 export type BrowserContext2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;

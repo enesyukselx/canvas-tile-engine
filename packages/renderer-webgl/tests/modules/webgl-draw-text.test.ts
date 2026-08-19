@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
-import { Layer } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import type { GLRenderer } from "../../src/modules/gl/GLRenderer";
 
 // Minimal fake overlay 2D context that records the active font at every fillText() call.
