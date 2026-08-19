@@ -74,7 +74,9 @@ describe("CanvasTileEngine mount component (React Native)", () => {
         expect(canvasProps).toHaveLength(0);
 
         // The documented pre-mount contract: a default config snapshot, never
-        // undefined (same shape the web hook returns).
+        // undefined (same shape the web hook returns, and the same values the
+        // engine's own normalization resolves — nothing here may flip once
+        // the engine attaches).
         const config = captured!.getConfig();
         expect(config.size).toEqual({
             width: 0,
@@ -85,7 +87,8 @@ describe("CanvasTileEngine mount component (React Native)", () => {
             maxHeight: Infinity,
         });
         expect(config.scale).toBe(1);
-        expect(config.eventHandlers.drag).toBe(true);
+        expect(config.eventHandlers.drag).toBe(false);
+        expect(config.eventHandlers.zoom).toBe(false);
         expect(captured!.getScale()).toBe(1);
         expect(captured!.getCenter()).toEqual({ x: 0, y: 0 });
     });
