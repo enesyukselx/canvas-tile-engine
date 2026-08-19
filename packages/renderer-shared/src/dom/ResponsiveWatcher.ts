@@ -25,6 +25,9 @@ export class ResponsiveWatcher {
     /** Callback fired when a responsive resize changes the camera scale (preserve-viewport) */
     public onScaleChange?: (scale: number) => void;
 
+    /** Whether applySize has run at least once (see the ResizeObserver dedupe below) */
+    private sizedOnce = false;
+
     constructor(
         private wrapper: HTMLDivElement,
         private canvases: HTMLCanvasElement[],
@@ -77,11 +80,14 @@ export class ResponsiveWatcher {
 
         // A wrapper measuring zero (hidden tab, collapsed accordion,
         // not-yet-opened modal, flex parent on first paint) must not reach
-        // applySize: preserve-viewport would divide by zero and permanently
-        // NaN the camera. Skip initial sizing here; the ResizeObserver below
-        // already fires when the wrapper transitions to a real size, so it
-        // picks up the initial application once dimensions are non-zero.
-        if (initialWidth > 0 && initialHeight > 0) {
+        // applySize: the derived scale collapses to 0 and setCenter then
+        // divides by it, permanently NaN-ing the camera. preserve-viewport
+        // derives the height from the width and is itself what assigns the
+        // wrapper a height, so a zero height there is the normal first
+        // measurement, not a hidden mount — only the width may be required.
+        const hasInitialSize =
+            responsiveMode === "preserve-viewport" ? initialWidth > 0 : initialWidth > 0 && initialHeight > 0;
+        if (hasInitialSize) {
             this.applySize(initialWidth, initialHeight, responsiveMode);
         }
 
@@ -92,12 +98,19 @@ export class ResponsiveWatcher {
                 const width = Math.round(rawW);
                 const height = Math.round(rawH);
 
-                if (width <= 0 || height <= 0) {
+                // Same mode-aware zero check as the initial sizing above:
+                // preserve-viewport can legitimately report a zero height
+                // (the wrapper has none until applySize assigns one).
+                if (width <= 0 || (responsiveMode !== "preserve-viewport" && height <= 0)) {
                     continue;
                 }
 
                 const prev = this.viewport.getSize();
-                if (width === prev.width && height === prev.height) {
+                // Only dedupe once sizing has actually applied at least once:
+                // before that, a wrapper that happens to already match the
+                // configured size (e.g. it starts equal to viewport's initial
+                // size) must not be treated as "already sized".
+                if (this.sizedOnce && width === prev.width && height === prev.height) {
                     continue;
                 }
 
@@ -127,11 +140,15 @@ export class ResponsiveWatcher {
 
     private applySize(width: number, height: number, mode: "preserve-scale" | "preserve-viewport") {
         // Defensive: a zero-size call must never reach the camera math below
-        // (preserve-viewport divides by width, permanently NaN-ing the
-        // camera). Callers already guard this; this is a backstop.
-        if (width <= 0 || height <= 0) {
+        // (the derived scale would collapse to 0 and setCenter divides by it,
+        // permanently NaN-ing the camera). Callers already guard this; this is
+        // a backstop. preserve-viewport recomputes the height from the width,
+        // so only a zero width is degenerate there.
+        if (width <= 0 || (mode !== "preserve-viewport" && height <= 0)) {
             return;
         }
+
+        this.sizedOnce = true;
 
         const dpr = this.viewport.dpr;
         const prev = this.viewport.getSize();
