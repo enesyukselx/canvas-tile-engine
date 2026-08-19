@@ -60,18 +60,24 @@ describe("SkiaDebug", () => {
     });
 
     it("drives the shared FPS sampler and stops it on destroy", () => {
-        const frames: Array<() => void> = [];
-        vi.stubGlobal("requestAnimationFrame", (cb: () => void) => frames.push(cb));
+        const frames = new Map<number, () => void>();
+        let nextHandle = 1;
+        vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+            const handle = nextHandle++;
+            frames.set(handle, cb);
+            return handle;
+        });
+        vi.stubGlobal("cancelAnimationFrame", (handle: number) => frames.delete(handle));
 
         const { camera, config, viewport } = setup(hudConfig);
         const debug = new SkiaDebug(camera, config, viewport);
 
         debug.startFpsLoop();
-        expect(frames).toHaveLength(1);
+        expect(frames.size).toBe(1);
 
+        // destroy() cancels the queued frame rather than leaving it to drain.
         debug.destroy();
-        frames.pop()!();
-        expect(frames).toHaveLength(0);
+        expect(frames.size).toBe(0);
 
         vi.unstubAllGlobals();
     });

@@ -2,14 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FpsSampler } from "../src/scene/FpsSampler";
 
 // Drives the sampler's rAF loop by hand: `advance` moves the fake clock and
-// runs whatever the last tick queued.
+// runs whatever the last tick queued. Callbacks are keyed by handle so the
+// cancelAnimationFrame stub can drop one the way a real host would.
 let now = 0;
-let queued: Array<() => void> = [];
+let nextHandle = 1;
+let queued = new Map<number, () => void>();
 
 function advance(ms: number) {
     now += ms;
-    const pending = queued;
-    queued = [];
+    const pending = [...queued.values()];
+    queued.clear();
     for (const cb of pending) {
         cb();
     }
@@ -17,11 +19,16 @@ function advance(ms: number) {
 
 beforeEach(() => {
     now = 0;
-    queued = [];
+    nextHandle = 1;
+    queued = new Map();
     vi.spyOn(performance, "now").mockImplementation(() => now);
     vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
-        queued.push(cb);
-        return queued.length;
+        const handle = nextHandle++;
+        queued.set(handle, cb);
+        return handle;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (handle: number) => {
+        queued.delete(handle);
     });
 });
 
@@ -86,20 +93,21 @@ describe("FpsSampler", () => {
         sampler.start();
         sampler.start();
 
-        expect(queued).toHaveLength(1);
+        expect(queued.size).toBe(1);
     });
 
-    it("stops scheduling frames after stop, and keeps the last reading", () => {
+    it("cancels the pending frame on stop, and keeps the last reading", () => {
         const sampler = new FpsSampler();
         sampler.start();
         for (let i = 0; i < 12; i++) {
             advance(16);
         }
 
-        sampler.stop();
-        advance(16); // the already-queued frame runs, and queues nothing further
+        sampler.stop(); // drops the frame the last tick queued, right away
 
-        expect(queued).toHaveLength(0);
+        expect(queued.size).toBe(0);
+        advance(16);
+        expect(queued.size).toBe(0);
         expect(sampler.fps).toBe(63);
     });
 
@@ -107,11 +115,48 @@ describe("FpsSampler", () => {
         const sampler = new FpsSampler();
         sampler.start();
         sampler.stop();
-        advance(16);
-        expect(queued).toHaveLength(0);
+        expect(queued.size).toBe(0);
 
         sampler.start();
-        expect(queued).toHaveLength(1);
+        expect(queued.size).toBe(1);
+    });
+
+    it("keeps one loop when restarted before the pending frame fires", () => {
+        const sampler = new FpsSampler();
+        sampler.start();
+        for (let i = 0; i < 12; i++) {
+            advance(16);
+        }
+
+        // No advance() between the two calls: the frame stop() cancels is the
+        // one the last tick queued. A second chained loop here would feed the
+        // average a 16ms delta and a 0ms one per frame and double the reading.
+        sampler.stop();
+        sampler.start();
+        expect(queued.size).toBe(1);
+
+        for (let i = 0; i < 12; i++) {
+            advance(16);
+        }
+        expect(queued.size).toBe(1);
+        expect(sampler.fps).toBe(63);
+    });
+
+    it("drops pre-stop samples on restart", () => {
+        const sampler = new FpsSampler();
+        sampler.start();
+        for (let i = 0; i < 12; i++) {
+            advance(10);
+        }
+        expect(sampler.fps).toBe(100);
+
+        sampler.stop();
+        advance(5_000); // idle gap; it must not land in the average either
+        sampler.start();
+
+        // First frame after the restart: 16ms alone, not blended with the 10ms run.
+        advance(16);
+        expect(sampler.fps).toBe(63);
     });
 
     it("stops the loop and drops the callback on destroy", () => {
@@ -125,7 +170,7 @@ describe("FpsSampler", () => {
         sampler.destroy();
         advance(16);
 
-        expect(queued).toHaveLength(0);
+        expect(queued.size).toBe(0);
         expect(onUpdate).not.toHaveBeenCalled();
     });
 });
