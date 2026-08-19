@@ -1,20 +1,18 @@
 /**
- * Upper bound for the per-renderer color caches.
- *
- * Sized so a hand-authored palette (a few dozen entries, or a few hundred for a
- * generated ramp) never evicts, while a `styleOf` that computes a fresh color
- * string per frame — `hsl(${item.data.load * 120}, 70%, 50%)` — settles at a
- * fixed memory cost instead of growing for the renderer's whole lifetime.
- */
-export const COLOR_CACHE_LIMIT = 1024;
-
-/**
  * Fixed-capacity least-recently-used map.
  *
  * `Map` already iterates in insertion order, so "least recently used" is just
  * the first key: reads and writes re-insert their key at the end, and an insert
  * past `limit` drops from the front. That keeps a static palette resident (it is
  * touched every frame) even while dynamic one-off keys stream through.
+ *
+ * Picking `limit` is the caller's call, and it is not a soft knob. A per-frame
+ * scan that touches more distinct keys than the bound is LRU's worst case: each
+ * lookup asks for the entry the previous frame's overflow just evicted, so the
+ * hit rate goes to zero rather than degrading gradually. Size the bound above
+ * the largest working set worth keeping resident, and weigh it against what a
+ * miss actually costs — see the `COLOR_CACHE_LIMIT` in `renderer-webgl` and
+ * `renderer-skia`, which differ for exactly that reason.
  *
  * Values must not be `undefined` — a `get` miss and a stored `undefined` are
  * indistinguishable.

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COLOR_CACHE_LIMIT } from "@canvas-tile-engine/renderer-shared/cache";
-import { ColorParser } from "../../src/utils/color";
+import { COLOR_CACHE_LIMIT, ColorParser } from "../../src/utils/color";
 
 // These run under `environment: "node"`, so there is no 1x1 canvas to fall back
 // on: every value asserted below is produced by the inline fast path, and
