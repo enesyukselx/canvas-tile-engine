@@ -5,10 +5,10 @@ const FPS_SAMPLE_SIZE = 10;
  * loop so the reading keeps updating while the scene is idle.
  *
  * Free of drawing APIs, but not of platform globals: it needs
- * `requestAnimationFrame`, which the browser and React Native provide and plain
- * Node does not — `renderer-server` must never start one. Every renderer's
- * debug HUD owns one of these and
- * reads {@link fps} while painting.
+ * `requestAnimationFrame` / `cancelAnimationFrame`, which the browser and React
+ * Native provide and plain Node does not — `renderer-server` must never start
+ * one. Every renderer's debug HUD owns one of these and reads {@link fps} while
+ * painting.
  * @internal
  */
 export class FpsSampler {
@@ -16,6 +16,7 @@ export class FpsSampler {
     private lastFrameTime = 0;
     private currentFps = 0;
     private running = false;
+    private frameHandle: number | null = null;
     private onUpdate: (() => void) | null = null;
 
     /** Latest reading, rounded to whole frames per second. */
@@ -31,19 +32,33 @@ export class FpsSampler {
         this.onUpdate = callback;
     }
 
-    /** Start sampling. No-op while already running. */
+    /**
+     * Start sampling. No-op while already running. A restart drops the samples
+     * taken before the last {@link stop}, so the first reading after it is not
+     * an average across the gap.
+     */
     start() {
         if (this.running) {
             return;
         }
         this.running = true;
+        this.frameTimes = [];
         this.lastFrameTime = performance.now();
-        requestAnimationFrame(() => this.tick());
+        this.frameHandle = requestAnimationFrame(() => this.tick());
     }
 
-    /** Stop sampling. The last reading stays readable. */
+    /**
+     * Stop sampling, cancelling the frame the last tick queued. The last
+     * reading stays readable. Cancelling matters: without it a `stop()` /
+     * `start()` pair that lands before the pending frame fires would leave two
+     * chained loops running and double the reported rate.
+     */
     stop() {
         this.running = false;
+        if (this.frameHandle !== null) {
+            cancelAnimationFrame(this.frameHandle);
+            this.frameHandle = null;
+        }
     }
 
     /** Stop sampling and release the update callback. */
@@ -53,6 +68,7 @@ export class FpsSampler {
     }
 
     private tick() {
+        this.frameHandle = null;
         if (!this.running) {
             return;
         }
@@ -75,6 +91,6 @@ export class FpsSampler {
             this.onUpdate?.();
         }
 
-        requestAnimationFrame(() => this.tick());
+        this.frameHandle = requestAnimationFrame(() => this.tick());
     }
 }
