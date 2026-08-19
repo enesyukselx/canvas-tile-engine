@@ -31,6 +31,7 @@ import {
     ResizeWatcher,
     ResponsiveWatcher,
     ReducedMotionWatcher,
+    A11yAttributes,
     SizeController,
     initStyles,
 } from "@canvas-tile-engine/renderer-shared/dom";
@@ -101,6 +102,8 @@ export class RendererWebGL implements IRenderer {
     private resizeWatcher?: ResizeWatcher;
     private responsiveWatcher?: ResponsiveWatcher;
     private reducedMotionWatcher?: ReducedMotionWatcher;
+    private a11yAttributes?: A11yAttributes;
+    private unsubscribeA11y?: () => void;
     private eventsAttached = false;
 
     // Size control
@@ -322,6 +325,16 @@ export class RendererWebGL implements IRenderer {
         // not one of the opt-in eventHandlers.
         this.reducedMotionWatcher = new ReducedMotionWatcher(this.config);
         this.reducedMotionWatcher.start();
+
+        // The wrapper carries the accessible identity; the canvases are
+        // hidden from assistive technology. Re-applied on config change
+        // because these attributes are written once, unlike the config
+        // the draw pipeline re-reads every frame.
+        this.a11yAttributes = new A11yAttributes(this.canvasWrapper, [this.canvas, this.overlayCanvas]);
+        this.a11yAttributes.apply(this.config.get().accessibility);
+        this.unsubscribeA11y = this.config.onAccessibilityChange(() => {
+            this.a11yAttributes?.apply(this.config.get().accessibility);
+        });
 
         if (this.config.get().responsive) {
             if (this.config.get().eventHandlers?.resize) {
@@ -584,6 +597,10 @@ export class RendererWebGL implements IRenderer {
         this.responsiveWatcher = undefined;
         this.reducedMotionWatcher?.stop();
         this.reducedMotionWatcher = undefined;
+        this.unsubscribeA11y?.();
+        this.unsubscribeA11y = undefined;
+        this.a11yAttributes?.destroy();
+        this.a11yAttributes = undefined;
 
         // Cancel animations
         this.animationController.cancelAll();
