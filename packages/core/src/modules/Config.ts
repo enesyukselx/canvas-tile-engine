@@ -1,6 +1,19 @@
-import { CanvasTileEngineConfig, EventHandlers, MotionPolicy, ReducedMotionSetting, ZoomMode } from "../types";
+import {
+    AccessibilityConfig,
+    CanvasTileEngineConfig,
+    EventHandlers,
+    MotionPolicy,
+    ReducedMotionSetting,
+    ZoomMode,
+} from "../types";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
-import { validateConfig, validateBounds, validateScaleLimits, validateReducedMotion } from "../utils/validateConfig";
+import {
+    validateConfig,
+    validateBounds,
+    validateScaleLimits,
+    validateReducedMotion,
+    validateAccessibility,
+} from "../utils/validateConfig";
 
 /** Normalize the zoom setting so consumers only see a mode or `false` (`true` means `"pointer"`). */
 function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
@@ -8,6 +21,42 @@ function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
         return "pointer";
     }
     return zoom || false;
+}
+
+type NormalizedEventHandlers = Required<CanvasTileEngineConfig>["eventHandlers"];
+
+/**
+ * Whether the surface offers any pointer interaction. Drives the derived
+ * `accessibility.focusable` default: a surface nobody can click, drag or zoom
+ * has nothing for a keyboard user to reach, so it should not take a tab stop.
+ */
+function hasPointerInteraction(handlers: NormalizedEventHandlers): boolean {
+    return handlers.click || handlers.rightClick || handlers.hover || handlers.drag || handlers.zoom !== false;
+}
+
+/**
+ * Resolve the accessibility snapshot from what the app supplied plus the
+ * normalized event handlers. Kept a pure function so it can run during
+ * construction, before the config field exists.
+ */
+function resolveAccessibility(input: AccessibilityConfig, handlers: NormalizedEventHandlers): AccessibilityConfig {
+    const resolved: AccessibilityConfig = {
+        focusable: input.focusable ?? hasPointerInteraction(handlers),
+        reducedMotion: input.reducedMotion ?? "auto",
+    };
+    if (input.label !== undefined) {
+        resolved.label = input.label;
+    }
+    if (input.description !== undefined) {
+        resolved.description = input.description;
+    }
+    // A role without a name announces as a bare landmark, so it is only
+    // defaulted alongside a label. An explicit role is honored either way.
+    const role = input.role ?? (input.label !== undefined ? "region" : undefined);
+    if (role !== undefined) {
+        resolved.role = role;
+    }
+    return resolved;
 }
 
 /**
@@ -30,6 +79,15 @@ export class Config implements MotionPolicy {
     private platformReducedMotion = false;
 
     /**
+     * What the app supplied for `accessibility`, kept separate from the
+     * resolved snapshot because `focusable` and `role` are derived — from the
+     * event handlers and from `label` respectively — and both inputs can
+     * change at runtime.
+     */
+    private accessibilityInput: AccessibilityConfig = {};
+    private accessibilityListeners = new Set<() => void>();
+
+    /**
      * Create a config store with defaults merged from the provided partial config.
      * @param config Incoming configuration values.
      * @throws {ConfigValidationError} If any config value is invalid.
@@ -40,6 +98,17 @@ export class Config implements MotionPolicy {
         // Resolved once: `Required<>` is shallow, so the snapshot's own
         // `reducedMotion` stays optional and cannot type the preference slot.
         const reducedMotion: ReducedMotionSetting = config.accessibility?.reducedMotion ?? "auto";
+
+        // Hoisted: `accessibility.focusable` is derived from these.
+        const eventHandlers: NormalizedEventHandlers = {
+            click: config.eventHandlers?.click ?? false,
+            rightClick: config.eventHandlers?.rightClick ?? false,
+            hover: config.eventHandlers?.hover ?? false,
+            drag: config.eventHandlers?.drag ?? false,
+            zoom: normalizeZoom(config.eventHandlers?.zoom),
+            resize: config.eventHandlers?.resize ?? false,
+        };
+        const accessibilityInput: AccessibilityConfig = { ...config.accessibility };
 
         const base: Required<CanvasTileEngineConfig> = {
             scale: config.scale,
@@ -60,14 +129,7 @@ export class Config implements MotionPolicy {
 
             backgroundColor: config.backgroundColor ?? RENDER_DEFAULTS.BACKGROUND_COLOR,
 
-            eventHandlers: {
-                click: config.eventHandlers?.click ?? false,
-                rightClick: config.eventHandlers?.rightClick ?? false,
-                hover: config.eventHandlers?.hover ?? false,
-                drag: config.eventHandlers?.drag ?? false,
-                zoom: normalizeZoom(config.eventHandlers?.zoom),
-                resize: config.eventHandlers?.resize ?? false,
-            },
+            eventHandlers,
 
             bounds: config.bounds ?? {
                 minX: -Infinity,
@@ -81,7 +143,7 @@ export class Config implements MotionPolicy {
                 shownScaleRange: config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity },
             },
 
-            accessibility: { reducedMotion },
+            accessibility: resolveAccessibility(accessibilityInput, eventHandlers),
 
             debug: {
                 enabled: config.debug?.enabled ?? false,
@@ -103,6 +165,7 @@ export class Config implements MotionPolicy {
             },
         };
         this.motionPreference = reducedMotion;
+        this.accessibilityInput = accessibilityInput;
         this.config = Object.freeze({
             ...base,
             size: Object.freeze(base.size),
@@ -151,7 +214,11 @@ export class Config implements MotionPolicy {
         this.config = Object.freeze({
             ...this.config,
             eventHandlers: Object.freeze(merged),
+            // `focusable` is derived from these, so toggling interaction at
+            // runtime moves the tab stop with it.
+            accessibility: Object.freeze(resolveAccessibility(this.accessibilityInput, merged)),
         });
+        this.notifyAccessibilityChange();
     }
 
     /**
@@ -214,10 +281,53 @@ export class Config implements MotionPolicy {
         validateReducedMotion(value);
 
         this.motionPreference = value;
+        this.accessibilityInput = { ...this.accessibilityInput, reducedMotion: value };
         this.config = Object.freeze({
             ...this.config,
             accessibility: Object.freeze({ ...this.config.accessibility, reducedMotion: value }),
         });
+    }
+
+    /**
+     * Merge a patch into the accessibility preferences at runtime and
+     * re-resolve the derived fields. Mirrors `updateEventHandlers`: the patch
+     * is merged, not replaced wholesale, so setting only `label` leaves an
+     * explicit `focusable` alone.
+     * @throws {ConfigValidationError} If any supplied value is invalid.
+     */
+    updateAccessibility(patch: Partial<AccessibilityConfig>) {
+        validateAccessibility(patch);
+
+        this.accessibilityInput = { ...this.accessibilityInput, ...patch };
+        if (patch.reducedMotion !== undefined) {
+            this.motionPreference = patch.reducedMotion;
+        }
+        this.config = Object.freeze({
+            ...this.config,
+            accessibility: Object.freeze(resolveAccessibility(this.accessibilityInput, this.config.eventHandlers)),
+        });
+        this.notifyAccessibilityChange();
+    }
+
+    /**
+     * Subscribe to accessibility changes so the DOM layer can re-apply its
+     * attributes. Returns an unsubscribe function.
+     *
+     * Needed because the attributes are written once at mount, unlike config
+     * the renderers re-read every frame — an accessible name that could never
+     * change after mount would be the wrong thing to freeze into 1.0.
+     */
+    onAccessibilityChange(listener: () => void): () => void {
+        this.accessibilityListeners.add(listener);
+        return () => {
+            this.accessibilityListeners.delete(listener);
+        };
+    }
+
+    private notifyAccessibilityChange() {
+        for (const listener of this.accessibilityListeners) {
+            listener();
+        }
     }
 
     /**

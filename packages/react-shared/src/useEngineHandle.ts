@@ -5,6 +5,7 @@ import type {
     Coords,
     Bounds,
     EventHandlers,
+    AccessibilityConfig,
     FitBoundsOptions,
     FitBoundsResult,
     DrawHandle,
@@ -86,6 +87,9 @@ const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
     // what the real engine reports once mounted.
     accessibility: {
         reducedMotion: "auto",
+        // Derived from the handlers above (drag + zoom), matching what the
+        // real engine resolves once mounted.
+        focusable: true,
     },
     debug: {
         enabled: false,
@@ -167,6 +171,13 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
 
     /** Update the min/max scale limits at runtime, clamping the current scale into the new range */
     setScaleLimits(minScale: number, maxScale: number): void;
+
+    /**
+     * Update accessibility preferences at runtime: `label`, `description`,
+     * `role`, `focusable`, `reducedMotion`. Merged, not replaced, and the DOM
+     * renderers re-apply their attributes in response.
+     */
+    setAccessibility(patch: Partial<AccessibilityConfig>): void;
 
     /**
      * Replace the reduced-motion preference. `"auto"` (the default) follows
@@ -416,6 +427,10 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
 
             setScaleLimits(minScale: number, maxScale: number) {
                 instanceRef.current?.setScaleLimits(minScale, maxScale);
+            },
+
+            setAccessibility(patch) {
+                instanceRef.current?.setAccessibility(patch);
             },
 
             setReducedMotion(value: ReducedMotionSetting) {

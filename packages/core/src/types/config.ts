@@ -6,7 +6,50 @@
  */
 export type ReducedMotionSetting = boolean | "auto";
 
+/**
+ * Semantic role for the whole surface, mapped per platform. Web: `"region"` →
+ * `role="region"`, `"image"` → `role="img"`, `"application"` →
+ * `role="application"`. React Native: only `"image"` has an
+ * `accessibilityRole` equivalent.
+ *
+ * Deliberately a narrow union rather than an ARIA passthrough string:
+ * widening an accepted union later is free, narrowing a shipped string is a
+ * compile break. `"grid"` is excluded because it obliges `aria-rowcount` /
+ * `aria-colcount` and real `gridcell` descendants, which a canvas surface
+ * cannot provide.
+ */
+export type AccessibilityRole = "region" | "image" | "application";
+
 export type AccessibilityConfig = {
+    /**
+     * Accessible name for the surface. No default — a fabricated one like
+     * "Interactive map" would be wrong for a game board, a seat picker or a
+     * pixel editor, and it would suppress the unlabeled-region audit signal.
+     * When omitted, neither `aria-label` nor `role` is written at all.
+     */
+    label?: string;
+    /**
+     * Longer usage description, e.g. which keys do what. Web: rendered into a
+     * visually hidden node referenced by `aria-describedby`. React Native:
+     * `accessibilityHint`. Inert on the server renderer.
+     */
+    description?: string;
+    /**
+     * Semantic role. Defaults to `"region"` when {@link label} is set, and to
+     * nothing at all when it is not. `"application"` is never the default: it
+     * forfeits every screen-reader quick-navigation command.
+     */
+    role?: AccessibilityRole;
+    /**
+     * Whether the surface is a keyboard tab stop.
+     *
+     * The default is DERIVED, not a constant: `true` when any pointer
+     * interaction is enabled (`click`, `rightClick`, `hover`, `drag`, or
+     * `zoom`), otherwise `false`. A decorative minimap configured with no
+     * event handlers gains no tab stop; an interactive map does. An explicit
+     * `true`/`false` always wins.
+     */
+    focusable?: boolean;
     /**
      * Collapse engine-driven camera animation to instant. Default `"auto"`.
      *
