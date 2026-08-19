@@ -40,7 +40,6 @@ export class FpsSampler {
         this.lastFrameTime = performance.now();
         requestAnimationFrame(() => this.tick());
     }
-    }
 
     /** Stop sampling. The last reading stays readable. */
     stop() {
