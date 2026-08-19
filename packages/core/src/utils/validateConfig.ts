@@ -131,7 +131,7 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
 
 /**
  * Validate a reduced-motion preference. Shared by the constructor and
- * `Config.setReducedMotion` so both reject identically.
+ * `Config.updateReducedMotion` so both reject identically.
  * @throws {ConfigValidationError} If the value is not `true`, `false` or `"auto"`.
  */
 export function validateReducedMotion(value: unknown): void {

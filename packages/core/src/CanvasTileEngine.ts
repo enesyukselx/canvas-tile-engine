@@ -547,7 +547,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * ```
      */
     setReducedMotion(value: ReducedMotionSetting) {
-        this.config.setReducedMotion(value);
+        this.config.updateReducedMotion(value);
     }
 
     /**
