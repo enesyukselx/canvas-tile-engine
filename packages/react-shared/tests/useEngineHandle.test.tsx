@@ -148,6 +148,8 @@ describe("useEngineHandle", () => {
         ["zoomIn", [1.2]],
         ["zoomOut", [1.3]],
         ["setScaleLimits", [0.5, 8]],
+        ["setReducedMotion", ["auto"]],
+        ["getReducedMotion", []],
         ["getConfig", []],
         ["setBounds", [{ minX: 0, maxX: 9, minY: 0, maxY: 9 }]],
         ["fitBounds", [{ minX: 0, maxX: 4, minY: 0, maxY: 4 }, {}]],
