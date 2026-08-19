@@ -75,6 +75,10 @@ interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
 }
 ```
 
+:::info Reduced motion in `resizeWithAnimation`
+The engine forwards `durationMs` unchanged — reduced motion is applied once, by whatever animates. A renderer that animates through the shared `AnimationController` gets that for free by passing `deps.config` as the controller's motion policy; a renderer that animates by other means must consult `deps.config.getReducedMotion()` itself.
+:::
+
 The draw API is platform-agnostic and returns `DrawHandle` values that can be removed later.
 
 ```ts
