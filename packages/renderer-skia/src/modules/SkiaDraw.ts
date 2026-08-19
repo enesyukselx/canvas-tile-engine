@@ -55,11 +55,32 @@ import {
     type SkRect,
 } from "@shopify/react-native-skia";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
+import { LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 import { Layer } from "./Layer";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
 const SPATIAL_INDEX_THRESHOLD = 500;
+
+/**
+ * Upper bound on the parsed-color cache.
+ *
+ * The cache is consulted once per visible item per frame, so the working set is
+ * whatever survives culling — not the whole item list. The bound has to clear
+ * that, because a bounded LRU whose working set overflows it does not degrade,
+ * it falls off a cliff: every lookup asks for the entry the previous frame
+ * evicted and the hit rate goes to zero. 8192 covers a dense viewport where
+ * `styleOf` gives every cell its own stable color, at roughly 180 bytes an
+ * entry (the key string, the `SkColor` float array, the map slot) — about 1.5MB
+ * held, which is cheap next to the pictures a frame already records.
+ *
+ * It is deliberately twice `renderer-webgl`'s bound. Every miss here crosses
+ * into native `Skia.Color`, and unlike WebGL there is no inline parser to fall
+ * back on, so headroom is worth more memory here than there. Size the two
+ * independently rather than reunifying them.
+ * @internal
+ */
+export const COLOR_CACHE_LIMIT = 8192;
 
 /**
  * Skia implementation of the engine draw API.
@@ -81,7 +102,7 @@ export class SkiaDraw {
     private strokePaint: SkPaint;
     private imagePaint: SkPaint;
     private fontCache = new Map<string, SkFont>();
-    private colorCache = new Map<string, SkColor>();
+    private colorCache = new LruCache<string, SkColor>(COLOR_CACHE_LIMIT);
     // Pre-recorded pictures for the drawStatic* variants, keyed by cacheKey.
     private staticPictureCache = new Map<string, { picture: SkPicture; recordScale: number }>();
 
@@ -809,6 +830,9 @@ export class SkiaDraw {
     /**
      * Parse a CSS color string once and reuse the result — `Skia.Color` is a
      * native parse per call, which adds up over thousands of items per frame.
+     *
+     * The cache is bounded: a `styleOf` that computes a color string per frame
+     * would otherwise add a permanent entry for every value it ever produced.
      */
     private color(value: string): SkColor {
         let parsed = this.colorCache.get(value);
