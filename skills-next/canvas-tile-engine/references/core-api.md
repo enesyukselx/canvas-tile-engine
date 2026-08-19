@@ -137,7 +137,7 @@ after mount.
 | `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |
 | `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
 | `fitBounds(bounds, opts?): { scale, fitted }` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. `bounds` is an AREA, not cell indices: cell k spans [k-0.5, k+0.5], so a board of cells 0..31 is `{ minX: -0.5, maxX: 31.5, ... }` and centers on 15.5 - passing 0..32 fits the same width but centers half a cell off. Returns the targeted scale and `fitted` - `false` ONLY when `minScale` floors the fit, so the whole rectangle is NOT visible; `maxScale` clamping keeps `fitted: true`. The React/RN handle returns `undefined` before mount. |
-| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. |
+| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. Deeply frozen - do not mutate. The React/RN handle answers it before mount with `normalizeConfig({ scale: 1, size: { width: 0, height: 0 } })`, so nothing flips on attach, but scale-derived fields describe THAT placeholder, not the `config` prop. |
 | `setReducedMotion(value): void` | `value: boolean \| "auto"` (default `"auto"` = follow platform). Collapses engine-driven camera animation to instant. OVERRIDES an explicitly passed `durationMs` - there is NO per-call escape, the escape is `false`. Covers goCenter/goScale/fitBounds/resize ONLY; `SpriteAnimator` and app drawing are OUT of scope (call `animator.stop()` yourself for SC 2.2.2). |
 | `getReducedMotion(): boolean` | The RESOLVED value in effect. `getConfig().accessibility.reducedMotion` reports the PREFERENCE instead, which may be `"auto"`. Handle returns `false` before mount. |
 | `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |
@@ -415,8 +415,8 @@ job on one `PathItem` (null when it draws nothing).
 ## Exported types and classes (import from `@canvas-tile-engine/core`)
 
 Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`,
-`itemsBounds`, `pathItemBounds`, `SpatialIndex`, `Config`, `ViewportState`, `CoordinateTransformer`,
-`GestureProcessor`, `AnimationController`.
+`itemsBounds`, `pathItemBounds`, `normalizeConfig`, `SpatialIndex`, `Config`, `ViewportState`,
+`CoordinateTransformer`, `GestureProcessor`, `AnimationController`.
 
 Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `BoundedItem`, `DrawObject`, `Rect`,
 `Circle`, `Text`, `Line`, `PathItem`, `PathStyle`, `ImageItem<TImage>`, `SpriteRect`,
@@ -434,4 +434,6 @@ renderer authors; app code normally only needs `CanvasTileEngine`,
 `scale` must be a positive finite number and coordinates finite numbers;
 `setScale`, `goScale`, `setCenter`, and `goCenter` throw
 `ConfigValidationError` otherwise. Config normalization fills every optional field with the defaults
-listed above.
+listed above. `normalizeConfig(config)` runs that same normalization without an engine and returns
+the deeply frozen snapshot (`normalizeConfig({ scale: 32, size }).minScale === 16`); it does NOT
+validate, so values the constructor rejects come back normalized instead of throwing.

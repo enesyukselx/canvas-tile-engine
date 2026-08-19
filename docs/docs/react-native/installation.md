@@ -183,6 +183,7 @@ import { Skia } from "@canvas-tile-engine/react-native";
 - Use `engine.setEventHandlers`, `engine.setBounds`, `engine.setCenter`, `engine.goCenter`, `engine.setScale`, `engine.goScale`, `engine.setScaleLimits`, `zoomIn`, and `zoomOut` for runtime changes.
 - Static helpers record and replay Skia pictures keyed by `cacheKey`.
 - The React Native wrapper owns layout, touch handling (via react-native-gesture-handler), tap detection, and presentation.
+- `engine.getConfig()` before the first layout returns the same pre-mount snapshot as the web hook: the engine's defaults for an unconfigured engine, not the `config` prop. See [the web notes](../react/installation.md#usecanvastileengine).
 
 :::info Maps inside a ScrollView
 Because touch input participates in native gesture arbitration (react-native-gesture-handler), an interactive map inside a `ScrollView` works: while interactions are enabled the map claims the touch stream and the page does not scroll under it; with interactions off (no `eventHandlers`) the gesture yields and the page scrolls naturally over the map. For reliable arbitration, import the `ScrollView` from `react-native-gesture-handler` (not from `react-native`) when embedding a map in it.
