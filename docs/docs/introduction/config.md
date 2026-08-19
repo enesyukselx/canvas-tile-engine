@@ -36,7 +36,15 @@ const config: CanvasTileEngineConfig = {
 
 | Property | Type | Default | Description |
 | :-- | :-- | :-- | :-- |
+| `label` | `string` | — | Accessible name for the surface. No default: a fabricated one would be wrong for a game board or a pixel editor, and it would hide the unlabeled-region audit signal. With no label, neither `aria-label` nor `role` is written. |
+| `description` | `string` | — | Longer usage description, e.g. which keys do what. Web: a visually hidden node referenced by `aria-describedby`. React Native: `accessibilityHint`. |
+| `role` | `"region" \| "image" \| "application"` | `"region"` when `label` is set | Semantic role. `"application"` is never the default — it forfeits every screen-reader quick-navigation command. On React Native only `"image"` has an equivalent; the others are dropped and the label still announces. |
+| `focusable` | `boolean` | derived | Whether the surface is a keyboard tab stop. The default is derived, not constant: `true` when any pointer interaction is enabled (`click`, `rightClick`, `hover`, `drag`, `zoom`) or `eventHandlers.keyboard` is `true`. A decorative minimap gains no tab stop; an interactive map does. |
 | `reducedMotion` | `boolean \| "auto"` | `"auto"` | Collapses engine-driven camera animation to instant. `"auto"` follows the platform: `prefers-reduced-motion` on the web, `AccessibilityInfo` on React Native. |
+
+The wrapper element carries the accessible identity, and every canvas the engine manages is hidden from assistive technology. An attribute you set yourself on the wrapper is **never** overwritten, and a canvas with fallback child content keeps it — that content is your own accessible alternative.
+
+Use [`engine.setAccessibility(patch)`](../js/camera_and_viewport.md) to change any of these at runtime; the DOM renderers re-apply the attributes in response.
 
 When reduced motion is in effect it **overrides an explicitly passed `durationMs`** — `goCenter(x, y, 800)` lands instantly. That is deliberate: a duration the app hard-codes is exactly what the preference exists to suppress, so the escape hatch is `reducedMotion: false` (or `engine.setReducedMotion(false)`), never a per-call duration.
 
@@ -98,6 +106,7 @@ All interaction flags default to `false`.
 | `drag` | `boolean` | Enables panning by pointer drag or touch drag. |
 | `zoom` | `boolean \| "pointer" \| "center"` | Enables wheel/pinch zoom. `true` is `"pointer"`. `"center"` zooms around the viewport center. |
 | `resize` | `boolean` | Enables wrapper resize observation when `responsive` is `false`. |
+| `keyboard` | `boolean \| { pan?, panPx?, zoomFactor? }` | Keyboard camera control. See below. |
 
 ```ts
 eventHandlers: {
@@ -113,6 +122,37 @@ You can update interaction flags at runtime:
 ```ts
 engine.setEventHandlers({ drag: false, hover: true });
 ```
+
+### Keyboard
+
+Left unset, `keyboard` **mirrors the pointer gates**: arrows pan only if `drag` is on, `+`/`-` zoom only if `zoom` is on, and `Enter`/`Space` activate only if `click` is on. Keyboard therefore grants nothing you did not already grant, and is a genuine no-op on a deliberately static board. `true` forces all three on; `false` turns them off.
+
+| Key | Action | Requires |
+| :-- | :-- | :-- |
+| `←` `→` `↑` `↓` | Pan the view | `drag` |
+| `+` / `=` | Zoom in at the viewport center | `zoom` |
+| `-` / `_` | Zoom out at the viewport center | `zoom` |
+| `Enter`, `Space` | Fire `onClick` at the viewport center | `click` |
+
+`Enter`/`Space` call your existing `onClick` — there is no separate callback. The coordinates describe the viewport center, which is genuinely where the activation points, and a trailing `info` argument tells the two apart:
+
+```ts
+engine.onClick = (coords, mouse, client, info) => {
+    if (info?.source === "keyboard") {
+        // activated from the crosshair at the viewport center
+    }
+};
+```
+
+`preventDefault` runs only for a key the engine consumed. `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are never captured, so the surface can never become a keyboard trap, and any modifier combination is ignored so browser and screen-reader shortcuts keep working.
+
+Step sizes come from the object form: `panPx` (screen pixels, default `80`) wins over `pan` (world units), and `zoomFactor` defaults to `1.5`, matching `zoomIn`/`zoomOut`.
+
+```ts
+eventHandlers: { drag: true, zoom: true, click: true, keyboard: { panPx: 40 } }
+```
+
+Keyboard control is DOM-only. React Native's core `View` has no key events, and the server renderer has no input loop.
 
 Disabled interactions leave the platform's default behavior intact: with `zoom` off the mouse wheel keeps scrolling the page, with `rightClick` off the browser context menu opens, and when `click`, `drag`, `zoom`, and `hover` are all off, touch gestures scroll the page instead of being captured by the canvas. On React Native the wrapper only claims the gesture responder while an interaction is enabled (or an `onMouseDown`/`onMouseUp` callback is set), so parent scroll views keep receiving touches.
 
@@ -208,6 +248,10 @@ export type CanvasTileEngineConfig = {
         maxY: number;
     };
     accessibility?: {
+        label?: string;
+        description?: string;
+        role?: "region" | "image" | "application";
+        focusable?: boolean;
         reducedMotion?: boolean | "auto";
     };
     coordinates?: {

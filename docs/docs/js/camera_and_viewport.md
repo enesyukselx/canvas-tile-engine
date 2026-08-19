@@ -221,6 +221,17 @@ engine.fitBounds(selectionBounds, { durationMs: 0 });
 
 Throws a `ConfigValidationError` if an edge is not finite, `min >= max` on an axis, or a padding value is negative. A `paddingPx` too large for the viewport is clamped (at least 1px of fit area per axis) and the result rides the scale limits.
 
+#### `setAccessibility(patch)`
+
+Update accessibility preferences at runtime — the accessible name, its description, the semantic role, or whether the surface is a tab stop. The patch is merged, not replaced, and the DOM renderers re-apply their attributes in response.
+
+```typescript
+engine.setAccessibility({ label: `Floor ${floor} seating chart` });
+```
+
+This exists because the React bindings read `config` once on mount, so a name that could never change afterwards would be useless. See [Configuration](../introduction/config.md) for the fields.
+
+
 #### `setReducedMotion(value)` / `getReducedMotion()`
 
 Replace the reduced-motion preference at runtime, and read the value actually in effect.

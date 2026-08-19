@@ -271,6 +271,15 @@ const zoomToSelection = (selection: { minX: number; maxX: number; minY: number; 
 };
 ```
 
+### `setAccessibility(patch)`
+
+Update the accessible name, description, role or tab-stop behavior at runtime. Merged, not replaced.
+
+```tsx
+engine.setAccessibility({ label: `Floor ${floor} seating chart` });
+```
+
+
 ### `setReducedMotion(value)` / `getReducedMotion()`
 
 Replace the reduced-motion preference, and read the value in effect.

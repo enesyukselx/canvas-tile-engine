@@ -110,6 +110,18 @@ Wired automatically - apps do NOT subscribe to anything. The binding reads
 `SpriteAnimator` and custom `DrawFunction` drawing are OUT of scope - stop
 those yourself.
 
+## Accessibility surface
+
+`config.accessibility.label` / `.description` / `.role` land on the measured
+`View` (accessible / accessibilityLabel / accessibilityHint /
+accessibilityRole), NEVER on the Skia `Canvas`. Only `role: "image"` has an RN
+equivalent - `"region"` and `"application"` are dropped and the label still
+announces. `engine.setAccessibility(patch)` updates them at runtime.
+
+LIMITATION to tell users: this makes the surface ANNOUNCED but not OPERABLE on
+React Native. Keyboard camera control is DOM-only (RN's core View has no key
+events) and `accessibilityActions` is not wired yet.
+
 ## Skia re-exports (import from the RN package, not @shopify/react-native-skia)
 
 ```tsx
