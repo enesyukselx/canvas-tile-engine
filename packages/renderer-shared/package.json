@@ -23,6 +23,6 @@
     },
     "devDependencies": {
         "@canvas-tile-engine/core": "workspace:^",
-        "jsdom": "^26.1.0"
+        "jsdom": "^30.0.1"
     }
 }
