@@ -190,7 +190,12 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
             },
         );
 
-        this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
+        this.animationController = new AnimationController(
+            this.camera,
+            this.viewport,
+            () => this.render(),
+            this.config,
+        );
     }
 
     /**

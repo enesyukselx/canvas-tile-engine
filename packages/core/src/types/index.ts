@@ -137,6 +137,13 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     init(deps: RendererDependencies<TMount>): void;
     render(): void;
     resize(width: number, height: number): void;
+    /**
+     * The engine forwards `durationMs` unchanged — reduced motion is applied
+     * once, by whatever animates. A renderer that animates through the shared
+     * `AnimationController` gets that for free by passing `deps.config` as the
+     * controller's motion policy; a renderer that animates by other means must
+     * consult `deps.config.getReducedMotion()` itself.
+     */
     resizeWithAnimation(width: number, height: number, durationMs: number, onComplete?: () => void): void;
     destroy(): void;
 

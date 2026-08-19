@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PixelRatio, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { AccessibilityInfo, PixelRatio, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector, type GestureTouchEvent, type TouchData } from "react-native-gesture-handler";
 import {
     Canvas,
@@ -230,6 +230,45 @@ function CanvasTileEngineBase({
         instance.onWheel = (...args) => callbacksRef.current.onWheel?.(...args);
     }, []);
 
+    // React Native's reduced-motion signal. Pushed into the engine rather than
+    // polled by core: core has no AccessibilityInfo, and the browser idiom
+    // (window.matchMedia) does not exist here even though `window` does.
+    const platformReducedMotionRef = useRef(false);
+    const applyReducedMotion = useCallback((value: boolean) => {
+        platformReducedMotionRef.current = value;
+        instanceRef.current?._setPlatformReducedMotion(value);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        let live = false;
+
+        // Subscribe before reading, and let a delivered event win: the read is
+        // async, so a flip that lands between the two would otherwise be lost
+        // (no listener yet) or clobbered (stale promise resolving last).
+        const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (enabled) => {
+            live = true;
+            applyReducedMotion(enabled);
+        });
+
+        // Async, and it resolves after the first layout on a slow device — so
+        // the value is also replayed when the engine is created below.
+        AccessibilityInfo.isReduceMotionEnabled()
+            .then((enabled) => {
+                if (!cancelled && !live) {
+                    applyReducedMotion(enabled);
+                }
+            })
+            .catch(() => {
+                // A platform without the query keeps "auto" meaning "animate".
+            });
+
+        return () => {
+            cancelled = true;
+            subscription.remove();
+        };
+    }, [applyReducedMotion]);
+
     const handleLayout = useCallback(
         (e: LayoutChangeEvent) => {
             const { width, height } = e.nativeEvent.layout;
@@ -248,6 +287,9 @@ function CanvasTileEngineBase({
                 const mergedConfig = { ...config, size: { ...config.size, width: w, height: h } };
                 const instance = new CanvasTileEngineCore<SkiaMount, SkImage>(mount, mergedConfig, renderer, center);
                 wireCallbacks(instance);
+                // The engine is created lazily on first layout, so a signal
+                // that arrived before now has to be replayed into it.
+                instance._setPlatformReducedMotion(platformReducedMotionRef.current);
                 instanceRef.current = instance;
                 rendererRef.current = renderer;
                 engine._setInstance(instance);

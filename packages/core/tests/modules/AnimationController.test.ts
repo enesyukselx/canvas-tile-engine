@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { AnimationController } from "../../src/modules/AnimationController";
 import { ICamera } from "../../src/modules/Camera";
 import { ViewportState } from "../../src/modules/ViewportState";
-import { Coords } from "../../src/types";
+import { Coords, MotionPolicy } from "../../src/types";
 
 describe("AnimationController", () => {
     let mockCamera: ICamera;
@@ -11,6 +11,9 @@ describe("AnimationController", () => {
     let controller: AnimationController;
     let setCenterMock: (center: Coords, canvasWidth: number, canvasHeight: number) => void;
     let currentScale: number;
+    /** Mutable so a test can flip the preference mid-animation. */
+    let reducedMotion: boolean;
+    let motion: MotionPolicy;
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -38,16 +41,37 @@ describe("AnimationController", () => {
 
         viewport = new ViewportState(800, 600);
         onAnimationFrame = vi.fn();
-        controller = new AnimationController(mockCamera, viewport, onAnimationFrame);
+        reducedMotion = false;
+        motion = {
+            getReducedMotion: () => reducedMotion,
+            effectiveDuration: (durationMs: number) => (reducedMotion ? 0 : durationMs),
+        };
+        controller = new AnimationController(mockCamera, viewport, onAnimationFrame, motion);
 
-        // Mock requestAnimationFrame
+        // Mock requestAnimationFrame. cancelAnimationFrame really cancels:
+        // a no-op stub lets a cancelled animation keep writing on the next
+        // timer tick, which would make every cancellation assertion in this
+        // file vacuous.
         let frameId = 0;
+        const frameTimers = new Map<number, ReturnType<typeof setTimeout>>();
         vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-            frameId++;
-            setTimeout(() => cb(performance.now()), 16);
-            return frameId;
+            const id = ++frameId;
+            frameTimers.set(
+                id,
+                setTimeout(() => {
+                    frameTimers.delete(id);
+                    cb(performance.now());
+                }, 16),
+            );
+            return id;
         });
-        vi.stubGlobal("cancelAnimationFrame", vi.fn());
+        vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+            const timer = frameTimers.get(id);
+            if (timer !== undefined) {
+                clearTimeout(timer);
+                frameTimers.delete(id);
+            }
+        });
     });
 
     afterEach(() => {
@@ -356,6 +380,83 @@ describe("AnimationController", () => {
 
             expect(onApplySize).toHaveBeenCalledWith(1000, 800, { x: 50, y: 50 });
             expect(onComplete).toHaveBeenCalled();
+        });
+    });
+
+    describe("reduced motion", () => {
+        it("lands a move on target synchronously and fires onComplete once", () => {
+            reducedMotion = true;
+            const onComplete = vi.fn();
+
+            controller.animateMoveTo(100, 100, 500, onComplete);
+
+            expect(setCenterMock).toHaveBeenCalledWith({ x: 100, y: 100 }, 800, 600);
+            expect(onComplete).toHaveBeenCalledTimes(1);
+            expect(controller.isAnimating()).toBe(false);
+
+            // No frame was ever scheduled, so advancing time changes nothing.
+            const calls = (setCenterMock as ReturnType<typeof vi.fn>).mock.calls.length;
+            vi.advanceTimersByTime(1000);
+            expect((setCenterMock as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
+        });
+
+        it("lands a zoom on the exact target scale synchronously", () => {
+            reducedMotion = true;
+            const onComplete = vi.fn();
+
+            controller.animateZoomTo(4, 500, undefined, onComplete);
+
+            expect(mockCamera.scale).toBe(4);
+            expect(onComplete).toHaveBeenCalledTimes(1);
+            expect(controller.isAnimating()).toBe(false);
+        });
+
+        it("applies a resize in one step", () => {
+            reducedMotion = true;
+            const onApplySize = vi.fn();
+            const onComplete = vi.fn();
+
+            controller.animateResize(1000, 800, 500, onApplySize, onComplete);
+
+            expect(onApplySize).toHaveBeenCalledTimes(1);
+            expect(onApplySize).toHaveBeenCalledWith(1000, 800, { x: 50, y: 50 });
+            expect(onComplete).toHaveBeenCalledTimes(1);
+        });
+
+        it("still cancels an in-flight animation before applying", () => {
+            controller.animateMoveTo(200, 200, 500);
+            expect(controller.isAnimating()).toBe(true);
+
+            reducedMotion = true;
+            controller.animateMoveTo(100, 100, 500);
+
+            expect(setCenterMock).toHaveBeenLastCalledWith({ x: 100, y: 100 }, 800, 600);
+            expect(controller.isAnimating()).toBe(false);
+
+            // The cancelled animation must not resume and drag the camera back.
+            vi.advanceTimersByTime(1000);
+            expect(setCenterMock).toHaveBeenLastCalledWith({ x: 100, y: 100 }, 800, 600);
+        });
+
+        it("still rejects a non-positive resize", () => {
+            reducedMotion = true;
+            const onApplySize = vi.fn();
+
+            controller.animateResize(0, 100, 500, onApplySize);
+
+            expect(onApplySize).not.toHaveBeenCalled();
+        });
+
+        it("ends on target when the preference flips mid-animation", () => {
+            controller.animateMoveTo(100, 100, 500);
+            vi.advanceTimersByTime(16);
+            expect(controller.isAnimating()).toBe(true);
+
+            reducedMotion = true;
+            vi.advanceTimersByTime(16);
+
+            expect(setCenterMock).toHaveBeenLastCalledWith({ x: 100, y: 100 }, 800, 600);
+            expect(controller.isAnimating()).toBe(false);
         });
     });
 });

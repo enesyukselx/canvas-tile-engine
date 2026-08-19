@@ -58,6 +58,44 @@ export const Platform = {
     },
 };
 
+type ReduceMotionListener = (enabled: boolean) => void;
+
+let reduceMotionEnabled = false;
+const reduceMotionListeners = new Set<ReduceMotionListener>();
+
+export const AccessibilityInfo = {
+    isReduceMotionEnabled: (): Promise<boolean> => Promise.resolve(reduceMotionEnabled),
+    addEventListener(event: string, listener: ReduceMotionListener) {
+        if (event !== "reduceMotionChanged") {
+            throw new Error(`react-native mock: unexpected AccessibilityInfo event "${event}"`);
+        }
+        reduceMotionListeners.add(listener);
+        return {
+            remove() {
+                reduceMotionListeners.delete(listener);
+            },
+        };
+    },
+};
+
+/** Seed the value `isReduceMotionEnabled()` resolves with, before mount. */
+export function setReduceMotionEnabled(value: boolean): void {
+    reduceMotionEnabled = value;
+}
+
+/** Fire a `reduceMotionChanged` event. Wrap calls in `act`. */
+export function emitReduceMotionChanged(value: boolean): void {
+    reduceMotionEnabled = value;
+    for (const listener of reduceMotionListeners) {
+        listener(value);
+    }
+}
+
+/** How many subscriptions are live — proves cleanup on unmount. */
+export function reduceMotionListenerCount(): number {
+    return reduceMotionListeners.size;
+}
+
 /** Fire `onLayout` on the most recently rendered View. Wrap calls in `act`. */
 export function emitLayout(width: number, height: number, x = 0, y = 0): void {
     const onLayout = viewProps[viewProps.length - 1]?.onLayout;
@@ -70,4 +108,6 @@ export function emitLayout(width: number, height: number, x = 0, y = 0): void {
 /** Reset recorded props between tests. */
 export function resetReactNativeMock(): void {
     viewProps.length = 0;
+    reduceMotionEnabled = false;
+    reduceMotionListeners.clear();
 }

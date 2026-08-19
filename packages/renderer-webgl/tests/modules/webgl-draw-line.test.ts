@@ -47,9 +47,14 @@ describe("WebGLDraw per-item line style", () => {
         );
         render(gl);
 
-        // Color assertions are skipped: ColorParser falls back to opaque
-        // white in node (no real 2D canvas backs the parser here).
+        // Hex resolves without a 2D canvas (ColorParser's inline fast path), so
+        // colors are assertable in node.
         expect(lines.map((l) => l.width)).toEqual([2, 6, 2]);
+        expect(lines.map((l) => l.color)).toEqual([
+            [0, 0, 1, 1],
+            [1, 0, 0, 1],
+            [0, 0, 1, 1],
+        ]);
     });
 
     it("scales item world lineWidth by the camera scale", () => {

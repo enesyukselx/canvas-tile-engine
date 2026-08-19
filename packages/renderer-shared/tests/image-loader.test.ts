@@ -17,7 +17,8 @@ class FakeImage {
 
     onload: (() => void) | null = null;
     onerror: ((err: unknown) => void) | null = null;
-    crossOrigin = "";
+    /** Undefined until the loader assigns it, which is how opting out is asserted. */
+    crossOrigin?: string;
     decoding = "";
     loading = "";
     private _src = "";
@@ -112,6 +113,70 @@ describe("ImageLoader", () => {
         unsubscribe();
         await loader.load("b.png");
         expect(seen).toHaveLength(1);
+    });
+
+    it("requests images with crossOrigin=anonymous by default", async () => {
+        const loader = new ImageLoader();
+
+        await loader.load("a.png");
+
+        expect(FakeImage.instances[0].crossOrigin).toBe("anonymous");
+    });
+
+    it("honours an explicit crossOrigin value", async () => {
+        const loader = new ImageLoader({ crossOrigin: "use-credentials" });
+
+        await loader.load("a.png");
+
+        expect(FakeImage.instances[0].crossOrigin).toBe("use-credentials");
+    });
+
+    it("never touches crossOrigin when opted out with null", async () => {
+        const loader = new ImageLoader({ crossOrigin: null });
+
+        await loader.load("a.png");
+
+        // Assigning any string would make this a CORS request; the property must
+        // stay untouched so no crossorigin attribute is reflected at all.
+        expect(FakeImage.instances[0].crossOrigin).toBeUndefined();
+    });
+
+    it("treats an undefined crossOrigin option as the default", async () => {
+        const loader = new ImageLoader({ crossOrigin: undefined });
+
+        await loader.load("a.png");
+
+        expect(FakeImage.instances[0].crossOrigin).toBe("anonymous");
+    });
+
+    it("keeps the opted-out setting across a retry", async () => {
+        FakeImage.failuresFor.set("flaky.png", 1);
+        const loader = new ImageLoader({ crossOrigin: null });
+
+        await loader.load("flaky.png");
+
+        expect(FakeImage.instances).toHaveLength(2);
+        expect(FakeImage.instances.every((img) => img.crossOrigin === undefined)).toBe(true);
+    });
+
+    it("names CORS in the failure message while crossOrigin is set", async () => {
+        FakeImage.failuresFor.set("broken.png", 2);
+        const loader = new ImageLoader();
+
+        await expect(loader.load("broken.png")).rejects.toThrow(/Access-Control-Allow-Origin/);
+    });
+
+    it("omits the CORS hint once opted out, since CORS is no longer a suspect", async () => {
+        FakeImage.failuresFor.set("broken.png", 2);
+        const loader = new ImageLoader({ crossOrigin: null });
+
+        // One rejection, asserted twice: the failure budget is consumed per
+        // attempt, so a second load() would succeed instead of throwing.
+        const error = await loader.load("broken.png").catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toMatch(/Image failed to load: broken\.png/);
+        expect((error as Error).message).not.toMatch(/Access-Control-Allow-Origin/);
     });
 
     it("clear drops the cache so the next load fetches again", async () => {

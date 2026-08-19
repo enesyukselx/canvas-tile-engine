@@ -220,7 +220,7 @@ engine.drawCircle({ x: 4, y: 0, sizePx: 12, style: { fillStyle: "#f43f5e" } }, 2
 
 ### Text
 
-Two sizing modes, no `radius`:
+Two sizing modes, no `radius`, no `origin` (anchors from `x`/`y` directly):
 
 - `size` (default 1): font em-box height in world units; pixel height is
   `size * scale`, so text scales with zoom like other primitives.
@@ -251,7 +251,7 @@ composites ABOVE all GPU primitives regardless of layer (see
 
 ### Image
 
-`ImageItem` = `DrawObject` minus `style`, plus:
+`ImageItem` = `DrawObject` minus `style` and `radius`, plus:
 
 ```ts
 {

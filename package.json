@@ -11,7 +11,9 @@
     },
     "scripts": {
         "build": "turbo run build --filter=./packages/*",
+        "install:docs": "npm --prefix docs ci",
         "build:docs": "pnpm --dir docs build",
+        "typecheck:docs": "pnpm --dir docs typecheck",
         "dev": "concurrently \"pnpm dev:lib\" \"pnpm --filter vanilla-js-game-map dev\"",
         "dev:lib": "turbo run dev --filter=./packages/* --filter=!@canvas-tile-engine/renderer-server",
         "dev:example": "node run-example.js",
@@ -20,6 +22,7 @@
         "format": "turbo run format",
         "format:check": "turbo run format:check",
         "test": "turbo run test",
+        "test:watch": "turbo run test:watch",
         "test:coverage": "turbo run test:coverage",
         "changeset": "changeset",
         "changeset:version": "changeset version && pnpm install --lockfile-only",
