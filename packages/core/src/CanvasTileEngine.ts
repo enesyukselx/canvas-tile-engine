@@ -14,6 +14,7 @@ import {
     CanvasTileEngineConfig,
     FitBoundsOptions,
     FitBoundsResult,
+    ReducedMotionSetting,
     onClickCallback,
     onRightClickCallback,
     onDrawCallback,
@@ -360,7 +361,12 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.coordinateTransformer = new CoordinateTransformer(this.camera);
 
         // Initialize animation controller
-        this.animationController = new AnimationController(this.camera, this.viewport, () => this.handleCameraChange());
+        this.animationController = new AnimationController(
+            this.camera,
+            this.viewport,
+            () => this.handleCameraChange(),
+            this.config,
+        );
 
         // Initialize renderer with dependencies
         this.renderer = renderer;
@@ -523,6 +529,53 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.handleCameraChange();
     }
 
+    /**
+     * Replace the reduced-motion preference at runtime.
+     *
+     * `"auto"` follows the platform signal (`prefers-reduced-motion` on the
+     * web, `AccessibilityInfo` on React Native); `true`/`false` are explicit
+     * choices the platform can never override. When reduced motion is in
+     * effect every engine-driven camera animation lands instantly, including
+     * one given an explicit `durationMs`.
+     * @throws {ConfigValidationError} If the value is not `true`, `false` or `"auto"`.
+     * @example
+     * ```ts
+     * // Respect the OS setting (default)
+     * engine.setReducedMotion("auto");
+     * // Force animations on regardless of the OS
+     * engine.setReducedMotion(false);
+     * ```
+     */
+    setReducedMotion(value: ReducedMotionSetting) {
+        this.config.updateReducedMotion(value);
+    }
+
+    /**
+     * Whether reduced motion is currently in effect — the preference resolved
+     * against the platform signal. `getConfig().accessibility.reducedMotion`
+     * reports the preference itself, which may be `"auto"`.
+     */
+    getReducedMotion(): boolean {
+        return this.config.getReducedMotion();
+    }
+
+    /**
+     * Record the platform's reduced-motion signal. Consulted only while the
+     * preference is `"auto"`.
+     * Called by the DOM renderers' `prefers-reduced-motion` watcher and by
+     * the React Native binding's `AccessibilityInfo` subscription.
+     *
+     * Deliberately carries no internal-tag annotation: core builds with
+     * `stripInternal: true`, which would delete this method from the
+     * published .d.ts — and every caller lives in another package. Even
+     * naming the tag inside this comment would strip it. The underscore is
+     * the marker instead. Not part of the supported API; application code
+     * should use {@link setReducedMotion}.
+     */
+    _setPlatformReducedMotion(value: boolean) {
+        this.config._setPlatformReducedMotion(value);
+    }
+
     /** Snapshot of current normalized config. */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
@@ -621,6 +674,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     fitBounds(bounds: Bounds, options: FitBoundsOptions = {}): FitBoundsResult {
         const { padding = 0, paddingPx, durationMs = DEFAULT_VALUES.ANIMATION_DURATION_MS, onComplete } = options;
+        // Resolved once: this same number picks the branch below AND is what
+        // the animation controller receives, so reduced motion cannot make
+        // the two disagree.
+        const duration = this.config.effectiveDuration(durationMs);
 
         const size = this.viewport.getSize();
         // Shared with the config-time helper (it also validates), so the
@@ -637,7 +694,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             y: (bounds.minY + bounds.maxY) / 2,
         };
 
-        if (durationMs <= 0) {
+        if (duration <= 0) {
             // An instant fit has to win. This branch writes the camera
             // directly instead of going through the AnimationController, so
             // unlike goCenter/goScale (whose animate* calls cancel first) it
@@ -660,10 +717,10 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         // Concurrent move and zoom animations cooperate: the zoom step
         // re-reads the (moving) center every frame. onComplete rides on the
         // zoom animation; both share the same duration.
-        this.animationController.animateMoveTo(center.x, center.y, durationMs);
+        this.animationController.animateMoveTo(center.x, center.y, duration);
         this.animationController.animateZoomTo(
             targetScale,
-            durationMs,
+            duration,
             (prevScale) => this.notifyZoomIfChanged(prevScale),
             onComplete,
         );

@@ -30,6 +30,19 @@ const config: CanvasTileEngineConfig = {
 | `backgroundColor` | `string` | `"#ffffff"` | Frame background color. |
 | `gridAligned` | `boolean` | `false` | Snaps the initial center to the nearest grid-aligned value for pixel-perfect alignment: half-integers (x.5) for even tile counts, integers for odd. Integers are cell centers (cell `k` spans `[k-0.5, k+0.5]`); integer ties snap down so a center given as `N/2` lands on a 0-based board's true center `(N-1)/2`. |
 | `responsive` | `"preserve-scale" \| "preserve-viewport" \| false` | `false` | Enables container-driven resizing in browser renderers. |
+| `accessibility` | `object` | — | Accessibility preferences. See [Accessibility](#accessibility). |
+
+### Accessibility
+
+| Property | Type | Default | Description |
+| :-- | :-- | :-- | :-- |
+| `reducedMotion` | `boolean \| "auto"` | `"auto"` | Collapses engine-driven camera animation to instant. `"auto"` follows the platform: `prefers-reduced-motion` on the web, `AccessibilityInfo` on React Native. |
+
+When reduced motion is in effect it **overrides an explicitly passed `durationMs`** — `goCenter(x, y, 800)` lands instantly. That is deliberate: a duration the app hard-codes is exactly what the preference exists to suppress, so the escape hatch is `reducedMotion: false` (or `engine.setReducedMotion(false)`), never a per-call duration.
+
+Scope is the engine's own camera animation: `goCenter`, `goScale`, `fitBounds` and `resize`. `SpriteAnimator` and anything you draw yourself are **not** covered — call `animator.stop()` yourself if you need WCAG SC 2.2.2.
+
+This field reports the preference **as configured**, so persisting a `getConfig()` snapshot and replaying it never turns "follow the OS" into a permanent choice. For the value actually in effect, call [`engine.getReducedMotion()`](../js/camera_and_viewport.md).
 
 ### Size
 
@@ -193,6 +206,9 @@ export type CanvasTileEngineConfig = {
         maxX: number;
         minY: number;
         maxY: number;
+    };
+    accessibility?: {
+        reducedMotion?: boolean | "auto";
     };
     coordinates?: {
         enabled?: boolean;

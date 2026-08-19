@@ -221,6 +221,35 @@ engine.fitBounds(selectionBounds, { durationMs: 0 });
 
 Throws a `ConfigValidationError` if an edge is not finite, `min >= max` on an axis, or a padding value is negative. A `paddingPx` too large for the viewport is clamped (at least 1px of fit area per axis) and the result rides the scale limits.
 
+#### `setReducedMotion(value)` / `getReducedMotion()`
+
+Replace the reduced-motion preference at runtime, and read the value actually in effect.
+
+| Parameter | Type | Description |
+| :-------- | :--- | :---------- |
+| `value` | `boolean \| "auto"` | `"auto"` (default) follows the platform; `true`/`false` are explicit choices the platform can never override. |
+
+```typescript
+// Follow the OS setting (the default)
+engine.setReducedMotion("auto");
+
+// Force animation on regardless of the OS
+engine.setReducedMotion(false);
+
+if (engine.getReducedMotion()) {
+    // Skip your own transitions too — the engine only covers its own.
+}
+```
+
+When in effect, every engine-driven camera animation lands instantly: `goCenter`, `goScale`, `fitBounds` and `resize`. It **overrides an explicitly passed `durationMs`**, which is the point of the preference — the escape hatch is `setReducedMotion(false)`, not a per-call duration.
+
+Scope is deliberately narrow. `SpriteAnimator` and anything your app draws itself are **not** covered; call `animator.stop()` yourself if you need WCAG SC 2.2.2.
+
+On the web the platform signal is `prefers-reduced-motion`, read by the Canvas2D and WebGL renderers. On React Native the binding subscribes to `AccessibilityInfo`. A custom third-party renderer that pushes no signal leaves `"auto"` resolving to `false` — which is why `setReducedMotion(true)` exists as an app-level override.
+
+`getReducedMotion()` returns the resolved boolean; `getConfig().accessibility.reducedMotion` reports the preference, which may still be `"auto"`.
+
+
 ## Viewport & Resizing
 
 The viewport is the visible area of the canvas. The engine can handle resizing automatically or manually.
