@@ -30,7 +30,7 @@ export { resolveOrigin, computeOriginOffset, type Origin, type RawOrigin } from 
 export { flattenPathCommands, pathCommandsBounds, type Subpath } from "./utils/flattenPath";
 export type { CornerArc } from "./utils/pathCorners";
 // Additional core modules
-export { Config } from "./modules/Config";
+export { Config, normalizeConfig } from "./modules/Config";
 export { ViewportState } from "./modules/ViewportState";
 export { CoordinateTransformer } from "./modules/CoordinateTransformer";
 export { SpatialIndex } from "./modules/SpatialIndex";
