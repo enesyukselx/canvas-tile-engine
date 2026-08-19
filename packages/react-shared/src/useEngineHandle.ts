@@ -26,6 +26,7 @@ import type {
     PathDrawOptions,
     ImageDrawOptions,
     StaticDrawOptions,
+    ReducedMotionSetting,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -173,7 +174,7 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
      * on React Native. When in effect, every engine-driven camera animation
      * lands instantly — including one given an explicit `durationMs`.
      */
-    setReducedMotion(value: boolean | "auto"): void;
+    setReducedMotion(value: ReducedMotionSetting): void;
 
     /**
      * Whether reduced motion is currently in effect, preference resolved
@@ -417,7 +418,7 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                 instanceRef.current?.setScaleLimits(minScale, maxScale);
             },
 
-            setReducedMotion(value: boolean | "auto") {
+            setReducedMotion(value: ReducedMotionSetting) {
                 instanceRef.current?.setReducedMotion(value);
             },
 

@@ -210,7 +210,7 @@ export class Config implements MotionPolicy {
      * `"auto"` into a permanent choice.
      * @throws {ConfigValidationError} If the value is not `true`, `false` or `"auto"`.
      */
-    setReducedMotion(value: ReducedMotionSetting) {
+    updateReducedMotion(value: ReducedMotionSetting) {
         validateReducedMotion(value);
 
         this.motionPreference = value;
@@ -236,7 +236,7 @@ export class Config implements MotionPolicy {
      * published .d.ts — and every caller lives in another package. Even
      * naming the tag inside this comment would strip it. The underscore is
      * the marker instead. Not part of the supported API; application code
-     * should use {@link setReducedMotion}.
+     * should use {@link updateReducedMotion}.
      */
     _setPlatformReducedMotion(value: boolean) {
         this.platformReducedMotion = value;

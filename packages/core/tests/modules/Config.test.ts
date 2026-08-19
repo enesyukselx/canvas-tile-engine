@@ -461,11 +461,11 @@ describe("Config", () => {
             expect(config.get().accessibility.reducedMotion).toBe("auto");
         });
 
-        it("setReducedMotion replaces the preference and the snapshot", () => {
+        it("updateReducedMotion replaces the preference and the snapshot", () => {
             const config = new Config(minimalConfig);
             const before = config.get();
 
-            config.setReducedMotion(true);
+            config.updateReducedMotion(true);
 
             expect(config.getReducedMotion()).toBe(true);
             expect(config.get().accessibility.reducedMotion).toBe(true);
@@ -501,8 +501,8 @@ describe("Config", () => {
             ).toThrow();
 
             const config = new Config(minimalConfig);
-            expect(() => config.setReducedMotion("reduce" as never)).toThrow();
-            expect(() => config.setReducedMotion(1 as never)).toThrow();
+            expect(() => config.updateReducedMotion("reduce" as never)).toThrow();
+            expect(() => config.updateReducedMotion(1 as never)).toThrow();
             expect(config.get().accessibility.reducedMotion).toBe("auto"); // unchanged after a rejected set
         });
     });

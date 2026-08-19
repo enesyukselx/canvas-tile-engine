@@ -86,7 +86,7 @@ describe("ReducedMotionWatcher", () => {
     it("feeds the platform slot, so an explicit preference still wins", () => {
         const media = stubMatchMedia(true);
         const config = createConfig();
-        config.setReducedMotion(false);
+        config.updateReducedMotion(false);
 
         new ReducedMotionWatcher(config).start();
         media.emit(true);
