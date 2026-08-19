@@ -299,6 +299,7 @@ export class GestureProcessor {
             const centerY = centerMode ? bounds.height / 2 : currentCenter.y - bounds.top;
 
             // Apply zoom
+            const prevScale = this.camera.scale;
             this.camera.zoomByFactor(scaleFactor, centerX, centerY);
 
             // Also pan if pinch center moved. Skipped in "center" mode: fingers
@@ -327,7 +328,11 @@ export class GestureProcessor {
                 scaleFactor === 1 ? 0 : -Math.log(scaleFactor) / DEFAULT_VALUES.ZOOM_SENSITIVITY,
                 "pinch",
             );
-            if (this.onZoom) {
+            // onZoom means "the zoom level changed": stay silent when the
+            // factor was a no-op or the camera clamped at a scale limit,
+            // matching the programmatic paths. onWheel above still fires,
+            // since it reports the gesture rather than the result.
+            if (this.onZoom && this.camera.scale !== prevScale) {
                 this.onZoom(this.camera.scale);
             }
             this.onCameraChange();
@@ -409,9 +414,12 @@ export class GestureProcessor {
             zoom === "center"
                 ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
                 : { x: pointer.clientX, y: pointer.clientY };
+        const prevScale = this.camera.scale;
         this.camera.zoom(anchor.x, anchor.y, deltaY, bounds as DOMRect);
         this.notifyWheel(pointer, deltaY, "wheel");
-        if (this.onZoom) {
+        // Scrolling on at a scale limit leaves the scale untouched: report it
+        // as onWheel only, so onZoom keeps meaning "the zoom level changed".
+        if (this.onZoom && this.camera.scale !== prevScale) {
             this.onZoom(this.camera.scale);
         }
         this.onCameraChange();
