@@ -29,10 +29,30 @@ import {
     ImageLoader,
     ResizeWatcher,
     ResponsiveWatcher,
+    ReducedMotionWatcher,
     SizeController,
     initStyles,
 } from "@canvas-tile-engine/renderer-shared/dom";
 import { BrowserCanvasDraw, BrowserContext2D, createBrowserCanvasDraw } from "./modules/createCanvasDraw";
+
+// crossOrigin is spelled out below rather than imported from renderer-shared:
+// that package is private, so a type reference to it would land in the
+// published d.ts and resolve to nothing for consumers.
+export interface RendererCanvasOptions {
+    /**
+     * `crossOrigin` attribute used for images loaded through `engine.images`.
+     * Default `"anonymous"`.
+     *
+     * The attribute makes every image request a CORS request, so images served
+     * without an `Access-Control-Allow-Origin` header — a plain bucket, a CDN,
+     * a third-party tile server — fail to load entirely. Pass `null` to request
+     * them as ordinary images instead; they then load fine and merely taint the
+     * canvas, which this renderer never reads back from.
+     *
+     * Use `"use-credentials"` for CORS requests that must carry cookies.
+     */
+    crossOrigin?: "anonymous" | "use-credentials" | null;
+}
 
 export class RendererCanvas implements IRenderer {
     /** Transform helpers handed to the onDraw hook. */
@@ -58,6 +78,7 @@ export class RendererCanvas implements IRenderer {
     private eventBinder!: EventBinder;
     private resizeWatcher?: ResizeWatcher;
     private responsiveWatcher?: ResponsiveWatcher;
+    private reducedMotionWatcher?: ReducedMotionWatcher;
     private eventsAttached = false;
 
     // Size control
@@ -65,13 +86,20 @@ export class RendererCanvas implements IRenderer {
     private animationController!: AnimationController;
 
     // Image loading
-    private imageLoader = new ImageLoader();
+    private imageLoader: ImageLoader;
 
     /** Optional user-provided draw hook executed after engine layers. */
     public onDraw?: onDrawCallback;
 
     /** Optional callback fired when canvas is resized. */
     public onResize?: () => void;
+
+    /**
+     * @param options See {@link RendererCanvasOptions}.
+     */
+    constructor(options: RendererCanvasOptions = {}) {
+        this.imageLoader = new ImageLoader({ crossOrigin: options.crossOrigin });
+    }
 
     // ─── Callback Getters/Setters (proxy to GestureProcessor) ───
 
@@ -223,7 +251,12 @@ export class RendererCanvas implements IRenderer {
         });
 
         // Initialize AnimationController and SizeController
-        this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
+        this.animationController = new AnimationController(
+            this.camera,
+            this.viewport,
+            () => this.render(),
+            this.config,
+        );
         this.sizeController = new SizeController(
             this.canvasWrapper,
             [this.canvas],
@@ -242,6 +275,11 @@ export class RendererCanvas implements IRenderer {
         }
         this.eventBinder.attach();
         this.eventsAttached = true;
+
+        // Unconditional: reduced motion is an accessibility preference,
+        // not one of the opt-in eventHandlers.
+        this.reducedMotionWatcher = new ReducedMotionWatcher(this.config);
+        this.reducedMotionWatcher.start();
 
         // Setup responsive or resize watcher based on config
         if (this.config.get().responsive) {
@@ -491,6 +529,8 @@ export class RendererCanvas implements IRenderer {
         this.resizeWatcher = undefined;
         this.responsiveWatcher?.stop();
         this.responsiveWatcher = undefined;
+        this.reducedMotionWatcher?.stop();
+        this.reducedMotionWatcher = undefined;
 
         // Cancel animations
         this.animationController.cancelAll();

@@ -30,12 +30,32 @@ import {
     ImageLoader,
     ResizeWatcher,
     ResponsiveWatcher,
+    ReducedMotionWatcher,
     SizeController,
     initStyles,
 } from "@canvas-tile-engine/renderer-shared/dom";
 import { GLRenderer } from "./modules/gl/GLRenderer";
 import { ColorParser } from "./utils/color";
 import { createOverlayCanvas, getWebGLContext } from "./utils/webgl";
+
+// crossOrigin is spelled out below rather than imported from renderer-shared:
+// that package is private, so a type reference to it would land in the
+// published d.ts and resolve to nothing for consumers.
+export interface RendererWebGLOptions {
+    /**
+     * `crossOrigin` attribute used for images loaded through `engine.images`.
+     * Default `"anonymous"`.
+     *
+     * Unlike the Canvas2D renderer, WebGL genuinely needs this: uploading a
+     * cross-origin image that was fetched without CORS throws a `SecurityError`
+     * on `texImage2D`, and the engine skips drawing it. Only pass `null` when
+     * every image is same-origin; cross-origin hosts must send an
+     * `Access-Control-Allow-Origin` header for this renderer to draw them.
+     *
+     * Use `"use-credentials"` for CORS requests that must carry cookies.
+     */
+    crossOrigin?: "anonymous" | "use-credentials" | null;
+}
 
 /**
  * WebGL2/WebGL1 implementation of {@link IRenderer}.
@@ -80,6 +100,7 @@ export class RendererWebGL implements IRenderer {
     private eventBinder!: EventBinder;
     private resizeWatcher?: ResizeWatcher;
     private responsiveWatcher?: ResponsiveWatcher;
+    private reducedMotionWatcher?: ReducedMotionWatcher;
     private eventsAttached = false;
 
     // Size control
@@ -87,7 +108,14 @@ export class RendererWebGL implements IRenderer {
     private animationController!: AnimationController;
 
     // Image loading
-    private imageLoader = new ImageLoader();
+    private imageLoader: ImageLoader;
+
+    /**
+     * @param options See {@link RendererWebGLOptions}.
+     */
+    constructor(options: RendererWebGLOptions = {}) {
+        this.imageLoader = new ImageLoader({ crossOrigin: options.crossOrigin });
+    }
 
     private handleContextLost = (e: Event): void => {
         // Prevent the default so the context can be restored later.
@@ -265,7 +293,12 @@ export class RendererWebGL implements IRenderer {
         });
 
         // Initialize AnimationController and SizeController
-        this.animationController = new AnimationController(this.camera, this.viewport, () => this.render());
+        this.animationController = new AnimationController(
+            this.camera,
+            this.viewport,
+            () => this.render(),
+            this.config,
+        );
         this.sizeController = new SizeController(
             this.canvasWrapper,
             [this.canvas, this.overlayCanvas],
@@ -284,6 +317,11 @@ export class RendererWebGL implements IRenderer {
         }
         this.eventBinder.attach();
         this.eventsAttached = true;
+
+        // Unconditional: reduced motion is an accessibility preference,
+        // not one of the opt-in eventHandlers.
+        this.reducedMotionWatcher = new ReducedMotionWatcher(this.config);
+        this.reducedMotionWatcher.start();
 
         if (this.config.get().responsive) {
             if (this.config.get().eventHandlers?.resize) {
@@ -544,6 +582,8 @@ export class RendererWebGL implements IRenderer {
         this.resizeWatcher = undefined;
         this.responsiveWatcher?.stop();
         this.responsiveWatcher = undefined;
+        this.reducedMotionWatcher?.stop();
+        this.reducedMotionWatcher = undefined;
 
         // Cancel animations
         this.animationController.cancelAll();

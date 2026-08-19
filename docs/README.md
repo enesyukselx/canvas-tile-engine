@@ -8,9 +8,13 @@ The documentation is built using [Docusaurus](https://docusaurus.io/).
 
 ### Installation
 
+This site is a standalone npm project - it is not part of the repository's pnpm workspace, so a root `pnpm install` does not install these dependencies.
+
 ```bash
-npm install
+npm ci
 ```
+
+Equivalently, `pnpm install:docs` from the repository root. Use `npm install` only when you are intentionally adding or upgrading a dependency, and commit the resulting `package-lock.json`.
 
 ### Local Development
 

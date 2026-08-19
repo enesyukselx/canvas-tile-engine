@@ -978,4 +978,111 @@ describe("CanvasTileEngine", () => {
             expect(e.hitTestFirst({ x: 7.5, y: 6 })).toBeUndefined();
         });
     });
+
+    describe("reduced motion", () => {
+        const reduced: CanvasTileEngineConfig = {
+            ...baseConfig,
+            minScale: 0.01,
+            maxScale: 1000,
+            accessibility: { reducedMotion: true },
+        };
+
+        // The anti-drift guarantee: fitBounds picks its branch from the same
+        // number the animation controller receives, so a reduced animated fit
+        // and an explicit instant fit cannot end up anywhere different.
+        it("makes an animated fitBounds identical to an instant one", () => {
+            const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 50 };
+
+            const animated = createEngine(reduced);
+            const animatedResult = animated.fitBounds(bounds);
+
+            const instant = createEngine({ ...reduced, accessibility: { reducedMotion: false } });
+            const instantResult = instant.fitBounds(bounds, { durationMs: 0 });
+
+            expect(animatedResult).toEqual(instantResult);
+            expect(animated.getScale()).toBe(instant.getScale());
+            expect(animated.getCenter().x).toBeCloseTo(instant.getCenter().x);
+            expect(animated.getCenter().y).toBeCloseTo(instant.getCenter().y);
+        });
+
+        it("fires onComplete synchronously for an animated fitBounds", () => {
+            const e = createEngine(reduced);
+            const onComplete = vi.fn();
+
+            e.fitBounds({ minX: 0, maxX: 100, minY: 0, maxY: 50 }, { onComplete });
+
+            expect(onComplete).toHaveBeenCalledTimes(1);
+        });
+
+        it("collapses goCenter and goScale to instant", () => {
+            const e = createEngine(reduced);
+            const onZoom = vi.fn<(scale: number) => void>();
+            e.onZoom = onZoom;
+
+            e.goCenter(40, 25, 500);
+            expect(e.getCenter()).toEqual({ x: 40, y: 25 });
+
+            e.goScale(4, 500);
+            expect(e.getScale()).toBe(4);
+            expect(onZoom).toHaveBeenCalledTimes(1);
+            expect(onZoom).toHaveBeenCalledWith(4);
+        });
+
+        it("overrides an explicitly passed durationMs", () => {
+            const e = createEngine(reduced);
+
+            e.goCenter(10, 20, 5000);
+
+            expect(e.getCenter()).toEqual({ x: 10, y: 20 });
+        });
+
+        it("honors a runtime setReducedMotion", () => {
+            const e = createEngine({ ...baseConfig, minScale: 0.01, maxScale: 1000 });
+            expect(e.getReducedMotion()).toBe(false);
+
+            e.setReducedMotion(true);
+
+            expect(e.getReducedMotion()).toBe(true);
+            expect(e.getConfig().accessibility.reducedMotion).toBe(true);
+        });
+
+        it('resolves "auto" from the pushed platform signal', () => {
+            const e = createEngine();
+            expect(e.getReducedMotion()).toBe(false);
+
+            e._setPlatformReducedMotion(true);
+
+            expect(e.getReducedMotion()).toBe(true);
+            // The snapshot keeps reporting the preference, not the resolution.
+            expect(e.getConfig().accessibility.reducedMotion).toBe("auto");
+        });
+
+        // Reduction happens once, inside the renderer's own AnimationController.
+        // Forwarding a shortened duration here would double-apply it on the web
+        // and skip it entirely on a renderer that does its own thing.
+        it("forwards resize durations to the renderer unchanged", () => {
+            const renderer = createMockRenderer();
+            const e = new CanvasTileEngine<Mount>({}, reduced, renderer);
+
+            e.resize(1000, 800, 500);
+
+            expect(renderer.resizeWithAnimation).toHaveBeenCalledWith(1000, 800, 500, undefined);
+        });
+
+        // The regression guard for pull-based detection: on React Native
+        // `window` exists but `matchMedia` does not, so any core-side probe
+        // would throw here.
+        it("never probes the platform itself", () => {
+            vi.stubGlobal("window", {});
+            try {
+                const e = createEngine({ ...baseConfig, minScale: 0.01, maxScale: 1000 });
+                expect(() => e.setReducedMotion("auto")).not.toThrow();
+                expect(() => e.goCenter(5, 5, 500)).not.toThrow();
+                expect(() => e.fitBounds({ minX: 0, maxX: 10, minY: 0, maxY: 10 })).not.toThrow();
+                expect(e.getReducedMotion()).toBe(false);
+            } finally {
+                vi.unstubAllGlobals();
+            }
+        });
+    });
 });

@@ -390,7 +390,6 @@ drawText(items: Text | Text[], layer?: number, options?: DrawOptions): DrawHandl
 | `text`   | `string` | **Required**                       | The text content.                                                             |
 | `size`   | `number` | `1`                                | Font size in world units (scales with zoom). Ignored when `fontPx` is set.    |
 | `fontPx` | `number` | -                                  | Fixed font size in pixels, independent of zoom. Takes precedence over `size`. |
-| `origin` | `object` | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                 |
 | `style`  | `object` | -                                  | Font styling options.                                                         |
 | `rotate` | `number` | `0`                                | Rotation angle in degrees (clockwise).                                        |
 

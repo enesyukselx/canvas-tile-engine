@@ -92,6 +92,16 @@ const unsubscribe = engine.images?.onLoad(() => engine.render());
 unsubscribe?.();
 ```
 
+## CORS and `crossOrigin`
+
+Browser renderers request images with `crossOrigin="anonymous"` by default, which makes every image request a CORS request. If your assets are served without an `Access-Control-Allow-Origin` header, the load fails outright; pass `crossOrigin: null` on the renderer to request them as ordinary images instead:
+
+```tsx
+<CanvasTileEngine engine={engine} renderer={new RendererCanvas({ crossOrigin: null })} config={config}>
+```
+
+`RendererWebGL` accepts the same option, but needs CORS-clean images to upload them to the GPU — with `crossOrigin: null` any cross-origin image is skipped at draw time. See [Image Loader](../js/image_loader.md#cors-and-crossorigin) for the full trade-off.
+
 ## Spritesheets
 
 ```tsx

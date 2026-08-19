@@ -1,3 +1,45 @@
+/**
+ * Reduced-motion preference. `"auto"` follows the platform signal (the
+ * browser's `prefers-reduced-motion` media query, or React Native's
+ * `AccessibilityInfo`); `true`/`false` are explicit app choices that the
+ * platform can never override.
+ */
+export type ReducedMotionSetting = boolean | "auto";
+
+export type AccessibilityConfig = {
+    /**
+     * Collapse engine-driven camera animation to instant. Default `"auto"`.
+     *
+     * When in effect this **overrides an explicitly passed `durationMs`** —
+     * `goCenter(x, y, 800)` lands instantly. That is deliberate: a duration
+     * the app hard-codes is exactly what the preference exists to suppress,
+     * so the escape hatch is `reducedMotion: false` (or
+     * `engine.setReducedMotion(false)`), never a per-call duration.
+     *
+     * Scope is the engine's own camera animation: `goCenter`, `goScale`,
+     * `fitBounds` and `resize`. `SpriteAnimator` and anything the app draws
+     * itself are out of scope — call `animator.stop()` yourself if you need
+     * WCAG SC 2.2.2.
+     *
+     * This field reports the preference **as configured**, so a persisted
+     * snapshot never turns "follow the OS" into a permanent choice. For the
+     * value actually in effect, call `engine.getReducedMotion()`.
+     */
+    reducedMotion?: ReducedMotionSetting;
+};
+
+/**
+ * The motion policy the animation paths consult. `Config` implements it; the
+ * interface exists so `AnimationController` depends on the two methods it
+ * needs rather than on the whole config store.
+ */
+export interface MotionPolicy {
+    /** The reduced-motion value actually in effect, preference resolved against the platform signal. */
+    getReducedMotion(): boolean;
+    /** `durationMs`, or `0` when reduced motion is in effect. */
+    effectiveDuration(durationMs: number): number;
+}
+
 export type CanvasTileEngineConfig = {
     scale: number;
     maxScale?: number;
@@ -31,6 +73,7 @@ export type CanvasTileEngineConfig = {
         enabled?: boolean;
         shownScaleRange?: { min: number; max: number };
     };
+    accessibility?: AccessibilityConfig;
     debug?: {
         enabled?: boolean;
         hud?: {

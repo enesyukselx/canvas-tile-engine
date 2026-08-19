@@ -3,6 +3,30 @@ import { IImageLoader } from "@canvas-tile-engine/core";
 const DEFAULT_IMAGE_LOAD_RETRY_COUNT = 1;
 
 /**
+ * Value for the `crossOrigin` attribute of a loaded image, or `null` to omit
+ * the attribute entirely and issue a plain (non-CORS) image request.
+ */
+export type ImageCrossOrigin = "anonymous" | "use-credentials" | null;
+
+const DEFAULT_CROSS_ORIGIN: ImageCrossOrigin = "anonymous";
+
+export interface ImageLoaderOptions {
+    /**
+     * `crossOrigin` attribute applied to every image element this loader
+     * creates. Default `"anonymous"`.
+     *
+     * Setting the attribute turns the request into a CORS request, so a host
+     * that does not send `Access-Control-Allow-Origin` fails the load outright.
+     * Pass `null` to drop the attribute: such hosts then load fine, at the cost
+     * of tainting the canvas.
+     *
+     * WebGL needs CORS-clean images — uploading a tainted image as a texture
+     * throws — so `null` is only safe on the Canvas2D renderer.
+     */
+    crossOrigin?: ImageCrossOrigin;
+}
+
+/**
  * DOM-based image loader with in-memory caching to avoid duplicate network requests.
  * Implements IImageLoader for HTMLImageElement.
  */
@@ -10,6 +34,14 @@ export class ImageLoader implements IImageLoader<HTMLImageElement> {
     private cache = new Map<string, HTMLImageElement>();
     private inflight = new Map<string, Promise<HTMLImageElement>>();
     private listeners = new Set<() => void>();
+    private readonly crossOrigin: ImageCrossOrigin;
+
+    /**
+     * @param options See {@link ImageLoaderOptions}.
+     */
+    constructor(options: ImageLoaderOptions = {}) {
+        this.crossOrigin = options.crossOrigin === undefined ? DEFAULT_CROSS_ORIGIN : options.crossOrigin;
+    }
 
     /**
      * Register a callback fired when a new image finishes loading.
@@ -44,7 +76,11 @@ export class ImageLoader implements IImageLoader<HTMLImageElement> {
 
         const task = new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
-            img.crossOrigin = "anonymous";
+            // Opting out leaves the property untouched so no `crossorigin`
+            // attribute is ever reflected and the request stays a plain image load.
+            if (this.crossOrigin !== null) {
+                img.crossOrigin = this.crossOrigin;
+            }
             img.decoding = "async";
             img.loading = "eager";
 
@@ -73,7 +109,13 @@ export class ImageLoader implements IImageLoader<HTMLImageElement> {
                     console.error(`Image failed to load: ${src}`, err);
                     const reason =
                         err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err);
-                    reject(new Error(`Image failed to load: ${src}. Reason: ${reason}`));
+                    // A missing Access-Control-Allow-Origin header surfaces as a
+                    // plain onerror, so name it rather than blaming the asset.
+                    const corsHint =
+                        this.crossOrigin === null
+                            ? ""
+                            : ` Images are requested with crossOrigin="${this.crossOrigin}", so this also fails when the host does not send an Access-Control-Allow-Origin header; pass crossOrigin: null to the renderer to load it without CORS (Canvas2D only).`;
+                    reject(new Error(`Image failed to load: ${src}. Reason: ${reason}.${corsHint}`));
                 }
             };
 

@@ -7,6 +7,7 @@
     "license": "MIT",
     "sideEffects": false,
     "exports": {
+        "./cache": "./src/cache/index.ts",
         "./canvas2d": "./src/canvas2d/index.ts",
         "./dom": "./src/dom/index.ts",
         "./geometry": "./src/geometry/index.ts",
@@ -15,7 +16,8 @@
     "scripts": {
         "typecheck": "tsc --noEmit",
         "lint": "oxlint",
-        "test": "vitest",
+        "test": "vitest run",
+        "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "format": "oxfmt",
         "format:check": "oxfmt --check"

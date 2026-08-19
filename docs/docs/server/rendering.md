@@ -114,3 +114,7 @@ engine.drawText(
 - Static draw helpers use an offscreen `@napi-rs/canvas` cache.
 - `onDraw` and `addDrawFunction` receive `SKRSContext2D`.
 - `engine.images.load()` accepts paths, `file://` URLs, `http(s)` URLs, and `data:` URIs supported by `@napi-rs/canvas`.
+
+## Accessibility
+
+`config.accessibility.reducedMotion` is accepted and has no observable effect here. Server rendering produces a single frame, and Node has no `requestAnimationFrame`, so every animation API already resolves instantly. Nothing pushes a platform signal, so `"auto"` resolves to `false` and `engine.getReducedMotion()` reflects only the configured preference.

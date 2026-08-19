@@ -96,7 +96,7 @@ export type SpriteRect = {
  * An image to draw. `TImage` is the platform-specific image handle and defaults
  * to `HTMLImageElement` (DOM); other renderers parameterize it (e.g. `SkImage`).
  */
-export type ImageItem<TImage = HTMLImageElement, TData = unknown> = Omit<DrawObject<TData>, "style"> & {
+export type ImageItem<TImage = HTMLImageElement, TData = unknown> = Omit<DrawObject<TData>, "style" | "radius"> & {
     img: TImage;
     /**
      * Source rectangle in sheet pixels. When set, only this sub-region of
@@ -126,7 +126,7 @@ export type ImageItem<TImage = HTMLImageElement, TData = unknown> = Omit<DrawObj
      */
     opacity?: number;
 };
-export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size"> & {
+export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size" | "origin"> & {
     text: string;
     /**
      * Font size in world units: the font's em box spans `size` world units, so

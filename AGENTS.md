@@ -17,8 +17,14 @@ pnpm install
 # Build published packages
 pnpm build
 
-# Build docs
+# Install docs dependencies (docs/ is a separate npm project, not in the pnpm workspace)
+pnpm install:docs
+
+# Build docs (requires pnpm install:docs first)
 pnpm build:docs
+
+# Type check docs
+pnpm typecheck:docs
 
 # Run package watch mode plus the default vanilla example
 pnpm dev
@@ -43,6 +49,9 @@ pnpm format:check
 
 # Run tests
 pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
 
 # Run tests with coverage
 pnpm test:coverage
@@ -110,7 +119,7 @@ For example development against local package changes, run `pnpm dev:lib` in one
 - `packages/renderer-server/` - `@canvas-tile-engine/renderer-server`: headless Node.js renderer for PNG/JPEG/WebP buffers.
 - `packages/renderer-shared/` - `@canvas-tile-engine/renderer-shared`: private internal package with modules shared between renderers. Not published; consumers bundle its TypeScript source.
 - `examples/` - Vite, React, React Native, spritesheet, and server-rendering examples.
-- `docs/` - Docusaurus documentation site.
+- `docs/` - Docusaurus documentation site. A standalone npm project with its own `package-lock.json`; it is not listed in `pnpm-workspace.yaml`, so use `pnpm install:docs` (npm under the hood) before building it.
 
 ### Core Package
 
@@ -164,7 +173,7 @@ Key public contracts:
 
 `renderer-shared` (internal, not published):
 
-- Four entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types; `renderer-webgl`'s 2D overlay also consumes its CoordinateOverlayRenderer and DebugOverlay), `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too), `@canvas-tile-engine/renderer-shared/geometry` (the viewport cull rect and per-item visibility test), and `@canvas-tile-engine/renderer-shared/scene` (per-frame plumbing: the `Layer` manager, the `FpsSampler`, and the debug-HUD / coordinate-overlay layout). The last two are consumed by all four renderers and are pure — no context or platform types. Geometry that application code also needs lives in core instead (`itemsBounds`, `pathItemBounds`), not here.
+- Five entry points: `@canvas-tile-engine/renderer-shared/canvas2d` (Canvas2D draw pipeline shared by `renderer-canvas` and `renderer-server`, generic over the 2D context and image types; `renderer-webgl`'s 2D overlay also consumes its CoordinateOverlayRenderer and DebugOverlay), `@canvas-tile-engine/renderer-shared/dom` (browser plumbing shared by `renderer-canvas` and `renderer-webgl`; sizing modules take a list of canvases so WebGL can drive its overlay too), `@canvas-tile-engine/renderer-shared/geometry` (the viewport cull rect and per-item visibility test), `@canvas-tile-engine/renderer-shared/scene` (per-frame plumbing: the `Layer` manager, the `FpsSampler`, and the debug-HUD / coordinate-overlay layout), and `@canvas-tile-engine/renderer-shared/cache` (`LruCache`, the fixed-capacity map behind the WebGL and Skia color caches — the data structure only; each renderer owns its own `COLOR_CACHE_LIMIT`, and the two are deliberately different because a WebGL miss is an inline parse and a Skia miss is a native call, so do not reunify them). `geometry` and `scene` are consumed by all four renderers and are pure — no context or platform types. Geometry that application code also needs lives in core instead (`itemsBounds`, `pathItemBounds`), not here.
 - `scene` computes, renderers paint: `computeHudLayout` returns the HUD strings plus panel and line positions, and `coordinateOverlayBorders` / `forEachCoordinateLabel` return the overlay geometry, so each renderer is left with a thin paint adapter (`fillRect`/`fillText` vs `drawRect`/`drawText`). Skia's HUD is the same layout shifted by its own `HUD_TOP_OFFSET`, passed as the `topOffset` argument — do not reintroduce a private copy of the layout to move it. `Layer` is generic over the draw context and calls the target `ctx` on every platform; Skia's callbacks destructure it as `canvas` (`({ ctx: canvas }) => ...`), and Layer prefers `restoreToCount` when the context offers one.
 - No build step: `exports` points at `src/*.ts` and consumers bundle the source with tsup (`noExternal`).
 - Consumers depend on it via `devDependencies` (`workspace:^`) so it never appears in published `package.json` files; the `workspace:^` publishing rule does not apply to it.
@@ -243,7 +252,7 @@ const png = await renderToBuffer({
 For every edit, feature, or fix, check whether these need updating alongside the code:
 
 - `.changeset/` - required whenever a published package changes (behavior or public artifact). Run `pnpm changeset` and commit the generated file. Docs-, example-, or tooling-only changes do not need one.
-- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one. Unreleased changes go to `docs/docs/` only; `versioned_docs` is synced at release time. Only edit `versioned_docs` directly to fix documentation of already-published behavior.
+- `docs/` - update when the change affects usage or the public API. The site is versioned: `docs/docs/` is the upcoming version and `docs/versioned_docs/version-0.x.x/` is the published one. Unreleased changes go to `docs/docs/` only; `versioned_docs` is synced at release time. Only edit `versioned_docs` directly to fix documentation of already-published behavior. Pushes touching `docs/**` run `.github/workflows/docs.yml` (`npm ci`, `npm run typecheck`, `npm run build`), so a broken link or a stale `docs/package-lock.json` fails CI.
 - `skills-next/canvas-tile-engine/` - update `SKILL.md` and its reference files when the change affects usage or the public API. This is the upcoming (unreleased) copy of the AI agent skill. Never edit `skills/canvas-tile-engine/` in feature PRs: it describes the published packages and is consumed directly from `master` (skills CLI, plugin marketplace), so it must only be synced from `skills-next` when cutting a release.
 
 ## Releases (Changesets)
