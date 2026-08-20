@@ -43,11 +43,17 @@ export type AccessibilityConfig = {
     /**
      * Whether the surface is a keyboard tab stop.
      *
-     * The default is DERIVED, not a constant: `true` when any pointer
-     * interaction is enabled (`click`, `rightClick`, `hover`, `drag`, or
-     * `zoom`), otherwise `false`. A decorative minimap configured with no
-     * event handlers gains no tab stop; an interactive map does. An explicit
-     * `true`/`false` always wins.
+     * The default is DERIVED, not a constant: `eventHandlers.keyboard` decides
+     * it outright when set to a boolean, otherwise it is `true` when any
+     * pointer interaction is enabled (`click`, `rightClick`, `hover`, `drag`,
+     * or `zoom`) and `false` when none is. A decorative minimap configured
+     * with no event handlers gains no tab stop; an interactive map does. An
+     * explicit `true`/`false` always wins.
+     *
+     * The pointer mirror is deliberately coarse: keyboard control covers pan,
+     * zoom and activation only, so a `hover`-only or `rightClick`-only surface
+     * still takes a tab stop with nothing to operate from the keyboard. Pass
+     * `focusable: false` (or `eventHandlers.keyboard: false`) there.
      */
     focusable?: boolean;
     /**
@@ -183,7 +189,9 @@ export type EventHandlers = {
      *
      * `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are never
      * captured and never will be, so the surface can never become a keyboard
-     * trap (SC 2.1.2).
+     * trap (SC 2.1.2). Ctrl/Meta/Alt combinations are never captured either;
+     * Shift is only honored on the zoom keys, because `+` and `_` are the
+     * shifted spellings of `=` and `-` on common layouts.
      */
     keyboard?: boolean | KeyboardConfig;
 };

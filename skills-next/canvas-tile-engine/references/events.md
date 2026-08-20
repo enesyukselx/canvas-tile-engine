@@ -279,9 +279,13 @@ window.addEventListener("keyup", (e) => {
 });
 ```
 
-The engine binds no keyboard events itself - wire `keydown`/`keyup` yourself
-and translate them into camera calls (`goCenter`, `zoomIn`, ...) or
-`setEventHandlers` mode flips.
+The engine's own keyboard binding covers camera control only (arrows pan, `+`/
+`-` zoom, `Enter`/`Space` fire `onClick` at the viewport center - see
+`eventHandlers.keyboard`, DOM renderers only). For anything else - mode flips,
+shortcuts, tool switching - wire `keydown`/`keyup` yourself and translate them
+into camera calls (`goCenter`, `zoomIn`, ...) or `setEventHandlers` flips.
+`Tab`, `Escape`, `Home`, `End`, `PageUp`/`PageDown` and Ctrl/Meta/Alt chords are
+never captured by the engine, so they stay yours.
 
 ## Best practices
 

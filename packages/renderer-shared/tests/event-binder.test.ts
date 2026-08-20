@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { EventBinder } from "../src/dom/EventBinder";
 
+function createFakeElement() {
+    return {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+    } as unknown as HTMLElement & {
+        addEventListener: ReturnType<typeof vi.fn>;
+        removeEventListener: ReturnType<typeof vi.fn>;
+    };
+}
+
 function createFakeCanvas() {
     return {
         addEventListener: vi.fn(),
@@ -53,6 +63,42 @@ describe("EventBinder", () => {
         new EventBinder(canvas, { click: vi.fn() }).attach();
 
         expect(canvas.addEventListener).toHaveBeenCalledTimes(1);
+    });
+
+    // keydown belongs on the wrapper, not the canvas: the wrapper is what
+    // carries tabindex, and a canvas is never focusable on its own.
+    it("binds keydown to the key target and everything else to the canvas", () => {
+        const canvas = createFakeCanvas();
+        const keyTarget = createFakeElement();
+        const handlers = { click: vi.fn(), keydown: vi.fn() };
+
+        new EventBinder(canvas, handlers, keyTarget).attach();
+
+        expect(canvas.addEventListener).toHaveBeenCalledTimes(1);
+        expect(canvas.addEventListener).toHaveBeenCalledWith("click", handlers.click);
+        expect(keyTarget.addEventListener).toHaveBeenCalledTimes(1);
+        expect(keyTarget.addEventListener).toHaveBeenCalledWith("keydown", handlers.keydown);
+    });
+
+    it("drops keydown entirely when there is no key target", () => {
+        const canvas = createFakeCanvas();
+
+        new EventBinder(canvas, { keydown: vi.fn() }).attach();
+
+        expect(canvas.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it("detaches keydown from the key target, not the canvas", () => {
+        const canvas = createFakeCanvas();
+        const keyTarget = createFakeElement();
+        const handlers = { keydown: vi.fn() };
+        const binder = new EventBinder(canvas, handlers, keyTarget);
+
+        binder.attach();
+        binder.detach();
+
+        expect(keyTarget.removeEventListener).toHaveBeenCalledWith("keydown", handlers.keydown);
+        expect(canvas.removeEventListener).not.toHaveBeenCalled();
     });
 
     it("detaches exactly the handler references it attached", () => {

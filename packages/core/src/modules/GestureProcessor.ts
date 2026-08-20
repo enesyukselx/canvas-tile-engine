@@ -62,10 +62,6 @@ export interface ProcessedCoords {
 }
 
 /**
- * Canvas bounds for zoom calculation.
- * Compatible with DOMRect subset needed by Camera.zoom
- */
-/**
  * A key press, normalized so core never touches a DOM `KeyboardEvent`.
  * Mirrors `KeyboardEvent.key` semantics.
  */
@@ -91,6 +87,17 @@ interface KeyboardSettings {
 const DEFAULT_KEYBOARD_PAN_PX = 80;
 const DEFAULT_KEYBOARD_ZOOM_FACTOR = 1.5;
 
+/**
+ * Keys that survive the Shift bail in `handleKeyDown`. On US/UK layouts `+`
+ * and `_` can only be typed as Shift+`=` and Shift+`-`, so rejecting every
+ * shifted key would leave the documented `+`/`_` bindings dead.
+ */
+const ZOOM_KEYS = new Set(["+", "=", "-", "_"]);
+
+/**
+ * Canvas bounds for zoom calculation.
+ * Compatible with DOMRect subset needed by Camera.zoom
+ */
 export interface CanvasBounds {
     left: number;
     top: number;
@@ -237,11 +244,17 @@ export class GestureProcessor {
      *
      * `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are deliberately
      * absent and must stay absent: leaving them to the browser is what keeps
-     * the surface escapable (SC 2.1.2). Any modifier combination is ignored so
-     * browser and screen-reader shortcuts keep working.
+     * the surface escapable (SC 2.1.2). Ctrl, Meta and Alt combinations are
+     * always ignored so browser and screen-reader shortcuts keep working.
+     * Shift is ignored too, except on the zoom keys — `+` and `_` *are* the
+     * shifted spellings of `=` and `-` on common layouts, so a blanket Shift
+     * bail would make the documented `+` binding unreachable.
      */
     handleKeyDown = (event: NormalizedKey): boolean => {
-        if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+            return false;
+        }
+        if (event.shiftKey && !ZOOM_KEYS.has(event.key)) {
             return false;
         }
 
@@ -534,7 +547,7 @@ export class GestureProcessor {
         // Fire onClick for tap gesture (touch end without drag)
         if (changedPointer && !this.shouldPreventClick && this.config.get().eventHandlers.click && this.onClick) {
             const { coords, mouse, client } = this.processCoords(changedPointer);
-            this.onClick(coords, mouse, client);
+            this.onClick(coords, mouse, client, { source: "pointer" });
         }
 
         // All fingers lifted

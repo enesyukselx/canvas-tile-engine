@@ -231,6 +231,17 @@ engine.setAccessibility({ label: `Floor ${floor} seating chart` });
 
 This exists because the React bindings read `config` once on mount, so a name that could never change afterwards would be useless. See [Configuration](../introduction/config.md) for the fields.
 
+#### `onAccessibilityChange(listener)`
+
+Subscribe to `setAccessibility` calls; returns an unsubscribe function. The DOM renderers already listen internally to re-apply their attributes, so this is only for a host that renders the accessible surface itself.
+
+```typescript
+const stop = engine.onAccessibilityChange(() => {
+    console.log(engine.getConfig().accessibility.label);
+});
+```
+
+
 
 #### `setReducedMotion(value)` / `getReducedMotion()`
 

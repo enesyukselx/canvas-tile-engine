@@ -7,8 +7,15 @@ const ARIA_ROLE: Record<AccessibilityRole, string> = {
     application: "application",
 };
 
-/** Class the focus outline rule is scoped to. */
-const FOCUS_CLASS = "cte-a11y-surface";
+/**
+ * Attribute the focus outline rule is scoped to. Deliberately a data
+ * attribute and not a class: the React binding renders the wrapper as
+ * `<div className={className}>`, and React rewrites `node.className` whenever
+ * that prop changes — which would silently drop a class added here and leave
+ * an invisible tab stop behind. React only owns `className` and `style` on
+ * that element, so a data attribute survives.
+ */
+const FOCUS_ATTR = "data-cte-a11y-surface";
 const STYLE_ID = "cte-a11y-style";
 
 /**
@@ -16,7 +23,7 @@ const STYLE_ID = "cte-a11y-style";
  * with such a reset gets an invisible tab stop, which is worse than no tab
  * stop at all (WCAG 2.4.7).
  */
-const FOCUS_STYLE = `.${FOCUS_CLASS}:focus-visible{outline:2px solid Highlight;outline:2px solid -webkit-focus-ring-color;outline-offset:2px;}`;
+const FOCUS_STYLE = `[${FOCUS_ATTR}]:focus-visible{outline:2px solid Highlight;outline:2px solid -webkit-focus-ring-color;outline-offset:2px;}`;
 
 let descriptionSeq = 0;
 
@@ -39,7 +46,7 @@ export class A11yAttributes {
     /** Attributes this module owns; anything else on the wrapper is the app's. */
     private owned = new Set<string>();
     private descriptionNode?: HTMLElement;
-    private addedFocusClass = false;
+    private addedFocusAttr = false;
 
     constructor(
         private wrapper: HTMLElement,
@@ -50,9 +57,9 @@ export class A11yAttributes {
     apply(accessibility: AccessibilityConfig) {
         this.ensureFocusStyle();
 
-        if (!this.addedFocusClass) {
-            this.wrapper.classList.add(FOCUS_CLASS);
-            this.addedFocusClass = true;
+        if (!this.addedFocusAttr) {
+            this.wrapper.setAttribute(FOCUS_ATTR, "");
+            this.addedFocusAttr = true;
         }
 
         this.setOrClear("tabindex", accessibility.focusable ? "0" : undefined);
@@ -77,9 +84,9 @@ export class A11yAttributes {
         }
         this.owned.clear();
 
-        if (this.addedFocusClass) {
-            this.wrapper.classList.remove(FOCUS_CLASS);
-            this.addedFocusClass = false;
+        if (this.addedFocusAttr) {
+            this.wrapper.removeAttribute(FOCUS_ATTR);
+            this.addedFocusAttr = false;
         }
 
         this.descriptionNode?.remove();

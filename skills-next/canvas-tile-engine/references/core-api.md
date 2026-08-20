@@ -51,6 +51,13 @@ type CanvasTileEngineConfig = {
         drag?: boolean;
         zoom?: boolean | "pointer" | "center"; // true === "pointer"
         resize?: boolean;              // observe wrapper size when responsive=false
+        keyboard?: boolean | { pan?: number; panPx?: number; zoomFactor?: number };
+                                       // DOM-only camera control. Unset = MIRROR the
+                                       // pointer gates: arrows pan iff drag, +/- zoom
+                                       // iff zoom, Enter/Space fire onClick at the
+                                       // viewport center iff click. true forces all
+                                       // on, false all off. panPx default 80 (wins
+                                       // over pan), zoomFactor default 1.5
     };
     bounds?: { minX: number; maxX: number; minY: number; maxY: number };
                                        // camera limits; use +/-Infinity per axis
@@ -59,8 +66,9 @@ type CanvasTileEngineConfig = {
                                        // neither aria-label nor role is written
         description?: string;          // aria-describedby node / RN accessibilityHint
         role?: "region" | "image" | "application";  // default "region" IF label set
-        focusable?: boolean;           // tab stop. Default DERIVED: true iff any
-                                       // pointer handler is on, or keyboard === true
+        focusable?: boolean;           // tab stop. Default DERIVED: a boolean
+                                       // eventHandlers.keyboard decides outright,
+                                       // else true iff any pointer handler is on
         reducedMotion?: boolean | "auto"; // default "auto" = follow the platform
     };                                 // OVERRIDES an explicit durationMs; escape is false
     coordinates?: {                    // coordinate labels around the viewport edge
@@ -145,6 +153,7 @@ after mount.
 | `fitBounds(bounds, opts?): { scale, fitted }` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. `bounds` is an AREA, not cell indices: cell k spans [k-0.5, k+0.5], so a board of cells 0..31 is `{ minX: -0.5, maxX: 31.5, ... }` and centers on 15.5 - passing 0..32 fits the same width but centers half a cell off. Returns the targeted scale and `fitted` - `false` ONLY when `minScale` floors the fit, so the whole rectangle is NOT visible; `maxScale` clamping keeps `fitted: true`. The React/RN handle returns `undefined` before mount. |
 | `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. |
 | `setAccessibility(patch): void` | Merge a patch into `config.accessibility` at runtime (label/description/role/focusable/reducedMotion). The DOM renderers re-apply their attributes. Needed because React reads config once on mount. |
+| `onAccessibilityChange(listener): () => void` | Subscribe to `setAccessibility` updates. Only needed by a host that renders the accessible surface itself — the DOM renderers and the React Native binding subscribe internally. |
 | `setReducedMotion(value): void` | `value: boolean \| "auto"` (default `"auto"` = follow platform). Collapses engine-driven camera animation to instant. OVERRIDES an explicitly passed `durationMs` - there is NO per-call escape, the escape is `false`. Covers goCenter/goScale/fitBounds/resize ONLY; `SpriteAnimator` and app drawing are OUT of scope (call `animator.stop()` yourself for SC 2.2.2). |
 | `getReducedMotion(): boolean` | The RESOLVED value in effect. `getConfig().accessibility.reducedMotion` reports the PREFERENCE instead, which may be `"auto"`. Handle returns `false` before mount. |
 | `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |

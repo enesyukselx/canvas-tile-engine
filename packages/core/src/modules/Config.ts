@@ -31,8 +31,12 @@ type NormalizedEventHandlers = Required<CanvasTileEngineConfig>["eventHandlers"]
  * has nothing for a keyboard user to reach, so it should not take a tab stop.
  */
 function wantsFocus(handlers: NormalizedEventHandlers): boolean {
-    if (handlers.keyboard === true) {
-        return true; // explicitly keyboard-operable, so it needs a tab stop
+    if (typeof handlers.keyboard === "boolean") {
+        // Explicitly on: a keyboard user has something to reach. Explicitly
+        // off: no key does anything here, so a tab stop would be a dead one —
+        // `accessibility.focusable: true` still forces it back for an app that
+        // handles keys itself on the container.
+        return handlers.keyboard;
     }
     return handlers.click || handlers.rightClick || handlers.hover || handlers.drag || handlers.zoom !== false;
 }

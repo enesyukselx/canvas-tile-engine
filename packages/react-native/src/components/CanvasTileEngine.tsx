@@ -137,6 +137,9 @@ function CanvasTileEngineBase({
     // Local state starts false on every mount, so children always mount
     // after their own engine is attached.
     const [ready, setReady] = useState(false);
+    // Bumped by the accessibility subscription below; its only job is to
+    // re-render so the View re-reads the engine's resolved snapshot.
+    const [, setA11yVersion] = useState(0);
 
     const instanceRef = useRef<CanvasTileEngineCore<SkiaMount, SkImage> | null>(null);
     const sizeRef = useRef({ width: 0, height: 0 });
@@ -312,6 +315,17 @@ function CanvasTileEngineBase({
             engine._setInstance(null);
         };
     }, [engine]);
+
+    // Re-render when `engine.setAccessibility()` changes the name/description/
+    // role, so the measured View below picks it up. Runs once the engine
+    // exists (`ready`), which is also when its snapshot becomes readable.
+    useEffect(() => {
+        const instance = instanceRef.current;
+        if (!instance) {
+            return;
+        }
+        return instance.onAccessibilityChange(() => setA11yVersion((v) => v + 1));
+    }, [ready]);
 
     // ─── Touch → renderer gesture forwarding (react-native-gesture-handler) ───
     //
@@ -532,10 +546,12 @@ function CanvasTileEngineBase({
         return Gesture.Simultaneous(transport, blocker);
     }, [interactionsClaimed, onTouchesDown, onTouchesMove, onTouchesUp, onTouchesCancelled]);
 
-    // Read from the config prop rather than the engine: the View renders
-    // before the first layout creates the engine, and an unnamed surface in
-    // that window would be announced as nothing.
-    const a11y = config.accessibility;
+    // Prefer the engine's resolved snapshot so `engine.setAccessibility()`
+    // reaches this View, and fall back to the prop for the window before the
+    // first layout creates the engine — an unnamed surface there would be
+    // announced as nothing. The subscription above is what re-renders us on a
+    // change; without it a name update would wait for the next painted frame.
+    const a11y = instanceRef.current?.getConfig().accessibility ?? config.accessibility;
     const accessibilityRole = a11y?.role === "image" ? ("image" as const) : undefined;
 
     return (
