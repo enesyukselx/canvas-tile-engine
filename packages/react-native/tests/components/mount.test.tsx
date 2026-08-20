@@ -454,5 +454,35 @@ describe("CanvasTileEngine mount component (React Native)", () => {
             expect(viewProps[viewProps.length - 1].accessibilityRole).toBeUndefined();
             expect(viewProps[viewProps.length - 1].accessibilityLabel).toBe("Board");
         });
+
+        // The View reads the engine's resolved snapshot, not the config prop,
+        // precisely so this reaches it — the prop is only the fallback for the
+        // window before the first layout creates the engine.
+        it("picks up engine.setAccessibility at runtime", () => {
+            const fake = createFakeRenderer();
+            let handle!: ReturnType<typeof useCanvasTileEngine>;
+
+            function Harness() {
+                handle = useCanvasTileEngine();
+                return (
+                    <CanvasTileEngine
+                        engine={handle}
+                        config={{ ...CONFIG, accessibility: { label: "Floor 1", role: "image" } }}
+                        renderer={fake.renderer}
+                    />
+                );
+            }
+
+            render(<Harness />);
+            act(() => emitLayout(300, 200));
+            expect(viewProps[viewProps.length - 1].accessibilityLabel).toBe("Floor 1");
+
+            act(() => handle.setAccessibility({ label: "Floor 2", description: "Swipe to pan" }));
+
+            const view = viewProps[viewProps.length - 1];
+            expect(view.accessibilityLabel).toBe("Floor 2");
+            expect(view.accessibilityHint).toBe("Swipe to pan");
+            expect(view.accessibilityRole).toBe("image");
+        });
     });
 });

@@ -549,6 +549,23 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     }
 
     /**
+     * Subscribe to {@link setAccessibility} changes. Returns an unsubscribe
+     * function.
+     *
+     * The DOM renderers already listen internally to re-apply their
+     * attributes; this is for hosts that render the accessible surface
+     * themselves — the React Native binding puts the name on its measured
+     * `View`, so it needs to re-render when the name changes.
+     * @example
+     * ```ts
+     * const stop = engine.onAccessibilityChange(() => render(engine.getConfig().accessibility));
+     * ```
+     */
+    onAccessibilityChange(listener: () => void): () => void {
+        return this.config.onAccessibilityChange(listener);
+    }
+
+    /**
      * Replace the reduced-motion preference at runtime.
      *
      * `"auto"` follows the platform signal (`prefers-reduced-motion` on the

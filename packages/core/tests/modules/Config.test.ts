@@ -527,6 +527,37 @@ describe("Config", () => {
             ).toBe(false);
         });
 
+        it("lets an explicit eventHandlers.keyboard decide the tab stop either way", () => {
+            // keyboard: true is the whole reason to focus a surface with no
+            // pointer handler at all.
+            expect(
+                new Config({ ...minimalConfig, eventHandlers: { keyboard: true } }).get().accessibility.focusable,
+            ).toBe(true);
+
+            // keyboard: false with pointer handlers on would otherwise derive a
+            // dead tab stop — focused, but no key does anything.
+            expect(
+                new Config({ ...minimalConfig, eventHandlers: { drag: true, keyboard: false } }).get().accessibility
+                    .focusable,
+            ).toBe(false);
+
+            // ...and accessibility.focusable still overrides it, for an app
+            // handling keys on the container itself.
+            expect(
+                new Config({
+                    ...minimalConfig,
+                    eventHandlers: { drag: true, keyboard: false },
+                    accessibility: { focusable: true },
+                }).get().accessibility.focusable,
+            ).toBe(true);
+
+            // An object only tunes the step sizes, so it keeps mirroring.
+            expect(
+                new Config({ ...minimalConfig, eventHandlers: { keyboard: { pan: 40 } } }).get().accessibility
+                    .focusable,
+            ).toBe(false);
+        });
+
         it("lets an explicit focusable win over the derived default", () => {
             const forcedOn = new Config({ ...minimalConfig, accessibility: { focusable: true } });
             expect(forcedOn.get().accessibility.focusable).toBe(true);

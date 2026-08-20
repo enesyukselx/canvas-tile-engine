@@ -115,9 +115,19 @@ describe("A11yAttributes", () => {
 
         a11y.apply({ focusable: true });
 
-        expect(wrapper.classList.contains("cte-a11y-surface")).toBe(true);
+        expect(wrapper.hasAttribute("data-cte-a11y-surface")).toBe(true);
         const style = document.getElementById("cte-a11y-style");
-        expect(style?.textContent).toContain(":focus-visible");
+        expect(style?.textContent).toContain("[data-cte-a11y-surface]:focus-visible");
+    });
+
+    it("hooks the outline to an attribute React does not own, so a className change cannot drop it", () => {
+        const { wrapper, a11y } = createSurface();
+
+        a11y.apply({ focusable: true });
+        // What React does on every `className` prop change.
+        wrapper.className = "app-supplied";
+
+        expect(wrapper.hasAttribute("data-cte-a11y-surface")).toBe(true);
     });
 
     it("removes only what it added", () => {
@@ -131,7 +141,7 @@ describe("A11yAttributes", () => {
         expect(wrapper.hasAttribute("aria-label")).toBe(false);
         expect(wrapper.hasAttribute("role")).toBe(false);
         expect(wrapper.hasAttribute("aria-describedby")).toBe(false);
-        expect(wrapper.classList.contains("cte-a11y-surface")).toBe(false);
+        expect(wrapper.hasAttribute("data-cte-a11y-surface")).toBe(false);
         expect(wrapper.getAttribute("data-app")).toBe("keep me");
         expect(canvases[0].hasAttribute("aria-hidden")).toBe(false);
         expect(wrapper.querySelectorAll("span").length).toBe(0);

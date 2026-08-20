@@ -39,7 +39,7 @@ const config: CanvasTileEngineConfig = {
 | `label` | `string` | — | Accessible name for the surface. No default: a fabricated one would be wrong for a game board or a pixel editor, and it would hide the unlabeled-region audit signal. With no label, neither `aria-label` nor `role` is written. |
 | `description` | `string` | — | Longer usage description, e.g. which keys do what. Web: a visually hidden node referenced by `aria-describedby`. React Native: `accessibilityHint`. |
 | `role` | `"region" \| "image" \| "application"` | `"region"` when `label` is set | Semantic role. `"application"` is never the default — it forfeits every screen-reader quick-navigation command. On React Native only `"image"` has an equivalent; the others are dropped and the label still announces. |
-| `focusable` | `boolean` | derived | Whether the surface is a keyboard tab stop. The default is derived, not constant: `true` when any pointer interaction is enabled (`click`, `rightClick`, `hover`, `drag`, `zoom`) or `eventHandlers.keyboard` is `true`. A decorative minimap gains no tab stop; an interactive map does. |
+| `focusable` | `boolean` | derived | Whether the surface is a keyboard tab stop. The default is derived, not constant: a boolean `eventHandlers.keyboard` decides it outright, otherwise it is `true` when any pointer interaction is enabled (`click`, `rightClick`, `hover`, `drag`, `zoom`). A decorative minimap gains no tab stop; an interactive map does. The pointer mirror is coarse — a `hover`-only or `rightClick`-only surface still takes a tab stop with nothing to operate, so pass `focusable: false` there. |
 | `reducedMotion` | `boolean \| "auto"` | `"auto"` | Collapses engine-driven camera animation to instant. `"auto"` follows the platform: `prefers-reduced-motion` on the web, `AccessibilityInfo` on React Native. |
 
 The wrapper element carries the accessible identity, and every canvas the engine manages is hidden from assistive technology. An attribute you set yourself on the wrapper is **never** overwritten, and a canvas with fallback child content keeps it — that content is your own accessible alternative.
@@ -144,7 +144,7 @@ engine.onClick = (coords, mouse, client, info) => {
 };
 ```
 
-`preventDefault` runs only for a key the engine consumed. `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are never captured, so the surface can never become a keyboard trap, and any modifier combination is ignored so browser and screen-reader shortcuts keep working.
+`preventDefault` runs only for a key the engine consumed. `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are never captured, so the surface can never become a keyboard trap, and Ctrl/Meta/Alt combinations are ignored so browser and screen-reader shortcuts keep working (Shift is honored only on the zoom keys, since `+` and `_` *are* Shift+`=` and Shift+`-`).
 
 Step sizes come from the object form: `panPx` (screen pixels, default `80`) wins over `pan` (world units), and `zoomFactor` defaults to `1.5`, matching `zoomIn`/`zoomOut`.
 

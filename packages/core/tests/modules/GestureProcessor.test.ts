@@ -581,6 +581,19 @@ describe("GestureProcessor", () => {
             expect(onClick.mock.calls[0][3]).toEqual({ source: "pointer" });
         });
 
+        // The tap path is a separate call site, and it is the only one mobile
+        // web ever reaches — an app branching on `info.source` would otherwise
+        // see `undefined` on touch while working on desktop.
+        it("tags a touch tap as a pointer click too", () => {
+            const onClick = vi.fn();
+            processor.onClick = onClick;
+
+            processor.handleTouchStart([createPointer(10, 10)]);
+            processor.handleTouchEnd([], createPointer(10, 10));
+
+            expect(onClick.mock.calls[0][3]).toEqual({ source: "pointer" });
+        });
+
         // The frozen no-trap contract.
         it("never consumes the keys that let a user escape", () => {
             for (const key of ["Tab", "Escape", "Home", "End", "PageUp", "PageDown", "a", "F5"]) {
@@ -589,11 +602,27 @@ describe("GestureProcessor", () => {
             expect(panMock).not.toHaveBeenCalled();
         });
 
-        it("ignores any modifier combination so browser shortcuts keep working", () => {
+        it("ignores modifier combinations so browser shortcuts keep working", () => {
             for (const modifier of ["ctrlKey", "metaKey", "altKey", "shiftKey"] as const) {
                 expect(processor.handleKeyDown({ key: "ArrowRight", [modifier]: true })).toBe(false);
             }
             expect(panMock).not.toHaveBeenCalled();
+
+            // Ctrl/Meta/Alt are refused even on the zoom keys.
+            for (const modifier of ["ctrlKey", "metaKey", "altKey"] as const) {
+                expect(processor.handleKeyDown({ key: "+", [modifier]: true })).toBe(false);
+            }
+        });
+
+        // "+" is Shift+"=" and "_" is Shift+"-" on US/UK layouts, so a blanket
+        // Shift bail would leave the documented "+" binding reachable only
+        // from the numpad.
+        it("honors Shift on the zoom keys, which is the only way to type them", () => {
+            const keys = ["+", "_", "=", "-"];
+            for (const key of keys) {
+                expect(processor.handleKeyDown({ key, shiftKey: true })).toBe(true);
+            }
+            expect(zoomByFactorMock).toHaveBeenCalledTimes(keys.length);
         });
 
         // The central decision: keyboard grants nothing the app did not grant.
