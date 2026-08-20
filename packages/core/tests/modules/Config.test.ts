@@ -506,4 +506,164 @@ describe("Config", () => {
             expect(config.get().accessibility.reducedMotion).toBe("auto"); // unchanged after a rejected set
         });
     });
+
+    describe("accessibility surface", () => {
+        it("derives focusable from the pointer handlers, not a constant", () => {
+            // Every eventHandler defaults to false, so a bare config is a
+            // decorative surface and must not take a tab stop.
+            expect(new Config(minimalConfig).get().accessibility.focusable).toBe(false);
+
+            for (const handlers of [{ click: true }, { rightClick: true }, { hover: true }, { drag: true }]) {
+                const config = new Config({ ...minimalConfig, eventHandlers: handlers });
+                expect(config.get().accessibility.focusable).toBe(true);
+            }
+
+            expect(new Config({ ...minimalConfig, eventHandlers: { zoom: true } }).get().accessibility.focusable).toBe(
+                true,
+            );
+            // resize is not a pointer interaction.
+            expect(
+                new Config({ ...minimalConfig, eventHandlers: { resize: true } }).get().accessibility.focusable,
+            ).toBe(false);
+        });
+
+        it("lets an explicit eventHandlers.keyboard decide the tab stop either way", () => {
+            // keyboard: true is the whole reason to focus a surface with no
+            // pointer handler at all.
+            expect(
+                new Config({ ...minimalConfig, eventHandlers: { keyboard: true } }).get().accessibility.focusable,
+            ).toBe(true);
+
+            // keyboard: false with pointer handlers on would otherwise derive a
+            // dead tab stop — focused, but no key does anything.
+            expect(
+                new Config({ ...minimalConfig, eventHandlers: { drag: true, keyboard: false } }).get().accessibility
+                    .focusable,
+            ).toBe(false);
+
+            // ...and accessibility.focusable still overrides it, for an app
+            // handling keys on the container itself.
+            expect(
+                new Config({
+                    ...minimalConfig,
+                    eventHandlers: { drag: true, keyboard: false },
+                    accessibility: { focusable: true },
+                }).get().accessibility.focusable,
+            ).toBe(true);
+
+            // An object only tunes the step sizes, so it keeps mirroring.
+            expect(
+                new Config({ ...minimalConfig, eventHandlers: { keyboard: { pan: 40 } } }).get().accessibility
+                    .focusable,
+            ).toBe(false);
+        });
+
+        it("lets an explicit focusable win over the derived default", () => {
+            const forcedOn = new Config({ ...minimalConfig, accessibility: { focusable: true } });
+            expect(forcedOn.get().accessibility.focusable).toBe(true);
+
+            const forcedOff = new Config({
+                ...minimalConfig,
+                eventHandlers: { drag: true },
+                accessibility: { focusable: false },
+            });
+            expect(forcedOff.get().accessibility.focusable).toBe(false);
+        });
+
+        it("moves the tab stop when interaction is toggled at runtime", () => {
+            const config = new Config(minimalConfig);
+            expect(config.get().accessibility.focusable).toBe(false);
+
+            config.updateEventHandlers({ drag: true });
+            expect(config.get().accessibility.focusable).toBe(true);
+
+            config.updateEventHandlers({ drag: false });
+            expect(config.get().accessibility.focusable).toBe(false);
+        });
+
+        it("keeps an explicit focusable across a handler change", () => {
+            const config = new Config({ ...minimalConfig, accessibility: { focusable: false } });
+
+            config.updateEventHandlers({ drag: true });
+
+            expect(config.get().accessibility.focusable).toBe(false);
+        });
+
+        it("writes no name and no role by default", () => {
+            const accessibility = new Config(minimalConfig).get().accessibility;
+
+            expect(accessibility.label).toBeUndefined();
+            expect(accessibility.role).toBeUndefined();
+            expect(accessibility.description).toBeUndefined();
+        });
+
+        it('defaults role to "region" only alongside a label', () => {
+            const named = new Config({ ...minimalConfig, accessibility: { label: "Seating chart" } });
+            expect(named.get().accessibility.role).toBe("region");
+
+            const unnamed = new Config({ ...minimalConfig, accessibility: { description: "Arrow keys pan" } });
+            expect(unnamed.get().accessibility.role).toBeUndefined();
+        });
+
+        it("honors an explicit role with or without a label", () => {
+            expect(new Config({ ...minimalConfig, accessibility: { role: "image" } }).get().accessibility.role).toBe(
+                "image",
+            );
+            expect(
+                new Config({ ...minimalConfig, accessibility: { label: "Board", role: "application" } }).get()
+                    .accessibility.role,
+            ).toBe("application");
+        });
+
+        it("merges an updateAccessibility patch instead of replacing it", () => {
+            const config = new Config({ ...minimalConfig, accessibility: { label: "Board", focusable: true } });
+
+            config.updateAccessibility({ description: "Arrow keys pan" });
+
+            const accessibility = config.get().accessibility;
+            expect(accessibility.label).toBe("Board");
+            expect(accessibility.focusable).toBe(true);
+            expect(accessibility.description).toBe("Arrow keys pan");
+            expect(accessibility.role).toBe("region");
+        });
+
+        it("re-derives role when a label arrives at runtime", () => {
+            const config = new Config(minimalConfig);
+            expect(config.get().accessibility.role).toBeUndefined();
+
+            config.updateAccessibility({ label: "Board" });
+
+            expect(config.get().accessibility.role).toBe("region");
+        });
+
+        it("notifies subscribers on accessibility and handler changes", () => {
+            const config = new Config(minimalConfig);
+            let calls = 0;
+            const unsubscribe = config.onAccessibilityChange(() => calls++);
+
+            config.updateAccessibility({ label: "Board" });
+            expect(calls).toBe(1);
+
+            // focusable is derived from the handlers, so this changes the
+            // attributes too and must notify.
+            config.updateEventHandlers({ drag: true });
+            expect(calls).toBe(2);
+
+            unsubscribe();
+            config.updateAccessibility({ label: "Other" });
+            expect(calls).toBe(2);
+        });
+
+        it("rejects invalid accessibility values from the constructor and the updater alike", () => {
+            expect(() => new Config({ ...minimalConfig, accessibility: { role: "grid" as never } })).toThrow(/role/);
+            expect(() => new Config({ ...minimalConfig, accessibility: { label: 5 as never } })).toThrow(/label/);
+            expect(() => new Config({ ...minimalConfig, accessibility: { focusable: "yes" as never } })).toThrow(
+                /focusable/,
+            );
+
+            const config = new Config(minimalConfig);
+            expect(() => config.updateAccessibility({ role: "grid" as never })).toThrow(/role/);
+            expect(config.get().accessibility.role).toBeUndefined(); // unchanged after a rejected patch
+        });
+    });
 });

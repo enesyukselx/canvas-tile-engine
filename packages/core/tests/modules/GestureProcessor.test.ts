@@ -82,6 +82,7 @@ describe("GestureProcessor", () => {
                 expect.objectContaining({ raw: expect.any(Object) as unknown, snapped: expect.any(Object) as unknown }),
                 expect.objectContaining({ raw: expect.any(Object) as unknown, snapped: expect.any(Object) as unknown }),
                 expect.objectContaining({ raw: expect.any(Object) as unknown, snapped: expect.any(Object) as unknown }),
+                { source: "pointer" },
             );
         });
 
@@ -512,6 +513,181 @@ describe("GestureProcessor", () => {
             expect(processor.pinching).toBe(true);
             processor.handleTouchEnd([]);
             expect(processor.pinching).toBe(false);
+        });
+    });
+
+    describe("handleKeyDown", () => {
+        /** A processor whose config is exactly the handlers under test. */
+        const withHandlers = (eventHandlers: Record<string, unknown>) =>
+            new GestureProcessor(
+                mockCamera,
+                new Config({ scale: 1, size: { width: 800, height: 600 }, eventHandlers }),
+                transformer,
+                () => canvasBounds,
+                onCameraChange,
+            );
+
+        it("pans the view in the pressed direction", () => {
+            // pan(dx, dy) shifts the camera by -d/scale, so moving the VIEW
+            // right is a negative delta.
+            processor.handleKeyDown({ key: "ArrowRight" });
+            expect(panMock).toHaveBeenLastCalledWith(-80, 0);
+
+            processor.handleKeyDown({ key: "ArrowLeft" });
+            expect(panMock).toHaveBeenLastCalledWith(80, 0);
+
+            processor.handleKeyDown({ key: "ArrowDown" });
+            expect(panMock).toHaveBeenLastCalledWith(0, -80);
+
+            processor.handleKeyDown({ key: "ArrowUp" });
+            expect(panMock).toHaveBeenLastCalledWith(0, 80);
+        });
+
+        it("zooms at the viewport center on +/-", () => {
+            expect(processor.handleKeyDown({ key: "+" })).toBe(true);
+            expect(zoomByFactorMock).toHaveBeenLastCalledWith(1.5, 400, 300);
+
+            processor.handleKeyDown({ key: "-" });
+            expect(zoomByFactorMock).toHaveBeenLastCalledWith(1 / 1.5, 400, 300);
+
+            // The unshifted spellings of the same physical keys.
+            processor.handleKeyDown({ key: "=" });
+            expect(zoomByFactorMock).toHaveBeenLastCalledWith(1.5, 400, 300);
+            processor.handleKeyDown({ key: "_" });
+            expect(zoomByFactorMock).toHaveBeenLastCalledWith(1 / 1.5, 400, 300);
+        });
+
+        it("activates at the viewport center with truthful coordinates", () => {
+            const onClick = vi.fn();
+            processor.onClick = onClick;
+            canvasBounds = { ...canvasBounds, left: 30, top: 40 };
+
+            expect(processor.handleKeyDown({ key: "Enter" })).toBe(true);
+            expect(processor.handleKeyDown({ key: " " })).toBe(true);
+
+            expect(onClick).toHaveBeenCalledTimes(2);
+            const [, mouse, client, info] = onClick.mock.calls[0];
+            expect(mouse.raw).toEqual({ x: 400, y: 300 });
+            expect(client.raw).toEqual({ x: 430, y: 340 });
+            expect(info).toEqual({ source: "keyboard" });
+        });
+
+        it("tags a pointer click as such", () => {
+            const onClick = vi.fn();
+            processor.onClick = onClick;
+
+            processor.handleClick(createPointer(10, 10));
+
+            expect(onClick.mock.calls[0][3]).toEqual({ source: "pointer" });
+        });
+
+        // The tap path is a separate call site, and it is the only one mobile
+        // web ever reaches — an app branching on `info.source` would otherwise
+        // see `undefined` on touch while working on desktop.
+        it("tags a touch tap as a pointer click too", () => {
+            const onClick = vi.fn();
+            processor.onClick = onClick;
+
+            processor.handleTouchStart([createPointer(10, 10)]);
+            processor.handleTouchEnd([], createPointer(10, 10));
+
+            expect(onClick.mock.calls[0][3]).toEqual({ source: "pointer" });
+        });
+
+        // The frozen no-trap contract.
+        it("never consumes the keys that let a user escape", () => {
+            for (const key of ["Tab", "Escape", "Home", "End", "PageUp", "PageDown", "a", "F5"]) {
+                expect(processor.handleKeyDown({ key })).toBe(false);
+            }
+            expect(panMock).not.toHaveBeenCalled();
+        });
+
+        it("ignores modifier combinations so browser shortcuts keep working", () => {
+            for (const modifier of ["ctrlKey", "metaKey", "altKey", "shiftKey"] as const) {
+                expect(processor.handleKeyDown({ key: "ArrowRight", [modifier]: true })).toBe(false);
+            }
+            expect(panMock).not.toHaveBeenCalled();
+
+            // Ctrl/Meta/Alt are refused even on the zoom keys.
+            for (const modifier of ["ctrlKey", "metaKey", "altKey"] as const) {
+                expect(processor.handleKeyDown({ key: "+", [modifier]: true })).toBe(false);
+            }
+        });
+
+        // "+" is Shift+"=" and "_" is Shift+"-" on US/UK layouts, so a blanket
+        // Shift bail would leave the documented "+" binding reachable only
+        // from the numpad.
+        it("honors Shift on the zoom keys, which is the only way to type them", () => {
+            const keys = ["+", "_", "=", "-"];
+            for (const key of keys) {
+                expect(processor.handleKeyDown({ key, shiftKey: true })).toBe(true);
+            }
+            expect(zoomByFactorMock).toHaveBeenCalledTimes(keys.length);
+        });
+
+        // The central decision: keyboard grants nothing the app did not grant.
+        it("mirrors the pointer gates by default", () => {
+            const inert = withHandlers({});
+            for (const key of ["ArrowRight", "+", "-", "Enter", " "]) {
+                expect(inert.handleKeyDown({ key })).toBe(false);
+            }
+            expect(panMock).not.toHaveBeenCalled();
+
+            const dragOnly = withHandlers({ drag: true });
+            expect(dragOnly.handleKeyDown({ key: "ArrowRight" })).toBe(true);
+            expect(dragOnly.handleKeyDown({ key: "+" })).toBe(false);
+            expect(dragOnly.handleKeyDown({ key: "Enter" })).toBe(false);
+
+            const zoomOnly = withHandlers({ zoom: true });
+            expect(zoomOnly.handleKeyDown({ key: "+" })).toBe(true);
+            expect(zoomOnly.handleKeyDown({ key: "ArrowRight" })).toBe(false);
+        });
+
+        it("keyboard: true forces every binding on", () => {
+            const forced = withHandlers({ keyboard: true });
+            forced.onClick = vi.fn();
+
+            expect(forced.handleKeyDown({ key: "ArrowRight" })).toBe(true);
+            expect(forced.handleKeyDown({ key: "+" })).toBe(true);
+            expect(forced.handleKeyDown({ key: "Enter" })).toBe(true);
+        });
+
+        it("keyboard: false turns every binding off", () => {
+            const off = withHandlers({ click: true, drag: true, zoom: true, keyboard: false });
+            for (const key of ["ArrowRight", "+", "Enter"]) {
+                expect(off.handleKeyDown({ key })).toBe(false);
+            }
+        });
+
+        it("takes the step sizes from the keyboard options, with panPx winning", () => {
+            withHandlers({ drag: true, keyboard: { panPx: 25 } }).handleKeyDown({ key: "ArrowRight" });
+            expect(panMock).toHaveBeenLastCalledWith(-25, 0);
+
+            // World units convert through the live scale (1 here).
+            withHandlers({ drag: true, keyboard: { pan: 3 } }).handleKeyDown({ key: "ArrowRight" });
+            expect(panMock).toHaveBeenLastCalledWith(-3, 0);
+
+            withHandlers({ drag: true, keyboard: { pan: 3, panPx: 25 } }).handleKeyDown({ key: "ArrowRight" });
+            expect(panMock).toHaveBeenLastCalledWith(-25, 0);
+
+            withHandlers({ zoom: true, keyboard: { zoomFactor: 2 } }).handleKeyDown({ key: "+" });
+            expect(zoomByFactorMock).toHaveBeenLastCalledWith(2, 400, 300);
+        });
+
+        it("reports keyboard zoom through onZoom, never onWheel", () => {
+            const onZoom = vi.fn();
+            const onWheel = vi.fn();
+            let scale = 1;
+            const camera = { ...mockCamera, zoomByFactor: vi.fn(() => (scale = 2)) };
+            Object.defineProperty(camera, "scale", { get: () => scale });
+            const keyed = new GestureProcessor(camera, config, transformer, () => canvasBounds, onCameraChange);
+            keyed.onZoom = onZoom;
+            keyed.onWheel = onWheel;
+
+            keyed.handleKeyDown({ key: "+" });
+
+            expect(onZoom).toHaveBeenCalledWith(2);
+            expect(onWheel).not.toHaveBeenCalled();
         });
     });
 });

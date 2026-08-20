@@ -271,6 +271,15 @@ const zoomToSelection = (selection: { minX: number; maxX: number; minY: number; 
 };
 ```
 
+### `setAccessibility(patch)` / `onAccessibilityChange(listener)`
+
+Update the accessible name, description, role or tab-stop behavior at runtime. Merged, not replaced. `onAccessibilityChange` subscribes to those updates and returns an unsubscribe function; the DOM renderers and the React Native binding already listen internally, so you rarely need it.
+
+```tsx
+engine.setAccessibility({ label: `Floor ${floor} seating chart` });
+```
+
+
 ### `setReducedMotion(value)` / `getReducedMotion()`
 
 Replace the reduced-motion preference, and read the value in effect.

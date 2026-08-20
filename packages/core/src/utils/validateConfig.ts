@@ -1,4 +1,4 @@
-import { CanvasTileEngineConfig } from "../types";
+import { AccessibilityConfig, CanvasTileEngineConfig } from "../types";
 
 /**
  * Creates a validation error with descriptive message.
@@ -119,13 +119,38 @@ export function validateConfig(config: CanvasTileEngineConfig): void {
     }
 
     // Accessibility validation
-    if (config.accessibility?.reducedMotion !== undefined) {
-        validateReducedMotion(config.accessibility.reducedMotion);
+    if (config.accessibility) {
+        validateAccessibility(config.accessibility);
     }
 
     // Bounds validation
     if (config.bounds) {
         validateBounds(config.bounds);
+    }
+}
+
+/**
+ * Validate accessibility preferences. Shared by the constructor and
+ * `Config.updateAccessibility` so both reject identically.
+ * @throws {ConfigValidationError} If any supplied value is invalid.
+ */
+export function validateAccessibility(accessibility: Partial<AccessibilityConfig>): void {
+    if (accessibility.reducedMotion !== undefined) {
+        validateReducedMotion(accessibility.reducedMotion);
+    }
+    for (const key of ["label", "description"] as const) {
+        const value = accessibility[key];
+        if (value !== undefined && typeof value !== "string") {
+            throw configError(`accessibility.${key} must be a string, got ${String(value)}`);
+        }
+    }
+    const { role } = accessibility;
+    if (role !== undefined && role !== "region" && role !== "image" && role !== "application") {
+        throw configError(`accessibility.role must be "region", "image" or "application", got ${String(role)}`);
+    }
+    const { focusable } = accessibility;
+    if (focusable !== undefined && typeof focusable !== "boolean") {
+        throw configError(`accessibility.focusable must be a boolean, got ${String(focusable)}`);
     }
 }
 

@@ -387,4 +387,102 @@ describe("CanvasTileEngine mount component (React Native)", () => {
             expect(reduceMotionListenerCount()).toBe(0);
         });
     });
+
+    describe("accessibility surface", () => {
+        it("names the measured View, never the Skia canvas", () => {
+            const fake = createFakeRenderer();
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                return (
+                    <CanvasTileEngine
+                        engine={engine}
+                        config={{
+                            ...CONFIG,
+                            accessibility: { label: "Venue map", description: "Drag to pan", role: "image" },
+                        }}
+                        renderer={fake.renderer}
+                    />
+                );
+            }
+
+            render(<Harness />);
+            act(() => emitLayout(300, 200));
+
+            const view = viewProps[viewProps.length - 1];
+            expect(view.accessible).toBe(true);
+            expect(view.accessibilityLabel).toBe("Venue map");
+            expect(view.accessibilityHint).toBe("Drag to pan");
+            expect(view.accessibilityRole).toBe("image");
+            // Nothing accessible is passed to the Skia canvas — its props type
+            // carries no such field, so tsc is what enforces that here.
+        });
+
+        it("stays unannounced when no label is configured", () => {
+            const fake = createFakeRenderer();
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                return <CanvasTileEngine engine={engine} config={CONFIG} renderer={fake.renderer} />;
+            }
+
+            render(<Harness />);
+
+            const view = viewProps[viewProps.length - 1];
+            expect(view.accessible).toBeUndefined();
+            expect(view.accessibilityLabel).toBeUndefined();
+        });
+
+        it("drops a role React Native has no equivalent for", () => {
+            const fake = createFakeRenderer();
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                return (
+                    <CanvasTileEngine
+                        engine={engine}
+                        config={{ ...CONFIG, accessibility: { label: "Board", role: "region" } }}
+                        renderer={fake.renderer}
+                    />
+                );
+            }
+
+            render(<Harness />);
+
+            // "region" and "application" have no RN accessibilityRole; the
+            // label still lands, which is what actually gets announced.
+            expect(viewProps[viewProps.length - 1].accessibilityRole).toBeUndefined();
+            expect(viewProps[viewProps.length - 1].accessibilityLabel).toBe("Board");
+        });
+
+        // The View reads the engine's resolved snapshot, not the config prop,
+        // precisely so this reaches it — the prop is only the fallback for the
+        // window before the first layout creates the engine.
+        it("picks up engine.setAccessibility at runtime", () => {
+            const fake = createFakeRenderer();
+            let handle!: ReturnType<typeof useCanvasTileEngine>;
+
+            function Harness() {
+                handle = useCanvasTileEngine();
+                return (
+                    <CanvasTileEngine
+                        engine={handle}
+                        config={{ ...CONFIG, accessibility: { label: "Floor 1", role: "image" } }}
+                        renderer={fake.renderer}
+                    />
+                );
+            }
+
+            render(<Harness />);
+            act(() => emitLayout(300, 200));
+            expect(viewProps[viewProps.length - 1].accessibilityLabel).toBe("Floor 1");
+
+            act(() => handle.setAccessibility({ label: "Floor 2", description: "Swipe to pan" }));
+
+            const view = viewProps[viewProps.length - 1];
+            expect(view.accessibilityLabel).toBe("Floor 2");
+            expect(view.accessibilityHint).toBe("Swipe to pan");
+            expect(view.accessibilityRole).toBe("image");
+        });
+    });
 });

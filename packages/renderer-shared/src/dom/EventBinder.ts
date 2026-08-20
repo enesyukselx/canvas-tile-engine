@@ -9,16 +9,23 @@ type HandlerMap = {
     touchstart?: (e: TouchEvent) => void;
     touchmove?: (e: TouchEvent) => void;
     touchend?: (e: TouchEvent) => void;
+    keydown?: (e: KeyboardEvent) => void;
 };
 
 /**
- * Thin wrapper to attach/detach DOM event listeners on the canvas.
+ * Thin wrapper to attach/detach DOM event listeners.
+ *
+ * Pointer events bind to the canvas, because the coordinate math is relative
+ * to its bounding rect. `keydown` binds to the KEY TARGET instead — the
+ * wrapper — because a key event only fires on the focused element, and the
+ * wrapper is what carries `tabindex`.
  * @internal
  */
 export class EventBinder {
     constructor(
         private canvas: HTMLCanvasElement,
         private handlers: HandlerMap,
+        private keyTarget?: HTMLElement,
     ) {}
 
     attach() {
@@ -61,6 +68,10 @@ export class EventBinder {
         if (this.handlers.touchend) {
             this.canvas.addEventListener("touchend", this.handlers.touchend, { passive: false });
         }
+
+        if (this.handlers.keydown && this.keyTarget) {
+            this.keyTarget.addEventListener("keydown", this.handlers.keydown);
+        }
     }
 
     detach() {
@@ -102,6 +113,10 @@ export class EventBinder {
 
         if (this.handlers.touchend) {
             this.canvas.removeEventListener("touchend", this.handlers.touchend);
+        }
+
+        if (this.handlers.keydown && this.keyTarget) {
+            this.keyTarget.removeEventListener("keydown", this.handlers.keydown);
         }
     }
 }

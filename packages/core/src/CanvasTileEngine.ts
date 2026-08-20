@@ -14,6 +14,7 @@ import {
     CanvasTileEngineConfig,
     FitBoundsOptions,
     FitBoundsResult,
+    AccessibilityConfig,
     ReducedMotionSetting,
     onClickCallback,
     onRightClickCallback,
@@ -527,6 +528,41 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         // the other camera-mutating APIs (also renders).
         this.notifyZoomIfChanged(prevScale);
         this.handleCameraChange();
+    }
+
+    /**
+     * Update accessibility preferences at runtime — the accessible name, its
+     * description, the semantic role, or whether the surface is a tab stop.
+     *
+     * The patch is merged, not replaced wholesale, and the DOM renderers
+     * re-apply their attributes in response. Exists because the React
+     * bindings read `config` once on mount, so a name that could never change
+     * afterwards would be the wrong thing to ship.
+     * @throws {ConfigValidationError} If any supplied value is invalid.
+     * @example
+     * ```ts
+     * engine.setAccessibility({ label: `Floor ${floor} seating chart` });
+     * ```
+     */
+    setAccessibility(patch: Partial<AccessibilityConfig>) {
+        this.config.updateAccessibility(patch);
+    }
+
+    /**
+     * Subscribe to {@link setAccessibility} changes. Returns an unsubscribe
+     * function.
+     *
+     * The DOM renderers already listen internally to re-apply their
+     * attributes; this is for hosts that render the accessible surface
+     * themselves — the React Native binding puts the name on its measured
+     * `View`, so it needs to re-render when the name changes.
+     * @example
+     * ```ts
+     * const stop = engine.onAccessibilityChange(() => render(engine.getConfig().accessibility));
+     * ```
+     */
+    onAccessibilityChange(listener: () => void): () => void {
+        return this.config.onAccessibilityChange(listener);
     }
 
     /**

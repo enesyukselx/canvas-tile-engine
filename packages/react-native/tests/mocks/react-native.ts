@@ -27,6 +27,10 @@ export interface ViewProps {
     style?: unknown;
     onLayout?: (event: LayoutChangeEvent) => void;
     pointerEvents?: string;
+    accessible?: boolean;
+    accessibilityRole?: string;
+    accessibilityLabel?: string;
+    accessibilityHint?: string;
     children?: ReactNode;
 }
 

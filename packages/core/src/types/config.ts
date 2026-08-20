@@ -6,7 +6,56 @@
  */
 export type ReducedMotionSetting = boolean | "auto";
 
+/**
+ * Semantic role for the whole surface, mapped per platform. Web: `"region"` →
+ * `role="region"`, `"image"` → `role="img"`, `"application"` →
+ * `role="application"`. React Native: only `"image"` has an
+ * `accessibilityRole` equivalent.
+ *
+ * Deliberately a narrow union rather than an ARIA passthrough string:
+ * widening an accepted union later is free, narrowing a shipped string is a
+ * compile break. `"grid"` is excluded because it obliges `aria-rowcount` /
+ * `aria-colcount` and real `gridcell` descendants, which a canvas surface
+ * cannot provide.
+ */
+export type AccessibilityRole = "region" | "image" | "application";
+
 export type AccessibilityConfig = {
+    /**
+     * Accessible name for the surface. No default — a fabricated one like
+     * "Interactive map" would be wrong for a game board, a seat picker or a
+     * pixel editor, and it would suppress the unlabeled-region audit signal.
+     * When omitted, neither `aria-label` nor `role` is written at all.
+     */
+    label?: string;
+    /**
+     * Longer usage description, e.g. which keys do what. Web: rendered into a
+     * visually hidden node referenced by `aria-describedby`. React Native:
+     * `accessibilityHint`. Inert on the server renderer.
+     */
+    description?: string;
+    /**
+     * Semantic role. Defaults to `"region"` when {@link label} is set, and to
+     * nothing at all when it is not. `"application"` is never the default: it
+     * forfeits every screen-reader quick-navigation command.
+     */
+    role?: AccessibilityRole;
+    /**
+     * Whether the surface is a keyboard tab stop.
+     *
+     * The default is DERIVED, not a constant: `eventHandlers.keyboard` decides
+     * it outright when set to a boolean, otherwise it is `true` when any
+     * pointer interaction is enabled (`click`, `rightClick`, `hover`, `drag`,
+     * or `zoom`) and `false` when none is. A decorative minimap configured
+     * with no event handlers gains no tab stop; an interactive map does. An
+     * explicit `true`/`false` always wins.
+     *
+     * The pointer mirror is deliberately coarse: keyboard control covers pan,
+     * zoom and activation only, so a `hover`-only or `rightClick`-only surface
+     * still takes a tab stop with nothing to operate from the keyboard. Pass
+     * `focusable: false` (or `eventHandlers.keyboard: false`) there.
+     */
+    focusable?: boolean;
     /**
      * Collapse engine-driven camera animation to instant. Default `"auto"`.
      *
@@ -101,6 +150,22 @@ export type CanvasTileEngineConfig = {
  */
 export type ZoomMode = "pointer" | "center";
 
+/** Step sizes for keyboard camera control. */
+export type KeyboardConfig = {
+    /**
+     * Pan step in world units — one cell per press with the default cell
+     * size. Ignored when {@link panPx} is set.
+     */
+    pan?: number;
+    /**
+     * Pan step in screen pixels, independent of zoom. Takes precedence over
+     * {@link pan}. Default 80, matching the step map libraries settled on.
+     */
+    panPx?: number;
+    /** Multiplicative zoom step for `+`/`-`. Default 1.5, matching `zoomIn`/`zoomOut`. */
+    zoomFactor?: number;
+};
+
 export type EventHandlers = {
     click?: boolean;
     rightClick?: boolean;
@@ -109,4 +174,24 @@ export type EventHandlers = {
     /** Zoom behavior: `false` disables zoom, `true` is shorthand for `"pointer"`. */
     zoom?: boolean | ZoomMode;
     resize?: boolean;
+    /**
+     * Keyboard camera control. DOM renderers only — React Native's core
+     * `View` has no key events, and the server renderer has no input loop.
+     *
+     * Left `undefined` (the default) it MIRRORS the pointer gates: arrows pan
+     * only if `drag` is on, `+`/`-` zoom only if `zoom` is on, and
+     * Enter/Space activate only if `click` is on. Keyboard therefore grants
+     * no capability the app did not already grant — which is what SC 2.1.1
+     * asks for — and is a genuine no-op on a deliberately static board.
+     *
+     * `true` forces all three on regardless; `false` forces them off. An
+     * object configures the step sizes while still mirroring the gates.
+     *
+     * `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are never
+     * captured and never will be, so the surface can never become a keyboard
+     * trap (SC 2.1.2). Ctrl/Meta/Alt combinations are never captured either;
+     * Shift is only honored on the zoom keys, because `+` and `_` are the
+     * shifted spellings of `=` and `-` on common layouts.
+     */
+    keyboard?: boolean | KeyboardConfig;
 };

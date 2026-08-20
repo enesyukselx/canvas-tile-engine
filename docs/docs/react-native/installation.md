@@ -198,3 +198,11 @@ Because touch input participates in native gesture arbitration (react-native-ges
 | Images              | `HTMLImageElement`                  | `SkImage`                         |
 | Custom draw context | Canvas2D or overlay context         | `SkCanvas`                        |
 | Input               | DOM mouse/touch/wheel               | react-native-gesture-handler      |
+
+## Accessibility
+
+`config.accessibility.label`, `.description` and `.role` are applied to the measured `View` — the one that owns layout and gestures — never to the Skia `Canvas`. Only `role: "image"` has a React Native equivalent; `"region"` and `"application"` are dropped, and the label still announces.
+
+Reduced motion is wired for you: the binding reads `AccessibilityInfo` and feeds it to the engine, so camera animation follows the OS setting without any app code.
+
+One limitation to know about: this makes the surface **announced** but not **operable** on React Native. Keyboard camera control is DOM-only — React Native's core `View` has no key events — and `accessibilityActions` is not wired yet.

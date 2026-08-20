@@ -30,7 +30,9 @@ import {
     ResizeWatcher,
     ResponsiveWatcher,
     ReducedMotionWatcher,
+    A11yAttributes,
     SizeController,
+    createKeyDownHandler,
     initStyles,
 } from "@canvas-tile-engine/renderer-shared/dom";
 import { BrowserCanvasDraw, BrowserContext2D, createBrowserCanvasDraw } from "./modules/createCanvasDraw";
@@ -79,6 +81,8 @@ export class RendererCanvas implements IRenderer {
     private resizeWatcher?: ResizeWatcher;
     private responsiveWatcher?: ResponsiveWatcher;
     private reducedMotionWatcher?: ReducedMotionWatcher;
+    private a11yAttributes?: A11yAttributes;
+    private unsubscribeA11y?: () => void;
     private eventsAttached = false;
 
     // Size control
@@ -237,18 +241,25 @@ export class RendererCanvas implements IRenderer {
         );
 
         // Initialize EventBinder with normalized handlers
-        this.eventBinder = new EventBinder(this.canvas, {
-            click: this.handleClick,
-            contextmenu: this.handleContextMenu,
-            mousedown: this.handleMouseDown,
-            mousemove: this.handleMouseMove,
-            mouseup: this.handleMouseUp,
-            mouseleave: this.handleMouseLeave,
-            wheel: this.handleWheel,
-            touchstart: this.handleTouchStart,
-            touchmove: this.handleTouchMove,
-            touchend: this.handleTouchEnd,
-        });
+        this.eventBinder = new EventBinder(
+            this.canvas,
+            {
+                click: this.handleClick,
+                contextmenu: this.handleContextMenu,
+                mousedown: this.handleMouseDown,
+                mousemove: this.handleMouseMove,
+                mouseup: this.handleMouseUp,
+                mouseleave: this.handleMouseLeave,
+                wheel: this.handleWheel,
+                touchstart: this.handleTouchStart,
+                touchmove: this.handleTouchMove,
+                touchend: this.handleTouchEnd,
+                keydown: createKeyDownHandler(this.gestureProcessor),
+            },
+            // keydown binds to the wrapper: it is what carries tabindex, and a key
+            // event only fires on the focused element.
+            this.canvasWrapper,
+        );
 
         // Initialize AnimationController and SizeController
         this.animationController = new AnimationController(
@@ -280,6 +291,16 @@ export class RendererCanvas implements IRenderer {
         // not one of the opt-in eventHandlers.
         this.reducedMotionWatcher = new ReducedMotionWatcher(this.config);
         this.reducedMotionWatcher.start();
+
+        // The wrapper carries the accessible identity; the canvases are
+        // hidden from assistive technology. Re-applied on config change
+        // because these attributes are written once, unlike the config
+        // the draw pipeline re-reads every frame.
+        this.a11yAttributes = new A11yAttributes(this.canvasWrapper, [this.canvas]);
+        this.a11yAttributes.apply(this.config.get().accessibility);
+        this.unsubscribeA11y = this.config.onAccessibilityChange(() => {
+            this.a11yAttributes?.apply(this.config.get().accessibility);
+        });
 
         // Setup responsive or resize watcher based on config
         if (this.config.get().responsive) {
@@ -531,6 +552,10 @@ export class RendererCanvas implements IRenderer {
         this.responsiveWatcher = undefined;
         this.reducedMotionWatcher?.stop();
         this.reducedMotionWatcher = undefined;
+        this.unsubscribeA11y?.();
+        this.unsubscribeA11y = undefined;
+        this.a11yAttributes?.destroy();
+        this.a11yAttributes = undefined;
 
         // Cancel animations
         this.animationController.cancelAll();
