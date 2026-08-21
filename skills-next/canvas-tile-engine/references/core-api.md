@@ -173,6 +173,12 @@ optional `options?` last parameter (core >= 0.10) with these fields:
   through to items below. The item-level counterpart of `hitTest: false`,
   for decorative items mixed into an interactive set or disabled entries.
   Items hidden by `visibleOf` never hit-test regardless of this callback.
+- `clip?: Bounds` - confine the registration to a world rectangle: nothing it
+  draws paints outside, and nothing outside hit-tests (point queries reject,
+  marquee queries narrow to the overlap; `padding` does not widen it).
+  Available on every draw kind including `drawGridLines`, `drawStatic*` and
+  `addDrawFunction`. World space, so it pans and zooms with the scene -
+  a chart plot area, a minimap frame. Axis-aligned rectangles only.
 - `hitTest?: boolean` - `false` keeps the registration out of hit testing
   (the `pointer-events: none` of the draw API). Declare decorative content
   (floor tiles, background images, zone overlays) once at registration and

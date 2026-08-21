@@ -436,6 +436,27 @@ function MapWithImages() {
 }
 ```
 
+### Clipping a Registration
+
+Every draw component takes a `clip` prop: a world rectangle the registration is confined to. Nothing it draws paints outside, and nothing outside it hit-tests.
+
+```tsx
+const plotArea = { minX: -0.5, maxX: 40, minY: -0.5, maxY: 20 };
+
+<CanvasTileEngine.Rect items={bars} layer={1} clip={plotArea} />
+<CanvasTileEngine.Line items={series} layer={1} clip={plotArea} />;
+```
+
+The `clip` prop is compared by value, so an inline object literal does not re-register the draw call on every render (unlike `items`, which is compared by reference).
+
+The rectangle is world (item) space — the same coordinates `fitBounds` and `hitTestRect` take — so it pans and zooms with the rest of the scene. That is what a chart's plot area wants: axes and labels drawn outside the clip stay put relative to the data, and panning cannot smear the series over them.
+
+| | |
+| :-- | :-- |
+| Applies to | Every draw kind, including grid lines, the `Static*` components and `DrawFunction`. |
+| Hit testing | Follows the clip. A point outside it cannot hit, and a marquee is narrowed to the overlap, so a selection half inside the clip cannot reach what is cut away. `padding` does not widen a clip — it grows an item's own tap target, and a target that is not drawn has nothing to grow. |
+| Shape | Axis-aligned rectangles only. An arbitrary shape would need the stencil buffer on WebGL, where path fills already live. |
+
 ## Advanced
 
 ### `<DrawFunction>`
