@@ -1,6 +1,13 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
-import type { PathItem, PathDecorationStyle, StyleOf, VisibleOf, InteractiveOf } from "@canvas-tile-engine/core";
+import type {
+    Bounds,
+    PathItem,
+    PathDecorationStyle,
+    StyleOf,
+    VisibleOf,
+    InteractiveOf,
+} from "@canvas-tile-engine/core";
 
 export interface PathProps {
     /**
@@ -44,14 +51,32 @@ export interface PathProps {
      * zone overlays. Default `true`.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
  * Draws free-form paths: open or closed polylines, filled shapes with a fill
  * rule, per-item stroke/dash/corner styling, and hit-testable geometry.
  */
-export const Path = memo(function Path({ items, layer = 1, styleOf, visibleOf, interactiveOf, hitTest }: PathProps) {
+export const Path = memo(function Path({
+    items,
+    layer = 1,
+    styleOf,
+    visibleOf,
+    interactiveOf,
+    hitTest,
+    clip,
+}: PathProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
 
     // Read through refs so callback identity changes never re-register.
     const styleOfRef = useRef(styleOf);
@@ -77,6 +102,7 @@ export const Path = memo(function Path({ items, layer = 1, styleOf, visibleOf, i
             visibleOf: (item) => visibleOfRef.current?.(item),
             interactiveOf: (item) => interactiveOfRef.current?.(item),
             hitTest,
+            clip,
         });
         requestRender();
         return () => {
@@ -87,7 +113,7 @@ export const Path = memo(function Path({ items, layer = 1, styleOf, visibleOf, i
                 requestRender();
             }
         };
-    }, [engine, items, layer, hitTest, requestRender]);
+    }, [engine, items, layer, hitTest, requestRender, clipKey]);
 
     return null;
 });

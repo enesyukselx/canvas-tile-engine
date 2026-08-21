@@ -28,6 +28,7 @@ export interface Canvas2DContextLike<TDrawable = never> extends CommandTraceTarg
     /** Optional: callers guard, falling back to `rect` (older environments). */
     roundRect?(x: number, y: number, w: number, h: number, radii?: number | number[]): void;
     fill(fillRule?: "nonzero" | "evenodd"): void;
+    clip(fillRule?: "nonzero" | "evenodd"): void;
     stroke(): void;
     setLineDash(segments: number[]): void;
     translate(x: number, y: number): void;

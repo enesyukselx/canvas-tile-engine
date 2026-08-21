@@ -30,6 +30,7 @@ import {
 } from "@canvas-tile-engine/core";
 import type {
     AnchoredItem,
+    RendererClipOptions,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -38,7 +39,7 @@ import type {
     ShapeDecorationStyle,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
-import { DrawContext, Layer } from "../scene/Layer";
+import { DrawCallback, DrawContext, Layer } from "../scene/Layer";
 import { getViewportBounds, isVisible } from "../geometry/culling";
 import { applyLineWidth } from "./applyLineWidth";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
@@ -93,11 +94,24 @@ export class CanvasDraw<
      * @param fn Callback invoked during render.
      * @param layer Layer order (lower draws first).
      */
+    /**
+     * Register a layer callback, forwarding the registration's clip. Every
+     * draw method funnels through here so a new draw kind cannot forget it.
+     */
+    private register(
+        layer: number,
+        options: RendererClipOptions | undefined,
+        fn: DrawCallback<DrawContext<TContext>>,
+    ): DrawHandle {
+        return this.layers.add(layer, fn, options?.clip);
+    }
+
     addDrawFunction(
         fn: (ctx: TContext, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer: number = 1,
+        options?: RendererClipOptions,
     ): DrawHandle {
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config, this.drawTransform);
         });
     }
@@ -115,7 +129,7 @@ export class CanvasDraw<
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -199,7 +213,7 @@ export class CanvasDraw<
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             ctx.save();
             const baseStroke = style?.strokeStyle ?? "#000000";
             ctx.strokeStyle = baseStroke;
@@ -297,7 +311,7 @@ export class CanvasDraw<
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -364,7 +378,7 @@ export class CanvasDraw<
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -426,7 +440,7 @@ export class CanvasDraw<
         // Conservative world bounds per item for culling, computed once.
         const itemBounds = items.map((item) => pathItemBounds(item));
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
@@ -537,7 +551,7 @@ export class CanvasDraw<
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -614,8 +628,13 @@ export class CanvasDraw<
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -792,7 +811,11 @@ export class CanvasDraw<
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
-    private addStaticCacheLayer(cache: StaticCache<TContext, TCanvas> | null, layer: number): DrawHandle | null {
+    private addStaticCacheLayer(
+        cache: StaticCache<TContext, TCanvas> | null,
+        layer: number,
+        options?: RendererClipOptions,
+    ): DrawHandle | null {
         if (!cache) {
             return null;
         }
@@ -800,7 +823,7 @@ export class CanvasDraw<
         const cachedBounds = cache.worldBounds;
         const cachedScale = cache.scale;
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const viewportWidth = config.size.width / config.scale;
             const viewportHeight = config.size.height / config.scale;
 
@@ -886,7 +909,7 @@ export class CanvasDraw<
      * @param cacheKey Unique key for this cache (e.g., "minimap-items")
      * @param layer Layer order
      */
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1, options?: RendererClipOptions): DrawHandle {
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
@@ -933,10 +956,10 @@ export class CanvasDraw<
         });
 
         if (!cache) {
-            return this.drawRect(items, layer);
+            return this.drawRect(items, layer, options);
         }
 
-        return this.addStaticCacheLayer(cache, layer)!;
+        return this.addStaticCacheLayer(cache, layer, options)!;
     }
 
     /**
@@ -947,7 +970,12 @@ export class CanvasDraw<
      * @param cacheKey Unique key for this cache (e.g., "terrain-cache")
      * @param layer Layer order
      */
-    drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(
+        items: Array<ImageItem<TImage>>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
             const img = item.img;
             const sprite = item.sprite;
@@ -993,10 +1021,10 @@ export class CanvasDraw<
         });
 
         if (!cache) {
-            return this.drawImage(items, layer);
+            return this.drawImage(items, layer, options);
         }
 
-        return this.addStaticCacheLayer(cache, layer)!;
+        return this.addStaticCacheLayer(cache, layer, options)!;
     }
 
     /**
@@ -1007,7 +1035,12 @@ export class CanvasDraw<
      * @param cacheKey Unique key for this cache (e.g., "minimap-circles")
      * @param layer Layer order
      */
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticCircle(
+        items: Array<Circle>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
@@ -1030,10 +1063,10 @@ export class CanvasDraw<
         });
 
         if (!cache) {
-            return this.drawCircle(items, layer);
+            return this.drawCircle(items, layer, options);
         }
 
-        return this.addStaticCacheLayer(cache, layer)!;
+        return this.addStaticCacheLayer(cache, layer, options)!;
     }
 
     /**

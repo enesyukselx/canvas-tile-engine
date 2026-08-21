@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
-import type { Rect as RectType } from "@canvas-tile-engine/core";
+import type { Bounds, Rect as RectType } from "@canvas-tile-engine/core";
 
 export interface StaticRectProps {
     /**
@@ -17,6 +17,12 @@ export interface StaticRectProps {
      * minimap tiles. Default `true`.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
@@ -25,8 +31,12 @@ export interface StaticRectProps {
  * on Canvas2D, a recorded picture on Skia — and replays the cached result
  * each frame. Prefer this over `Rect` for large item sets that don't change.
  */
-export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1, hitTest }: StaticRectProps) {
+export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1, hitTest, clip }: StaticRectProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
     const prevCacheKeyRef = useRef<string>(cacheKey);
     const prevItemsRef = useRef(items);
 
@@ -46,7 +56,7 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1,
         }
         prevItemsRef.current = items;
 
-        const handle = engine.drawStaticRect(items, cacheKey, layer, { hitTest });
+        const handle = engine.drawStaticRect(items, cacheKey, layer, { hitTest, clip });
         requestRender();
 
         return () => {
@@ -57,7 +67,7 @@ export const StaticRect = memo(function StaticRect({ items, cacheKey, layer = 1,
                 requestRender();
             }
         };
-    }, [engine, items, cacheKey, layer, hitTest, requestRender]);
+    }, [engine, items, cacheKey, layer, hitTest, requestRender, clipKey]);
 
     // Cleanup cache on unmount
     useEffect(() => {

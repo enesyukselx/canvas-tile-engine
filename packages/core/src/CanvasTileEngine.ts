@@ -846,11 +846,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawRect(items, layer, {
             styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Rect> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "rect", items, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -872,9 +874,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1, options?: StaticDrawOptions): DrawHandle {
         this.replacePreviousDraw(cacheKey);
-        const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer, { clip: options?.clip });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true });
+            this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true, clip: options?.clip });
         }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
@@ -899,9 +901,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: StaticDrawOptions,
     ): DrawHandle {
         this.replacePreviousDraw(cacheKey);
-        const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer, { clip: options?.clip });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true });
+            this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true, clip: options?.clip });
         }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
@@ -927,9 +929,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: StaticDrawOptions,
     ): DrawHandle {
         this.replacePreviousDraw(cacheKey);
-        const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer, { clip: options?.clip });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true });
+            this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true, clip: options?.clip });
         }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
@@ -968,12 +970,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawLine(items, style, layer, {
             styleOf: options?.styleOf as StyleOf<Line, LineDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Line> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "line", items, layer, {
                 style,
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1000,11 +1004,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawCircle(items, layer, {
             styleOf: options?.styleOf as StyleOf<Circle, ShapeDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Circle> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "circle", items, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1046,6 +1052,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawText(items, layer, {
             styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Text> | undefined,
+            clip: options?.clip,
         });
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -1089,11 +1096,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawPath(list, layer, {
             styleOf: options?.styleOf as StyleOf<PathItem, PathDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<PathItem> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "path", list, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1125,6 +1134,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             this.hitTester.register(handle, "image", items, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1149,7 +1159,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: DrawOptions,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+        const handle = this.renderer
+            .getDrawAPI()
+            .drawGridLines(cellSize, { lineWidth, strokeStyle }, layer, { clip: options?.clip });
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -1180,7 +1192,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: DrawOptions,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().addDrawFunction(fn, layer);
+        const handle = this.renderer.getDrawAPI().addDrawFunction(fn, layer, { clip: options?.clip });
         this.trackDrawId(options?.id, handle);
         return handle;
     }

@@ -1,4 +1,4 @@
-import { Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathCommand, PathItem, Rect } from "../types";
+import { Bounds, Circle, Coords, DrawHandle, ImageItem, Line, LineStyle, PathCommand, PathItem, Rect } from "../types";
 import {
     distanceToPolyline,
     pointInRect,
@@ -78,6 +78,9 @@ type HitEntry = {
     /** Static draw calls replay at a recorded scale, so `sizePx` is ignored
      * for them — the hit box must match what is actually drawn. */
     ignoreSizePx?: boolean;
+    /** World rectangle the registration is confined to. What is clipped away
+     * is not painted, so it must not answer queries either. */
+    clip?: Bounds;
     /** Call-level stroke style (line entries only; path items carry their
      * own). Per-item `Line.style` overlays it at test time. */
     style?: LineStyle;
@@ -100,6 +103,20 @@ const SPATIAL_INDEX_THRESHOLD = 500;
 // hairline strokes stay tappable at any zoom without the caller needing
 // `paddingPx` for the common case.
 const MIN_STROKE_HIT_WIDTH_PX = 8;
+
+/** Is a point inside a world rectangle (edges count)? */
+function pointInBounds(bounds: Bounds, point: Coords): boolean {
+    return point.x >= bounds.minX && point.x <= bounds.maxX && point.y >= bounds.minY && point.y <= bounds.maxY;
+}
+
+/** Overlap of two world rectangles, or `null` when they miss each other. */
+function intersectBounds(a: RectRegion, b: Bounds): RectRegion | null {
+    const minX = Math.max(a.minX, b.minX);
+    const maxX = Math.min(a.maxX, b.maxX);
+    const minY = Math.max(a.minY, b.minY);
+    const maxY = Math.min(a.maxY, b.maxY);
+    return minX > maxX || minY > maxY ? null : { minX, maxX, minY, maxY };
+}
 
 /**
  * Core-side registry answering "which item is under this world point?".
@@ -140,6 +157,7 @@ export class HitTester {
         opts?: {
             style?: LineStyle;
             ignoreSizePx?: boolean;
+            clip?: Bounds;
             visibleOf?: (item: HitItem) => boolean | undefined;
             interactiveOf?: (item: HitItem) => boolean | undefined;
         },
@@ -169,6 +187,7 @@ export class HitTester {
             maxSize,
             maxSizePx,
             ignoreSizePx: opts?.ignoreSizePx,
+            clip: opts?.clip,
             style: opts?.style,
             visibleOf: opts?.visibleOf,
             interactiveOf: opts?.interactiveOf,
@@ -198,6 +217,15 @@ export class HitTester {
 
         for (const entry of this.entries.values()) {
             if (opts?.layer !== undefined && entry.layer !== opts.layer) {
+                continue;
+            }
+
+            // A clipped registration paints nothing outside its rectangle, so
+            // a point outside it cannot hit — checked before any geometry.
+            // `padding` deliberately does not widen the clip: it grows an
+            // item's own tap target, and a target outside the clip is not
+            // drawn at all.
+            if (entry.clip && !pointInBounds(entry.clip, point)) {
                 continue;
             }
 
@@ -444,19 +472,29 @@ export class HitTester {
                 continue;
             }
 
+            // Marquee counterpart of the point check. A clipped registration
+            // can only answer for the part of the query rect that overlaps its
+            // rectangle, so the query is narrowed to that overlap rather than
+            // the entry merely being skipped when it misses entirely — a
+            // marquee half inside the clip must not select what is cut away.
+            const region = entry.clip ? intersectBounds(rect, entry.clip) : rect;
+            if (!region) {
+                continue;
+            }
+
             const indexable = entry.kind !== "path" && entry.kind !== "line";
             if (indexable && entry.items.length > SPATIAL_INDEX_THRESHOLD) {
                 this.ensureIndex(entry);
                 // Same conservative anchor padding as the point query.
                 const pad = 0.5 + entry.maxSize + (entry.ignoreSizePx ? 0 : entry.maxSizePx / this.getScale());
                 const candidates = entry.index!.query(
-                    rect.minX - pad,
-                    rect.minY - pad,
-                    rect.maxX + pad,
-                    rect.maxY + pad,
+                    region.minX - pad,
+                    region.minY - pad,
+                    region.maxX + pad,
+                    region.maxY + pad,
                 );
                 for (const item of candidates) {
-                    if (!this.testItemRect(rect, item, entry, mode)) {
+                    if (!this.testItemRect(region, item, entry, mode)) {
                         continue;
                     }
                     results.push({
@@ -471,7 +509,7 @@ export class HitTester {
             } else {
                 for (let i = 0; i < entry.items.length; i++) {
                     const item = entry.items[i];
-                    if (!this.testItemRect(rect, item, entry, mode)) {
+                    if (!this.testItemRect(region, item, entry, mode)) {
                         continue;
                     }
                     results.push({

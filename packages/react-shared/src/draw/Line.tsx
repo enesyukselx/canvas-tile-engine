@@ -1,6 +1,7 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
 import type {
+    Bounds,
     Line as LineType,
     LineStyle,
     LineDecorationStyle,
@@ -51,6 +52,12 @@ export interface LineProps {
      * Default `true`.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
@@ -64,8 +71,13 @@ export const Line = memo(function Line({
     visibleOf,
     interactiveOf,
     hitTest,
+    clip,
 }: LineProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
 
     // Read through refs so callback identity changes never re-register.
     const styleOfRef = useRef(styleOf);
@@ -91,6 +103,7 @@ export const Line = memo(function Line({
             visibleOf: (item) => visibleOfRef.current?.(item),
             interactiveOf: (item) => interactiveOfRef.current?.(item),
             hitTest,
+            clip,
         });
         requestRender();
         return () => {
@@ -101,7 +114,7 @@ export const Line = memo(function Line({
                 requestRender();
             }
         };
-    }, [engine, items, style, layer, hitTest, requestRender]);
+    }, [engine, items, style, layer, hitTest, requestRender, clipKey]);
 
     return null;
 });

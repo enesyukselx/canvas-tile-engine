@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
-import type { ImageItem } from "@canvas-tile-engine/core";
+import type { Bounds, ImageItem } from "@canvas-tile-engine/core";
 
 export interface StaticImageProps<TImage = unknown> {
     /**
@@ -17,6 +17,12 @@ export interface StaticImageProps<TImage = unknown> {
      * terrain tiles. Default `true`.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
@@ -26,8 +32,12 @@ export interface StaticImageProps<TImage = unknown> {
  * each frame. Prefer this over `Image` for large item sets that don't change,
  * like terrain tiles or static decorations.
  */
-export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1, hitTest }: StaticImageProps) {
+export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 1, hitTest, clip }: StaticImageProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
     const prevCacheKeyRef = useRef<string>(cacheKey);
     const prevItemsRef = useRef(items);
 
@@ -46,7 +56,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
         }
         prevItemsRef.current = items;
 
-        const handle = engine.drawStaticImage(items, cacheKey, layer, { hitTest });
+        const handle = engine.drawStaticImage(items, cacheKey, layer, { hitTest, clip });
         requestRender();
 
         return () => {
@@ -57,7 +67,7 @@ export const StaticImage = memo(function StaticImage({ items, cacheKey, layer = 
                 requestRender();
             }
         };
-    }, [engine, items, cacheKey, layer, hitTest, requestRender]);
+    }, [engine, items, cacheKey, layer, hitTest, requestRender, clipKey]);
 
     useEffect(() => {
         return () => {

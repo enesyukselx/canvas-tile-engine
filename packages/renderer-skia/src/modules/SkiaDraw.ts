@@ -29,6 +29,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    RendererClipOptions,
     AnchoredItem,
     LineStyle,
     LineDecorationStyle,
@@ -55,7 +56,7 @@ import {
     type SkRect,
 } from "@shopify/react-native-skia";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
-import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { type DrawCallback, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 import type { SkiaDrawContext } from "../types";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
@@ -124,6 +125,18 @@ export class SkiaDraw {
         this.imagePaint.setAntiAlias(true);
     }
 
+    /**
+     * Register a layer callback, forwarding the registration's clip. Every
+     * draw method funnels through here so a new draw kind cannot forget it.
+     */
+    private register(
+        layer: number,
+        options: RendererClipOptions | undefined,
+        fn: DrawCallback<SkiaDrawContext>,
+    ): DrawHandle {
+        return this.layers.add(layer, fn, options?.clip);
+    }
+
     addDrawFunction(
         fn: (
             canvas: SkCanvas,
@@ -132,8 +145,9 @@ export class SkiaDraw {
             transform: DrawTransform,
         ) => void,
         layer: number = 1,
+        options?: RendererClipOptions,
     ): DrawHandle {
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             fn(canvas, topLeft, config, this.drawTransform);
         });
     }
@@ -150,7 +164,7 @@ export class SkiaDraw {
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -244,7 +258,7 @@ export class SkiaDraw {
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -322,7 +336,7 @@ export class SkiaDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const baseColor = this.color(style?.strokeStyle ?? "#000000");
             const baseWidth = resolveLineWidthPx(style, this.camera.scale);
             this.strokePaint.setColor(baseColor);
@@ -388,7 +402,7 @@ export class SkiaDraw {
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -474,7 +488,7 @@ export class SkiaDraw {
         // Conservative world bounds per item for culling, computed once.
         const itemBounds = items.map((item) => pathItemBounds(item));
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
@@ -557,7 +571,7 @@ export class SkiaDraw {
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -658,8 +672,13 @@ export class SkiaDraw {
         }
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -700,21 +719,43 @@ export class SkiaDraw {
     // — use the dynamic draw methods when a zoom-independent px value must
     // hold.
 
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintRect(canvas, item, pos, cellSize),
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1, options?: RendererClipOptions): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (canvas, item, pos, cellSize) => this.paintRect(canvas, item, pos, cellSize),
+            options,
         );
     }
 
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintCircle(canvas, item, pos, cellSize, false),
+    drawStaticCircle(
+        items: Array<Circle>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (canvas, item, pos, cellSize) => this.paintCircle(canvas, item, pos, cellSize, false),
+            options,
         );
     }
 
-    drawStaticImage(items: Array<ImageItem<SkImage>>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintImage(canvas, item, pos, cellSize, false),
+    drawStaticImage(
+        items: Array<ImageItem<SkImage>>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (canvas, item, pos, cellSize) => this.paintImage(canvas, item, pos, cellSize, false),
+            options,
         );
     }
 
@@ -738,9 +779,10 @@ export class SkiaDraw {
         items: T[],
         layer: number,
         paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
+        options?: RendererClipOptions,
     ): DrawHandle {
         if (items.length === 0) {
-            return this.layers.add(layer, () => {});
+            return this.register(layer, options, () => {});
         }
 
         let entry = this.staticPictureCache.get(cacheKey);
@@ -750,7 +792,7 @@ export class SkiaDraw {
         }
         const { picture, recordScale } = entry;
 
-        return this.layers.add(layer, ({ ctx: canvas, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, topLeft }) => {
             // worldToScreen(w) = (w + CELL_CENTER_OFFSET - topLeft) * scale, and
             // the picture was recorded with a camera at (0, 0, recordScale), so
             // the recorded coordinates only miss the -topLeft term and the
