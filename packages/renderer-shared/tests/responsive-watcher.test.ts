@@ -297,4 +297,127 @@ describe("ResponsiveWatcher scale limits", () => {
             expect(state.scale).toBe(10);
         });
     });
+
+    describe("zero-size mount (issue #191)", () => {
+        it("sizes immediately when preserve-viewport measures a real width but no height on start (ordinary visible mount)", () => {
+            // A real preserve-viewport wrapper has no CSS height of its own: initStyles
+            // only sets position/overflow, the canvas is position:absolute so it
+            // contributes no flow height, and applySize is what assigns the wrapper's
+            // height (via `initialVisibleTiles.y * newScale`). So on a perfectly visible
+            // mount getBoundingClientRect() legitimately reports height 0 — this must
+            // still size immediately, not be treated as hidden.
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 600,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(state.scale).toBe(6);
+            expect(state.minScale).toBe(6);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("does not corrupt the camera when preserve-viewport measures 0x0 on start", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            // Camera stays at its configured values instead of collapsing to 0/NaN
+            expect(state.scale).toBe(10);
+            expect(state.minScale).toBe(10);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers once the observer reports a real size after a 0x0 preserve-viewport mount", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            // A real preserve-viewport wrapper still reports height 0 here too — nothing
+            // has assigned it one yet. Feeding a non-zero height would not reflect what
+            // the DOM actually delivers on recovery.
+            FakeResizeObserver.instance!.trigger(600, 0);
+
+            expect(state.scale).toBe(6);
+            expect(state.minScale).toBe(6);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers even when the reported size matches the viewport's initial (pre-mount) size", () => {
+            // Guards the ResizeObserver dedupe: before sizing has ever run, a wrapper
+            // resolving to exactly the configured/initial viewport size must not be
+            // mistaken for "already sized" and skipped, or preserve-viewport's wrapper
+            // height never gets assigned.
+            const { watcher, wrapper } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(wrapper.style.height).toBeUndefined();
+
+            // ViewportState in this test harness starts at the configured 1000x800,
+            // which is exactly what the wrapper reports here.
+            FakeResizeObserver.instance!.trigger(1000, 800);
+
+            expect(wrapper.style.height).toBe("800px");
+        });
+
+        it("does not corrupt the camera when preserve-scale measures 0x0 on start", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-scale",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(state.scale).toBe(10);
+            expect(state.minScale).toBe(10);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers once the observer reports a real size after a 0x0 preserve-scale mount", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-scale",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+                bounds: { minX: 0, maxX: 100, minY: 0, maxY: 80 },
+            });
+            watcher.start();
+
+            FakeResizeObserver.instance!.trigger(500, 800);
+
+            expect(state.minScale).toBe(5);
+            expect(state.scale).toBe(10);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+    });
 });
