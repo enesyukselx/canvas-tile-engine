@@ -29,7 +29,7 @@ const config: CanvasTileEngineConfig = {
 | `maxScale` | `number` | `scale * 2` | Maximum zoom scale. Adjustable at runtime with `engine.setScaleLimits(min, max)`. |
 | `backgroundColor` | `string` | `"#ffffff"` | Frame background color. |
 | `gridAligned` | `boolean` | `false` | Snaps the initial center to the nearest grid-aligned value for pixel-perfect alignment: half-integers (x.5) for even tile counts, integers for odd. Integers are cell centers (cell `k` spans `[k-0.5, k+0.5]`); integer ties snap down so a center given as `N/2` lands on a 0-based board's true center `(N-1)/2`. |
-| `responsive` | `"preserve-scale" \| "preserve-viewport" \| false` | `false` | Enables container-driven resizing in browser renderers. |
+| `responsive` | `"preserve-scale" \| "preserve-viewport" \| "fill" \| false` | `false` | Enables container-driven resizing in browser renderers. |
 | `accessibility` | `object` | — | Accessibility preferences. See [Accessibility](#accessibility). |
 
 ### Accessibility
@@ -61,8 +61,9 @@ Responsive mode is handled by the browser renderers. It is ignored by the server
 
 | Mode | Behavior |
 | :-- | :-- |
-| `"preserve-scale"` | Keeps `scale` fixed. The visible world area changes as the wrapper size changes. Width-responsive only: the wrapper gets `width: 100%` and its height is pinned to `config.size.height` with an inline style, overriding CSS heights. Use `"preserve-viewport"` if the height should follow the container. |
-| `"preserve-viewport"` | Keeps the configured tile count visible. The scale changes when the wrapper width changes. |
+| `"preserve-scale"` | Keeps `scale` fixed. The visible world area changes as the wrapper size changes. Width-responsive only: the wrapper gets `width: 100%` and its height is pinned to `config.size.height` with an inline style, overriding CSS heights. Use `"fill"` or `"preserve-viewport"` if the height should follow the container too. |
+| `"preserve-viewport"` | Keeps the configured tile count visible. The scale changes when the wrapper width changes, and the height is derived from the configured width/height ratio. |
+| `"fill"` | Keeps `scale` fixed and lets both axes follow the container — the mode for a canvas that fills a panel, grid cell, or split pane. `config.size` only seeds the first frame. |
 | `false` | The engine uses the configured `size` until you call `resize()` or enable `eventHandlers.resize`. |
 
 ```ts
@@ -77,12 +78,27 @@ const responsiveConfig: CanvasTileEngineConfig = {
 When `responsive` is enabled, `engine.resize()` and `eventHandlers.resize` are ignored because the wrapper element controls the size.
 :::
 
+### Sizing a `"fill"` container
+
+`"fill"` gives the wrapper `width: 100%` and `height: 100%`, so the container has to have a definite height of its own. The wrapper cannot supply one: the canvas inside it is absolutely positioned, so the wrapper's content height is zero. A flex or grid child also needs `min-height: 0`, otherwise its default `min-height: auto` keeps it from shrinking.
+
+```css
+.chart-panel {
+    display: flex;
+    min-height: 0; /* without this a flex child refuses to shrink */
+    height: 420px; /* or flex: 1 inside a parent that has a height */
+}
+```
+
+The engine warns once if the first measurement comes back zero-height, because a collapsed container renders a silently blank canvas.
+
 ### Scale limits in responsive mode
 
 `minScale` and `maxScale` describe the zoom range at the configured `size`. Responsive modes adapt them as the container resizes so the camera never gets stuck outside the reachable zoom range:
 
 - `"preserve-viewport"` rescales `minScale` with the base scale — it acts as a zoom-out factor, so `scale: 10, minScale: 10` always means "no zooming out past the base view", no matter how wide the container is. `maxScale` stays at its configured value: it is a px-per-tile quality cap (e.g. "tiles are readable up to 40px"), which does not depend on the container width. It is only lifted when the container makes the base scale itself exceed it.
 - `"preserve-scale"` keeps the limits as configured, unless finite `bounds` are set. With bounds, the minimum limit follows the scale at which the bounded area fits the viewport, so an intent like "minScale shows the whole board" stays valid at every container width. The limit is never raised above the current scale.
+- `"fill"` follows the same rule as `"preserve-scale"`, with the height participating: a shorter container lowers the minimum limit through the vertical fit as well as the horizontal one.
 
 When a `"preserve-viewport"` resize changes the scale, the engine fires `onZoom` with the new value, matching wheel/pinch and programmatic zoom changes — scale-dependent app logic (LOD switches, mini-map thresholds) keeps working across container resizes. The very first responsive sizing happens during engine construction, before callbacks can attach, so read the starting value with `engine.getScale()` after mount.
 
@@ -192,7 +208,7 @@ export type CanvasTileEngineConfig = {
         maxWidth?: number;
         maxHeight?: number;
     };
-    responsive?: "preserve-scale" | "preserve-viewport" | false;
+    responsive?: "preserve-scale" | "preserve-viewport" | "fill" | false;
     eventHandlers?: {
         click?: boolean;
         rightClick?: boolean;
