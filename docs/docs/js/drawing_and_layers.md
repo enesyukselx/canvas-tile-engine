@@ -509,6 +509,31 @@ engine.drawImage(
 );
 ```
 
+## Measuring Text
+
+`engine.measureText(text, style)` answers how much room a string takes, without drawing it. Sizes are screen pixels, like `Text.fontPx`.
+
+```ts
+const widest = labels.reduce((max, label) => Math.max(max, engine.measureText(label, { fontPx: 11 }).width), 0);
+
+// Turn it into the world-unit margin an axis needs
+const marginWorld = (widest + 8) / engine.getScale();
+```
+
+| Field | Meaning |
+| :-- | :-- |
+| `width` | The **advance** width: where the next glyph would start. This is the layout number — the widest tick label decides a margin, a centered label offsets by half of it. |
+| `ascent` | Ink height above the baseline, positive. Measured for **this string**, not the font, so `"acme"` reports less than `"Acme"`. |
+| `descent` | Ink depth below the baseline, positive. `0` for a string with no descenders. |
+
+`style` takes `fontPx` plus the optional `fontFamily` and `fontWeight` — the same fields `drawText` resolves, so a measured string and the drawn one agree. Weight matters: bold is wider.
+
+:::warning
+Fonts have to be ready before you measure. A webfont still loading, a server font not yet registered with `registerFont`, or an unresolved native typeface all measure against a fallback face and return numbers that look plausible and are wrong. Measure after fonts load, or call `engine.clearTextMetricsCache()` once they arrive and measure again.
+:::
+
+Measurements are cached per string, size, family and weight, so calling this in a layout loop every frame is fine.
+
 ## Advanced
 
 ### Custom Drawing (`addDrawFunction`)

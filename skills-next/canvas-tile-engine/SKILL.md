@@ -216,6 +216,11 @@ const png = await renderToBuffer({
   the check silently - so never route width changes through `styleOf`;
   re-register instead. Path quirk: decorating an unfilled path with
   `fillStyle` paints the fill but hit testing stays on the stroke.
+- **Do not guess text sizes**: `engine.measureText(text, { fontPx })` returns
+  `{ width, ascent, descent }` in screen pixels — use it for axis margins,
+  centering and truncation instead of `text.length * k`. Fonts must be loaded
+  first (a pending webfont measures the fallback); `clearTextMetricsCache()`
+  after they arrive.
 - **Do not roll your own culling, spatial index, pan/zoom math, or DPR
   handling** - the engine does all of it.
 

@@ -206,6 +206,29 @@ Full item shapes and semantics: [drawing.md](drawing.md).
 | `clearAll(): void` | Remove all callbacks on all layers and drop all static caches. |
 | `clearStaticCache(cacheKey?: string): void` | Drop one or all pre-rendered static caches (forces rebuild next frame). Rarely needed since core 0.10 - same-key re-register invalidates automatically. |
 
+### Text measurement
+
+| Signature | Notes |
+| :-- | :-- |
+| `measureText(text, style): { width, ascent, descent }` | Measure a string without drawing it, in SCREEN PIXELS. `style` is `{ fontPx, fontFamily?, fontWeight? }` — the same fields `drawText` resolves. Synchronous and cached per string/size/family/weight, so calling it in a layout loop is fine. |
+| `clearTextMetricsCache(): void` | Drop cached measurements after fonts change. |
+
+`width` is the ADVANCE width (where the next glyph starts) — the number layout
+wants for margins and centering. `ascent`/`descent` are ink extents from the
+baseline, both POSITIVE, measured for that string rather than the font, so
+`"acme"` reports a smaller ascent than `"Acme"` and `"gyp"` a non-zero descent.
+
+FONTS MUST BE READY: a webfont still loading, a server font not yet
+`registerFont`-ed, or an unresolved native typeface all measure against a
+fallback and return plausible wrong numbers. Measure after fonts load, or call
+`clearTextMetricsCache()` when they arrive.
+
+```ts
+// The axis margin a set of tick labels needs
+const widest = labels.reduce((max, l) => Math.max(max, engine.measureText(l, { fontPx: 11 }).width), 0);
+const marginWorld = (widest + 8) / engine.getScale();
+```
+
 ### Hit testing
 
 | Signature | Notes |

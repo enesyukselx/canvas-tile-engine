@@ -111,6 +111,8 @@ Handle members beyond the core engine API (see
 | `isReady: boolean`       | False until the engine mounts. Valid `useEffect` dependency. |
 | `instance`               | The raw `CanvasTileEngine` instance or `null`. Escape hatch. |
 | `images`                 | The image loader, `undefined` before mount.                  |
+| `measureText(text, style)` | `{ width, ascent, descent }` in screen px; zeros before mount. |
+| `clearTextMetricsCache()` | Drop cached measurements once fonts load.   |
 | `loadImage(src, retry?)` | `Promise<HTMLImageElement>`; rejects if called before ready. |
 
 The same handle can drive multiple concerns (toolbar buttons calling
