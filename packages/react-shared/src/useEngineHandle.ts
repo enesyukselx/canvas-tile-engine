@@ -146,10 +146,12 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     /**
      * Get the current normalized config snapshot (deeply frozen, never
      * `undefined`). Before mount this is the engine's defaults for an
-     * unconfigured engine, so no field contradicts what the engine reports
-     * once it attaches — but `scale` is the `1` those defaults are derived
-     * from, not the `config` prop, and `minScale`/`maxScale` follow from it.
-     * Gate on `isReady` for config-dependent values.
+     * *unconfigured* engine, resolved by the engine's own normalization, so
+     * nothing here contradicts a default-constructed engine — but the handle
+     * cannot see the `config` prop, so every field that prop sets still
+     * changes when the engine attaches: `scale` (and the `minScale`/`maxScale`
+     * derived from it), `size`, `eventHandlers`, `backgroundColor`,
+     * `coordinates`, `bounds`, `debug`. Gate on `isReady` for those.
      */
     getConfig(): Required<CanvasTileEngineConfig>;
 
