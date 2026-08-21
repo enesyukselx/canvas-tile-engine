@@ -32,6 +32,11 @@ type Rect = {
     x: number;
     y: number;
     size?: number;
+    width?: number;
+    height?: number;
+    sizePx?: number;
+    widthPx?: number;
+    heightPx?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
     style?: {
         fillStyle?: string;
@@ -46,7 +51,7 @@ type Rect = {
 };
 ```
 
-`size`, `radius`, `style.lineWidth`, and `style.lineDash` are world units and scale with zoom, so borders, corner rounding, and dash patterns stay proportional to the shape. `style.lineWidthPx` and `style.lineDashPx` are zoom-independent screen-pixel variants and take precedence over their world counterparts (the same pattern as `Text`'s `size`/`fontPx`). Dash patterns follow Canvas2D `setLineDash` semantics; omit them for a solid border. `rotate` is degrees, clockwise.
+`size`, `width`, `height`, `radius`, `style.lineWidth`, and `style.lineDash` are world units and scale with zoom, so borders, corner rounding, and dash patterns stay proportional to the shape. `sizePx`, `widthPx`, `heightPx`, `style.lineWidthPx` and `style.lineDashPx` are zoom-independent screen-pixel variants and take precedence over their world counterparts (the same pattern as `Text`'s `size`/`fontPx`). Per axis the specific field wins over the shared one, so the full order is `widthPx` → `sizePx` → `width` → `size`; the static variants ignore the pixel fields because their cache replays at a recorded scale. Dash patterns follow Canvas2D `setLineDash` semantics; omit them for a solid border. `rotate` is degrees, clockwise.
 
 ### `Circle`
 
