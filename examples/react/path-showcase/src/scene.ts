@@ -1,4 +1,4 @@
-import type { Line, PathItem, Text } from "@canvas-tile-engine/react";
+import type { Circle, Line, PathItem, Rect, Text } from "@canvas-tile-engine/react";
 
 export type ShapeData = { name: string };
 
@@ -245,6 +245,117 @@ export const pathItems: PathItem<ShapeData>[] = [
     },
 ];
 
+/**
+ * Gradient fills. `fillStyle` takes a linear gradient as well as a color
+ * string, on shapes and on paths.
+ *
+ * Box units (the default) are fractions of the item's own drawn box, so one
+ * spec describes "top to bottom" whatever the item's size, position or
+ * rotation — which is why the same RAMP object serves the rect, the rotated
+ * card, the circle and the path below. World units place the axis in world
+ * coordinates instead, so the ramp spans the scene rather than the item and
+ * every shape shows the slice of it that it covers.
+ */
+const RAMP = {
+    type: "linear" as const,
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [
+        { offset: 0, color: "#f97316" },
+        { offset: 0.5, color: "#a855f7" },
+        { offset: 1, color: "#22d3ee" },
+    ],
+};
+
+const DIAGONAL = {
+    type: "linear" as const,
+    from: { x: 0, y: 0 },
+    to: { x: 1, y: 1 },
+    stops: [
+        { offset: 0, color: "#22c55e" },
+        { offset: 1, color: "#0ea5e9" },
+    ],
+};
+
+const ACROSS_THE_SCENE = {
+    type: "linear" as const,
+    units: "world" as const,
+    from: { x: 20, y: 0 },
+    to: { x: 27, y: 0 },
+    stops: [
+        { offset: 0, color: "#f43f5e" },
+        { offset: 1, color: "#facc15" },
+    ],
+};
+
+export const gradientRects: Rect<ShapeData>[] = [
+    {
+        x: 2,
+        y: 8.5,
+        width: 4,
+        height: 3,
+        style: { fillStyle: RAMP },
+        data: { name: "Three stops, box units — top to bottom" },
+    },
+    {
+        x: 7.5,
+        y: 8.5,
+        width: 4,
+        height: 3,
+        style: { fillStyle: DIAGONAL },
+        data: { name: "Diagonal axis — corner to corner" },
+    },
+    {
+        x: 13,
+        y: 8.5,
+        size: 3,
+        rotate: 30,
+        radius: 0.4,
+        style: { fillStyle: RAMP },
+        data: { name: "Rotated — a box-unit ramp turns with its shape" },
+    },
+    // Two neighbours sharing one world-unit ramp: each shows its own slice
+    {
+        x: 21.5,
+        y: 8.5,
+        width: 3,
+        height: 3,
+        style: { fillStyle: ACROSS_THE_SCENE },
+        data: { name: "World units — the ramp spans the scene, not the item" },
+    },
+    {
+        x: 25.5,
+        y: 8.5,
+        width: 3,
+        height: 3,
+        style: { fillStyle: ACROSS_THE_SCENE },
+        data: { name: "World units — same spec, further along the same ramp" },
+    },
+];
+
+export const gradientCircles: Circle<ShapeData>[] = [
+    {
+        x: 17.5,
+        y: 8.5,
+        size: 3,
+        style: { fillStyle: RAMP },
+        data: { name: "Circles fill the same way" },
+    },
+];
+
+export const gradientPaths: PathItem<ShapeData>[] = [
+    {
+        points: [
+            { x: 29.5, y: 10 },
+            { x: 32, y: 7 },
+            { x: 34.5, y: 10 },
+        ],
+        closed: true,
+        style: { fillStyle: RAMP, strokeStyle: "#0f172a", lineWidthPx: 2 },
+        data: { name: "Path fill — box units span the path's bounding box" },
+    },
+];
+
 export const lineItems: Line<ShapeData>[] = [
     {
         from: { x: 15, y: 18 },
@@ -263,6 +374,13 @@ export const labelItems: Text[] = [
         x: 1.2,
         y: 0.2,
         text: "points form",
+        fontPx: 13,
+        style: { fillStyle: "#94a3b8", textAlign: "left" },
+    },
+    {
+        x: 1.2,
+        y: 6.6,
+        text: "gradient fills",
         fontPx: 13,
         style: { fillStyle: "#94a3b8", textAlign: "left" },
     },

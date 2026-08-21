@@ -2,7 +2,15 @@ import { useState } from "react";
 import { CanvasTileEngine, useCanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
-import { labelItems, lineItems, pathItems, type ShapeData } from "./scene";
+import {
+    gradientCircles,
+    gradientPaths,
+    gradientRects,
+    labelItems,
+    lineItems,
+    pathItems,
+    type ShapeData,
+} from "./scene";
 
 const INITIAL_CENTER = { x: 13, y: 11 };
 
@@ -60,6 +68,9 @@ export default function App() {
                 <CanvasTileEngine.GridLines cellSize={1} strokeStyle="#1e293b" layer={0} />
                 <CanvasTileEngine.GridLines cellSize={5} strokeStyle="#334155" layer={0} />
                 <CanvasTileEngine.Path items={pathItems} layer={1} />
+                <CanvasTileEngine.Rect items={gradientRects} layer={1} />
+                <CanvasTileEngine.Circle items={gradientCircles} layer={1} />
+                <CanvasTileEngine.Path items={gradientPaths} layer={1} />
                 <CanvasTileEngine.Line
                     items={lineItems}
                     style={{
