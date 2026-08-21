@@ -1,4 +1,4 @@
-import type { Line, PathItem, Text } from "@canvas-tile-engine/react";
+import type { Circle, Line, PathItem, Rect, Text } from "@canvas-tile-engine/react";
 
 export type ShapeData = { name: string };
 
@@ -245,6 +245,43 @@ export const pathItems: PathItem<ShapeData>[] = [
     },
 ];
 
+/**
+ * Clipping. Every draw registration accepts a `clip`: a world rectangle it is
+ * confined to, both for painting and for hit testing.
+ *
+ * The field below deliberately overflows the window on all four sides — it
+ * would otherwise run into the commands row underneath — so the cut is the
+ * visible part. Because the rectangle is world space it pans and zooms with
+ * the scene: drag the map and the window stays over the same cells rather
+ * than sliding across the viewport.
+ */
+export const CLIP_WINDOW = { minX: 2.5, maxX: 12.5, minY: 6.4, maxY: 10.4 };
+
+/** Overflows CLIP_WINDOW on every side; only the middle survives. */
+export const clippedField: Circle<ShapeData>[] = Array.from({ length: 16 * 7 }, (_, i) => {
+    const x = (i % 16) + 1;
+    const y = Math.floor(i / 16) + 5;
+    return {
+        x,
+        y,
+        size: 0.7,
+        style: { fillStyle: `hsl(${(x * 14 + y * 20) % 360} 70% 62%)` },
+        data: { name: `Clipped dot (${x}, ${y}) — outside the window it neither paints nor hit-tests` },
+    };
+});
+
+/** Drawn unclipped, so it frames the window the field is cut to. */
+export const clipFrame: Rect<ShapeData>[] = [
+    {
+        x: (CLIP_WINDOW.minX + CLIP_WINDOW.maxX) / 2,
+        y: (CLIP_WINDOW.minY + CLIP_WINDOW.maxY) / 2,
+        width: CLIP_WINDOW.maxX - CLIP_WINDOW.minX,
+        height: CLIP_WINDOW.maxY - CLIP_WINDOW.minY,
+        style: { strokeStyle: "#64748b", lineWidthPx: 2, lineDashPx: [6, 4] },
+        data: { name: "The clip window itself — drawn unclipped, and hitTest={false}" },
+    },
+];
+
 export const lineItems: Line<ShapeData>[] = [
     {
         from: { x: 15, y: 18 },
@@ -263,6 +300,13 @@ export const labelItems: Text[] = [
         x: 1.2,
         y: 0.2,
         text: "points form",
+        fontPx: 13,
+        style: { fillStyle: "#94a3b8", textAlign: "left" },
+    },
+    {
+        x: 1.2,
+        y: 5.6,
+        text: "clipped to a window",
         fontPx: 13,
         style: { fillStyle: "#94a3b8", textAlign: "left" },
     },

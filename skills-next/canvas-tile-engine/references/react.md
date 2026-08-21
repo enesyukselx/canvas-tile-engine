@@ -150,6 +150,11 @@ Sprite semantics: [sprites.md](sprites.md). `hitTest={false}` keeps a
 component's items out of `hitTest`/`hitTestRect` queries (decorative floors,
 terrain, overlays) — the `pointer-events: none` of the draw components.
 
+Every draw component also takes `clip={{ minX, maxX, minY, maxY }}`: a world
+rectangle the registration is confined to, for a chart plot area or a minimap
+frame. Nothing outside it paints or hit-tests. Unlike `items` it is compared
+BY VALUE, so an inline literal does not re-register.
+
 All the types and helpers these components and handles use are re-exported from
 `@canvas-tile-engine/react` — import them from the binding instead of reaching
 into `@canvas-tile-engine/core`. That includes the draw-object types (`Rect`,

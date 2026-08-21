@@ -367,6 +367,31 @@ engine.drawGridLines(1, 1, "#1e293b", 0);
 
 Grid lines are infinite - they cover whatever the camera shows.
 
+## Clipping a registration
+
+Every draw method's `options` takes a `clip`: a world rectangle the whole
+registration is confined to.
+
+```ts
+const plotArea = { minX: -0.5, maxX: 40, minY: -0.5, maxY: 20 };
+engine.drawRect(bars, 1, { clip: plotArea });
+engine.drawLine(series, { strokeStyle: "#22d3ee" }, 1, { clip: plotArea });
+```
+
+- WORLD (item) space, the same coordinates `fitBounds`/`hitTestRect` take, so
+  the clip pans and zooms with the scene. That is what a chart plot area
+  wants: pan cannot smear the series over the axes drawn outside it.
+- Applies to EVERY draw kind, `drawGridLines`, `drawStatic*` and
+  `addDrawFunction` included.
+- HIT TESTING FOLLOWS IT: a point outside cannot hit, and `hitTestRect` is
+  narrowed to the overlap. `padding`/`paddingPx` do NOT widen a clip - they
+  grow an item's own tap target, and a target that is not drawn has nothing
+  to grow.
+- Axis-aligned rectangles only (arbitrary shapes would need WebGL's stencil
+  buffer, which path fills already use).
+- React/RN: a `clip` prop on every draw component, compared BY VALUE, so an
+  inline literal is fine (unlike `items`, compared by reference).
+
 ## Static caching (`drawStaticRect` / `drawStaticCircle` / `drawStaticImage`)
 
 Renders ALL items once into an offscreen canvas, then blits only the visible

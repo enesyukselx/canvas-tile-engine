@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
-import type { ImageItem, VisibleOf, InteractiveOf } from "@canvas-tile-engine/core";
+import type { Bounds, ImageItem, VisibleOf, InteractiveOf } from "@canvas-tile-engine/core";
 
 export interface ImageProps<TImage = unknown> {
     /**
@@ -33,13 +33,23 @@ export interface ImageProps<TImage = unknown> {
      * terrain art. Default `true`.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
  * Draws images on the canvas.
  */
-export const Image = memo(function Image({ items, layer = 1, visibleOf, interactiveOf, hitTest }: ImageProps) {
+export const Image = memo(function Image({ items, layer = 1, visibleOf, interactiveOf, hitTest, clip }: ImageProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
 
     // Read through refs so callback identity changes never re-register.
     const visibleOfRef = useRef(visibleOf);
@@ -62,6 +72,7 @@ export const Image = memo(function Image({ items, layer = 1, visibleOf, interact
             visibleOf: (item) => visibleOfRef.current?.(item),
             interactiveOf: (item) => interactiveOfRef.current?.(item),
             hitTest,
+            clip,
         });
         requestRender();
         return () => {
@@ -72,7 +83,7 @@ export const Image = memo(function Image({ items, layer = 1, visibleOf, interact
                 requestRender();
             }
         };
-    }, [engine, items, layer, hitTest, requestRender]);
+    }, [engine, items, layer, hitTest, requestRender, clipKey]);
 
     return null;
 });

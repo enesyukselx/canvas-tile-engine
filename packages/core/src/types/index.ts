@@ -174,6 +174,7 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
+        options?: RendererClipOptions,
     ): DrawHandle;
     drawRect(
         items: Rect | Rect[],
@@ -209,10 +210,20 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
         layer?: number,
         options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
     ): DrawHandle;
-    drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
-    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
-    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
-    drawStaticImage(items: ImageItem<TImage>[], cacheKey: string, layer?: number): DrawHandle;
+    drawGridLines(
+        cellSize: number,
+        style: { lineWidth: number; strokeStyle: string },
+        layer?: number,
+        options?: RendererClipOptions,
+    ): DrawHandle;
+    drawStaticRect(items: Rect[], cacheKey: string, layer?: number, options?: RendererClipOptions): DrawHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number, options?: RendererClipOptions): DrawHandle;
+    drawStaticImage(
+        items: ImageItem<TImage>[],
+        cacheKey: string,
+        layer?: number,
+        options?: RendererClipOptions,
+    ): DrawHandle;
     removeDrawHandle(handle: DrawHandle): void;
     clearLayer(layer: number): void;
     clearAll(): void;
@@ -263,16 +274,27 @@ export type InteractiveOf<TItem> = (item: TItem) => boolean | undefined;
  * concerns (`id`) and hit-test concerns (`interactiveOf`) are resolved in
  * the engine.
  */
-export interface RendererDrawOptions<TItem, TStyle> {
+export interface RendererDrawOptions<TItem, TStyle> extends RendererClipOptions {
     styleOf?: StyleOf<TItem, TStyle>;
     visibleOf?: VisibleOf<TItem>;
+}
+
+/**
+ * The clip a renderer receives for any registration, including the kinds that
+ * take no other paint-time options (grid lines, statics, custom draw
+ * functions). Renderers apply it through their layer manager rather than
+ * per primitive.
+ */
+export interface RendererClipOptions {
+    /** World rectangle to confine the registration to; see {@link DrawOptions.clip}. */
+    clip?: Bounds;
 }
 
 /**
  * Paint-time options for `drawImage` — images carry no `style`, so only
  * `visibleOf` reaches renderers.
  */
-export interface RendererImageDrawOptions<TImage> {
+export interface RendererImageDrawOptions<TImage> extends RendererClipOptions {
     visibleOf?: VisibleOf<ImageItem<TImage>>;
 }
 
@@ -321,15 +343,30 @@ export interface DrawOptions {
      * regardless of this flag.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside, and nothing outside hit-tests either.
+     *
+     * The rectangle is world (item) space, so it pans and zooms with the rest
+     * of the scene — the same coordinates `fitBounds` and `hitTestRect` take.
+     * That is the plot-area of a chart, the frame of a minimap inset, or any
+     * "this layer belongs inside that box" region.
+     *
+     * Axis-aligned rectangles only. Arbitrary shapes would need a stencil
+     * pass on WebGL, where the stencil buffer already belongs to path fills.
+     */
+    clip?: Bounds;
 }
 
 /** Options for the static draw helpers (`drawStaticRect`, ...). Their
  * `cacheKey` already plays the registration-id role, so only the hit-test
- * opt-out applies. */
+ * opt-out and the clip apply. */
 export interface StaticDrawOptions {
     /** Set to `false` to keep this registration out of hit testing; see
      * {@link DrawOptions.hitTest}. */
     hitTest?: boolean;
+    /** Confine the registration to a world rectangle; see {@link DrawOptions.clip}. */
+    clip?: Bounds;
 }
 
 /** Options for {@link CanvasTileEngine.drawRect}. */

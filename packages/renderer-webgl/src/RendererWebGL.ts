@@ -24,7 +24,7 @@ import {
 } from "@canvas-tile-engine/core";
 import { WebGLDraw, type WebGLDrawContext } from "./modules/WebGLDraw";
 import { CoordinateOverlayRenderer, DebugOverlay } from "@canvas-tile-engine/renderer-shared/canvas2d";
-import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { type ClipAdapter, clipRectPx, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import {
     EventBinder,
     ImageLoader,
@@ -69,6 +69,30 @@ export interface RendererWebGLOptions {
  * above every WebGL primitive regardless of their layer index. Within each
  * surface, layer ordering is preserved.
  */
+/**
+ * Clip adapter for WebGL, which paints on two surfaces and so cuts twice.
+ *
+ * The GL scissor covers the batched primitives; the transparent 2D overlay
+ * carries text, the coordinate overlay and `addDrawFunction`, and takes an
+ * ordinary path clip. Only the scissor needs releasing — the overlay's clip is
+ * context state inside the save/restore pair {@link Layer} already opened.
+ */
+const webglClipAdapter: ClipAdapter<WebGLDrawContext> = ({ ctx, gl, transformer }, clip) => {
+    const rect = clipRectPx(clip, (x, y) => transformer.worldToScreen(x, y));
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.width, rect.height);
+    ctx.clip();
+
+    gl.setScissor(rect.x, rect.y, rect.width, rect.height);
+
+    return () => {
+        gl.clearScissor();
+        ctx.restore();
+    };
+};
+
 export class RendererWebGL implements IRenderer {
     /** Transform helpers handed to the onDraw hook. */
     private drawTransform: DrawTransform = {
@@ -247,7 +271,7 @@ export class RendererWebGL implements IRenderer {
         this.transformer = deps.transformer;
         this.viewport = deps.viewport;
         this.camera = deps.camera;
-        this.layers = new Layer();
+        this.layers = new Layer(webglClipAdapter);
         this.drawAPI = new WebGLDraw(this.layers, deps.transformer, deps.camera);
 
         this.applyCanvasSize();

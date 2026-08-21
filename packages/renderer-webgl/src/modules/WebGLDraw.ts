@@ -29,6 +29,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    RendererClipOptions,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -38,7 +39,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
-import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { type DrawCallback, DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
 import { GLRenderer } from "./gl/GLRenderer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
@@ -82,6 +83,18 @@ export class WebGLDraw {
         private camera: ICamera,
     ) {}
 
+    /**
+     * Register a layer callback, forwarding the registration's clip. Every
+     * draw method funnels through here so a new draw kind cannot forget it.
+     */
+    private register(
+        layer: number,
+        options: RendererClipOptions | undefined,
+        fn: DrawCallback<WebGLDrawContext>,
+    ): DrawHandle {
+        return this.layers.add(layer, fn, options?.clip);
+    }
+
     addDrawFunction(
         fn: (
             ctx: CanvasRenderingContext2D,
@@ -90,8 +103,9 @@ export class WebGLDraw {
             transform: DrawTransform,
         ) => void,
         layer: number = 1,
+        options?: RendererClipOptions,
     ): DrawHandle {
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config, this.drawTransform);
         });
     }
@@ -108,7 +122,7 @@ export class WebGLDraw {
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -188,7 +202,7 @@ export class WebGLDraw {
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -264,7 +278,7 @@ export class WebGLDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
             const lineWidth = resolveLineWidthPx(style, this.camera.scale);
             const dash = resolveLineDashPx(style, this.camera.scale);
@@ -319,7 +333,7 @@ export class WebGLDraw {
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = spatialIndex
                 ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
@@ -397,7 +411,7 @@ export class WebGLDraw {
             return subpaths;
         };
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const lines: LineInstance[] = [];
 
             for (let n = 0; n < items.length; n++) {
@@ -492,7 +506,7 @@ export class WebGLDraw {
         // the anchor-index query is padded by this per frame (scale-divided).
         const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
@@ -583,8 +597,13 @@ export class WebGLDraw {
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -618,24 +637,41 @@ export class WebGLDraw {
     // and blits it each frame. With WebGL the per-frame cost of a batched draw is
     // already a single GPU call, so the static variants reuse the dynamic path.
 
-    drawStaticRect(items: Array<Rect>, _cacheKey: string, layer: number = 1): DrawHandle {
-        return this.drawRect(items, layer);
+    drawStaticRect(
+        items: Array<Rect>,
+        _cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.drawRect(items, layer, options);
     }
 
-    drawStaticCircle(items: Array<Circle>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticCircle(
+        items: Array<Circle>,
+        _cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         // sizePx is stripped even though WebGL redraws statics dynamically:
         // static draws must render identically across renderers (the cached
         // ones replay at a recorded scale), and hit boxes ignore it too.
         return this.drawCircle(
             items.map(({ sizePx: _sizePx, ...rest }) => rest),
             layer,
+            options,
         );
     }
 
-    drawStaticImage(items: Array<ImageItem>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(
+        items: Array<ImageItem>,
+        _cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         return this.drawImage(
             items.map(({ sizePx: _sizePx, ...rest }) => rest),
             layer,
+            options,
         );
     }
 

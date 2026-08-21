@@ -122,6 +122,8 @@ export class GLRenderer {
 
     private cssWidth = 0;
     private cssHeight = 0;
+    /** Backing-store pixels per CSS pixel; scissor rectangles are device-space. */
+    private dpr = 1;
 
     constructor(gl: GL) {
         this.gl = gl;
@@ -200,7 +202,33 @@ export class GLRenderer {
     setSize(physicalWidth: number, physicalHeight: number, cssWidth: number, cssHeight: number) {
         this.cssWidth = cssWidth;
         this.cssHeight = cssHeight;
+        this.dpr = cssHeight > 0 ? physicalHeight / cssHeight : 1;
         this.gl.viewport(0, 0, physicalWidth, physicalHeight);
+    }
+
+    /**
+     * Confine drawing to a rectangle given in CSS pixels with a top-left
+     * origin — the space every other coordinate here uses.
+     *
+     * The scissor box is neither: it is device pixels measured from the
+     * BOTTOM, so both conversions happen here rather than at each call site.
+     * Scissor is global GL state, outside any save/restore stack, so callers
+     * must pair this with {@link clearScissor}.
+     */
+    setScissor(x: number, y: number, width: number, height: number) {
+        const gl = this.gl;
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(
+            Math.round(x * this.dpr),
+            Math.round((this.cssHeight - (y + height)) * this.dpr),
+            Math.max(0, Math.round(width * this.dpr)),
+            Math.max(0, Math.round(height * this.dpr)),
+        );
+    }
+
+    /** Release {@link setScissor}. */
+    clearScissor() {
+        this.gl.disable(this.gl.SCISSOR_TEST);
     }
 
     /** Clear the framebuffer with a background color. */

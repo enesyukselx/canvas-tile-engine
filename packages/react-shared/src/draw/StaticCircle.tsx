@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
-import type { Circle as CircleType } from "@canvas-tile-engine/core";
+import type { Bounds, Circle as CircleType } from "@canvas-tile-engine/core";
 
 export interface StaticCircleProps {
     /**
@@ -17,6 +17,12 @@ export interface StaticCircleProps {
      * Default `true`.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
@@ -26,8 +32,18 @@ export interface StaticCircleProps {
  * each frame. Prefer this over `Circle` for large item sets that don't
  * change.
  */
-export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer = 1, hitTest }: StaticCircleProps) {
+export const StaticCircle = memo(function StaticCircle({
+    items,
+    cacheKey,
+    layer = 1,
+    hitTest,
+    clip,
+}: StaticCircleProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
     const prevCacheKeyRef = useRef<string>(cacheKey);
     const prevItemsRef = useRef(items);
 
@@ -46,7 +62,7 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
         }
         prevItemsRef.current = items;
 
-        const handle = engine.drawStaticCircle(items, cacheKey, layer, { hitTest });
+        const handle = engine.drawStaticCircle(items, cacheKey, layer, { hitTest, clip });
         requestRender();
 
         return () => {
@@ -57,7 +73,7 @@ export const StaticCircle = memo(function StaticCircle({ items, cacheKey, layer 
                 requestRender();
             }
         };
-    }, [engine, items, cacheKey, layer, hitTest, requestRender]);
+    }, [engine, items, cacheKey, layer, hitTest, requestRender, clipKey]);
 
     useEffect(() => {
         return () => {

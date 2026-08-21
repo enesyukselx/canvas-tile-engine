@@ -141,3 +141,73 @@ describe("Layer", () => {
         expect(order).toEqual([]);
     });
 });
+
+describe("Layer clipping", () => {
+    const CLIP = { minX: 0, maxX: 4, minY: 0, maxY: 2 };
+
+    function setup() {
+        const events: string[] = [];
+        const ctx = {
+            save: () => void events.push("save"),
+            restore: () => void events.push("restore"),
+        };
+        return { events, dc: { ctx } as never };
+    }
+
+    it("applies the clip before the callback and releases it after", () => {
+        const { events, dc } = setup();
+        const layers = new Layer<never>((_dc, clip) => {
+            events.push(`clip:${clip.minX}-${clip.maxX}`);
+            return () => void events.push("release");
+        });
+
+        layers.add(1, () => void events.push("draw"), CLIP);
+        layers.drawAll(dc);
+
+        // Inside the save/restore pair, so a context-stack clip unwinds itself
+        expect(events).toEqual(["save", "clip:0-4", "draw", "release", "restore"]);
+    });
+
+    it("leaves an unclipped registration alone", () => {
+        const { events, dc } = setup();
+        const layers = new Layer<never>(() => void events.push("clip"));
+
+        layers.add(1, () => void events.push("draw"));
+        layers.drawAll(dc);
+
+        expect(events).toEqual(["save", "draw", "restore"]);
+    });
+
+    it("draws unclipped when the renderer supplies no adapter", () => {
+        const { events, dc } = setup();
+        const layers = new Layer<never>();
+
+        layers.add(1, () => void events.push("draw"), CLIP);
+        layers.drawAll(dc);
+
+        expect(events).toEqual(["save", "draw", "restore"]);
+    });
+
+    it("clips each registration independently", () => {
+        const { events, dc } = setup();
+        const layers = new Layer<never>((_dc, clip) => {
+            events.push(`clip:${clip.maxX}`);
+            return () => void events.push("release");
+        });
+
+        layers.add(1, () => void events.push("a"), { ...CLIP, maxX: 4 });
+        layers.add(1, () => void events.push("b"));
+        layers.add(2, () => void events.push("c"), { ...CLIP, maxX: 9 });
+        layers.drawAll(dc);
+
+        expect(events.filter((e) => e !== "save" && e !== "restore")).toEqual([
+            "clip:4",
+            "a",
+            "release",
+            "b",
+            "clip:9",
+            "c",
+            "release",
+        ]);
+    });
+});

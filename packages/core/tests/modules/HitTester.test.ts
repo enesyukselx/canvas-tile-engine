@@ -728,3 +728,75 @@ describe("HitTester rect queries", () => {
         expect(hits.map((h) => h.item.data?.i).sort((a, b) => a! - b!)).toEqual([50, 51, 52, 53, 54, 55]);
     });
 });
+
+describe("HitTester clipped registrations", () => {
+    const CLIP = { minX: 0, maxX: 5, minY: 0, maxY: 5 };
+
+    it("does not hit an item the clip cuts away", () => {
+        const ht = new HitTester();
+        ht.register(
+            handle(1),
+            "rect",
+            [
+                { x: 2, y: 2 },
+                { x: 9, y: 2 },
+            ],
+            1,
+            { clip: CLIP },
+        );
+
+        expect(ht.hitTestFirst({ x: 2, y: 2 })).toBeDefined();
+        // Drawn nowhere, so clickable nowhere
+        expect(ht.hitTestFirst({ x: 9, y: 2 })).toBeUndefined();
+    });
+
+    it("falls through to a registration below", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", [{ x: 9, y: 2, data: "under" }], 1);
+        ht.register(handle(2), "rect", [{ x: 9, y: 2, data: "clipped" }], 2, { clip: CLIP });
+
+        expect(ht.hitTestFirst({ x: 9, y: 2 })?.item.data).toBe("under");
+    });
+
+    it("does not let padding reach outside the clip", () => {
+        // padding grows an item's own tap target; a target that is not drawn
+        // has nothing to grow
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", [{ x: 9, y: 2 }], 1, { clip: CLIP });
+
+        expect(ht.hitTestFirst({ x: 9, y: 2 }, { padding: 5 })).toBeUndefined();
+    });
+
+    it("narrows a marquee to the clipped region", () => {
+        const ht = new HitTester();
+        ht.register(
+            handle(1),
+            "rect",
+            [
+                { x: 2, y: 2 },
+                { x: 9, y: 2 },
+            ],
+            1,
+            { clip: CLIP },
+        );
+
+        // The marquee spans both items but only the visible one can be selected
+        const hits = ht.hitTestRect({ minX: 0, maxX: 12, minY: 0, maxY: 4 });
+        expect(hits).toHaveLength(1);
+        expect(hits[0].index).toBe(0);
+    });
+
+    it("drops a marquee that misses the clip entirely", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", [{ x: 9, y: 9 }], 1, { clip: CLIP });
+
+        expect(ht.hitTestRect({ minX: 8, maxX: 12, minY: 8, maxY: 12 })).toEqual([]);
+    });
+
+    it("leaves unclipped registrations untouched", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", [{ x: 9, y: 2 }], 1);
+
+        expect(ht.hitTestFirst({ x: 9, y: 2 })).toBeDefined();
+    });
+});
