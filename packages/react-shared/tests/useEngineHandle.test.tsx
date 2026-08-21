@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, renderHook } from "@testing-library/react";
+import { Config } from "@canvas-tile-engine/core";
 import type { CanvasTileEngine as CanvasTileEngineCore, Rect } from "@canvas-tile-engine/core";
 import { useEngineHandle, type EngineHandleBase } from "../src";
 
@@ -44,7 +45,7 @@ describe("useEngineHandle", () => {
         const config = handle.getConfig();
         expect(config.scale).toBe(1);
         expect(config.size.width).toBe(0);
-        expect(config.eventHandlers.drag).toBe(true);
+        expect(config.eventHandlers.drag).toBe(false);
 
         const dropped = handle.drawRect(TILE);
         expect(dropped.layer).toBe(-1);
@@ -52,6 +53,33 @@ describe("useEngineHandle", () => {
         expect(warn.mock.calls[0][0]).toContain("drawRect() was called before the engine mounted");
 
         await expect(handle.loadImage("a.png")).rejects.toThrow("Engine not ready");
+    });
+
+    it("reports the engine's own defaults before mount, deeply frozen", () => {
+        const { result } = renderHook(() => useEngineHandle<unknown, unknown, unknown>());
+        const snapshot = result.current.getConfig();
+
+        // Every field but the placeholder size has to match what the engine
+        // itself resolves for an unconfigured engine: a pre-mount reader must
+        // not see a value that flips the moment the engine attaches. The size
+        // is the only difference — 0x0, matching the pre-mount getSize(),
+        // where the engine requires a positive one.
+        const engineDefaults = new Config({ scale: 1, size: { width: 800, height: 600 } }).get();
+        expect({ ...snapshot, size: engineDefaults.size }).toEqual(engineDefaults);
+        expect(snapshot.eventHandlers.zoom).toBe(false);
+        expect(snapshot.minScale).toBe(0.5);
+        expect(snapshot.maxScale).toBe(2);
+        expect(snapshot.debug.eventHandlers?.drag).toBe(true);
+
+        // Shared by every pre-mount call, so it is frozen like the snapshots
+        // Config.get() returns: one consumer mutating it cannot corrupt the
+        // next reader.
+        expect(Object.isFrozen(snapshot)).toBe(true);
+        expect(Object.isFrozen(snapshot.eventHandlers)).toBe(true);
+        expect(() => {
+            (snapshot as { minScale: number }).minScale = 99;
+        }).toThrow();
+        expect(result.current.getConfig().minScale).toBe(0.5);
     });
 
     it("forwards to the engine once attached", async () => {

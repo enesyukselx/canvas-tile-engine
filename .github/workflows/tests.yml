@@ -2,6 +2,8 @@ name: "Tests"
 
 on:
     push:
+        branches:
+            - master
         paths:
             - "packages/**"
             - "examples/**"
@@ -9,14 +11,31 @@ on:
             - "turbo.json"
             - "pnpm-lock.yaml"
             - "pnpm-workspace.yaml"
+    pull_request:
+        paths:
+            - "packages/**"
+            - "examples/**"
+            - "package.json"
+            - "turbo.json"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - "tsconfig.base.json"
+            - ".github/workflows/tests.yml"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
     checks:
         name: Tests
         runs-on: ubuntu-22.04
+        env:
+            TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         steps:
             - uses: actions/checkout@v6
               with:
-                  fetch-depth: 2
+                  fetch-depth: 0
             - uses: pnpm/action-setup@v4
               with:
                   version: 10.23.0
@@ -24,5 +43,5 @@ jobs:
               with:
                   node-version: 22
                   cache: "pnpm"
-            - run: pnpm install --no-frozen-lockfile
+            - run: pnpm install --frozen-lockfile
             - run: pnpm run test --affected

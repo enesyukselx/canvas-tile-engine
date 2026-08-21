@@ -112,6 +112,7 @@ Handle members beyond the core engine API (see
 | `instance`               | The raw `CanvasTileEngine` instance or `null`. Escape hatch. |
 | `images`                 | The image loader, `undefined` before mount.                  |
 | `loadImage(src, retry?)` | `Promise<HTMLImageElement>`; rejects if called before ready. |
+| `getConfig()`            | Before mount: the engine's defaults for an UNCONFIGURED engine (`scale: 1`, `size` 0x0, interactions off), not the `config` prop - so `minScale`/`maxScale` read `0.5`/`2`, never `scale * 0.5`/`scale * 2` of YOUR scale. Frozen and shared. Gate config-derived reads (zoom slider ranges) on `isReady`. |
 
 The same handle can drive multiple concerns (toolbar buttons calling
 `engine.zoomIn()`, effects calling `engine.goCenter(...)`) without prop

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Config } from "../../src/modules/Config";
+import { Config, normalizeConfig } from "../../src/modules/Config";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../../src/constants";
 
 describe("Config", () => {
@@ -505,5 +505,73 @@ describe("Config", () => {
             expect(() => config.updateReducedMotion(1 as never)).toThrow();
             expect(config.get().accessibility.reducedMotion).toBe("auto"); // unchanged after a rejected set
         });
+    });
+});
+
+describe("normalizeConfig", () => {
+    const minimalConfig = {
+        scale: 1,
+        size: { width: 800, height: 600 },
+    };
+
+    // The reason this is exported at all: the React bindings answer
+    // getConfig() with it before an engine exists, and that snapshot used to
+    // be a hand-written copy that disagreed with the engine on drag, zoom,
+    // the scale limits, and the debug event logs.
+    it("produces exactly what the engine resolves for the same input", () => {
+        expect(normalizeConfig(minimalConfig)).toEqual(new Config(minimalConfig).get());
+
+        const full = {
+            scale: 32,
+            size: { width: 800, height: 600 },
+            eventHandlers: { drag: true, zoom: true as const },
+            coordinates: { enabled: true },
+            debug: { enabled: true, eventHandlers: { drag: false } },
+        };
+        expect(normalizeConfig(full)).toEqual(new Config(full).get());
+    });
+
+    it("returns a deeply frozen snapshot", () => {
+        const result = normalizeConfig(minimalConfig);
+
+        expect(Object.isFrozen(result)).toBe(true);
+        expect(Object.isFrozen(result.size)).toBe(true);
+        expect(Object.isFrozen(result.eventHandlers)).toBe(true);
+        expect(Object.isFrozen(result.bounds)).toBe(true);
+        expect(Object.isFrozen(result.accessibility)).toBe(true);
+        expect(Object.isFrozen(result.coordinates)).toBe(true);
+        expect(Object.isFrozen(result.coordinates.shownScaleRange)).toBe(true);
+        expect(Object.isFrozen(result.debug)).toBe(true);
+        expect(Object.isFrozen(result.debug.hud)).toBe(true);
+        expect(Object.isFrozen(result.debug.eventHandlers)).toBe(true);
+    });
+
+    it("copies the caller's nested objects instead of freezing them", () => {
+        const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 100 };
+        const shownScaleRange = { min: 1, max: 10 };
+        const result = normalizeConfig({ ...minimalConfig, bounds, coordinates: { shownScaleRange } });
+
+        expect(Object.isFrozen(bounds)).toBe(false);
+        expect(Object.isFrozen(shownScaleRange)).toBe(false);
+        expect(result.bounds).not.toBe(bounds);
+        expect(result.coordinates.shownScaleRange).not.toBe(shownScaleRange);
+
+        bounds.maxX = 200; // caller can keep using its own object
+        expect(result.bounds.maxX).toBe(100);
+    });
+
+    // Normalization only: validation belongs to the engine constructor. The
+    // React handle relies on this to describe an unmounted engine as a zero
+    // size, which is not a size any real engine would accept.
+    it("normalizes without validating", () => {
+        expect(normalizeConfig({ scale: 1, size: { width: 0, height: 0 } }).size).toEqual({
+            width: 0,
+            height: 0,
+            minWidth: SIZE_LIMITS.MIN_WIDTH,
+            minHeight: SIZE_LIMITS.MIN_HEIGHT,
+            maxWidth: SIZE_LIMITS.MAX_WIDTH,
+            maxHeight: SIZE_LIMITS.MAX_HEIGHT,
+        });
+        expect(() => new Config({ scale: 1, size: { width: 0, height: 0 } })).toThrow();
     });
 });

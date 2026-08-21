@@ -92,6 +92,8 @@ The hook returns a stable handle. Methods are safe before mount: they no-op or r
 | `instance` | The underlying core `CanvasTileEngine` instance, or `null`. |
 | `images` | Renderer image loader, available after mount. |
 
+Before mount, `engine.getConfig()` returns the engine's defaults for an *unconfigured* engine (`scale: 1`, interactions off), resolved by the same [normalization](../introduction/config.md#reading-the-defaults) the engine runs — so no field contradicts a default-constructed engine. It cannot know the `config` you pass to the component, so every field your `config` sets still changes when the engine attaches: `scale` and the `minScale`/`maxScale`/`size` derived from it, but also `eventHandlers`, `backgroundColor`, `coordinates`, `bounds` and `debug`. Read any of those after `engine.isReady`. The snapshot is frozen and shared; do not mutate it.
+
 Common methods:
 
 ```tsx

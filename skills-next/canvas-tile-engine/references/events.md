@@ -58,9 +58,11 @@ engine.onCoordsChange = (center: Coords) => {};
 // minimaps, URL state, or coordinate readouts.
 
 engine.onZoom = (scale: number) => {};
-// Fires on ANY scale change: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
+// Fires on ANY scale CHANGE: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
 // setScaleLimits clamping the current scale into a new range, and
 // preserve-viewport responsive resizes (the resize changes the scale).
+// Silent when the scale does not actually move (a wheel/pinch at minScale or
+// maxScale), so non-idempotent handlers are safe here.
 
 engine.onWheel = (coords, mouse, client, wheel) => {};
 // Fires for wheel (desktop) and pinch (touch) zoom gestures — requires

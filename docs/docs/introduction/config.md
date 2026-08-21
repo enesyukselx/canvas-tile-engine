@@ -191,6 +191,21 @@ debug: {
 | `debug.hud.fps` | `false` | Shows FPS, continuously updated. |
 | `debug.eventHandlers.*` | `true` | Debug logging switches for click, hover, drag, zoom, and resize. |
 
+## Reading The Defaults
+
+`engine.getConfig()` returns the normalized snapshot of a live engine. To resolve the same defaults without an engine, call `normalizeConfig()` — the exact function the engine uses internally, so the two can never disagree:
+
+```ts
+import { normalizeConfig } from "@canvas-tile-engine/core";
+
+const resolved = normalizeConfig({ scale: 32, size: { width: 800, height: 500 } });
+resolved.minScale; // 16
+resolved.maxScale; // 64
+resolved.eventHandlers.drag; // false
+```
+
+The result is deeply frozen, like every `getConfig()` snapshot. It fills in defaults only and does **not** validate: values the engine constructor would reject come back normalized instead of throwing.
+
 ## Full Type
 
 ```ts

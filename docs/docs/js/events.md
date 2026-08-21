@@ -126,7 +126,7 @@ engine.onCoordsChange = (center) => {
 
 ### `onZoom`
 
-Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping the current scale into a new range.
+Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping the current scale into a new range. A gesture that leaves the scale untouched — scrolling on at `minScale`/`maxScale`, or a pinch that holds the finger distance — does not fire it, so non-idempotent handlers (state updates, analytics, tile-level fetches) run once per real zoom step. Use `onWheel` to observe the gesture itself.
 
 ```ts
 engine.onZoom = (scale) => {

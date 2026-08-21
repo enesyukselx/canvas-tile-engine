@@ -11,6 +11,90 @@ function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
 }
 
 /**
+ * Fill every optional config field with its default and deep-freeze the result.
+ *
+ * The single source of truth for what the engine's defaults actually are:
+ * {@link Config} builds its snapshot with it, and the React bindings answer
+ * `getConfig()` with it before an engine exists, so a pre-mount snapshot can
+ * never report a value the engine contradicts the moment it attaches.
+ *
+ * Normalization only — nothing here is validated. The engine validates the
+ * config it is handed before normalizing it, so calling this directly with
+ * values `new CanvasTileEngine(...)` would reject returns them normalized
+ * rather than throwing.
+ * @param config Incoming configuration values.
+ * @returns Deeply frozen snapshot with every optional field resolved e.g. `{ scale: 1, minScale: 0.5, ... }`.
+ */
+export function normalizeConfig(config: CanvasTileEngineConfig): Readonly<Required<CanvasTileEngineConfig>> {
+    return Object.freeze({
+        scale: config.scale,
+        minScale: config.minScale ?? config.scale * SCALE_LIMITS.MIN_SCALE_MULTIPLIER,
+        maxScale: config.maxScale ?? config.scale * SCALE_LIMITS.MAX_SCALE_MULTIPLIER,
+        gridAligned: config.gridAligned ?? false,
+
+        size: Object.freeze({
+            width: config.size.width,
+            height: config.size.height,
+            maxHeight: config.size.maxHeight ?? SIZE_LIMITS.MAX_HEIGHT,
+            maxWidth: config.size.maxWidth ?? SIZE_LIMITS.MAX_WIDTH,
+            minHeight: config.size.minHeight ?? SIZE_LIMITS.MIN_HEIGHT,
+            minWidth: config.size.minWidth ?? SIZE_LIMITS.MIN_WIDTH,
+        }),
+
+        responsive: config.responsive ?? false,
+
+        backgroundColor: config.backgroundColor ?? RENDER_DEFAULTS.BACKGROUND_COLOR,
+
+        eventHandlers: Object.freeze({
+            click: config.eventHandlers?.click ?? false,
+            rightClick: config.eventHandlers?.rightClick ?? false,
+            hover: config.eventHandlers?.hover ?? false,
+            drag: config.eventHandlers?.drag ?? false,
+            zoom: normalizeZoom(config.eventHandlers?.zoom),
+            resize: config.eventHandlers?.resize ?? false,
+        }),
+
+        // Nested objects are copied before freezing, never adopted: freezing
+        // what the caller passed in would silently make their own config
+        // object immutable (`updateBounds` already avoids that).
+        bounds: Object.freeze({
+            ...(config.bounds ?? {
+                minX: -Infinity,
+                maxX: Infinity,
+                minY: -Infinity,
+                maxY: Infinity,
+            }),
+        }),
+
+        coordinates: Object.freeze({
+            enabled: config.coordinates?.enabled ?? false,
+            shownScaleRange: Object.freeze({ ...(config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity }) }),
+        }),
+
+        accessibility: Object.freeze({ reducedMotion: config.accessibility?.reducedMotion ?? "auto" }),
+
+        debug: Object.freeze({
+            enabled: config.debug?.enabled ?? false,
+            hud: Object.freeze({
+                enabled: config.debug?.hud?.enabled ?? false,
+                topLeftCoordinates: config.debug?.hud?.topLeftCoordinates ?? false,
+                coordinates: config.debug?.hud?.coordinates ?? false,
+                scale: config.debug?.hud?.scale ?? false,
+                tilesInView: config.debug?.hud?.tilesInView ?? false,
+                fps: config.debug?.hud?.fps ?? false,
+            }),
+            eventHandlers: Object.freeze({
+                click: config.debug?.eventHandlers?.click ?? true,
+                hover: config.debug?.eventHandlers?.hover ?? true,
+                drag: config.debug?.eventHandlers?.drag ?? true,
+                zoom: config.debug?.eventHandlers?.zoom ?? true,
+                resize: config.debug?.eventHandlers?.resize ?? true,
+            }),
+        }),
+    });
+}
+
+/**
  * Normalizes and stores grid engine configuration with safe defaults.
  */
 export class Config implements MotionPolicy {
@@ -37,88 +121,12 @@ export class Config implements MotionPolicy {
     constructor(config: CanvasTileEngineConfig) {
         validateConfig(config);
 
-        // Resolved once: `Required<>` is shallow, so the snapshot's own
-        // `reducedMotion` stays optional and cannot type the preference slot.
-        const reducedMotion: ReducedMotionSetting = config.accessibility?.reducedMotion ?? "auto";
-
-        const base: Required<CanvasTileEngineConfig> = {
-            scale: config.scale,
-            minScale: config.minScale ?? config.scale * SCALE_LIMITS.MIN_SCALE_MULTIPLIER,
-            maxScale: config.maxScale ?? config.scale * SCALE_LIMITS.MAX_SCALE_MULTIPLIER,
-            gridAligned: config.gridAligned ?? false,
-
-            size: {
-                width: config.size.width,
-                height: config.size.height,
-                maxHeight: config.size.maxHeight ?? SIZE_LIMITS.MAX_HEIGHT,
-                maxWidth: config.size.maxWidth ?? SIZE_LIMITS.MAX_WIDTH,
-                minHeight: config.size.minHeight ?? SIZE_LIMITS.MIN_HEIGHT,
-                minWidth: config.size.minWidth ?? SIZE_LIMITS.MIN_WIDTH,
-            },
-
-            responsive: config.responsive ?? false,
-
-            backgroundColor: config.backgroundColor ?? RENDER_DEFAULTS.BACKGROUND_COLOR,
-
-            eventHandlers: {
-                click: config.eventHandlers?.click ?? false,
-                rightClick: config.eventHandlers?.rightClick ?? false,
-                hover: config.eventHandlers?.hover ?? false,
-                drag: config.eventHandlers?.drag ?? false,
-                zoom: normalizeZoom(config.eventHandlers?.zoom),
-                resize: config.eventHandlers?.resize ?? false,
-            },
-
-            bounds: config.bounds ?? {
-                minX: -Infinity,
-                maxX: Infinity,
-                minY: -Infinity,
-                maxY: Infinity,
-            },
-
-            coordinates: {
-                enabled: config.coordinates?.enabled ?? false,
-                shownScaleRange: config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity },
-            },
-
-            accessibility: { reducedMotion },
-
-            debug: {
-                enabled: config.debug?.enabled ?? false,
-                hud: {
-                    enabled: config.debug?.hud?.enabled ?? false,
-                    topLeftCoordinates: config.debug?.hud?.topLeftCoordinates ?? false,
-                    coordinates: config.debug?.hud?.coordinates ?? false,
-                    scale: config.debug?.hud?.scale ?? false,
-                    tilesInView: config.debug?.hud?.tilesInView ?? false,
-                    fps: config.debug?.hud?.fps ?? false,
-                },
-                eventHandlers: {
-                    click: config.debug?.eventHandlers?.click ?? true,
-                    hover: config.debug?.eventHandlers?.hover ?? true,
-                    drag: config.debug?.eventHandlers?.drag ?? true,
-                    zoom: config.debug?.eventHandlers?.zoom ?? true,
-                    resize: config.debug?.eventHandlers?.resize ?? true,
-                },
-            },
-        };
-        this.motionPreference = reducedMotion;
-        this.config = Object.freeze({
-            ...base,
-            size: Object.freeze(base.size),
-            eventHandlers: Object.freeze(base.eventHandlers),
-            accessibility: Object.freeze(base.accessibility),
-            bounds: Object.freeze(base.bounds),
-            coordinates: Object.freeze({
-                ...base.coordinates,
-                shownScaleRange: Object.freeze(base.coordinates.shownScaleRange),
-            }),
-            debug: Object.freeze({
-                enabled: base.debug.enabled,
-                hud: Object.freeze(base.debug.hud),
-                eventHandlers: Object.freeze(base.debug.eventHandlers),
-            }),
-        });
+        this.config = normalizeConfig(config);
+        // Read back off the snapshot so the default lives in one place. The
+        // `?? "auto"` is a type-level formality: `Required<>` is shallow, so
+        // the snapshot's own `reducedMotion` stays optional and cannot type
+        // the preference slot, but normalizeConfig always resolved it.
+        this.motionPreference = this.config.accessibility.reducedMotion ?? "auto";
     }
 
     /**
