@@ -3,9 +3,10 @@ import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
 /**
  * Watches wrapper element size changes and handles responsive resizing.
  * Resizes every managed canvas (renderers with an overlay pass both).
- * Supports two modes:
- * - "preserve-scale": Scale stays constant, visible tile count changes
+ * Supports three modes:
+ * - "preserve-scale": Scale stays constant, visible tile count changes (width only)
  * - "preserve-viewport": Visible tile count stays constant, scale changes
+ * - "fill": Like "preserve-scale", but the height follows the container too
  * @internal
  */
 export class ResponsiveWatcher {
@@ -66,6 +67,11 @@ export class ResponsiveWatcher {
             // Width follows the container; scale limits adapt in applySize,
             // so no CSS min/max width is needed to protect them
             this.wrapper.style.width = "100%";
+        } else if (responsiveMode === "fill") {
+            // Both axes follow the container: the host element owns the box
+            // and config.size only seeds the first frame
+            this.wrapper.style.width = "100%";
+            this.wrapper.style.height = "100%";
         } else {
             // preserve-scale: width is responsive, height stays at initial config value
             const cfg = this.config.get();
@@ -77,6 +83,18 @@ export class ResponsiveWatcher {
         const wrapperRect = this.wrapper.getBoundingClientRect();
         const initialWidth = Math.round(wrapperRect.width);
         const initialHeight = Math.round(wrapperRect.height);
+
+        // A `height: 100%` wrapper collapses when its container has no definite
+        // height — the canvas is absolutely positioned, so the wrapper has no
+        // content height of its own. The ResizeObserver below then skips every
+        // zero-sized entry and the canvas silently stays blank, so say so once.
+        if (responsiveMode === "fill" && initialHeight <= 0) {
+            console.warn(
+                'Canvas Tile Engine: responsive "fill" measured a zero-height container. ' +
+                    "Give the wrapper's parent a definite height (a flex/grid child also needs " +
+                    "min-height: 0), otherwise the canvas cannot be sized.",
+            );
+        }
 
         // A wrapper measuring zero (hidden tab, collapsed accordion,
         // not-yet-opened modal, flex parent on first paint) must not reach
@@ -138,7 +156,12 @@ export class ResponsiveWatcher {
         }
     }
 
-    private applySize(width: number, height: number, mode: "preserve-scale" | "preserve-viewport") {
+    /**
+     * `"fill"` shares the `"preserve-scale"` branch below deliberately: keeping
+     * the scale and re-anchoring the camera is the same work on both axes as on
+     * one. The modes differ only in what `start()` lets the wrapper's height do.
+     */
+    private applySize(width: number, height: number, mode: "preserve-scale" | "preserve-viewport" | "fill") {
         // Defensive: a zero-size call must never reach the camera math below
         // (the derived scale would collapse to 0 and setCenter divides by it,
         // permanently NaN-ing the camera). Callers already guard this; this is

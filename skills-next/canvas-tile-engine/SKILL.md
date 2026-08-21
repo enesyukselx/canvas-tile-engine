@@ -179,7 +179,7 @@ const png = await renderToBuffer({
   `scale * 2`. If the user wants deep zooming, set them explicitly. In
   responsive modes the minimum adapts to the container: `preserve-viewport`
   treats `minScale` as a zoom-out factor of the base scale, `preserve-scale`
-  lowers it so finite `bounds` stay fully viewable at any width. `maxScale`
+  and `fill` lower it so finite `bounds` stay fully viewable at any size. `maxScale`
   stays absolute (px-per-tile quality cap; lifted only if the base scale
   exceeds it).
 - **Fixed boards MUST set the center**: a board of cells `0..N-1` is centered

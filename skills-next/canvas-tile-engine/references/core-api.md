@@ -43,7 +43,7 @@ type CanvasTileEngineConfig = {
                                        // (pixel-perfect grids). Integer ties snap
                                        // down, so N/2 lands on a 0-based board's
                                        // true center (N-1)/2.
-    responsive?: "preserve-scale" | "preserve-viewport" | false; // default false
+    responsive?: "preserve-scale" | "preserve-viewport" | "fill" | false; // default false
     eventHandlers?: {                  // ALL default false
         click?: boolean;
         rightClick?: boolean;          // DOM renderers only
@@ -85,6 +85,7 @@ type CanvasTileEngineConfig = {
 | :-- | :-- |
 | `"preserve-scale"` | Scale stays fixed; visible world area grows/shrinks with the wrapper. Width-responsive only: the wrapper is set to `width: 100%` and its height is PINNED to `config.size.height` via inline style (CSS heights are overridden). |
 | `"preserve-viewport"` | Configured tile count stays visible; scale changes with wrapper width. |
+| `"fill"` | Scale stays fixed and BOTH axes follow the container (`width: 100%; height: 100%`) - the panel/grid-cell/split-pane mode; `config.size` only seeds the first frame. The container must have a definite height (a flex/grid child also needs `min-height: 0`); the wrapper cannot supply one because the canvas is absolutely positioned. A zero-height first measurement warns once. |
 | `false` | Fixed `config.size` until `engine.resize()` or `eventHandlers.resize`. |
 
 When `responsive` is enabled, `engine.resize()` and `eventHandlers.resize`
@@ -94,7 +95,7 @@ via `onLayout` instead.
 
 Scale limits adapt to the container in responsive modes: `"preserve-viewport"`
 scales `minScale` with the base scale (a zoom-out factor of the configured
-`scale`), and `"preserve-scale"` lowers the minimum limit to the scale at
+`scale`), and `"preserve-scale"` / `"fill"` lower the minimum limit to the scale at
 which finite `bounds` fit the viewport (never raising it above the current
 scale). `maxScale` stays absolute in both modes - a px-per-tile quality cap,
 lifted only when a preserve-viewport base scale exceeds it. The camera
