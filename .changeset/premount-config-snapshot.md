@@ -1,7 +1,7 @@
 ---
 "@canvas-tile-engine/core": minor
-"@canvas-tile-engine/react": patch
-"@canvas-tile-engine/react-native": patch
+"@canvas-tile-engine/react": minor
+"@canvas-tile-engine/react-native": minor
 ---
 
 Fix: the config snapshot the React and React Native handles return before the engine mounts no longer contradicts the engine's own defaults.
