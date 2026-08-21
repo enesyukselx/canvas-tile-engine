@@ -1,5 +1,69 @@
 # @canvas-tile-engine/renderer-webgl
 
+## 0.8.0
+
+### Minor Changes
+
+- c399475: Add a `crossOrigin` option to `RendererCanvas` and `RendererWebGL`. The DOM image loader hardcoded `crossOrigin="anonymous"`, which turns every image request into a CORS request: tiles and sprites served from a bucket, a CDN, or a third-party tile server without an `Access-Control-Allow-Origin` header failed to load entirely, where without the attribute they would have loaded fine and merely tainted the canvas. The failure also surfaced as `Image failed to load: <src>`, pointing at the URL rather than at the missing header.
+
+  The default is unchanged (`"anonymous"`); pass `new RendererCanvas({ crossOrigin: null })` to drop the attribute, or `"use-credentials"` for CORS requests with cookies. Failure messages now name CORS as a possible cause while the attribute is set.
+
+  WebGL genuinely needs CORS-clean images — a tainted image cannot be uploaded as a texture — so `crossOrigin: null` is only safe there when every image is same-origin. Relatedly, `RendererWebGL` no longer throws when it meets a tainted image: the upload is attempted once, logged with the CORS cause, and that image is skipped so the rest of the frame still draws.
+
+- 91b4014: Behavior change: both renderers now watch `prefers-reduced-motion` and feed it to the engine, so on upgrade users with the OS setting enabled get instant camera movement instead of animation. The opt-out is `accessibility: { reducedMotion: false }` in the engine config.
+
+  The watcher starts unconditionally in `setupEvents()` — reduced motion is an accessibility preference, not one of the opt-in `eventHandlers` — and stops in `destroy()`. It only ever writes the platform slot, so an explicit app preference always wins.
+
+- e7509c1: feat: `responsive: "fill"` — the mode that hands both axes to the container
+
+  - New responsive mode alongside `"preserve-scale"` and `"preserve-viewport"`. The wrapper gets `width: 100%` and `height: 100%`, the scale stays fixed, and the visible world area follows the container on both axes. This is the mode a canvas embedded in a panel, grid cell, or split pane needs: the existing modes each pin the height (`"preserve-scale"` to `config.size.height`, `"preserve-viewport"` to the configured width/height ratio), so neither could fill a box whose height is decided by the layout.
+  - `config.size` only seeds the first frame in this mode. `engine.resize()` and `eventHandlers.resize` stay ignored while any responsive mode is active, unchanged.
+  - Scale limits follow the `"preserve-scale"` rule, now with the height participating: with finite `bounds`, a shorter container lowers the minimum limit through the vertical fit as well as the horizontal one, so "minScale shows the whole board" survives a resize in either direction.
+  - The container must have a definite height, because the wrapper cannot supply one — the canvas inside it is absolutely positioned, so its content height is zero (a flex or grid child also needs `min-height: 0`). A collapsed container would otherwise render a silently blank canvas, so a zero-height first measurement warns once.
+  - Purely additive: existing configs are untouched, and the renderers pick the mode up through the shared DOM sizing watcher with no per-renderer branching.
+
+### Patch Changes
+
+- 1b68c1d: Fix: the renderers' color caches no longer grow without bound, so `styleOf` can compute a color string per frame the way it is documented to.
+
+  Both renderers memoize parsed colors keyed on the raw CSS string, and both only dropped that map on destroy. That is right for a fixed palette, but the natural way to write a pulse, a heat map, or a fade is a computed string — a `styleOf` returning `fillStyle: "hsl(" + item.data.load * 120 + ", 70%, 50%)"` — and every distinct value it ever produced stayed resident for the renderer's lifetime. A 60fps animation over a large item set added tens of thousands of entries per minute.
+
+  - Both caches are now a fixed-capacity LRU. The bound is sized per renderer — 4096 entries in `renderer-webgl`, 8192 in `renderer-skia`, where a miss is a native call rather than an inline parse — so it clears the working set even when `styleOf` gives every cell on screen its own color. A palette that is touched every frame stays resident; computed one-off colors cost a fixed amount of memory instead of one permanent entry each.
+  - `renderer-webgl` additionally parses the `#rgb`/`#rgba`/`#rrggbb`/`#rrggbbaa`, `rgb()`/`rgba()`, and `hsl()`/`hsla()` forms inline, in both the legacy comma and the modern space/slash syntaxes. Those were previously normalized by painting onto a 1x1 canvas and reading the pixel back — a GPU-to-CPU sync per new color, per frame, which the bound alone would have made more frequent. Everything else (named colors, `color-mix()`, `oklch()`, ...) still goes through the canvas, unchanged.
+
+  Colors render the same. The inline path keeps full float precision where the pixel readback quantized to 8 bits per channel, so an `hsl()` or fractional-alpha value can differ from the old result by less than 1/255.
+
+- bf19844: Fix: a responsive map (`preserve-viewport` or `preserve-scale`) mounted while its wrapper measures 0x0 — a hidden tab, a collapsed accordion, a not-yet-opened modal, a flex parent on first paint — no longer permanently corrupts the camera with `NaN`.
+
+  `ResponsiveWatcher.start()` now skips its initial sizing pass when the wrapper's measured size is degenerate, instead of deriving a scale of 0 and having `Camera.setCenter` divide by it. The zero check is mode-aware: `preserve-viewport` derives the wrapper's height from its width and is itself what assigns that height, so a zero height on first measurement is normal there and only a zero width is treated as hidden; `preserve-scale` requires both dimensions. The `ResizeObserver` it already installs picks up the initial sizing once the wrapper transitions to a real size, using the same mode-aware check. `applySize` also gained a matching defensive guard.
+
+- 3ca8eee: Internal refactor: the world-space geometry every renderer's draw pipeline duplicated now comes from one place.
+
+  - Per-item path culling bounds (control-point hull for command paths, vertex box for polylines) was a byte-identical block in all three draw pipelines. They now call core's `pathItemBounds`.
+  - `getViewportBounds` / `isVisible` were identical private methods in each pipeline; they move to a new `geometry` entry point in the private `@canvas-tile-engine/renderer-shared` package, so the viewport-plus-tile-buffer formula is stated once instead of six times. Renderer-only helpers stay out of core's public API.
+  - `renderer-skia` now consumes `renderer-shared` like the other three renderers (bundled source, nothing new on npm).
+
+  No behavior change.
+
+- 868229a: Internal refactor: the FPS loop, the debug HUD and the coordinate overlay are computed in one place instead of two.
+
+  - The rAF sampler behind `FPS: n`, the block that assembles the HUD strings from camera/viewport state, and the overlay's border geometry, font-size clamp and label loop were duplicated line for line between `renderer-shared` and `renderer-skia`. They move to a new `scene` entry point in the private `@canvas-tile-engine/renderer-shared` package; each renderer keeps only its paint calls (`fillRect`/`fillText` vs `drawRect`/`drawText`).
+  - Skia's HUD offset — the panel sits 50px lower so the status bar / notch does not hide it — is now the shared layout's `topOffset` argument rather than an undocumented divergence.
+  - `renderer-skia`'s `Layer` was a byte-for-byte reimplementation of the shared one; it now uses the shared manager, which restores Skia canvases to their save depth exactly as before. `DrawHandle` is re-exported from core (same shape) instead of from the deleted module.
+  - The sampler's stop path is fixed on the way: stopping now cancels the frame the last tick queued and starting clears the sample window. Stopping and restarting within the same frame previously left two chained loops running, which roughly doubled the reported `FPS: n` for the rest of the session; the HUD never reached that path, so no released renderer showed it.
+
+  No other behavior change.
+
+- Updated dependencies [819dd99]
+- Updated dependencies [819dd99]
+- Updated dependencies [f6c4f64]
+- Updated dependencies [576f4b7]
+- Updated dependencies [c3a6381]
+- Updated dependencies [91b4014]
+- Updated dependencies [e7509c1]
+- Updated dependencies [467b077]
+  - @canvas-tile-engine/core@0.12.0
+
 ## 0.7.0
 
 ### Minor Changes
