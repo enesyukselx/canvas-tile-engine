@@ -1,5 +1,37 @@
 # @canvas-tile-engine/renderer-server
 
+## 0.6.1
+
+### Patch Changes
+
+- 3ca8eee: Internal refactor: the world-space geometry every renderer's draw pipeline duplicated now comes from one place.
+
+  - Per-item path culling bounds (control-point hull for command paths, vertex box for polylines) was a byte-identical block in all three draw pipelines. They now call core's `pathItemBounds`.
+  - `getViewportBounds` / `isVisible` were identical private methods in each pipeline; they move to a new `geometry` entry point in the private `@canvas-tile-engine/renderer-shared` package, so the viewport-plus-tile-buffer formula is stated once instead of six times. Renderer-only helpers stay out of core's public API.
+  - `renderer-skia` now consumes `renderer-shared` like the other three renderers (bundled source, nothing new on npm).
+
+  No behavior change.
+
+- 868229a: Internal refactor: the FPS loop, the debug HUD and the coordinate overlay are computed in one place instead of two.
+
+  - The rAF sampler behind `FPS: n`, the block that assembles the HUD strings from camera/viewport state, and the overlay's border geometry, font-size clamp and label loop were duplicated line for line between `renderer-shared` and `renderer-skia`. They move to a new `scene` entry point in the private `@canvas-tile-engine/renderer-shared` package; each renderer keeps only its paint calls (`fillRect`/`fillText` vs `drawRect`/`drawText`).
+  - Skia's HUD offset — the panel sits 50px lower so the status bar / notch does not hide it — is now the shared layout's `topOffset` argument rather than an undocumented divergence.
+  - `renderer-skia`'s `Layer` was a byte-for-byte reimplementation of the shared one; it now uses the shared manager, which restores Skia canvases to their save depth exactly as before. `DrawHandle` is re-exported from core (same shape) instead of from the deleted module.
+  - The sampler's stop path is fixed on the way: stopping now cancels the frame the last tick queued and starting clears the sample window. Stopping and restarting within the same frame previously left two chained loops running, which roughly doubled the reported `FPS: n` for the rest of the session; the HUD never reached that path, so no released renderer showed it.
+
+  No other behavior change.
+
+- 576f4b7: Internal refactor: the static cache's world-bounds computation now comes from core's `itemsBounds` helper instead of an inline min/max loop. Same math, same one-world-unit padding for origin and rotation. No behavior change.
+- Updated dependencies [819dd99]
+- Updated dependencies [819dd99]
+- Updated dependencies [f6c4f64]
+- Updated dependencies [576f4b7]
+- Updated dependencies [c3a6381]
+- Updated dependencies [91b4014]
+- Updated dependencies [e7509c1]
+- Updated dependencies [467b077]
+  - @canvas-tile-engine/core@0.12.0
+
 ## 0.6.0
 
 ### Minor Changes
