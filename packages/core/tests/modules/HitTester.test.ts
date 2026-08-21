@@ -514,6 +514,57 @@ describe("HitTester sizePx items", () => {
         expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeUndefined();
     });
 
+    it("hits a pixel-sized rect inside its scale-converted box", () => {
+        // 24px square at scale 40 -> 0.6 world, so the box spans [4.7, 5.3]
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, size: 2, sizePx: 24 }, 1);
+
+        expect(ht.hitTestFirst({ x: 5.25, y: 5 })).toBeDefined();
+        // Inside the world-size box (size 2 -> [4, 6]) but outside the sizePx box
+        expect(ht.hitTestFirst({ x: 5.6, y: 5 })).toBeUndefined();
+    });
+
+    it("lets widthPx and heightPx override sizePx per axis", () => {
+        // 80x20 px at scale 40 -> 2 x 0.5 world
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, sizePx: 24, widthPx: 80, heightPx: 20 }, 1);
+
+        expect(ht.hitTestFirst({ x: 5.9, y: 5 })).toBeDefined();
+        // The shared sizePx would have made this axis 0.6 world tall
+        expect(ht.hitTestFirst({ x: 5, y: 5.4 })).toBeUndefined();
+    });
+
+    it("mixes a pixel width with a world height", () => {
+        // widthPx 80 at scale 40 -> 2 world; height stays the world value 3
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, widthPx: 80, height: 3 }, 1);
+
+        expect(ht.hitTestFirst({ x: 5.9, y: 6.4 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeUndefined();
+    });
+
+    it("ignores rect pixel sizes for static entries, matching the drawn geometry", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, size: 2, sizePx: 24 }, 1, { ignoreSizePx: true });
+
+        // Static caches draw the world size ([4, 6]), not the 24px square
+        expect(ht.hitTestFirst({ x: 5.9, y: 5 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeUndefined();
+    });
+
+    it("pads spatial-index queries by a rect's per-axis pixel size", () => {
+        // Same setup as the circle case, but the extent comes from widthPx/
+        // heightPx with no sizePx to fall back on.
+        const ht = new HitTester(() => 5);
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i * 20, y: 0, widthPx: 30, heightPx: 30 }));
+        ht.register(handle(1), "rect", items, 1);
+
+        const hit = ht.hitTestFirst({ x: 202.9, y: 0 });
+        expect(hit).toBeDefined();
+        expect(hit?.index).toBe(10);
+        expect(ht.hitTestFirst({ x: 203.2, y: 0 })).toBeUndefined();
+    });
+
     it("pads spatial-index queries by the scale-converted max sizePx", () => {
         // Zoomed far out: 30px markers at scale 5 span 6 world units, far
         // beyond the default anchor pad. 600 items forces the R-Tree path.

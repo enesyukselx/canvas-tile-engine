@@ -55,6 +55,22 @@ export type Rect<TData = unknown> = DrawObject<TData> & {
     width?: number;
     /** Height in world units. Defaults to `size`. */
     height?: number;
+    /**
+     * Fixed size in screen pixels for both axes, independent of zoom — the
+     * Rect counterpart of {@link Circle.sizePx} and Text's `fontPx`. Takes
+     * precedence over {@link DrawObject.size} and {@link width}/{@link height},
+     * and is itself overridden per axis by {@link widthPx}/{@link heightPx}.
+     * Ignored by `drawStaticRect`: static caches replay at their recorded
+     * scale, so pixel sizing cannot hold there.
+     */
+    sizePx?: number;
+    /**
+     * Fixed width in screen pixels. Wins over {@link sizePx} and
+     * {@link width}. Same static-cache caveat as {@link sizePx}.
+     */
+    widthPx?: number;
+    /** Fixed height in screen pixels. See {@link widthPx}. */
+    heightPx?: number;
 };
 
 export type Circle<TData = unknown> = Omit<DrawObject<TData>, "rotate" | "radius"> & {
