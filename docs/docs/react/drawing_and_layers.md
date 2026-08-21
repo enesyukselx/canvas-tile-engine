@@ -65,7 +65,7 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 
 **Style Options:**
 
-- `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
+- `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`), or a gradient — see [Gradient Fills](#gradient-fills)
 - `strokeStyle`: Border color
 - `lineWidth`: Border width in world units; scales with zoom like the shape
 - `lineWidthPx`: Border width in screen pixels, independent of zoom; wins over `lineWidth`
@@ -149,6 +149,38 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
     />
 </CanvasTileEngine>
 ```
+
+### Gradient Fills
+
+`fillStyle` takes a linear gradient as well as a color string, on shapes (`Rect`, `Circle`) and on path fills.
+
+```ts
+const ramp = {
+    type: "linear",
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [
+        { offset: 0, color: "#f97316" },
+        { offset: 1, color: "#22d3ee" },
+    ],
+} as const;
+
+<CanvasTileEngine.Rect items={bars} layer={1} />;
+```
+
+| Field | Meaning |
+| :-- | :-- |
+| `from`, `to` | The axis the ramp runs along. |
+| `stops` | `{ offset, color }` pairs. Offsets are clamped to `0..1` and sorted; two stops at one offset make a hard break. An empty list paints nothing, a single stop paints flat. |
+| `units` | `"box"` (default) reads `from`/`to` as fractions of the item's own drawn box. `"world"` reads them as world coordinates. |
+
+Box units make one gradient object reusable: `{ from: { x: 0, y: 0 }, to: { x: 0, y: 1 } }` means "top to bottom" for every item that uses it, whatever its size, position or rotation — a rotated shape's ramp turns with the shape. World units place the axis in the scene instead, so neighbouring items each show their own slice of a single ramp, and it moves and scales with the camera.
+
+Strokes and text stay color strings. A stroke has no box to normalize an axis against, and "along the stroke" and "across the stroke" are equally fair readings of one axis, so the ambiguity is left out of the API rather than answered differently by each renderer.
+
+:::note
+The `Static*` components accept gradients too, but their cache is recorded at one scale, so a `"world"` axis is baked at the scale the cache was built with.
+:::
 
 ## Lines & Paths
 

@@ -25,6 +25,26 @@ type Coords = {
 };
 ```
 
+### `Paint`
+
+Anything that can fill a shape or a path: a CSS color string, or a linear gradient.
+
+```ts
+type Paint = string | LinearGradient;
+
+type LinearGradient = {
+    type: "linear";
+    from: Coords;
+    to: Coords;
+    stops: Array<{ offset: number; color: string }>;
+    units?: "box" | "world"; // default "box"
+};
+```
+
+With `"box"` units `from`/`to` are fractions of the item's own drawn box, so one object means "top to bottom" for every item that uses it — including a rotated one, whose ramp turns with it. With `"world"` units they are world coordinates, so the ramp spans the scene and moves with the camera. Stop offsets are clamped to `0..1` and sorted before painting; two stops at one offset make a hard break.
+
+`strokeStyle` and text fills stay plain color strings.
+
 ### `Rect`
 
 ```ts
@@ -34,7 +54,7 @@ type Rect = {
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
     style?: {
-        fillStyle?: string;
+        fillStyle?: Paint;
         strokeStyle?: string;
         lineWidth?: number;
         lineWidthPx?: number;
@@ -57,7 +77,7 @@ type Circle = {
     size?: number;
     origin?: { mode?: "cell" | "self"; x?: number; y?: number };
     style?: {
-        fillStyle?: string;
+        fillStyle?: Paint;
         strokeStyle?: string;
         lineWidth?: number;
         lineWidthPx?: number;
@@ -117,7 +137,7 @@ type LineStyle = {
 };
 ```
 
-`PathItem` describes a free-form path (open polyline, closed outline, or filled shape); `PathStyle` extends the `LineStyle` fields with `fillStyle` and `cornerRadius`/`cornerRadiusPx`. `drawLine` takes a `LineStyle` as its second argument as the batch default; a `Line` item's own `style` overrides it per item, unit pair by unit pair (an item that sets either width or dash field replaces that whole pair, so a world-unit value is never shadowed by the batch's `*Px` value). Because item styles are registration-time, they may change `lineWidth`/`lineWidthPx` — hit testing follows the item's own width. Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around path corners.
+`PathItem` describes a free-form path (open polyline, closed outline, or filled shape); `PathStyle` extends the `LineStyle` fields with `fillStyle` (a [`Paint`](#paint), so a path fill can be a gradient) and `cornerRadius`/`cornerRadiusPx`. `drawLine` takes a `LineStyle` as its second argument as the batch default; a `Line` item's own `style` overrides it per item, unit pair by unit pair (an item that sets either width or dash field replaces that whole pair, so a world-unit value is never shadowed by the batch's `*Px` value). Because item styles are registration-time, they may change `lineWidth`/`lineWidthPx` — hit testing follows the item's own width. Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repeat) and flow continuously around path corners.
 
 ### `ImageItem<TImage>`
 

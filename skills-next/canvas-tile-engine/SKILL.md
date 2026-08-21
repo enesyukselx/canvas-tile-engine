@@ -84,12 +84,18 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    per-item `hitTest: false`; not on `drawText`). Both also exist on
    `drawImage`, which has no `styleOf`. A `visibleOf`-hidden item never
    hit-tests, regardless of `interactiveOf`.
-5. **Layers are z-order.** Lower layer numbers draw first (underneath).
+5. **Fills can be gradients.** `fillStyle` on Rect/Circle and on path styles
+   takes `string | LinearGradient`; strokes and text stay strings. A
+   gradient's default `"box"` units are fractions of the item's own drawn box,
+   so one spec is "top to bottom" for a whole series regardless of size or
+   rotation; `"world"` units span the scene instead. Same result on all four
+   renderers - see [drawing.md](references/drawing.md).
+6. **Layers are z-order.** Lower layer numbers draw first (underneath).
    Defaults: grid lines 0, shapes/images 1, text 2. Any integer works.
-6. **All interaction is opt-in.** Every `eventHandlers` flag defaults to
+7. **All interaction is opt-in.** Every `eventHandlers` flag defaults to
    `false`. A map that should pan/zoom/click MUST set
    `eventHandlers: { drag: true, zoom: true, click: true }` explicitly.
-7. **Culling is automatic.** Off-viewport items are skipped, and above 500
+8. **Culling is automatic.** Off-viewport items are skipped, and above 500
    items an R-tree spatial index kicks in. You can pass 100k items to a draw
    call; do not write your own visibility filtering.
 
