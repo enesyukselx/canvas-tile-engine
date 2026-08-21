@@ -21,6 +21,8 @@ on:
             - "pnpm-lock.yaml"
             - "pnpm-workspace.yaml"
             - ".oxlintrc.json"
+            - "tsconfig.base.json"
+            - ".github/workflows/checks.yml"
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
