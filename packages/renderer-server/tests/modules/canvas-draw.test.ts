@@ -135,3 +135,26 @@ describe("CanvasDraw per-item line style", () => {
         ]);
     });
 });
+
+// Font weight contract shared by all renderers: an unset weight is omitted
+// entirely rather than emitted as "normal". The same fixture values are
+// asserted in the canvas, webgl, and skia suites.
+describe("CanvasDraw text font weight", () => {
+    it("puts the weight in the font shorthand", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([
+            { x: 1, y: 1, text: "plain" },
+            { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+            { x: 3, y: 1, text: "numeric", fontPx: 14, style: { fontWeight: 700, fontFamily: "monospace" } },
+        ]);
+        render(ctx);
+
+        expect(texts).toEqual([
+            { text: "plain", font: "10px sans-serif" },
+            { text: "bold", font: "bold 10px sans-serif" },
+            { text: "numeric", font: "700 14px monospace" },
+        ]);
+    });
+});

@@ -15,6 +15,8 @@ import {
     SpriteRect,
     Text,
     resolveLineWidthPx,
+    maxPxExtent,
+    resolveBoxPx,
     resolveSizeWorld,
     resolveLineDashPx,
     overlayLineStyle,
@@ -114,11 +116,20 @@ export class CanvasDraw<
         // Build spatial index for large datasets (RBush R-Tree)
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce((max, item) => Math.max(max, maxPxExtent(item)), 0);
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
+                  )
                 : list;
 
             ctx.save();
@@ -129,21 +140,21 @@ export class CanvasDraw<
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const size = item.size ?? 1;
-                const w = item.width ?? size;
-                const h = item.height ?? size;
+                // Pixel sizes win over world units, resolved against the live scale
+                const { width: pxW, height: pxH } = resolveBoxPx(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
                 // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                if (
+                    !spatialIndex &&
+                    !isVisible(item.x, item.y, Math.max(pxW, pxH) / (2 * this.camera.scale), topLeft, config)
+                ) {
                     continue;
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxW = w * this.camera.scale;
-                const pxH = h * this.camera.scale;
                 const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
 
                 // Only update style when changed (reduces state changes)
@@ -390,7 +401,13 @@ export class CanvasDraw<
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
-                ctx.font = `${pxSize}px ${family}`;
+                // Weight is omitted entirely when unset: the CSS font shorthand
+                // resets every unlisted property, so an explicit "normal" would
+                // be a behavior change for callers who never asked for one.
+                ctx.font =
+                    style?.fontWeight !== undefined
+                        ? `${style.fontWeight} ${pxSize}px ${family}`
+                        : `${pxSize}px ${family}`;
 
                 if (style?.fillStyle) {
                     ctx.fillStyle = style.fillStyle;
@@ -762,6 +779,10 @@ export class CanvasDraw<
 
             // Render all items using the provided render function
             for (const item of items) {
+                // World units only: the cache is rendered once at renderScale
+                // and blitted afterwards, so a screen-pixel size could not hold
+                // its size across zooms. `ignoreSizePx` keeps hit testing in
+                // step with what is drawn here.
                 const size = item.size ?? 1;
                 const pxW = (item.width ?? size) * renderScale;
                 const pxH = (item.height ?? size) * renderScale;
