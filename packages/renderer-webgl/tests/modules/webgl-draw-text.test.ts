@@ -109,3 +109,38 @@ describe("WebGLDraw text font weight", () => {
         ]);
     });
 });
+
+// Measurement contract shared by all renderers: advance width plus ink
+// ascent/descent, both positive, in screen pixels. WebGL measures on the same
+// 2D overlay it draws text on, so a measurement and the drawn string agree.
+describe("WebGLDraw measureText", () => {
+    function setupMeasuring() {
+        const fonts: string[] = [];
+        const overlay = {
+            font: "",
+            measureText(text: string) {
+                fonts.push(overlay.font);
+                return { width: text.length * 7, actualBoundingBoxAscent: 9, actualBoundingBoxDescent: 3 };
+            },
+        } as unknown as CanvasRenderingContext2D;
+
+        const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
+        const transformer = new CoordinateTransformer(camera);
+        const draw = new WebGLDraw(new Layer<WebGLDrawContext>(), transformer, camera, overlay);
+        return { draw, fonts };
+    }
+
+    it("reports advance width and positive ink extents", () => {
+        const { draw } = setupMeasuring();
+
+        expect(draw.measureText("abcd", { fontPx: 12 })).toEqual({ width: 28, ascent: 9, descent: 3 });
+    });
+
+    it("measures with the font it would draw with, weight included", () => {
+        const { draw, fonts } = setupMeasuring();
+
+        draw.measureText("a", { fontPx: 14, fontFamily: "monospace", fontWeight: 700 });
+
+        expect(fonts).toEqual(["700 14px monospace"]);
+    });
+});

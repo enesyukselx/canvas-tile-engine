@@ -747,3 +747,38 @@ describe("text font weight", () => {
         expect(matchFontCalls.map((call) => call.fontWeight)).toEqual([undefined, "bold", "700"]);
     });
 });
+
+// Measurement contract shared by all renderers: advance width plus ink
+// ascent/descent, both positive, in screen pixels. Skia is the one that has to
+// normalize — its ink rect has y growing downward from the baseline.
+describe("measureText", () => {
+    it("normalizes the ink rect into positive ascent and descent", () => {
+        const { draw } = setup();
+
+        // Mock font: ink rect { y: -8, height: 10 } (y is the top edge, so it
+        // is negative above the baseline) and an advance of len * 7
+        expect(draw.measureText("abc", { fontPx: 12 })).toEqual({ width: 21, ascent: 8, descent: 2 });
+    });
+
+    it("measures through the same font cache the draw path uses", () => {
+        const { draw } = setup();
+
+        draw.measureText("a", { fontPx: 12, fontWeight: "bold" });
+
+        expect(matchFontCalls.at(-1)?.fontWeight).toBe("bold");
+    });
+
+    it("measures each distinct string once and again after a clear", () => {
+        const { draw } = setup();
+        const before = matchFontCalls.length;
+
+        draw.measureText("same", { fontPx: 12 });
+        draw.measureText("same", { fontPx: 12 });
+        expect(matchFontCalls.length).toBe(before + 1);
+
+        draw.clearTextMetricsCache();
+        draw.measureText("same", { fontPx: 12 });
+        // The typeface itself stays cached; only the measurement is re-taken
+        expect(matchFontCalls.length).toBe(before + 1);
+    });
+});

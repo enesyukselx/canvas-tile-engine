@@ -165,6 +165,8 @@ describe("useEngineHandle", () => {
         ["drawImage", [[{ x: 0, y: 0, img: "img" }], 2, {}]],
         ["drawStaticImage", [[{ x: 0, y: 0, img: "img" }], "cache", 2, {}]],
         ["drawGridLines", [1, 2, "red", 3]],
+        ["measureText", ["label", { fontPx: 12 }]],
+        ["clearTextMetricsCache", []],
         ["clearLayer", [2]],
         ["clearAll", []],
         ["clearStaticCache", ["cache"]],

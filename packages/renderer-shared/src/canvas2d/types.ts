@@ -10,6 +10,19 @@ export interface CanvasImageSourceLike {
 }
 
 /**
+ * What `measureText` reports. The browser's `TextMetrics` and
+ * @napi-rs/canvas's both carry more; these are the four the pipeline reads.
+ */
+export interface Canvas2DTextMetrics {
+    /** Advance width: where the next glyph would start. */
+    readonly width: number;
+    /** Ink extent above the baseline (positive). */
+    readonly actualBoundingBoxAscent: number;
+    /** Ink extent below the baseline (positive). */
+    readonly actualBoundingBoxDescent: number;
+}
+
+/**
  * Minimal structural view of a Canvas2D-style rendering context — only the
  * members the shared pipeline actually calls. Browser contexts
  * (CanvasRenderingContext2D, OffscreenCanvasRenderingContext2D) and
@@ -35,6 +48,7 @@ export interface Canvas2DContextLike<TDrawable = never> extends CommandTraceTarg
     scale(x: number, y: number): void;
     fillRect(x: number, y: number, w: number, h: number): void;
     fillText(text: string, x: number, y: number): void;
+    measureText(text: string): Canvas2DTextMetrics;
     drawImage(image: TDrawable, dx: number, dy: number, dw: number, dh: number): void;
     drawImage(
         image: TDrawable,

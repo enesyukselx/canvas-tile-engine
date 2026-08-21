@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import type {
+    MeasuredText,
+    TextMeasureStyle,
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
     Coords,
@@ -269,6 +271,16 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     /** Draw grid lines */
     drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
 
+    /**
+     * Measure a string without drawing it — axis margins, centering offsets,
+     * "does this label fit". Sizes are screen pixels, like `Text.fontPx`.
+     * Returns zeros before the engine mounts, like the other getters.
+     */
+    measureText(text: string, style: TextMeasureStyle): MeasuredText;
+
+    /** Drop cached measurements, e.g. once a webfont has loaded. */
+    clearTextMetricsCache(): void;
+
     /** Clear a specific layer */
     clearLayer(layer: number): void;
 
@@ -509,6 +521,17 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                     instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ??
                     droppedDraw("drawGridLines")
                 );
+            },
+
+            measureText(text, style) {
+                // Zeros rather than an estimate: a caller laying out against a
+                // measurement taken before mount should see an obviously empty
+                // result, not a plausible wrong one.
+                return instanceRef.current?.measureText(text, style) ?? { width: 0, ascent: 0, descent: 0 };
+            },
+
+            clearTextMetricsCache() {
+                instanceRef.current?.clearTextMetricsCache();
             },
 
             clearLayer(layer) {

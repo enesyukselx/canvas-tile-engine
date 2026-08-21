@@ -12,7 +12,7 @@ import {
     onWheelCallback,
     onZoomCallback,
 } from "./callback";
-import { Circle, DrawObject, ImageItem, Line, PathItem, PathStyle, Rect, Text } from "./draw-object";
+import { Circle, DrawObject, FontWeight, ImageItem, Line, PathItem, PathStyle, Rect, Text } from "./draw-object";
 import { CanvasTileEngineConfig } from "./config";
 
 export type Coords = {
@@ -170,7 +170,53 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     onDraw?: onDrawCallback;
 }
 
+/**
+ * The font a measurement is taken with. Mirrors what `drawText` resolves at
+ * paint time, so a measured string and the drawn one agree.
+ */
+export interface TextMeasureStyle {
+    /** Size in screen pixels — the same space the result comes back in. */
+    fontPx: number;
+    /** Default `"sans-serif"`, matching `drawText`. */
+    fontFamily?: string;
+    /** Default: the family's normal weight. Part of the measurement, since a
+     * bold string is wider than the same string at regular weight. */
+    fontWeight?: FontWeight;
+}
+
+/**
+ * What a string occupies, in screen pixels.
+ *
+ * `width` is the ADVANCE width — where the next glyph would start — which is
+ * the number layout wants: the widest tick label decides an axis margin, and
+ * a centered label offsets by half of it. The ink a string actually covers can
+ * be slightly narrower (or wider, for an italic overhang), so a tight box
+ * around the glyphs is not what this reports.
+ *
+ * `ascent`/`descent` are ink extents measured from the baseline, both
+ * positive: the string's own top and bottom, not the font's. `"acme"` has a
+ * smaller ascent than `"Acme"`, which is what a badge drawn snugly around the
+ * text needs.
+ */
+export interface MeasuredText {
+    width: number;
+    ascent: number;
+    descent: number;
+}
+
 export interface IDrawAPI<TImage = HTMLImageElement> {
+    /**
+     * Measure a string without drawing it. Synchronous and cached.
+     *
+     * Fonts have to be ready first: a webfont still loading, a server font not
+     * yet registered, or an unresolved native typeface all measure against a
+     * fallback face and quietly return the wrong numbers. Call
+     * `clearTextMetricsCache()` after fonts arrive.
+     */
+    measureText(text: string, style: TextMeasureStyle): MeasuredText;
+    /** Drop cached measurements; see {@link measureText}. */
+    clearTextMetricsCache(): void;
+
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,

@@ -158,3 +158,29 @@ describe("CanvasDraw text font weight", () => {
         ]);
     });
 });
+
+// Measurement contract shared by all renderers: advance width plus ink
+// ascent/descent, both positive, in screen pixels. The server measures on the
+// same napi surface it draws on, so registered fonts apply.
+describe("CanvasDraw measureText", () => {
+    it("reports advance width and positive ink extents", () => {
+        const scratch = {
+            font: "",
+            measureText: (text: string) => ({
+                width: text.length * 7,
+                actualBoundingBoxAscent: 9,
+                actualBoundingBoxDescent: 3,
+            }),
+        };
+        const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
+        const transformer = new CoordinateTransformer(camera);
+        const draw = new CanvasDraw<SKRSContext2D, Image, Canvas>(
+            new Layer<DrawContext<SKRSContext2D>>(),
+            transformer,
+            camera,
+            () => ({ canvas: {} as Canvas, ctx: scratch as unknown as SKRSContext2D }),
+        );
+
+        expect(draw.measureText("abcd", { fontPx: 12 })).toEqual({ width: 28, ascent: 9, descent: 3 });
+    });
+});

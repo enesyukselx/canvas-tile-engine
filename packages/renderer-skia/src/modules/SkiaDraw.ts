@@ -32,6 +32,8 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    MeasuredText,
+    TextMeasureStyle,
     FontWeight,
     AnchoredItem,
     LineStyle,
@@ -63,6 +65,7 @@ import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-share
 /** matchFont's weight argument; its input type is not exported by the package. */
 type SkiaFontWeight = NonNullable<NonNullable<Parameters<typeof matchFont>[0]>["fontWeight"]>;
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { TextMetricsCache } from "@canvas-tile-engine/renderer-shared/scene";
 import { LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 import type { SkiaDrawContext } from "../types";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
@@ -111,6 +114,7 @@ export class SkiaDraw {
     private imagePaint: SkPaint;
     private fontCache = new Map<string, SkFont>();
     private colorCache = new LruCache<string, SkColor>(COLOR_CACHE_LIMIT);
+    private textMetrics = new TextMetricsCache((text, style) => this.measureWithFont(text, style));
     // Pre-recorded pictures for the drawStatic* variants, keyed by cacheKey.
     private staticPictureCache = new Map<string, { picture: SkPicture; recordScale: number }>();
 
@@ -858,6 +862,33 @@ export class SkiaDraw {
      * The cache is bounded: a `styleOf` that computes a color string per frame
      * would otherwise add a permanent entry for every value it ever produced.
      */
+    /**
+     * Measure through the same `getFont` the draw path uses, so a measurement
+     * and the drawn string come from one typeface.
+     *
+     * `measureText` returns the ink box with y growing downward and the origin
+     * on the baseline, so the top edge is negative — normalized here to the
+     * positive ascent/descent both other renderers report. `getTextWidth` is
+     * the advance, which is the width layout wants; the ink box is narrower.
+     */
+    measureText(text: string, style: TextMeasureStyle): MeasuredText {
+        return this.textMetrics.get(text, style);
+    }
+
+    clearTextMetricsCache() {
+        this.textMetrics.clear();
+    }
+
+    private measureWithFont(text: string, style: TextMeasureStyle): MeasuredText {
+        const font = this.getFont(style.fontFamily ?? DEFAULT_SANS_SERIF, style.fontPx, style.fontWeight);
+        const ink = font.measureText(text);
+        return {
+            width: font.getTextWidth(text),
+            ascent: -ink.y,
+            descent: ink.height + ink.y,
+        };
+    }
+
     private color(value: string): SkColor {
         let parsed = this.colorCache.get(value);
         if (!parsed) {

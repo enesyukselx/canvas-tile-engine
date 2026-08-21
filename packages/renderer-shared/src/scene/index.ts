@@ -14,3 +14,4 @@ export {
     type OverlayCamera,
 } from "./coordinateOverlayLayout";
 export type { ScreenRect, ScreenSize } from "./types";
+export { TextMetricsCache, fontShorthand, TEXT_METRICS_CACHE_LIMIT } from "./textMetrics";

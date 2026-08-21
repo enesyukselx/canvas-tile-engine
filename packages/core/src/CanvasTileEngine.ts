@@ -50,6 +50,8 @@ import {
     TextDecorationStyle,
     LineDecorationStyle,
     PathDecorationStyle,
+    MeasuredText,
+    TextMeasureStyle,
 } from "./types";
 
 /**
@@ -1183,6 +1185,42 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().addDrawFunction(fn, layer);
         this.trackDrawId(options?.id, handle);
         return handle;
+    }
+
+    /**
+     * Measure a string without drawing it — the widest tick label that decides
+     * an axis margin, the offset that centers a caption, whether a name fits
+     * its box.
+     *
+     * Sizes are screen pixels, like `Text.fontPx`, so the result does not
+     * change with zoom and stays valid until the fonts do.
+     *
+     * Fonts must be ready to measure: a webfont still loading, a server font
+     * not yet registered through `registerFont`, or an unresolved native
+     * typeface all measure against a fallback face and return numbers that
+     * look plausible and are wrong. Measure after fonts load, or call
+     * {@link clearTextMetricsCache} once they arrive.
+     *
+     * @example
+     * ```ts
+     * const widest = labels.reduce(
+     *     (max, label) => Math.max(max, engine.measureText(label, { fontPx: 11 }).width),
+     *     0,
+     * );
+     * const marginWorld = (widest + 8) / engine.getScale();
+     * ```
+     */
+    measureText(text: string, style: TextMeasureStyle): MeasuredText {
+        return this.renderer.getDrawAPI().measureText(text, style);
+    }
+
+    /**
+     * Drop every cached text measurement, so the next {@link measureText} asks
+     * the platform again. Call it when the fonts a measurement depended on
+     * have changed — a webfont finishing, `registerFont` on the server.
+     */
+    clearTextMetricsCache() {
+        this.renderer.getDrawAPI().clearTextMetricsCache();
     }
 
     /**

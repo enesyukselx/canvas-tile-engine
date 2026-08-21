@@ -31,6 +31,8 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    MeasuredText,
+    TextMeasureStyle,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -41,6 +43,7 @@ import type {
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { fontShorthand, TextMetricsCache } from "@canvas-tile-engine/renderer-shared/scene";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
 import { GLRenderer } from "./gl/GLRenderer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
@@ -78,11 +81,40 @@ export class WebGLDraw {
     };
     private colorParser = new ColorParser();
 
+    private textMetrics = new TextMetricsCache((text, style) => this.measureOnOverlay(text, style));
+
+    /**
+     * @param measureCtx The 2D overlay context, which is where this renderer
+     * draws text anyway — so a measurement and the drawn string agree by
+     * construction.
+     */
     constructor(
         private layers: Layer<WebGLDrawContext>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
+        private measureCtx?: CanvasRenderingContext2D,
     ) {}
+
+    measureText(text: string, style: TextMeasureStyle): MeasuredText {
+        return this.textMetrics.get(text, style);
+    }
+
+    clearTextMetricsCache() {
+        this.textMetrics.clear();
+    }
+
+    private measureOnOverlay(text: string, style: TextMeasureStyle): MeasuredText {
+        if (!this.measureCtx) {
+            return { width: text.length * style.fontPx * 0.5, ascent: style.fontPx * 0.8, descent: style.fontPx * 0.2 };
+        }
+        this.measureCtx.font = fontShorthand(style);
+        const metrics = this.measureCtx.measureText(text);
+        return {
+            width: metrics.width,
+            ascent: metrics.actualBoundingBoxAscent,
+            descent: metrics.actualBoundingBoxDescent,
+        };
+    }
 
     addDrawFunction(
         fn: (

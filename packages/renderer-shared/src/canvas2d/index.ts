@@ -3,4 +3,4 @@ export { CanvasDraw } from "./CanvasDraw";
 export { CoordinateOverlayRenderer } from "./CoordinateOverlayRenderer";
 export { DebugOverlay } from "./DebugOverlay";
 export { applyLineWidth } from "./applyLineWidth";
-export type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
+export type { Canvas2DContextLike, Canvas2DTextMetrics, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";

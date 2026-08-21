@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { CanvasDraw } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
 
 // Minimal fake 2D context that records state at every stroke()/fill() call.
@@ -1134,5 +1135,68 @@ describe("CanvasDraw text font weight", () => {
         render(ctx);
 
         expect(texts[0].font).toBe("800 10px sans-serif");
+    });
+});
+
+// Measurement contract shared by all renderers: advance width plus ink
+// ascent/descent, both positive, in screen pixels. The webgl, skia and server
+// suites assert the same shape through their own platforms.
+describe("CanvasDraw measureText", () => {
+    function setupMeasuring() {
+        const fonts: string[] = [];
+        const measured: string[] = [];
+        const scratch = {
+            font: "",
+            measureText(text: string) {
+                fonts.push(scratch.font);
+                measured.push(text);
+                return { width: text.length * 7, actualBoundingBoxAscent: 9, actualBoundingBoxDescent: 3 };
+            },
+        };
+        const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
+        const transformer = new CoordinateTransformer(camera);
+        const layers = new Layer<DrawContext<BrowserContext2D>>();
+        const draw = new CanvasDraw<BrowserContext2D, HTMLImageElement, HTMLCanvasElement>(
+            layers,
+            transformer,
+            camera,
+            () => ({ canvas: {} as HTMLCanvasElement, ctx: scratch as unknown as BrowserContext2D }),
+        );
+        return { draw, fonts, measured };
+    }
+
+    it("reports advance width and positive ink extents", () => {
+        const { draw } = setupMeasuring();
+
+        expect(draw.measureText("abcd", { fontPx: 12 })).toEqual({ width: 28, ascent: 9, descent: 3 });
+    });
+
+    it("measures with the font it would draw with, weight included", () => {
+        const { draw, fonts } = setupMeasuring();
+
+        draw.measureText("a", { fontPx: 12 });
+        draw.measureText("a", { fontPx: 14, fontFamily: "monospace", fontWeight: 700 });
+
+        expect(fonts).toEqual(["12px sans-serif", "700 14px monospace"]);
+    });
+
+    it("measures each distinct string once", () => {
+        const { draw, measured } = setupMeasuring();
+
+        draw.measureText("same", { fontPx: 12 });
+        draw.measureText("same", { fontPx: 12 });
+        draw.measureText("other", { fontPx: 12 });
+
+        expect(measured).toEqual(["same", "other"]);
+    });
+
+    it("re-measures after clearTextMetricsCache", () => {
+        const { draw, measured } = setupMeasuring();
+
+        draw.measureText("a", { fontPx: 12 });
+        draw.clearTextMetricsCache();
+        draw.measureText("a", { fontPx: 12 });
+
+        expect(measured).toEqual(["a", "a"]);
     });
 });

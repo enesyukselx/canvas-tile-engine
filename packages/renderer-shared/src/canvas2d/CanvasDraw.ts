@@ -32,6 +32,8 @@ import {
 } from "@canvas-tile-engine/core";
 import type {
     AnchoredItem,
+    MeasuredText,
+    TextMeasureStyle,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -41,6 +43,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "../scene/Layer";
+import { fontShorthand, TextMetricsCache } from "../scene/textMetrics";
 import { getViewportBounds, isVisible } from "../geometry/culling";
 import { applyLineWidth } from "./applyLineWidth";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
@@ -77,6 +80,10 @@ export class CanvasDraw<
     };
     private staticCaches = new Map<string, StaticCache<TContext, TCanvas>>();
     private warnedStaticCacheDisabled = false;
+    /** Lazily created 1x1 surface used only for text measurement. */
+    private scratchCtx?: TContext | null;
+    private warnedMeasureDisabled = false;
+    private textMetrics = new TextMetricsCache((text, style) => this.measureOnScratch(text, style));
 
     /**
      * @param createOffscreen Offscreen canvas factory for static caching, or
@@ -666,6 +673,53 @@ export class CanvasDraw<
             resetAlpha();
             ctx.restore();
         });
+    }
+
+    /**
+     * Measure a string on a 1x1 offscreen context.
+     *
+     * Deliberately not the drawing context: measurement happens outside the
+     * frame loop, where no context is in hand, and a scratch canvas answers
+     * identically — font metrics belong to the font, not the surface.
+     */
+    measureText(text: string, style: TextMeasureStyle): MeasuredText {
+        return this.textMetrics.get(text, style);
+    }
+
+    clearTextMetricsCache() {
+        this.textMetrics.clear();
+    }
+
+    private measureOnScratch(text: string, style: TextMeasureStyle): MeasuredText {
+        const ctx = this.measureContext();
+        if (!ctx) {
+            if (!this.warnedMeasureDisabled) {
+                console.warn(
+                    "[CanvasDraw] measureText is estimating: no offscreen canvas to measure on. " +
+                        "Layout derived from it will be approximate.",
+                );
+                this.warnedMeasureDisabled = true;
+            }
+            // Rough monospace-ish estimate, clearly labelled by the warning
+            // above rather than silently passing for a real measurement.
+            return { width: text.length * style.fontPx * 0.5, ascent: style.fontPx * 0.8, descent: style.fontPx * 0.2 };
+        }
+
+        ctx.font = fontShorthand(style);
+        const metrics = ctx.measureText(text);
+        return {
+            width: metrics.width,
+            ascent: metrics.actualBoundingBoxAscent,
+            descent: metrics.actualBoundingBoxDescent,
+        };
+    }
+
+    private measureContext(): TContext | null {
+        if (this.scratchCtx !== undefined) {
+            return this.scratchCtx;
+        }
+        this.scratchCtx = this.createOffscreen ? (this.createOffscreen(1, 1)?.ctx ?? null) : null;
+        return this.scratchCtx;
     }
 
     /**

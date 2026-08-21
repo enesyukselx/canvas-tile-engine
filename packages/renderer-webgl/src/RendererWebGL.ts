@@ -248,7 +248,7 @@ export class RendererWebGL implements IRenderer {
         this.viewport = deps.viewport;
         this.camera = deps.camera;
         this.layers = new Layer();
-        this.drawAPI = new WebGLDraw(this.layers, deps.transformer, deps.camera);
+        this.drawAPI = new WebGLDraw(this.layers, deps.transformer, deps.camera, this.overlayCtx);
 
         this.applyCanvasSize();
 

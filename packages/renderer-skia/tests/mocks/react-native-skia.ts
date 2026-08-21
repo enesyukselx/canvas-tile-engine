@@ -177,6 +177,7 @@ export interface MockFont {
     size: number;
     setSize(s: number): void;
     measureText(text: string): { x: number; y: number; width: number; height: number };
+    getTextWidth(text: string): number;
     getMetrics(): { ascent: number; descent: number };
 }
 
@@ -190,7 +191,10 @@ export const matchFont = (style: { fontFamily: string; fontSize: number; fontWei
         setSize(s: number) {
             font.size = s;
         },
-        measureText: (text: string) => ({ x: 0, y: 0, width: text.length * 6, height: 10 }),
+        // Ink box: y is the top edge relative to the baseline, so it is
+        // negative for anything with an ascent.
+        measureText: (text: string) => ({ x: 0, y: -8, width: text.length * 6, height: 10 }),
+        getTextWidth: (text: string) => text.length * 7,
         getMetrics: () => ({ ascent: -8, descent: 2 }),
     };
     return font;
