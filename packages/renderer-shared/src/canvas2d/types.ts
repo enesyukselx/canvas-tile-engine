@@ -10,6 +10,14 @@ export interface CanvasImageSourceLike {
 }
 
 /**
+ * The gradient object `createLinearGradient` hands back. Both the browser's
+ * `CanvasGradient` and @napi-rs/canvas's own are exactly this one method.
+ */
+export interface CanvasGradientLike {
+    addColorStop(offset: number, color: string): void;
+}
+
+/**
  * Minimal structural view of a Canvas2D-style rendering context — only the
  * members the shared pipeline actually calls. Browser contexts
  * (CanvasRenderingContext2D, OffscreenCanvasRenderingContext2D) and
@@ -35,6 +43,7 @@ export interface Canvas2DContextLike<TDrawable = never> extends CommandTraceTarg
     scale(x: number, y: number): void;
     fillRect(x: number, y: number, w: number, h: number): void;
     fillText(text: string, x: number, y: number): void;
+    createLinearGradient(x0: number, y0: number, x1: number, y1: number): CanvasGradientLike;
     drawImage(image: TDrawable, dx: number, dy: number, dw: number, dh: number): void;
     drawImage(
         image: TDrawable,
@@ -51,7 +60,7 @@ export interface Canvas2DContextLike<TDrawable = never> extends CommandTraceTarg
     globalAlpha: number;
     font: string;
     get fillStyle(): unknown;
-    set fillStyle(value: string);
+    set fillStyle(value: string | CanvasGradientLike);
     get strokeStyle(): unknown;
     set strokeStyle(value: string);
     get textAlign(): unknown;

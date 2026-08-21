@@ -1055,3 +1055,197 @@ describe("CanvasDraw per-item line style", () => {
         expect(strokes[0].strokeStyle).toBe("#0f0");
     });
 });
+
+// Fake 2D context that records every gradient built and the fill it was used
+// for, so the axis a gradient runs along can be asserted directly.
+type FakeGradient = { id: number; axis: number[]; stops: Array<[number, string]> };
+
+function makeGradientRecordingCtx() {
+    const gradients: FakeGradient[] = [];
+    const fills: Array<FakeGradient | string> = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        fillStyle: "#000" as unknown,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        closePath() {},
+        rect() {},
+        arc() {},
+        arcTo() {},
+        moveTo() {},
+        lineTo() {},
+        translate() {},
+        rotate() {},
+        setLineDash() {},
+        createLinearGradient(x0: number, y0: number, x1: number, y1: number) {
+            const gradient: FakeGradient = {
+                id: gradients.length,
+                axis: [x0, y0, x1, y1],
+                stops: [],
+                addColorStop(offset: number, color: string) {
+                    gradient.stops.push([offset, color]);
+                },
+            } as unknown as FakeGradient;
+            gradients.push(gradient);
+            return gradient;
+        },
+        fill() {
+            fills.push(ctx.fillStyle as FakeGradient | string);
+        },
+        stroke() {},
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, gradients, fills };
+}
+
+const topToBottom = {
+    type: "linear" as const,
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [
+        { offset: 0, color: "#f00" },
+        { offset: 1, color: "#00f" },
+    ],
+};
+
+// Gradient fill contract shared by all renderers; the webgl, skia and server
+// suites assert the same geometry through their own recorders.
+describe("CanvasDraw gradient fills", () => {
+    it("runs a box-unit axis across the item's drawn box", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+
+        // size 2 at (2,2) -> screen box (15,15,20,20)
+        draw.drawRect([{ x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } }], 1);
+        render(ctx);
+
+        expect(gradients).toHaveLength(1);
+        expect(gradients[0].axis).toEqual([15, 15, 15, 35]);
+        expect(gradients[0].stops).toEqual([
+            [0, "#f00"],
+            [1, "#00f"],
+        ]);
+        expect(fills[0]).toBe(gradients[0]);
+    });
+
+    it("gives each item its own axis, so one spec fits every size", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } },
+                { x: 6, y: 2, size: 1, style: { fillStyle: topToBottom } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(gradients.map((g) => g.axis)).toEqual([
+            [15, 15, 15, 35],
+            [60, 20, 60, 30],
+        ]);
+    });
+
+    it("projects world units through the camera and reuses one gradient", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+
+        const world = { ...topToBottom, units: "world" as const, from: { x: 0, y: 0 }, to: { x: 0, y: 4 } };
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 1, style: { fillStyle: world } },
+                { x: 4, y: 2, size: 1, style: { fillStyle: world } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        // A world axis does not depend on the item, so the per-frame memo
+        // collapses the batch onto one gradient object
+        expect(gradients).toHaveLength(1);
+        expect(gradients[0].axis).toEqual([5, 5, 5, 45]);
+        expect(fills[0]).toBe(fills[1]);
+    });
+
+    it("normalizes stops before handing them over", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        draw.drawRect(
+            [
+                {
+                    x: 2,
+                    y: 2,
+                    style: {
+                        fillStyle: {
+                            ...topToBottom,
+                            stops: [
+                                { offset: 2, color: "late" },
+                                { offset: -1, color: "early" },
+                            ],
+                        },
+                    },
+                },
+            ],
+            1,
+        );
+        render(ctx);
+
+        // addColorStop throws on an out-of-range offset, so clamping is not optional
+        expect(gradients[0].stops).toEqual([
+            [0, "early"],
+            [1, "late"],
+        ]);
+    });
+
+    it("rotates a box-unit axis with its shape", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        // Under the rotated transform the box is centered on the origin, so
+        // the axis is local: a 20px box spans -10..10 on both axes, and the
+        // gradient runs down its left edge (x is inert for a vertical ramp)
+        draw.drawRect([{ x: 2, y: 2, size: 2, rotate: 90, style: { fillStyle: topToBottom } }], 1);
+        render(ctx);
+
+        expect(gradients[0].axis).toEqual([-10, -10, -10, 10]);
+    });
+
+    it("spans a path's bounding box", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 1, y: 1 },
+                        { x: 3, y: 1 },
+                        { x: 3, y: 2 },
+                    ],
+                    closed: true,
+                    style: { fillStyle: topToBottom },
+                },
+            ],
+            1,
+        );
+        render(ctx);
+
+        // bounds (1,1)-(3,2) -> screen (15,15)-(35,25)
+        expect(gradients[0].axis).toEqual([15, 15, 15, 25]);
+    });
+
+    it("leaves a plain color string untouched", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+
+        draw.drawRect([{ x: 2, y: 2, style: { fillStyle: "#0f0" } }], 1);
+        render(ctx);
+
+        expect(gradients).toHaveLength(0);
+        expect(fills).toEqual(["#0f0"]);
+    });
+});
