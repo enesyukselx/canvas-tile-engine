@@ -698,3 +698,29 @@ describe("dashed rect/circle borders", () => {
         expect(ops[1].pathEffect).toEqual({ __dash: [4, 2], phase: 0 });
     });
 });
+
+// Pixel-sized rect contract shared by all renderers; the same fixture values
+// are asserted in the canvas, webgl, and server suites.
+describe("pixel-sized rects", () => {
+    it("resolves each axis against the live scale", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 4, sizePx: 30, style: { fillStyle: "#f00" } },
+                { x: 2, y: 2, size: 4, sizePx: 30, widthPx: 50, style: { fillStyle: "#0f0" } },
+                { x: 2, y: 2, widthPx: 50, height: 4, style: { fillStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(canvas);
+
+        const rects = ops.filter((o) => o.op === "rect").map((o) => o.rect);
+        expect(rects).toEqual([
+            { x: 10, y: 10, width: 30, height: 30 },
+            { x: 0, y: 10, width: 50, height: 30 },
+            { x: 0, y: 5, width: 50, height: 40 },
+        ]);
+    });
+});

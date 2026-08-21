@@ -142,3 +142,42 @@ describe("WebGLDraw dashed rect/circle borders", () => {
         expect(lines[0].y1).toBe(15);
     });
 });
+
+// Pixel-sized rect contract shared by all renderers; the same fixture values
+// are asserted in the canvas, skia, and server suites (as quad center + half
+// sizes).
+describe("WebGLDraw pixel-sized rects", () => {
+    it("resolves each axis against the live scale", () => {
+        const { draw, render } = setup();
+        const { gl, shapes } = makeRecordingGL();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 4, sizePx: 30, style: { fillStyle: "#f00" } },
+                { x: 2, y: 2, size: 4, sizePx: 30, widthPx: 50, style: { fillStyle: "#0f0" } },
+                { x: 2, y: 2, widthPx: 50, height: 4, style: { fillStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(gl);
+
+        expect(shapes.map(({ cx, cy, halfW, halfH }) => ({ cx, cy, halfW, halfH }))).toEqual([
+            { cx: 25, cy: 25, halfW: 15, halfH: 15 },
+            { cx: 25, cy: 25, halfW: 25, halfH: 15 },
+            { cx: 25, cy: 25, halfW: 25, halfH: 20 },
+        ]);
+    });
+
+    it("strips pixel sizes from static rects", () => {
+        // WebGL redraws statics through the dynamic path, so it has to drop
+        // the pixel fields itself to stay identical to the cached renderers
+        // (whose hit boxes ignore them too).
+        const { draw, render } = setup();
+        const { gl, shapes } = makeRecordingGL();
+
+        draw.drawStaticRect([{ x: 2, y: 2, size: 1, sizePx: 30, widthPx: 50, style: { fillStyle: "#f00" } }], "k", 1);
+        render(gl);
+
+        expect(shapes.map(({ halfW, halfH }) => ({ halfW, halfH }))).toEqual([{ halfW: 5, halfH: 5 }]);
+    });
+});

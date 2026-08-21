@@ -343,6 +343,52 @@ describe("CanvasDraw non-square rects", () => {
     });
 });
 
+// Pixel-sized rect contract shared by all renderers; the same fixture values
+// are asserted in the webgl, skia, and server suites. Scale is 10, so one world unit is 10px
+// and the precedence chain widthPx -> sizePx -> width -> size is visible in
+// every box below.
+describe("CanvasDraw pixel-sized rects", () => {
+    it("resolves each axis against the live scale", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { ctx, rects } = makeRectRecordingCtx();
+
+        draw.drawRect(
+            [
+                // sizePx wins over size: 30px square centered on cell (2,2)
+                { x: 2, y: 2, size: 4, sizePx: 30, style: { fillStyle: "#f00" } },
+                // widthPx wins over sizePx on its own axis
+                { x: 2, y: 2, size: 4, sizePx: 30, widthPx: 50, style: { fillStyle: "#0f0" } },
+                // a pixel width beside a world height
+                { x: 2, y: 2, widthPx: 50, height: 4, style: { fillStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(rects).toEqual([
+            { x: 10, y: 10, w: 30, h: 30 },
+            { x: 0, y: 10, w: 50, h: 30 },
+            { x: 0, y: 5, w: 50, h: 40 },
+        ]);
+    });
+
+    it("keeps a pixel-sized rect the same size at any zoom", () => {
+        const item = { x: 2, y: 2, sizePx: 30, style: { fillStyle: "#f00" } };
+
+        const drawAt = (scale: number) => {
+            const { draw, render } = setupAtScale(scale);
+            const { ctx, rects } = makeRectRecordingCtx();
+            draw.drawRect([item], 1);
+            render(ctx);
+            return rects[0];
+        };
+
+        // The world-sized counterpart would double; the pixel-sized one holds
+        expect(drawAt(20)).toMatchObject({ w: 30, h: 30 });
+        expect(drawAt(10)).toMatchObject({ w: 30, h: 30 });
+    });
+});
+
 // Minimal fake 2D context that records the active font at every fillText() call.
 function makeTextRecordingCtx() {
     const texts: Array<{ text: string; font: string }> = [];

@@ -13,6 +13,8 @@ import {
     SpatialIndex,
     Text,
     resolveLineWidthPx,
+    maxPxExtent,
+    resolveBoxPx,
     resolveSizeWorld,
     resolveLineDashPx,
     overlayLineStyle,
@@ -107,11 +109,20 @@ export class WebGLDraw {
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce((max, item) => Math.max(max, maxPxExtent(item)), 0);
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
+                  )
                 : list;
 
             const shapes: ShapeInstance[] = [];
@@ -121,20 +132,20 @@ export class WebGLDraw {
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const size = item.size ?? 1;
-                const w = item.width ?? size;
-                const h = item.height ?? size;
+                // Pixel sizes win over world units, resolved against the live scale
+                const { width: pxW, height: pxH } = resolveBoxPx(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                if (!spatialIndex && !isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                if (
+                    !spatialIndex &&
+                    !isVisible(item.x, item.y, Math.max(pxW, pxH) / (2 * this.camera.scale), topLeft, config)
+                ) {
                     continue;
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxW = w * this.camera.scale;
-                const pxH = h * this.camera.scale;
                 const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
                 const cx = drawX + pxW / 2;
                 const cy = drawY + pxH / 2;
@@ -619,7 +630,13 @@ export class WebGLDraw {
     // already a single GPU call, so the static variants reuse the dynamic path.
 
     drawStaticRect(items: Array<Rect>, _cacheKey: string, layer: number = 1): DrawHandle {
-        return this.drawRect(items, layer);
+        // Pixel sizes are stripped for the same reason as drawStaticCircle's:
+        // static draws must look the same on every renderer, and the cached
+        // ones replay at a recorded scale where a screen size cannot hold.
+        return this.drawRect(
+            items.map(({ sizePx: _sizePx, widthPx: _widthPx, heightPx: _heightPx, ...rest }) => rest),
+            layer,
+        );
     }
 
     drawStaticCircle(items: Array<Circle>, _cacheKey: string, layer: number = 1): DrawHandle {

@@ -14,6 +14,9 @@ import {
     Text,
     resolveLineWidthPx,
     resolveSizePx,
+    maxPxExtent,
+    resolveBoxPx,
+    resolveBoxWorld,
     resolveSizeWorld,
     resolveLineDashPx,
     overlayLineStyle,
@@ -149,46 +152,62 @@ export class SkiaDraw {
 
         const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
         const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        // Pixel-sized items grow in world units as the camera zooms out, so
+        // the anchor-index query is padded by this per frame (scale-divided).
+        const maxSizePx = list.reduce((max, item) => Math.max(max, maxPxExtent(item)), 0);
 
         return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
+            const sizePxPad = maxSizePx / this.camera.scale;
             const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
+                ? spatialIndex.query(
+                      bounds.minX - sizePxPad,
+                      bounds.minY - sizePxPad,
+                      bounds.maxX + sizePxPad,
+                      bounds.maxY + sizePxPad,
+                  )
                 : list;
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const size = item.size ?? 1;
-                const extent = Math.max(item.width ?? size, item.height ?? size) / 2;
+                // Pixel sizes win over world units, resolved against the live scale
+                const box = resolveBoxWorld(item, this.camera.scale);
+                const extent = Math.max(box.width, box.height) / 2;
 
                 if (!spatialIndex && !isVisible(item.x, item.y, extent, topLeft, config)) {
                     continue;
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintRect(canvas, item, pos, this.camera.scale, styleOf);
+                this.paintRect(canvas, item, pos, this.camera.scale, true, styleOf);
             }
         });
     }
 
     /** Paint a single rect at a resolved position; `cellSize` is the pixel
-     * size of one world cell. `styleOf` is dynamic-path only — the static
-     * picture path records without decorations. */
+     * size of one world cell. `useSizePx` is false on the static picture path,
+     * which replays at a recorded scale where a screen size cannot hold.
+     * `styleOf` is dynamic-path only — the static path records without
+     * decorations. */
     private paintRect(
         canvas: SkCanvas,
         item: Rect,
         pos: Coords,
         cellSize: number,
+        useSizePx: boolean,
         styleOf?: StyleOf<Rect, ShapeDecorationStyle>,
     ) {
         const size = item.size ?? 1;
         const origin = resolveOrigin(item.origin);
         const deco = styleOf?.(item);
         const style = deco ? { ...item.style, ...deco } : item.style;
-        const pxW = (item.width ?? size) * cellSize;
-        const pxH = (item.height ?? size) * cellSize;
+        const box = useSizePx
+            ? resolveBoxPx(item, cellSize)
+            : { width: (item.width ?? size) * cellSize, height: (item.height ?? size) * cellSize };
+        const pxW = box.width;
+        const pxH = box.height;
         const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, cellSize);
         const cx = drawX + pxW / 2;
         const cy = drawY + pxH / 2;
@@ -702,7 +721,7 @@ export class SkiaDraw {
 
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
         return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintRect(canvas, item, pos, cellSize),
+            this.paintRect(canvas, item, pos, cellSize, false),
         );
     }
 
