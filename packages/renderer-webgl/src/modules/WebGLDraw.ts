@@ -355,7 +355,11 @@ export class WebGLDraw {
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
-                ctx.font = `${pxSize}px ${family}`;
+                // Matches the Canvas2D renderer, weight omission included.
+                ctx.font =
+                    style?.fontWeight !== undefined
+                        ? `${style.fontWeight} ${pxSize}px ${family}`
+                        : `${pxSize}px ${family}`;
 
                 if (style?.fillStyle) {
                     ctx.fillStyle = style.fillStyle;

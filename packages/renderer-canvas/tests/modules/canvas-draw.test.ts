@@ -1101,3 +1101,38 @@ describe("CanvasDraw per-item line style", () => {
         expect(strokes[0].strokeStyle).toBe("#0f0");
     });
 });
+
+// Font weight contract shared by all renderers: an unset weight is omitted
+// entirely rather than emitted as "normal", so existing callers keep the exact
+// font they had. The same fixture values are asserted in the webgl, skia, and server suites.
+describe("CanvasDraw text font weight", () => {
+    it("puts the weight in the font shorthand", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([
+            { x: 1, y: 1, text: "plain" },
+            { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+            { x: 3, y: 1, text: "numeric", fontPx: 14, style: { fontWeight: 700, fontFamily: "monospace" } },
+        ]);
+        render(ctx);
+
+        expect(texts).toEqual([
+            { text: "plain", font: "10px sans-serif" },
+            { text: "bold", font: "bold 10px sans-serif" },
+            { text: "numeric", font: "700 14px monospace" },
+        ]);
+    });
+
+    it("lets styleOf decorate the weight", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([{ x: 1, y: 1, text: "a", data: { hot: true } }], 2, {
+            styleOf: (item) => ((item.data as { hot: boolean }).hot ? { fontWeight: 800 } : undefined),
+        });
+        render(ctx);
+
+        expect(texts[0].font).toBe("800 10px sans-serif");
+    });
+});

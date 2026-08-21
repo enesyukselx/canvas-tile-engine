@@ -401,7 +401,13 @@ export class CanvasDraw<
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
-                ctx.font = `${pxSize}px ${family}`;
+                // Weight is omitted entirely when unset: the CSS font shorthand
+                // resets every unlisted property, so an explicit "normal" would
+                // be a behavior change for callers who never asked for one.
+                ctx.font =
+                    style?.fontWeight !== undefined
+                        ? `${style.fontWeight} ${pxSize}px ${family}`
+                        : `${pxSize}px ${family}`;
 
                 if (style?.fillStyle) {
                     ctx.fillStyle = style.fillStyle;

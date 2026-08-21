@@ -98,6 +98,15 @@ export type TextAlign = "center" | "end" | "left" | "right" | "start";
 export type TextBaseline = "alphabetic" | "bottom" | "hanging" | "ideographic" | "middle" | "top";
 
 /**
+ * Font weight. The portable intersection of the platforms: Canvas2D's font
+ * shorthand also accepts the relative `bolder`/`lighter`, which Skia has no
+ * equivalent for, so they are left out rather than silently ignored on
+ * native. Declared locally for the same platform-agnostic reason as
+ * {@link TextAlign}.
+ */
+export type FontWeight = "normal" | "bold" | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
+
+/**
  * A source rectangle inside a spritesheet image, in sheet pixels.
  * Used to draw a sub-region (frame) of a larger image.
  */
@@ -159,6 +168,8 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size" | 
         fillStyle?: string;
         /** Font family (default: "sans-serif") */
         fontFamily?: string;
+        /** Font weight (default: the family's normal weight). */
+        fontWeight?: FontWeight;
         textAlign?: TextAlign;
         textBaseline?: TextBaseline;
     };

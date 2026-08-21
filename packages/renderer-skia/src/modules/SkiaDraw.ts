@@ -32,6 +32,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    FontWeight,
     AnchoredItem,
     LineStyle,
     LineDecorationStyle,
@@ -58,6 +59,9 @@ import {
     type SkRect,
 } from "@shopify/react-native-skia";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
+
+/** matchFont's weight argument; its input type is not exported by the package. */
+type SkiaFontWeight = NonNullable<NonNullable<Parameters<typeof matchFont>[0]>["fontWeight"]>;
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 import type { SkiaDrawContext } from "../types";
@@ -430,7 +434,7 @@ export class SkiaDraw {
 
                 // Font sizing matches the Canvas2D renderer: fontPx wins, else size * scale.
                 const pxSize = item.fontPx ?? size * this.camera.scale;
-                const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize);
+                const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize, style?.fontWeight);
                 this.fillPaint.setColor(this.color(style?.fillStyle ?? "#000000"));
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
@@ -926,11 +930,21 @@ export class SkiaDraw {
      * continuously with zoom (fonts are snapshotted into the recorded picture
      * at draw time, so mutating the shared instance between draws is safe).
      */
-    private getFont(family: string, size: number): SkFont {
-        let font = this.fontCache.get(family);
+    private getFont(family: string, size: number, weight?: FontWeight): SkFont {
+        // Weight is part of the key: a typeface is matched once and reused at
+        // every size (setSize below), so a family-only key would hand back the
+        // regular face for a bold request.
+        const key = weight === undefined ? family : `${family}|${weight}`;
+        let font = this.fontCache.get(key);
         if (!font) {
-            font = matchFont({ fontFamily: family, fontSize: size });
-            this.fontCache.set(family, font);
+            font = matchFont({
+                fontFamily: family,
+                fontSize: size,
+                // matchFont takes the CSS keywords and the numeric weights as
+                // strings; core's numeric literals map straight across.
+                ...(weight === undefined ? {} : { fontWeight: String(weight) as SkiaFontWeight }),
+            });
+            this.fontCache.set(key, font);
         }
         font.setSize(size);
         return font;

@@ -724,3 +724,26 @@ describe("pixel-sized rects", () => {
         ]);
     });
 });
+
+// Font weight contract shared by all renderers; the canvas, webgl and server
+// suites assert the same fixture through their font shorthand.
+describe("text font weight", () => {
+    it("matches a typeface per weight and keeps them apart in the cache", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "plain" },
+                { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+                { x: 3, y: 1, text: "numeric", style: { fontWeight: 700 } },
+            ],
+            2,
+        );
+        render(canvas);
+        // Second frame: every font is served from the cache
+        render(canvas);
+
+        expect(matchFontCalls.map((call) => call.fontWeight)).toEqual([undefined, "bold", "700"]);
+    });
+});
