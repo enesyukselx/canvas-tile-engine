@@ -4,7 +4,13 @@ import type { SkCanvas } from "@shopify/react-native-skia";
 import { COLOR_CACHE_LIMIT, SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import type { SkiaDrawContext } from "../../src/types";
-import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
+import {
+    colorParseCalls,
+    gradientCalls,
+    makeRecordingCanvas,
+    matchFontCalls,
+    type MockPicture,
+} from "../mocks/react-native-skia";
 
 interface Op {
     op: string;
@@ -38,6 +44,7 @@ function setup(scale = 10) {
 beforeEach(() => {
     colorParseCalls.length = 0;
     matchFontCalls.length = 0;
+    gradientCalls.length = 0;
 });
 
 describe("resolveRadius roundRect semantics", () => {
@@ -696,5 +703,120 @@ describe("dashed rect/circle borders", () => {
         expect(ops).toHaveLength(2); // fill + stroke
         expect(ops[0].pathEffect).toBeNull();
         expect(ops[1].pathEffect).toEqual({ __dash: [4, 2], phase: 0 });
+    });
+});
+
+const topToBottom = {
+    type: "linear" as const,
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [
+        { offset: 0, color: "#f00" },
+        { offset: 1, color: "#00f" },
+    ],
+};
+
+// Gradient fill contract shared by all renderers; the canvas, webgl and
+// server suites assert the same geometry through their own recorders.
+describe("gradient fills", () => {
+    it("runs a box-unit axis across the item's drawn box", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { canvas, ops } = makeCanvas();
+
+        // size 2 at (2,2) -> screen box (15,15,20,20)
+        draw.drawRect([{ x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } }], 1);
+        render(canvas);
+
+        expect(gradientCalls).toHaveLength(1);
+        expect(gradientCalls[0].start).toEqual({ x: 15, y: 15 });
+        expect(gradientCalls[0].end).toEqual({ x: 15, y: 35 });
+        expect(gradientCalls[0].pos).toEqual([0, 1]);
+        expect(ops.filter((o) => o.op === "rect")).toHaveLength(1);
+    });
+
+    it("clears the shader again so later solid fills stay solid", () => {
+        // fillPaint is shared across the whole frame, so a leaked shader
+        // would tint every rect drawn after the gradient one
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } },
+                { x: 6, y: 2, size: 2, style: { fillStyle: "#0f0" } },
+            ],
+            1,
+        );
+        render(canvas);
+
+        const shaders = ops.filter((o) => o.op === "rect").map((o) => o.shader);
+        expect(shaders[0]).toBeTruthy();
+        expect(shaders[1]).toBeNull();
+    });
+
+    it("projects world units through the camera", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawRect(
+            [
+                {
+                    x: 2,
+                    y: 2,
+                    style: {
+                        fillStyle: {
+                            ...topToBottom,
+                            units: "world" as const,
+                            from: { x: 0, y: 0 },
+                            to: { x: 0, y: 4 },
+                        },
+                    },
+                },
+            ],
+            1,
+        );
+        render(canvas);
+
+        expect(gradientCalls[0].start).toEqual({ x: 5, y: 5 });
+        expect(gradientCalls[0].end).toEqual({ x: 5, y: 45 });
+    });
+
+    it("normalizes stops into ascending positions", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawRect(
+            [
+                {
+                    x: 2,
+                    y: 2,
+                    style: {
+                        fillStyle: {
+                            ...topToBottom,
+                            stops: [
+                                { offset: 2, color: "late" },
+                                { offset: -1, color: "early" },
+                            ],
+                        },
+                    },
+                },
+            ],
+            1,
+        );
+        render(canvas);
+
+        // MakeLinearGradient takes a position array it expects ascending
+        expect(gradientCalls[0].pos).toEqual([0, 1]);
+        expect(gradientCalls[0].colors).toEqual([{ parsed: "early" }, { parsed: "late" }]);
+    });
+
+    it("leaves a plain color string on the solid path", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawRect([{ x: 2, y: 2, style: { fillStyle: "#0f0" } }], 1);
+        render(canvas);
+
+        expect(gradientCalls).toHaveLength(0);
     });
 });

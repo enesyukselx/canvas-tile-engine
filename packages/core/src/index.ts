@@ -18,6 +18,8 @@ export { cornerArc } from "./utils/pathCorners";
 export { traceRoundedPath, traceCommands, type PathTraceTarget, type CommandTraceTarget } from "./utils/tracePath";
 export { roundedPolyline, roundedRing, ARC_SEGMENT_LENGTH } from "./utils/pathFlatten";
 export { resolveSizePx, resolveSizeWorld } from "./utils/itemSize";
+export { isGradient, normalizeStops, gradientAxisPx, gradientT, paintKey } from "./utils/paint";
+export type { PaintBox } from "./utils/paint";
 export {
     itemsBounds,
     pathItemBounds,

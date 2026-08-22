@@ -1,4 +1,4 @@
-import type { Coords } from "@canvas-tile-engine/core";
+import { gradientT, type Coords } from "@canvas-tile-engine/core";
 import { RGBA } from "../../utils/color";
 import {
     LINE_FRAGMENT_SHADER,
@@ -28,6 +28,18 @@ export interface ShapeInstance {
     rotation: number;
     /** Normalized RGBA color. */
     color: RGBA;
+    /**
+     * Gradient fill, replacing {@link color}. The axis is in the shape's own
+     * local (unrotated, center-origin) space, so a gradient rotates with its
+     * shape; `row` indexes the ramp atlas from {@link GLRenderer.rampRow}.
+     */
+    gradient?: ShapeGradient;
+}
+
+/** A gradient fill resolved for the GPU. */
+export interface ShapeGradient {
+    axis: { x0: number; y0: number; x1: number; y1: number };
+    row: number;
 }
 
 /** A solid colored line segment with a pixel width. */
@@ -66,8 +78,15 @@ export interface ImageInstance {
 
 type GL = WebGLRenderingContext;
 
-const SHAPE_FLOATS_PER_VERTEX = 14; // pos(2) local(2) halfSize(2) radius(4) color(4)
-const LINE_FLOATS_PER_VERTEX = 6; // pos(2) color(4)
+const SHAPE_FLOATS_PER_VERTEX = 16; // pos(2) local(2) halfSize(2) radius(4) color(4) gradT(1) gradRow(1)
+const LINE_FLOATS_PER_VERTEX = 8; // pos(2) color(4) gradT(1) gradRow(1)
+
+/** Samples per ramp row. 256 is the usual gradient LUT width and is exact for 8-bit color. */
+const RAMP_WIDTH = 256;
+/** Rows before the atlas is reset; a scene realistically holds a handful. */
+const MAX_RAMP_ROWS = 256;
+/** `a_gradRow` for a solid fill. */
+const NO_GRADIENT = -1;
 const TEXTURE_FLOATS_PER_VERTEX = 4; // pos(2) texcoord(2)
 
 interface ShapeProgram {
@@ -77,14 +96,22 @@ interface ShapeProgram {
     a_halfSize: number;
     a_radius: number;
     a_color: number;
+    a_gradT: number;
+    a_gradRow: number;
     u_resolution: WebGLUniformLocation | null;
+    u_ramp: WebGLUniformLocation | null;
+    u_rampRows: WebGLUniformLocation | null;
 }
 
 interface LineProgram {
     program: WebGLProgram;
     a_position: number;
     a_color: number;
+    a_gradT: number;
+    a_gradRow: number;
     u_resolution: WebGLUniformLocation | null;
+    u_ramp: WebGLUniformLocation | null;
+    u_rampRows: WebGLUniformLocation | null;
 }
 
 interface TextureProgram {
@@ -115,6 +142,12 @@ export class GLRenderer {
     private shapeBuffer: WebGLBuffer;
     private lineBuffer: WebGLBuffer;
     private textureBuffer: WebGLBuffer;
+
+    /** Gradient ramp atlas: one RAMP_WIDTH row per distinct ramp. */
+    private rampTexture: WebGLTexture | null = null;
+    private rampRows = new Map<string, number>();
+    private rampPixels = new Uint8Array(RAMP_WIDTH * 4);
+    private rampDirty = false;
 
     private textures = new Map<TexImageSource, { texture: WebGLTexture; width: number; height: number }>();
     /** Sources that threw on upload (not CORS-clean); retried only after {@link invalidateTexture}. */
@@ -154,7 +187,11 @@ export class GLRenderer {
             a_halfSize: gl.getAttribLocation(shapeProgram, "a_halfSize"),
             a_radius: gl.getAttribLocation(shapeProgram, "a_radius"),
             a_color: gl.getAttribLocation(shapeProgram, "a_color"),
+            a_gradT: gl.getAttribLocation(shapeProgram, "a_gradT"),
+            a_gradRow: gl.getAttribLocation(shapeProgram, "a_gradRow"),
             u_resolution: gl.getUniformLocation(shapeProgram, "u_resolution"),
+            u_ramp: gl.getUniformLocation(shapeProgram, "u_ramp"),
+            u_rampRows: gl.getUniformLocation(shapeProgram, "u_rampRows"),
         };
 
         const lineProgram = this.createProgram(LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER);
@@ -162,7 +199,11 @@ export class GLRenderer {
             program: lineProgram,
             a_position: gl.getAttribLocation(lineProgram, "a_position"),
             a_color: gl.getAttribLocation(lineProgram, "a_color"),
+            a_gradT: gl.getAttribLocation(lineProgram, "a_gradT"),
+            a_gradRow: gl.getAttribLocation(lineProgram, "a_gradRow"),
             u_resolution: gl.getUniformLocation(lineProgram, "u_resolution"),
+            u_ramp: gl.getUniformLocation(lineProgram, "u_ramp"),
+            u_rampRows: gl.getUniformLocation(lineProgram, "u_rampRows"),
         };
 
         const textureProgram = this.createProgram(TEXTURE_VERTEX_SHADER, TEXTURE_FRAGMENT_SHADER);
@@ -212,6 +253,123 @@ export class GLRenderer {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     }
 
+    // ─── Gradient ramps ───
+
+    /**
+     * Register a color ramp and get back its row in the atlas.
+     *
+     * Rows are keyed structurally and kept across frames, because a scene's
+     * gradients rarely change; the texture only re-uploads when a new ramp
+     * shows up. An app that manufactures unbounded distinct gradients resets
+     * the atlas rather than growing without limit.
+     */
+    rampRow(key: string, stops: Array<{ offset: number; color: RGBA }>): number {
+        const existing = this.rampRows.get(key);
+        if (existing !== undefined) {
+            return existing;
+        }
+
+        if (this.rampRows.size >= MAX_RAMP_ROWS) {
+            this.rampRows.clear();
+        }
+
+        const row = this.rampRows.size;
+        this.rampRows.set(key, row);
+
+        const needed = (row + 1) * RAMP_WIDTH * 4;
+        if (this.rampPixels.length < needed) {
+            const grown = new Uint8Array(needed);
+            grown.set(this.rampPixels);
+            this.rampPixels = grown;
+        }
+
+        this.writeRamp(row, stops);
+        this.rampDirty = true;
+        return row;
+    }
+
+    /** Rasterize one ramp into its atlas row. */
+    private writeRamp(row: number, stops: Array<{ offset: number; color: RGBA }>) {
+        const base = row * RAMP_WIDTH * 4;
+
+        // An empty ramp paints nothing, matching the Canvas2D and Skia
+        // behavior for a gradient with no stops.
+        if (stops.length === 0) {
+            this.rampPixels.fill(0, base, base + RAMP_WIDTH * 4);
+            return;
+        }
+
+        let next = 0;
+        for (let i = 0; i < RAMP_WIDTH; i++) {
+            const t = i / (RAMP_WIDTH - 1);
+            while (next < stops.length && stops[next].offset < t) {
+                next++;
+            }
+
+            let color: RGBA;
+            if (next === 0) {
+                color = stops[0].color;
+            } else if (next >= stops.length) {
+                color = stops[stops.length - 1].color;
+            } else {
+                const before = stops[next - 1];
+                const after = stops[next];
+                const span = after.offset - before.offset;
+                // Coincident stops are a hard break: take the later color
+                const k = span <= 0 ? 1 : (t - before.offset) / span;
+                color = [
+                    before.color[0] + (after.color[0] - before.color[0]) * k,
+                    before.color[1] + (after.color[1] - before.color[1]) * k,
+                    before.color[2] + (after.color[2] - before.color[2]) * k,
+                    before.color[3] + (after.color[3] - before.color[3]) * k,
+                ];
+            }
+
+            const o = base + i * 4;
+            this.rampPixels[o] = Math.round(color[0] * 255);
+            this.rampPixels[o + 1] = Math.round(color[1] * 255);
+            this.rampPixels[o + 2] = Math.round(color[2] * 255);
+            this.rampPixels[o + 3] = Math.round(color[3] * 255);
+        }
+    }
+
+    /**
+     * Bind the atlas to texture unit 1 for the given program. Unit 0 stays
+     * with the image program, so a gradient fill never disturbs it.
+     */
+    private bindRamps(u_ramp: WebGLUniformLocation | null, u_rampRows: WebGLUniformLocation | null) {
+        const gl = this.gl;
+        const rows = Math.max(1, this.rampRows.size);
+
+        if (!this.rampTexture) {
+            this.rampTexture = gl.createTexture();
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, this.rampTexture);
+            // Linear along the ramp, clamped at both ends: the shader already
+            // clamps t, so the edge texels are what an out-of-range t gets.
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            this.rampDirty = true;
+        } else {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, this.rampTexture);
+        }
+
+        if (this.rampDirty) {
+            const needed = rows * RAMP_WIDTH * 4;
+            const pixels =
+                this.rampPixels.length >= needed ? this.rampPixels.subarray(0, needed) : new Uint8Array(needed).fill(0);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, RAMP_WIDTH, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            this.rampDirty = false;
+        }
+
+        gl.uniform1i(u_ramp, 1);
+        gl.uniform1f(u_rampRows, rows);
+        gl.activeTexture(gl.TEXTURE0);
+    }
+
     // ─── Shapes ───
 
     drawShapes(shapes: ShapeInstance[]) {
@@ -238,17 +396,20 @@ export class GLRenderer {
                 [-hw, hh],
             ];
 
+            // The gradient axis lives in this same local frame, so t comes
+            // from the unrotated corner and the ramp turns with the shape.
+            const grad = s.gradient;
             const verts: number[][] = [];
             for (const [lx, ly] of corners) {
                 const px = s.cx + lx * cos - ly * sin;
                 const py = s.cy + lx * sin + ly * cos;
-                verts.push([px, py, lx, ly]);
+                verts.push([px, py, lx, ly, grad ? gradientT(grad.axis, lx, ly) : 0]);
             }
 
             // Two triangles: TL, TR, BR and TL, BR, BL
             const order = [0, 1, 2, 0, 2, 3];
             for (const i of order) {
-                const [px, py, lx, ly] = verts[i];
+                const [px, py, lx, ly, gradT] = verts[i];
                 data[o++] = px;
                 data[o++] = py;
                 data[o++] = lx;
@@ -264,11 +425,14 @@ export class GLRenderer {
                 data[o++] = s.color[1];
                 data[o++] = s.color[2];
                 data[o++] = s.color[3];
+                data[o++] = gradT;
+                data[o++] = grad ? grad.row : NO_GRADIENT;
             }
         }
 
         gl.useProgram(this.shape.program);
         gl.uniform2f(this.shape.u_resolution, this.cssWidth, this.cssHeight);
+        this.bindRamps(this.shape.u_ramp, this.shape.u_rampRows);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.shapeBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
 
@@ -278,6 +442,8 @@ export class GLRenderer {
         this.enableAttrib(this.shape.a_halfSize, 2, stride, 4 * 4);
         this.enableAttrib(this.shape.a_radius, 4, stride, 6 * 4);
         this.enableAttrib(this.shape.a_color, 4, stride, 10 * 4);
+        this.enableAttrib(this.shape.a_gradT, 1, stride, 14 * 4);
+        this.enableAttrib(this.shape.a_gradRow, 1, stride, 15 * 4);
 
         gl.drawArrays(gl.TRIANGLES, 0, shapes.length * 6);
 
@@ -325,22 +491,30 @@ export class GLRenderer {
                 data[o++] = l.color[1];
                 data[o++] = l.color[2];
                 data[o++] = l.color[3];
+                data[o++] = 0;
+                // Strokes are solid: gradients are a fill-only feature
+                data[o++] = NO_GRADIENT;
             }
         }
 
         gl.useProgram(this.line.program);
         gl.uniform2f(this.line.u_resolution, this.cssWidth, this.cssHeight);
+        this.bindRamps(this.line.u_ramp, this.line.u_rampRows);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
 
         const stride = LINE_FLOATS_PER_VERTEX * 4;
         this.enableAttrib(this.line.a_position, 2, stride, 0);
         this.enableAttrib(this.line.a_color, 4, stride, 2 * 4);
+        this.enableAttrib(this.line.a_gradT, 1, stride, 6 * 4);
+        this.enableAttrib(this.line.a_gradRow, 1, stride, 7 * 4);
 
         gl.drawArrays(gl.TRIANGLES, 0, lines.length * 6);
 
         this.disableAttrib(this.line.a_position);
         this.disableAttrib(this.line.a_color);
+        this.disableAttrib(this.line.a_gradT);
+        this.disableAttrib(this.line.a_gradRow);
     }
 
     // ─── Path fills ───
@@ -357,17 +531,22 @@ export class GLRenderer {
 
         gl.useProgram(this.line.program);
         gl.uniform2f(this.line.u_resolution, this.cssWidth, this.cssHeight);
+        this.bindRamps(this.line.u_ramp, this.line.u_rampRows);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
 
         const stride = LINE_FLOATS_PER_VERTEX * 4;
         this.enableAttrib(this.line.a_position, 2, stride, 0);
         this.enableAttrib(this.line.a_color, 4, stride, 2 * 4);
+        this.enableAttrib(this.line.a_gradT, 1, stride, 6 * 4);
+        this.enableAttrib(this.line.a_gradRow, 1, stride, 7 * 4);
 
         gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
         this.disableAttrib(this.line.a_position);
         this.disableAttrib(this.line.a_color);
+        this.disableAttrib(this.line.a_gradT);
+        this.disableAttrib(this.line.a_gradRow);
     }
 
     /**
@@ -387,7 +566,7 @@ export class GLRenderer {
      *    fill starts clean. Each covered pixel is painted exactly once, so
      *    translucent fills show no self-overlap seams.
      */
-    fillPath(rings: Coords[][], color: RGBA, evenOdd: boolean) {
+    fillPath(rings: Coords[][], color: RGBA, evenOdd: boolean, gradient?: ShapeGradient) {
         const gl = this.gl;
 
         let minX = Infinity;
@@ -441,6 +620,10 @@ export class GLRenderer {
                     fan[o++] = color[1];
                     fan[o++] = color[2];
                     fan[o++] = color[3];
+                    // Pass 1 writes winding with color writes off, so this
+                    // pass never samples the ramp.
+                    fan[o++] = 0;
+                    fan[o++] = NO_GRADIENT;
                 }
             }
             this.flatTriangles(fan, fanVerts);
@@ -477,6 +660,10 @@ export class GLRenderer {
             quad[o++] = color[1];
             quad[o++] = color[2];
             quad[o++] = color[3];
+            // The cover quad is in screen space and unrotated, so the axis it
+            // is projected against is screen space too.
+            quad[o++] = gradient ? gradientT(gradient.axis, x, y) : 0;
+            quad[o++] = gradient ? gradient.row : NO_GRADIENT;
         }
         this.flatTriangles(quad, 6);
 

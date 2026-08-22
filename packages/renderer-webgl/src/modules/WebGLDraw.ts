@@ -14,6 +14,10 @@ import {
     Text,
     resolveLineWidthPx,
     resolveSizeWorld,
+    isGradient,
+    normalizeStops,
+    gradientAxisPx,
+    paintKey,
     resolveLineDashPx,
     overlayLineStyle,
     resolveCornerRadiusPx,
@@ -29,6 +33,8 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    Paint,
+    PaintBox,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -41,10 +47,29 @@ import { appendDashedSegment } from "../utils/dash";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
 import { GLRenderer } from "./gl/GLRenderer";
-import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
+import { ImageInstance, LineInstance, ShapeInstance, type ShapeGradient } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
 
 // Threshold for using spatial indexing (below this, linear scan is faster)
+/**
+ * Map a screen point into a shape instance's local frame: the unrotated,
+ * center-origin space its corner offsets live in, which is where the shader
+ * reads the gradient axis. `rotation` of 0 is a plain translation.
+ */
+function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coords {
+    const dx = point.x - cx;
+    const dy = point.y - cy;
+    if (rotation === 0) {
+        return { x: dx, y: dy };
+    }
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+}
+
+/** Fill color for a gradient with no stops: paints nothing, like Canvas2D. */
+const TRANSPARENT: RGBA = [0, 0, 0, 0];
+
 const SPATIAL_INDEX_THRESHOLD = 500;
 // Segment count used to approximate a stroked circle outline.
 const CIRCLE_STROKE_SEGMENTS = 48;
@@ -96,6 +121,35 @@ export class WebGLDraw {
         });
     }
 
+    /**
+     * Split a {@link Paint} into what the GPU wants: a flat color, plus an
+     * atlas row and axis when it is a gradient.
+     *
+     * The flat color stays meaningful for a gradient — it is the first stop —
+     * so anything that ignores the gradient (the stencil pass of a path fill)
+     * still paints something sensible rather than black.
+     */
+    private resolveFill(
+        gl: GLRenderer,
+        paint: Paint,
+        box: PaintBox,
+        toScreen: (x: number, y: number) => Coords = (x, y) => this.transformer.worldToScreen(x, y),
+    ): { color: RGBA; gradient?: ShapeGradient } {
+        if (!isGradient(paint)) {
+            return { color: this.colorParser.parse(paint) };
+        }
+
+        const stops = normalizeStops(paint.stops).map((stop) => ({
+            offset: stop.offset,
+            color: this.colorParser.parse(stop.color),
+        }));
+        const row = gl.rampRow(paintKey(paint), stops);
+        return {
+            color: stops[0]?.color ?? TRANSPARENT,
+            gradient: { axis: gradientAxisPx(paint, box, toScreen), row },
+        };
+    }
+
     drawRect(
         items: Array<Rect> | Rect,
         layer: number = 1,
@@ -142,6 +196,15 @@ export class WebGLDraw {
                 const radius = this.resolveRadius(resolveRadiusPx(item.radius, this.camera.scale), Math.min(pxW, pxH));
 
                 if (style?.fillStyle) {
+                    // The instance's gradient axis is read in the shape's own
+                    // local frame, so a box-unit ramp turns with the shape and
+                    // a world-unit one is un-rotated into that same frame.
+                    const fill = this.resolveFill(
+                        gl,
+                        style.fillStyle,
+                        { x: -pxW / 2, y: -pxH / 2, width: pxW, height: pxH },
+                        (wx, wy) => unrotate(this.transformer.worldToScreen(wx, wy), cx, cy, rotation),
+                    );
                     shapes.push({
                         cx,
                         cy,
@@ -149,7 +212,8 @@ export class WebGLDraw {
                         halfH: pxH / 2,
                         radius,
                         rotation,
-                        color: this.colorParser.parse(style.fillStyle),
+                        color: fill.color,
+                        gradient: fill.gradient,
                     });
                 }
 
@@ -225,6 +289,16 @@ export class WebGLDraw {
                 const cy = drawY + radius;
 
                 if (style?.fillStyle) {
+                    // Local frame like the rect path: drawShapes evaluates the
+                    // axis at the instance's unrotated corner offsets, so the
+                    // box is centered on the origin and a world axis is
+                    // translated into that frame.
+                    const fill = this.resolveFill(
+                        gl,
+                        style.fillStyle,
+                        { x: -radius, y: -radius, width: radius * 2, height: radius * 2 },
+                        (wx, wy) => unrotate(this.transformer.worldToScreen(wx, wy), cx, cy, 0),
+                    );
                     shapes.push({
                         cx,
                         cy,
@@ -232,7 +306,8 @@ export class WebGLDraw {
                         halfH: radius,
                         radius: [radius, radius, radius, radius],
                         rotation: 0,
-                        color: this.colorParser.parse(style.fillStyle),
+                        color: fill.color,
+                        gradient: fill.gradient,
                     });
                 }
 
@@ -443,11 +518,21 @@ export class WebGLDraw {
                     // Like Canvas2D fill(), open subpaths close implicitly.
                     // Multi-ring stencil-then-cover: winding accumulates
                     // across subpaths, so holes match Canvas2D/Skia exactly.
-                    const color = this.colorParser.parse(style!.fillStyle!);
+                    // The cover quad is unrotated screen space, so unlike the
+                    // shape instances the axis is screen space too.
+                    const topLeftPx = this.transformer.worldToScreen(bounds.minX, bounds.minY);
+                    const bottomRightPx = this.transformer.worldToScreen(bounds.maxX, bounds.maxY);
+                    const fill = this.resolveFill(gl, style!.fillStyle!, {
+                        x: topLeftPx.x,
+                        y: topLeftPx.y,
+                        width: bottomRightPx.x - topLeftPx.x,
+                        height: bottomRightPx.y - topLeftPx.y,
+                    });
                     gl.fillPath(
                         subpaths.map((sub) => sub.points),
-                        color,
+                        fill.color,
                         item.fillRule === "evenodd",
+                        fill.gradient,
                     );
                 }
 
