@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.12.0
+
+### Minor Changes
+
+- 819dd99: `fitBounds` now reports what it did instead of failing silently. It returns `{ scale, fitted }`: the scale the fit targets after clamping, and whether the whole rectangle actually ends up visible. `fitted` is `false` only when `minScale` floors the fit — the area needs a smaller scale than the configured minimum, so the view shows less than was asked for and nothing previously signalled that. Clamping at `maxScale` still leaves the rectangle fully visible, so it stays `true`.
+
+  The new `FitBoundsResult` type is exported from all three packages. On the React and React Native handles `fitBounds` returns `undefined` before mount, where there is no engine to fit. Existing callers that ignore the return value are unaffected.
+
+- 576f4b7: feat: itemsBounds — the rectangle `fitBounds`/`fitScale` ask for
+
+  - New pure helper `itemsBounds(items)`: the world rectangle enclosing a list of items, or `null` when nothing in the list has bounds. Replaces the hand-rolled min/max reduce every "fit to selection" flow needed. Returns `Bounds | null`, so the call is guarded: `const b = itemsBounds(selected); if (b) engine.fitBounds(b, { paddingPx: 24 });` — an empty selection should not move the camera.
+  - Every item kind fits in one list, mixed freely, so `hitTest`/`hitTestRect` results go straight in with no filtering: `Rect`/`Circle`/`Text`/`ImageItem` contribute `width ?? size` by `height ?? size` world units (default 1) centered on the anchor, `Line` its two endpoints, `PathItem` its vertex box (`points`) or control-point hull (`commands`). Items that draw nothing — a path with fewer than two points, an empty command list — are skipped rather than counted.
+  - `pathItemBounds(item)` is exported as the single-path building block.
+  - Deliberately camera-independent, so it leaves out `origin` offsets and `rotate` (both stay within half an item of the box — add `padding` for slack), `sizePx`/`fontPx` (pixel sizes have no world extent without a camera scale), and measured text: a `Text` item contributes its `size` box, not its glyph extents, because core carries no font metrics.
+  - Re-exported from `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native` alongside `gridToSize`/`fitScale` (with the `BoundedItem` type).
+
+- c3a6381: Fix: the config snapshot the React and React Native handles return before the engine mounts no longer contradicts the engine's own defaults.
+
+  `engine.getConfig()` answers with a default snapshot until the engine attaches, and that snapshot was a hand-written copy of the defaults that had drifted from what `Config` actually resolves: it reported `eventHandlers.drag: true` and `zoom: "pointer"` where the engine defaults both to off, and `debug.eventHandlers.*: false` where the engine defaults them to on. Code that read the handle before `isReady` — to decide whether panning is enabled, or to initialise a zoom control — got values that flipped the moment the engine mounted. The snapshot was also returned by reference and unfrozen, unlike `Config.get()`'s deeply frozen one, so a consumer mutating it corrupted every later pre-mount call.
+
+  The pre-mount snapshot is now produced by the engine's own normalization and is deeply frozen, so no field can disagree with a mounted engine. It still describes an _unconfigured_ engine (`scale: 1`, zero size, matching the pre-mount `getSize()`) because the handle cannot see the `config` you pass to the component — so `minScale`/`maxScale` are `0.5`/`2` rather than your scale's limits. Read config-derived values after `isReady`.
+
+  `@canvas-tile-engine/core` exports the normalization behind this as `normalizeConfig(config)`: it fills every optional field with its default and returns the deeply frozen snapshot, without validating (`new CanvasTileEngine(...)` still validates what it is given). `normalizeConfig({ scale: 32, size }).minScale` is `16`. It also no longer freezes the `bounds` and `coordinates.shownScaleRange` objects you pass in — those are copied into the snapshot now, matching what `updateBounds` already did.
+
+- e0c6ed3: feat: pixel sizing for `Rect` and `fontWeight` for text
+
+  Two gaps in the same corner of the item API, both about a value that should not scale with zoom.
+
+  - **`Rect.sizePx` / `widthPx` / `heightPx`.** Rect was the only anchored primitive without a pixel size — `Circle` has `sizePx`, `ImageItem` has `sizePx`, `Text` has `fontPx` — so a marker that must stay a fixed size on screen could not be a rectangle. Because Rect already carries `width`/`height`, the per-axis fields come along too: a shared-only `sizePx` would just move the asymmetry. Resolution order per axis is pixels before world units and specific before shared: `widthPx` → `sizePx` → `width` → `size`. Hit testing follows the drawn box on both axes, and culling re-evaluates it per frame because a pixel-sized box grows in world units as the camera zooms out.
+  - **`Text.style.fontWeight`.** Accepts `"normal"`, `"bold"`, and the numeric `100`–`900`. Canvas2D's font shorthand also takes the relative `bolder`/`lighter`, but Skia has no equivalent, so they are excluded rather than silently ignored on native. An unset weight is omitted from the font shorthand entirely rather than emitted as `"normal"` — the CSS shorthand resets every property it does not list, so an unconditional weight would change what existing callers get.
+
+  Both are additive; existing items render exactly as before.
+
+  The `drawStatic*` variants ignore the pixel sizes, matching how `drawStaticCircle` already ignores a circle's `sizePx`: a cache is recorded at one scale and blitted afterwards, so a screen size cannot hold across zooms. On WebGL, where statics are aliases of the dynamic path, `drawStaticRect` strips the fields itself so the four renderers stay identical and the hit box (registered with `ignoreSizePx`) keeps matching what is drawn.
+
+  New core helpers `resolveBoxPx`, `resolveBoxWorld` and `maxPxExtent` are exported alongside the existing `resolveSizePx`/`resolveSizeWorld` pair.
+
+- 91b4014: Behavior change: engine-driven camera animation now honors the OS reduced-motion setting by default. `accessibility.reducedMotion` defaults to `"auto"`, so on upgrade every app whose users enable "reduce motion" silently loses animated `goCenter`, `goScale`, `fitBounds` and `resize` — they land instantly instead. That is the feature, but nobody opted into it: set `accessibility: { reducedMotion: false }` (or call `engine.setReducedMotion(false)`) to keep animating regardless of the OS.
+
+  Reduced motion **overrides an explicitly passed `durationMs`**. `goCenter(x, y, 800)` lands instantly when the preference is on; there is no per-call escape by design, because a hard-coded duration is exactly what the preference exists to suppress.
+
+  Scope is the engine's own camera animation only. `SpriteAnimator` and anything the app draws itself are untouched — call `animator.stop()` yourself if you need WCAG SC 2.2.2.
+
+  New API: `accessibility.reducedMotion` config, `engine.setReducedMotion(value)`, `engine.getReducedMotion()`, and the `ReducedMotionSetting` / `AccessibilityConfig` / `MotionPolicy` types. `getConfig().accessibility.reducedMotion` reports the preference as configured (possibly `"auto"`), so a persisted snapshot never turns "follow the OS" into a permanent choice; `getReducedMotion()` is the resolved value.
+
+  Breaking for direct `AnimationController` users: it is exported from this package and now takes a required 4th constructor parameter, the motion policy (pass the engine's `Config`, or any `{ getReducedMotion, effectiveDuration }`). Deliberate — the compile error is what keeps the engine and the three renderers consistent. `Required<CanvasTileEngineConfig>` also gains a required top-level `accessibility` key, which only affects code constructing that type by hand.
+
+- e7509c1: feat: `responsive: "fill"` — the mode that hands both axes to the container
+
+  - New responsive mode alongside `"preserve-scale"` and `"preserve-viewport"`. The wrapper gets `width: 100%` and `height: 100%`, the scale stays fixed, and the visible world area follows the container on both axes. This is the mode a canvas embedded in a panel, grid cell, or split pane needs: the existing modes each pin the height (`"preserve-scale"` to `config.size.height`, `"preserve-viewport"` to the configured width/height ratio), so neither could fill a box whose height is decided by the layout.
+  - `config.size` only seeds the first frame in this mode. `engine.resize()` and `eventHandlers.resize` stay ignored while any responsive mode is active, unchanged.
+  - Scale limits follow the `"preserve-scale"` rule, now with the height participating: with finite `bounds`, a shorter container lowers the minimum limit through the vertical fit as well as the horizontal one, so "minScale shows the whole board" survives a resize in either direction.
+  - The container must have a definite height, because the wrapper cannot supply one — the canvas inside it is absolutely positioned, so its content height is zero (a flex or grid child also needs `min-height: 0`). A collapsed container would otherwise render a silently blank canvas, so a zero-height first measurement warns once.
+  - Purely additive: existing configs are untouched, and the renderers pick the mode up through the shared DOM sizing watcher with no per-renderer branching.
+
+### Patch Changes
+
+- 819dd99: Fix: `fitBounds(bounds, { durationMs: 0 })` no longer loses to an animation that is still running. The instant path writes the camera directly instead of going through the `AnimationController`, so unlike `goCenter`/`goScale` it never cancelled anything — an in-flight move or zoom kept interpolating on the next frame and dragged the view back off target. `fitBounds(a, { durationMs: 500 }); fitBounds(b, { durationMs: 0 });` jumped to `b` and then slid back toward `a`. The instant path now cancels the move and zoom animations before applying.
+- f6c4f64: Fix: `onZoom` no longer fires on wheel and pinch gestures that leave the scale unchanged.
+
+  Every camera-mutating API on the engine — `setScale`, `goScale`, `zoomIn`, `zoomOut`, `setScaleLimits`, `fitBounds` — already compares the scale before and after and skips the callback when clamping made the change a no-op. The gesture path did not: `handleWheel` and the pinch branch of `handleTouchMove` called `onZoom(camera.scale)` unconditionally. A user sitting at `maxScale` and still scrolling got one `onZoom` with the same scale per wheel event, so anything non-idempotent behind it — a React `setState`, an analytics event, a fetch for a new tile level — fired repeatedly for a zoom that never happened. A pinch that held its finger distance did the same.
+
+  Both gesture paths now capture the scale before zooming and notify only on an actual change, matching the programmatic paths and the documented contract. `onWheel` is unaffected: it reports the input gesture, and is explicitly documented to fire at a limit.
+
+- 467b077: Fix: `Text` and `ImageItem` inherited `origin` and `radius` from `DrawObject` without any renderer reading them, so both fields typechecked and silently did nothing — `{ x, y, text: "A", origin: { mode: "self", x: 0, y: 0 } }` and `{ x, y, img, radius: 8 }` looked like they should work but were dropped on every renderer. `Text` now omits `origin` and `ImageItem` now omits `radius`, matching the pattern `Circle` already used for `rotate`/`radius`. Type-only change; if either is meant to be supported later, that's a separate feature.
+
 ## 0.11.0
 
 ### Minor Changes
