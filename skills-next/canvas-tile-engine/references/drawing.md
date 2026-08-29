@@ -185,10 +185,18 @@ Adds to the shared fields:
 
 ```ts
 {
-    width?: number;   // world units, defaults to size - non-square rects
-    height?: number;  // world units, defaults to size
+    width?: number;    // world units, defaults to size - non-square rects
+    height?: number;   // world units, defaults to size
+    sizePx?: number;   // fixed screen-pixel size for both axes, wins over size/width/height
+    widthPx?: number;  // fixed screen-pixel width, wins over sizePx and width
+    heightPx?: number; // fixed screen-pixel height, wins over sizePx and height
 }
 ```
+
+Per axis the resolution order is `widthPx` -> `sizePx` -> `width` -> `size`,
+i.e. pixels before world units and the specific field before the shared one.
+The pixel fields are IGNORED by `drawStaticRect` (caches replay at a recorded
+scale), exactly like `drawStaticCircle` ignores a circle's `sizePx`.
 
 ```ts
 engine.drawRect({ x: 2, y: 3, size: 1, rotate: 45, radius: 0.12,
@@ -198,6 +206,11 @@ engine.drawRect(rectArray, 1);   // arrays are the fast path for many items
 // Non-square: one 4x2 zone floor instead of 8 one-cell rects
 engine.drawRect({ x: 5, y: 8, width: 4, height: 2,
                   style: { fillStyle: "rgba(34,197,94,0.3)" } }, 1);
+
+// Zoom-independent: a 14px square marker and a 120x24px label plate
+engine.drawRect({ x: 3, y: 3, sizePx: 14, style: { fillStyle: "#f43f5e" } }, 2);
+engine.drawRect({ x: 3, y: 4, widthPx: 120, heightPx: 24,
+                  style: { fillStyle: "#0f172acc" } }, 2);
 ```
 
 Origin anchoring applies per axis (cell mode centers the box on the anchor
@@ -235,6 +248,7 @@ engine.drawText({
     style: {
         fillStyle: "#e2e8f0",
         fontFamily: "sans-serif",          // default "sans-serif"
+        fontWeight: "bold",                // "normal"|"bold"|100..900; omit for the family default
         textAlign: "center",               // "center"|"end"|"left"|"right"|"start"
         textBaseline: "middle",            // "alphabetic"|"bottom"|"hanging"|"ideographic"|"middle"|"top"
     },

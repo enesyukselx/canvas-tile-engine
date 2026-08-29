@@ -86,3 +86,26 @@ describe("WebGLDraw text font sizing", () => {
         expect(texts.map((t) => t.text)).toEqual(["visible"]);
     });
 });
+
+// Font weight contract shared by all renderers: an unset weight is omitted
+// entirely rather than emitted as "normal", so existing callers keep the exact
+// font they had. The same fixture values are asserted in the canvas, skia, and server suites.
+describe("WebGLDraw text font weight", () => {
+    it("puts the weight in the overlay font shorthand", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([
+            { x: 1, y: 1, text: "plain" },
+            { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+            { x: 3, y: 1, text: "numeric", fontPx: 14, style: { fontWeight: 700, fontFamily: "monospace" } },
+        ]);
+        render(ctx);
+
+        expect(texts).toEqual([
+            { text: "plain", font: "10px sans-serif" },
+            { text: "bold", font: "bold 10px sans-serif" },
+            { text: "numeric", font: "700 14px monospace" },
+        ]);
+    });
+});

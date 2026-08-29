@@ -56,7 +56,9 @@ Every draw method accepts an optional `options` object as its last parameter. It
 | :------- | :------------------- | :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `x`, `y` | `number`             | **Required**                       | World coordinates of the center/origin.                                                                                                                 |
 | `size`   | `number`             | `1`                                | Size in grid units (width/diameter).                                                                                                                    |
-| `sizePx` | `number`             | -                                  | Fixed diameter in screen pixels, independent of zoom — marker-style dots (only for `drawCircle`, analog of Text's `fontPx`). Wins over `size`. Ignored by `drawStaticCircle`.  |
+| `sizePx` | `number`             | -                                  | Fixed size in screen pixels for both axes, independent of zoom (`drawRect` and `drawCircle`; on a circle it is the diameter). Wins over `size`/`width`/`height`. Ignored by the static variants. |
+| `widthPx` | `number`            | -                                  | Fixed width in screen pixels (only for `drawRect`). Wins over `sizePx` and `width`. Ignored by `drawStaticRect`.                                        |
+| `heightPx` | `number`           | -                                  | Fixed height in screen pixels (only for `drawRect`). Wins over `sizePx` and `height`. Ignored by `drawStaticRect`.                                      |
 | `style`  | `object`             | `{}`                               | Styling options (see below).                                                                                                                            |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                           |
 | `width`  | `number`             | `size`                             | Width in world units (only for `drawRect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
@@ -397,6 +399,7 @@ drawText(items: Text | Text[], layer?: number, options?: DrawOptions): DrawHandl
 
 - `fillStyle`: Text color
 - `fontFamily`: Font family (default: `"sans-serif"`)
+- `fontWeight`: `"normal"`, `"bold"`, or `100`-`900` (default: the family's normal weight)
 - `textAlign`: `"left"`, `"center"`, `"right"`
 - `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 

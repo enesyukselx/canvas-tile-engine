@@ -54,7 +54,9 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                                                  |
 | `size`   | `number`             | `1`                                | Size in grid units.                                                                                                                                 |
-| `sizePx` | `number`             | -                                  | Fixed diameter in screen pixels, independent of zoom — marker dots (only for `Circle`, analog of Text's `fontPx`). Wins over `size`. Ignored by `StaticCircle`.      |
+| `sizePx` | `number`             | -                                  | Fixed size in screen pixels for both axes, independent of zoom (`Rect` and `Circle`; on a circle it is the diameter). Wins over `size`/`width`/`height`. Ignored by the `Static*` variants. |
+| `widthPx` | `number`            | -                                  | Fixed width in screen pixels (only for `Rect`). Wins over `sizePx` and `width`. Ignored by `StaticRect`.                                                             |
+| `heightPx` | `number`           | -                                  | Fixed height in screen pixels (only for `Rect`). Wins over `sizePx` and `height`. Ignored by `StaticRect`.                                                           |
 | `style`  | `object`             | `{}`                               | Styling options.                                                                                                                                    |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                       |
 | `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
@@ -303,6 +305,7 @@ Render text at world coordinates. Text size scales with zoom.
 
 - `fillStyle`: Text color
 - `fontFamily`: Font family (default: `"sans-serif"`)
+- `fontWeight`: `"normal"`, `"bold"`, or `100`-`900` (default: the family's normal weight)
 - `textAlign`: `"left"`, `"center"`, `"right"`
 - `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 

@@ -181,9 +181,9 @@ export interface MockFont {
 }
 
 /** Every style passed to matchFont, for asserting font cache behavior. */
-export const matchFontCalls: Array<{ fontFamily: string; fontSize: number }> = [];
+export const matchFontCalls: Array<{ fontFamily: string; fontSize: number; fontWeight?: string }> = [];
 
-export const matchFont = (style: { fontFamily: string; fontSize: number }): MockFont => {
+export const matchFont = (style: { fontFamily: string; fontSize: number; fontWeight?: string }): MockFont => {
     matchFontCalls.push(style);
     const font: MockFont = {
         size: style.fontSize,

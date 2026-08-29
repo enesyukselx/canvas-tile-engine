@@ -343,6 +343,52 @@ describe("CanvasDraw non-square rects", () => {
     });
 });
 
+// Pixel-sized rect contract shared by all renderers; the same fixture values
+// are asserted in the webgl, skia, and server suites. Scale is 10, so one world unit is 10px
+// and the precedence chain widthPx -> sizePx -> width -> size is visible in
+// every box below.
+describe("CanvasDraw pixel-sized rects", () => {
+    it("resolves each axis against the live scale", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { ctx, rects } = makeRectRecordingCtx();
+
+        draw.drawRect(
+            [
+                // sizePx wins over size: 30px square centered on cell (2,2)
+                { x: 2, y: 2, size: 4, sizePx: 30, style: { fillStyle: "#f00" } },
+                // widthPx wins over sizePx on its own axis
+                { x: 2, y: 2, size: 4, sizePx: 30, widthPx: 50, style: { fillStyle: "#0f0" } },
+                // a pixel width beside a world height
+                { x: 2, y: 2, widthPx: 50, height: 4, style: { fillStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(rects).toEqual([
+            { x: 10, y: 10, w: 30, h: 30 },
+            { x: 0, y: 10, w: 50, h: 30 },
+            { x: 0, y: 5, w: 50, h: 40 },
+        ]);
+    });
+
+    it("keeps a pixel-sized rect the same size at any zoom", () => {
+        const item = { x: 2, y: 2, sizePx: 30, style: { fillStyle: "#f00" } };
+
+        const drawAt = (scale: number) => {
+            const { draw, render } = setupAtScale(scale);
+            const { ctx, rects } = makeRectRecordingCtx();
+            draw.drawRect([item], 1);
+            render(ctx);
+            return rects[0];
+        };
+
+        // The world-sized counterpart would double; the pixel-sized one holds
+        expect(drawAt(20)).toMatchObject({ w: 30, h: 30 });
+        expect(drawAt(10)).toMatchObject({ w: 30, h: 30 });
+    });
+});
+
 // Minimal fake 2D context that records the active font at every fillText() call.
 function makeTextRecordingCtx() {
     const texts: Array<{ text: string; font: string }> = [];
@@ -1053,5 +1099,40 @@ describe("CanvasDraw per-item line style", () => {
 
         expect(strokes).toHaveLength(1);
         expect(strokes[0].strokeStyle).toBe("#0f0");
+    });
+});
+
+// Font weight contract shared by all renderers: an unset weight is omitted
+// entirely rather than emitted as "normal", so existing callers keep the exact
+// font they had. The same fixture values are asserted in the webgl, skia, and server suites.
+describe("CanvasDraw text font weight", () => {
+    it("puts the weight in the font shorthand", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([
+            { x: 1, y: 1, text: "plain" },
+            { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+            { x: 3, y: 1, text: "numeric", fontPx: 14, style: { fontWeight: 700, fontFamily: "monospace" } },
+        ]);
+        render(ctx);
+
+        expect(texts).toEqual([
+            { text: "plain", font: "10px sans-serif" },
+            { text: "bold", font: "bold 10px sans-serif" },
+            { text: "numeric", font: "700 14px monospace" },
+        ]);
+    });
+
+    it("lets styleOf decorate the weight", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([{ x: 1, y: 1, text: "a", data: { hot: true } }], 2, {
+            styleOf: (item) => ((item.data as { hot: boolean }).hot ? { fontWeight: 800 } : undefined),
+        });
+        render(ctx);
+
+        expect(texts[0].font).toBe("800 10px sans-serif");
     });
 });
