@@ -536,15 +536,14 @@ function CanvasTileEngineBase({
         <EngineContext.Provider value={contextValue}>
             <GestureDetector gesture={gesture}>
                 <View style={[styles.fill, style]} onLayout={handleLayout}>
-                    {size.width > 0 &&
-                        size.height > 0 && (
-                            // pointerEvents="none": the canvas is purely visual — all
-                            // gestures are handled by the wrapper's GestureDetector, so
-                            // the Skia view must never intercept touches itself.
-                            <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
-                                {picture && <Picture picture={picture} />}
-                            </Canvas>
-                        )}
+                    {size.width > 0 && size.height > 0 && (
+                        // pointerEvents="none": the canvas is purely visual — all
+                        // gestures are handled by the wrapper's GestureDetector, so
+                        // the Skia view must never intercept touches itself.
+                        <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
+                            {picture && <Picture picture={picture} />}
+                        </Canvas>
+                    )}
                 </View>
             </GestureDetector>
             {/* Render children (draw components) only after this component's engine exists */}
