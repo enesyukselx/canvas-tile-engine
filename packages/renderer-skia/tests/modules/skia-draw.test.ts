@@ -344,6 +344,26 @@ describe("static picture cache", () => {
         expect(staticRects).toEqual(dynamicRects);
     });
 
+    it("ignores pixel sizes in all static picture primitives", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        const fakeImage = {
+            width: () => 10,
+            height: () => 10,
+        } as unknown as import("@shopify/react-native-skia").SkImage;
+        const item = Object.freeze({ x: 2, y: 2, size: 1, sizePx: 60, style: { fillStyle: "#f00" } });
+        draw.drawStaticRect([{ ...item, width: 2, height: 1, widthPx: 70, heightPx: 80 }], "rect");
+        draw.drawStaticCircle([item], "circle");
+        draw.drawStaticImage([{ ...item, img: fakeImage }], "image");
+        render(canvas);
+
+        const recorded = ops.filter((o) => o.op === "picture").flatMap((o) => (o.picture as MockPicture).ops);
+        expect(recorded.find((o) => o.op === "rect")?.rect).toEqual({ x: 15, y: 20, width: 20, height: 10 });
+        expect(recorded.find((o) => o.op === "circle")).toMatchObject({ cx: 25, cy: 25, r: 5 });
+        expect(recorded.find((o) => o.op === "image")?.dest).toEqual({ x: 20, y: 20, width: 10, height: 10 });
+        expect(item.sizePx).toBe(60);
+    });
+
     it("replays with the scale ratio when the camera zooms after recording", () => {
         const { draw, render, camera } = setup(10);
         const { canvas, ops } = makeCanvas();
