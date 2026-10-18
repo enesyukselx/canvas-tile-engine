@@ -11,6 +11,16 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 
 Works in CommonJS and ESM projects.
 
+TypeScript: install `typescript` and `@types/node`. A Node-only configuration
+with `lib: ["ES2022"]`, `types: ["node"]`, `strict: true`, and
+`skipLibCheck: false` is supported; do not add DOM libs or browser shims.
+`RendererServer` preserves native mount/image inference in the engine
+constructor and `renderToBuffer` callback. For standalone image annotations,
+use `ImageItem<Image>` from core with `Image` from `@napi-rs/canvas`.
+Unparameterized core mount/image types default to `unknown` without DOM types;
+browser defaults remain the full DOM types. On the server `engine.canvas` is
+`undefined`; use `renderer.getCanvas()` for the native canvas.
+
 ## Preferred API: `renderToBuffer` (one-shot)
 
 Creates engine + renderer, runs your draw callback, renders one frame,
@@ -25,12 +35,12 @@ const png = await renderToBuffer({
         scale: 40,
         size: { width: 480, height: 320 },
         backgroundColor: "#0b1021",
-        coordinates: { enabled: true },          // overlay is supported on server
+        coordinates: { enabled: true }, // overlay is supported on server
     },
-    center: { x: 2, y: 1 },     // default { x: 0, y: 0 }
-    pixelRatio: 2,              // default 1; physical output scale, logical size unchanged
-    format: "png",              // "png" (default) | "jpeg" | "webp"
-    quality: 90,                // 0-100, JPEG/WebP only, ignored for PNG
+    center: { x: 2, y: 1 }, // default { x: 0, y: 0 }
+    pixelRatio: 2, // default 1; physical output scale, logical size unchanged
+    format: "png", // "png" (default) | "jpeg" | "webp"
+    quality: 90, // 0-100, JPEG/WebP only, ignored for PNG
     draw: (engine) => {
         engine.drawGridLines(1, 1, "#1e2a45", 0);
         engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 0.12, style: { fillStyle: "#4ade80" } }, 1);
@@ -69,23 +79,23 @@ const engine = new CanvasTileEngine(SERVER_MOUNT, config, renderer, { x: 0, y: 0
 
 engine.drawGridLines(1, 1, "#334155", 0);
 engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#22d3ee" } }, 1);
-engine.render();                                   // explicit render required here
+engine.render(); // explicit render required here
 
-const png = renderer.toBuffer("png");              // sync encode
-const jpeg = await renderer.encode("jpeg", 80);    // async encode (prefer in request handlers)
+const png = renderer.toBuffer("png"); // sync encode
+const jpeg = await renderer.encode("jpeg", 80); // async encode (prefer in request handlers)
 
-engine.setCenter({ x: 50, y: 50 });             // camera moves re-render automatically
+engine.setCenter({ x: 50, y: 50 }); // camera moves re-render automatically
 const secondView = await renderer.encode("png");
 
 engine.destroy();
 ```
 
-| Method | Description |
-| :-- | :-- |
-| `renderer.toBuffer(format?, quality?)` | Synchronous encode to `Buffer`. |
-| `renderer.encode(format?, quality?)` | Async encode; keeps the event loop free. |
-| `renderer.getCanvas()` | Underlying `@napi-rs/canvas` Canvas. |
-| `renderer.getContext()` | Underlying `SKRSContext2D`. |
+| Method                                 | Description                              |
+| :------------------------------------- | :--------------------------------------- |
+| `renderer.toBuffer(format?, quality?)` | Synchronous encode to `Buffer`.          |
+| `renderer.encode(format?, quality?)`   | Async encode; keeps the event loop free. |
+| `renderer.getCanvas()`                 | Underlying `@napi-rs/canvas` Canvas.     |
+| `renderer.getContext()`                | Underlying `SKRSContext2D`.              |
 
 `SERVER_MOUNT` is the mount sentinel - always pass it as the wrapper
 argument; there is no DOM element on the server.
@@ -100,10 +110,7 @@ import { registerFont, GlobalFonts } from "@canvas-tile-engine/renderer-server";
 
 registerFont("./fonts/Inter.ttf", "Inter");
 
-engine.drawText(
-    { x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#fff" } },
-    2,
-);
+engine.drawText({ x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#fff" } }, 2);
 ```
 
 `GlobalFonts` (re-exported from `@napi-rs/canvas`) is available for advanced

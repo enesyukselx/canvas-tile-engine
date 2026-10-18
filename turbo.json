@@ -14,6 +14,16 @@
         "test": {
             "dependsOn": ["^build"]
         },
+        "test:platform-types": {
+            "dependsOn": [
+                "build",
+                "@canvas-tile-engine/renderer-server#build",
+                "@canvas-tile-engine/renderer-canvas#build",
+                "@canvas-tile-engine/renderer-webgl#build"
+            ],
+            "cache": false,
+            "passThroughEnv": ["CTE_TYPE_TEST_ARTIFACTS"]
+        },
         "test:watch": {
             "dependsOn": ["^build"],
             "persistent": true,

@@ -8,6 +8,7 @@ import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateScale } from "./utils/validateConfig";
 import { fitScale } from "./utils/fitScale";
 import { snapCenterToGrid } from "./utils/viewport";
+import type { BrowserCanvas, BrowserElement, DefaultImage, DefaultMount } from "./types/platform";
 import {
     Bounds,
     Coords,
@@ -55,7 +56,7 @@ import {
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
  */
-export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement> {
+export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
     private config: Config;
     private camera: Camera;
     private viewport: ViewportState;
@@ -73,7 +74,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * On non-DOM mounts (e.g. React Native / Skia) this is `undefined` at
      * runtime, and the type reflects that so consumers must null-check.
      */
-    public canvas: TMount extends HTMLElement ? HTMLCanvasElement : HTMLCanvasElement | undefined;
+    public canvas: TMount extends BrowserElement ? BrowserCanvas : BrowserCanvas | undefined;
 
     /**
      * Image loader for loading and caching images.
@@ -332,7 +333,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.canvasWrapper = canvasWrapper;
         // Resolve the DOM canvas only when the mount target is a DOM element.
         // Non-DOM platforms (e.g. React Native) leave this undefined.
-        const maybeDom = canvasWrapper as { querySelector?: (selector: string) => HTMLCanvasElement | null };
+        const maybeDom = canvasWrapper as { querySelector?: (selector: string) => BrowserCanvas | null };
         const resolvedCanvas =
             typeof maybeDom?.querySelector === "function" ? (maybeDom.querySelector("canvas") ?? undefined) : undefined;
         this.canvas = resolvedCanvas as this["canvas"];

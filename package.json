@@ -22,6 +22,7 @@
         "format": "turbo run format",
         "format:check": "turbo run format:check",
         "test": "turbo run test",
+        "test:platform-types": "turbo run test:platform-types --filter=@canvas-tile-engine/core",
         "test:watch": "turbo run test:watch",
         "test:coverage": "turbo run test:coverage",
         "changeset": "changeset",

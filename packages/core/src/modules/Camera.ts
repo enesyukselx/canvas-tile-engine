@@ -1,4 +1,4 @@
-import { Coords } from "../types";
+import { Coords, ViewportBounds } from "../types";
 import { computePan, computeZoom } from "../utils/viewport";
 import { DEFAULT_VALUES } from "../constants";
 import { ViewportState } from "./ViewportState";
@@ -28,7 +28,7 @@ export interface ICamera {
      * @param deltaY Wheel delta (positive scroll down).
      * @param canvasRect Canvas bounding rect for mouse offset.
      */
-    zoom(mouseX: number, mouseY: number, deltaY: number, canvasRect: DOMRect): void;
+    zoom(mouseX: number, mouseY: number, deltaY: number, canvasRect: Pick<ViewportBounds, "left" | "top">): void;
 
     /**
      * Canvas center coordinates in world space.
@@ -219,7 +219,7 @@ export class Camera implements ICamera {
         this.clampToBounds();
     }
 
-    zoom(mouseX: number, mouseY: number, deltaY: number, canvasRect: DOMRect) {
+    zoom(mouseX: number, mouseY: number, deltaY: number, canvasRect: Pick<ViewportBounds, "left" | "top">) {
         // Mouse position relative to canvas
         const mx = mouseX - canvasRect.left;
         const my = mouseY - canvasRect.top;
