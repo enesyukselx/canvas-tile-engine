@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
 import { CanvasDraw, type OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
@@ -109,6 +109,38 @@ function makeLineStyleRecordingCtx() {
     };
     return { ctx: ctx as unknown as SKRSContext2D, strokes };
 }
+
+describe("Server CanvasDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setupAtScale(10);
+            const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(ctx);
+            expect(strokes).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+        const moveTo = vi.spyOn(ctx, "moveTo");
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+        expect(moveTo).toHaveBeenCalledTimes(2 * (10 / cellSize + 1));
+
+        draw.removeDrawHandle(handle);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+    });
+});
 
 // Per-item line style contract shared by all renderers (mirrors the canvas
 // suite): item.style overlays the call-level style field by field.

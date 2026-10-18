@@ -40,6 +40,37 @@ beforeEach(() => {
     matchFontCalls.length = 0;
 });
 
+describe("SkiaDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setup();
+            const { canvas, ops } = makeCanvas();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(canvas);
+            expect(ops).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(canvas);
+        const lineCount = 2 * (10 / cellSize + 1);
+        expect(ops.filter((op) => op.op === "line")).toHaveLength(lineCount);
+
+        draw.removeDrawHandle(handle);
+        render(canvas);
+        expect(ops).toHaveLength(lineCount);
+    });
+});
+
 describe("resolveRadius roundRect semantics", () => {
     const rectWithRadius = (radius: number | number[]) => ({
         x: 1,

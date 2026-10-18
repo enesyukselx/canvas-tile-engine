@@ -209,6 +209,7 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
         layer?: number,
         options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
     ): DrawHandle;
+    /** Register a grid with a positive finite cellSize; otherwise throw RangeError synchronously. */
     drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;

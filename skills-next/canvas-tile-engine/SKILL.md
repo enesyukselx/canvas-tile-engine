@@ -55,6 +55,8 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    cell: cell `k` spans world `[k - 0.5, k + 0.5]`, grid lines fall on
    half-integers, and a board of cells `0..N-1` is centered at `(N-1)/2`
    (NOT `N/2` - that is half a cell off).
+   GridLines `cellSize` must be a positive finite number (fractions are
+   supported); invalid intervals throw `RangeError` when registered.
 2. **Retained draw model.** `engine.drawRect(...)` does NOT paint immediately.
    It registers a persistent draw callback on a layer and returns a
    `DrawHandle`. The callback re-runs on every frame. Call `engine.render()`
