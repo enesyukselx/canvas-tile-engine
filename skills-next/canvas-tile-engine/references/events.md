@@ -49,6 +49,15 @@ Touch behavior: taps fire `onClick`; touch drags pan (when `drag` enabled);
 pinch zooms (when `zoom` enabled). A drag suppresses the click that would
 otherwise fire on release.
 
+Browser Canvas2D/WebGL drags track mouse movement and release outside the
+canvas. `onMouseLeave` still fires immediately but does not stop the drag;
+ordinary hover remains local. Release coordinates can be outside the canvas.
+`touchcancel`, window blur, lost mouse buttons, and renderer teardown cancel
+the gesture without clicking, release an active press once via `onMouseUp`
+(last known position if needed), and clear drag/pinch state. Remaining fingers
+from a cancelled touch gesture are ignored until a fresh gesture. Only touches
+that started on the canvas participate; other elements' contacts are excluded.
+
 ## Camera callbacks
 
 ```ts
