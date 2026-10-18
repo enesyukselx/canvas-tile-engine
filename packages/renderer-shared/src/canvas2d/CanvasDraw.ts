@@ -409,9 +409,9 @@ export class CanvasDraw<
                         ? `${style.fontWeight} ${pxSize}px ${family}`
                         : `${pxSize}px ${family}`;
 
-                if (style?.fillStyle) {
-                    ctx.fillStyle = style.fillStyle;
-                }
+                // Resolve every item, including after a styleOf override, so
+                // text never inherits the frame background or a previous label.
+                ctx.fillStyle = style?.fillStyle ?? "#000000";
                 ctx.textAlign = style?.textAlign ?? "center";
                 ctx.textBaseline = style?.textBaseline ?? "middle";
 

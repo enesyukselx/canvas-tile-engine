@@ -141,6 +141,51 @@ describe("color caching", () => {
 });
 
 describe("text rendering", () => {
+    it("resolves black per item after styleOf, preserving explicit and decorated colors", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        let decorated = true;
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "default" },
+                { x: 2, y: 1, text: "explicit", style: { fillStyle: "#ff0000" } },
+                { x: 3, y: 1, text: "after", rotate: 30, style: {} },
+                { x: 4, y: 1, text: "font-only", style: { fillStyle: "#ff0000" } },
+                { x: 5, y: 1, text: "override", style: { fillStyle: "#ff0000" } },
+                { x: 6, y: 1, text: "reset", style: { fillStyle: "#ff0000" } },
+            ],
+            2,
+            {
+                styleOf: (item) => {
+                    if (item.text === "font-only") {
+                        return { fontWeight: "bold" };
+                    }
+                    if (item.text === "override" && decorated) {
+                        return { fillStyle: "#0000ff" };
+                    }
+                    if (item.text === "reset") {
+                        return { fillStyle: undefined };
+                    }
+                    return undefined;
+                },
+            },
+        );
+
+        const colors = () => ops.filter((op) => op.op === "text").map((op) => op.color);
+        render(canvas);
+        expect(colors()).toEqual(
+            ["#000000", "#ff0000", "#000000", "#ff0000", "#0000ff", "#000000"].map((parsed) => ({ parsed })),
+        );
+
+        decorated = false;
+        ops.length = 0;
+        render(canvas);
+        expect(colors()).toEqual(
+            ["#000000", "#ff0000", "#000000", "#ff0000", "#ff0000", "#000000"].map((parsed) => ({ parsed })),
+        );
+    });
+
     it("uses the exact (unrounded) scaled font size", () => {
         const { draw, render } = setup(11.5);
         const { canvas, ops } = makeCanvas();

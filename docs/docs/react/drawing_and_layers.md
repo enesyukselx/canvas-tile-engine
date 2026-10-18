@@ -303,7 +303,7 @@ Render text at world coordinates. Text size scales with zoom.
 
 **Style Options:**
 
-- `fillStyle`: Text color
+- `fillStyle`: Text color (default: black, `"#000000"`, resolved separately for every item after `styleOf`)
 - `fontFamily`: Font family (default: `"sans-serif"`)
 - `fontWeight`: `"normal"`, `"bold"`, or `100`-`900` (default: the family's normal weight)
 - `textAlign`: `"left"`, `"center"`, `"right"`
