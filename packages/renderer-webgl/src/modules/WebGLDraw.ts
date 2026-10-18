@@ -10,10 +10,8 @@ import {
     Line,
     PathItem,
     Rect,
-    SpatialIndex,
     Text,
     resolveLineWidthPx,
-    maxPxExtent,
     resolveBoxPx,
     resolveSizeWorld,
     resolveLineDashPx,
@@ -41,13 +39,21 @@ import type {
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
-import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
+import {
+    PaintedCuller,
+    boxPaintBounds,
+    boxPixelPadding,
+    getViewportBounds,
+    intersectsBounds,
+    linePaintBounds,
+    pathPaintBounds,
+    textPaintBounds,
+} from "@canvas-tile-engine/renderer-shared/geometry";
+import { CanvasTextBounds } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { GLRenderer } from "./gl/GLRenderer";
 import { ImageInstance, LineInstance, ShapeInstance } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
 
-// Threshold for using spatial indexing (below this, linear scan is faster)
-const SPATIAL_INDEX_THRESHOLD = 500;
 // Segment count used to approximate a stroked circle outline.
 const CIRCLE_STROKE_SEGMENTS = 48;
 
@@ -77,6 +83,7 @@ export class WebGLDraw {
         screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
     };
     private colorParser = new ColorParser();
+    private textBounds = new CanvasTextBounds();
 
     constructor(
         private layers: Layer<WebGLDrawContext>,
@@ -107,23 +114,16 @@ export class WebGLDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, maxPxExtent(item)), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             const shapes: ShapeInstance[] = [];
             const lines: LineInstance[] = [];
@@ -138,10 +138,7 @@ export class WebGLDraw {
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                if (
-                    !spatialIndex &&
-                    !isVisible(item.x, item.y, Math.max(pxW, pxH) / (2 * this.camera.scale), topLeft, config)
-                ) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
@@ -193,23 +190,16 @@ export class WebGLDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style, false),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             const shapes: ShapeInstance[] = [];
             const lines: LineInstance[] = [];
@@ -224,7 +214,7 @@ export class WebGLDraw {
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style, false))) {
                     continue;
                 }
 
@@ -276,6 +266,7 @@ export class WebGLDraw {
         const visibleOf = options?.visibleOf;
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
+            const bounds = getViewportBounds(topLeft, config);
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
             const lineWidth = resolveLineWidthPx(style, this.camera.scale);
             const dash = resolveLineDashPx(style, this.camera.scale);
@@ -285,10 +276,7 @@ export class WebGLDraw {
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const centerX = (item.from.x + item.to.x) / 2;
-                const centerY = (item.from.y + item.to.y) / 2;
-                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(bounds, linePaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
@@ -323,20 +311,25 @@ export class WebGLDraw {
         layer: number = 2,
         options?: RendererDrawOptions<Text, TextDecorationStyle>,
     ): DrawHandle {
+        this.textBounds.clear();
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        let culler: PaintedCuller<Text> | undefined;
+        let measuringContext: CanvasRenderingContext2D;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
-                : list;
-
             ctx.save();
+            measuringContext = ctx;
+            culler ??= new PaintedCuller(
+                list,
+                (item, scale) =>
+                    textPaintBounds(item, scale, this.textBounds.measure(measuringContext, item, item.style, scale)),
+                !!styleOf,
+            );
+            const visibleItems = culler.query(bounds, this.camera.scale, this.textBounds.getRevision(ctx));
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -346,10 +339,12 @@ export class WebGLDraw {
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // fontPx is zoom-independent; its world-space extent shrinks as scale grows
-                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
-
-                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                const paintedBounds = textPaintBounds(
+                    item,
+                    this.camera.scale,
+                    this.textBounds.measure(ctx, item, style, this.camera.scale),
+                );
+                if (!intersectsBounds(bounds, paintedBounds)) {
                     continue;
                 }
 
@@ -413,6 +408,7 @@ export class WebGLDraw {
         };
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
+            const viewport = getViewportBounds(topLeft, config);
             const lines: LineInstance[] = [];
 
             for (let n = 0; n < items.length; n++) {
@@ -422,10 +418,7 @@ export class WebGLDraw {
                     continue;
                 }
 
-                const centerX = (bounds.minX + bounds.maxX) / 2;
-                const centerY = (bounds.minY + bounds.maxY) / 2;
-                const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(viewport, pathPaintBounds(bounds, item.style, this.camera.scale))) {
                     continue;
                 }
 
@@ -501,23 +494,16 @@ export class WebGLDraw {
         const list = Array.isArray(items) ? items : [items];
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale),
+            false,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
+        );
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             const images: ImageInstance[] = [];
 
@@ -529,7 +515,7 @@ export class WebGLDraw {
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
 
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale))) {
                     continue;
                 }
 
@@ -685,6 +671,7 @@ export class WebGLDraw {
     destroy() {
         this.layers.clear();
         this.colorParser.clear();
+        this.textBounds.clear();
     }
 
     // ─── Geometry helpers ───

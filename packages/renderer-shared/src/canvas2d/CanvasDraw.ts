@@ -11,11 +11,9 @@ import {
     Line,
     PathItem,
     Rect,
-    SpatialIndex,
     SpriteRect,
     Text,
     resolveLineWidthPx,
-    maxPxExtent,
     resolveBoxPx,
     resolveSizeWorld,
     resolveLineDashPx,
@@ -41,12 +39,20 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "../scene/Layer";
-import { getViewportBounds, isVisible } from "../geometry/culling";
+import { getViewportBounds } from "../geometry/culling";
+import {
+    boxPaintBounds,
+    boxPixelPadding,
+    intersectsBounds,
+    linePaintBounds,
+    PaintedCuller,
+    pathPaintBounds,
+    textPaintBounds,
+} from "../geometry/paintedBounds";
 import { applyLineWidth } from "./applyLineWidth";
+import { CanvasTextBounds } from "./CanvasTextBounds";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
 
-// Threshold for using spatial indexing (below this, linear scan is faster)
-const SPATIAL_INDEX_THRESHOLD = 500;
 // Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
@@ -77,6 +83,7 @@ export class CanvasDraw<
     };
     private staticCaches = new Map<string, StaticCache<TContext, TCanvas>>();
     private warnedStaticCacheDisabled = false;
+    private textBounds = new CanvasTextBounds();
 
     /**
      * @param createOffscreen Offscreen canvas factory for static caching, or
@@ -113,24 +120,16 @@ export class CanvasDraw<
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, maxPxExtent(item)), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             ctx.save();
             let lastFillStyle: string | undefined;
@@ -146,11 +145,7 @@ export class CanvasDraw<
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // Skip visibility check if using spatial index (already filtered)
-                if (
-                    !spatialIndex &&
-                    !isVisible(item.x, item.y, Math.max(pxW, pxH) / (2 * this.camera.scale), topLeft, config)
-                ) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
@@ -211,6 +206,7 @@ export class CanvasDraw<
         const visibleOf = options?.visibleOf;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            const bounds = getViewportBounds(topLeft, config);
             ctx.save();
             const baseStroke = style?.strokeStyle ?? "#000000";
             ctx.strokeStyle = baseStroke;
@@ -240,10 +236,7 @@ export class CanvasDraw<
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const centerX = (item.from.x + item.to.x) / 2;
-                const centerY = (item.from.y + item.to.y) / 2;
-                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(bounds, linePaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
@@ -301,24 +294,16 @@ export class CanvasDraw<
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style, false),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             ctx.save();
             let lastFillStyle: string | undefined;
@@ -334,8 +319,7 @@ export class CanvasDraw<
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style, false))) {
                     continue;
                 }
 
@@ -367,19 +351,26 @@ export class CanvasDraw<
         layer: number = 2,
         options?: RendererDrawOptions<Text, TextDecorationStyle>,
     ): DrawHandle {
+        // Re-registration also refreshes metrics after platform font changes
+        // on hosts without a font-loading event source (e.g. server canvas).
+        this.textBounds.clear();
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        let culler: PaintedCuller<Text>;
+        let measuringContext: TContext;
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
-                : list;
+            measuringContext = ctx;
+            culler ??= new PaintedCuller(
+                list,
+                (item, scale) =>
+                    textPaintBounds(item, scale, this.textBounds.measure(measuringContext, item, item.style, scale)),
+                !!styleOf,
+            );
+            const visibleItems = culler.query(bounds, this.camera.scale, this.textBounds.getRevision(ctx));
 
             ctx.save();
 
@@ -391,11 +382,16 @@ export class CanvasDraw<
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // fontPx is zoom-independent; its world-space extent shrinks as scale grows
-                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
-
-                // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                if (
+                    !intersectsBounds(
+                        bounds,
+                        textPaintBounds(
+                            item,
+                            this.camera.scale,
+                            this.textBounds.measure(ctx, item, style, this.camera.scale),
+                        ),
+                    )
+                ) {
                     continue;
                 }
 
@@ -444,6 +440,7 @@ export class CanvasDraw<
         const itemBounds = items.map((item) => pathItemBounds(item));
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+            const viewport = getViewportBounds(topLeft, config);
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
@@ -451,10 +448,7 @@ export class CanvasDraw<
                     continue;
                 }
 
-                const centerX = (bounds.minX + bounds.maxX) / 2;
-                const centerY = (bounds.minY + bounds.maxY) / 2;
-                const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(viewport, pathPaintBounds(bounds, item.style, this.camera.scale))) {
                     continue;
                 }
 
@@ -547,24 +541,16 @@ export class CanvasDraw<
         const list = Array.isArray(items) ? items : [items];
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale),
+            false,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
+        );
 
         return this.layers.add(layer, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -574,8 +560,7 @@ export class CanvasDraw<
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
 
-                // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale))) {
                     continue;
                 }
 
@@ -1118,6 +1103,7 @@ export class CanvasDraw<
      * Release cached canvases and layer callbacks.
      */
     destroy() {
+        this.textBounds.clear();
         this.staticCaches.clear();
         this.layers.clear();
     }

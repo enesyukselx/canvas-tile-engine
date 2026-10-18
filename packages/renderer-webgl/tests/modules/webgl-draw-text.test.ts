@@ -16,6 +16,16 @@ function makeTextRecordingCtx() {
         restore() {},
         translate() {},
         rotate() {},
+        measureText(text: string) {
+            const size = Number(/([\d.]+)px/.exec(ctx.font)?.[1] ?? 10);
+            const halfWidth = (text.length * size * 0.6) / 2;
+            return {
+                actualBoundingBoxLeft: halfWidth,
+                actualBoundingBoxRight: halfWidth,
+                actualBoundingBoxAscent: size / 2,
+                actualBoundingBoxDescent: size / 2,
+            };
+        },
         fillText(text: string) {
             texts.push({ text, font: ctx.font });
         },
@@ -73,7 +83,7 @@ describe("WebGLDraw text font sizing", () => {
         }
     });
 
-    it("culls with the fontPx world-space extent (fontPx / scale)", () => {
+    it("culls with the measured fontPx ink bounds", () => {
         const { draw, render } = setupAtScale(10);
         const { ctx, texts } = makeTextRecordingCtx();
 
