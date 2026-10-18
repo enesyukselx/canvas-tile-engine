@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
+import { CoordinateTransformer, ICamera, type Circle, type Rect } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
 import { COLOR_CACHE_LIMIT, SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
@@ -410,6 +410,260 @@ describe("static picture cache", () => {
         draw.drawStaticRect([], "cache-e", 1);
         render(canvas);
         expect(ops).toHaveLength(0);
+    });
+});
+
+describe("static picture painted bounds", () => {
+    interface Box {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }
+
+    interface Bounds {
+        minX: number;
+        minY: number;
+        maxX: number;
+        maxY: number;
+    }
+
+    function recordedPicture(ops: Op[]): MockPicture {
+        const picture = ops.find((op) => op.op === "picture")?.picture as MockPicture;
+        expect(picture).toBeDefined();
+        return picture;
+    }
+
+    // Inspect the actual recording, independently of the production bounds
+    // helper. A rectangle's stroke box must rotate with its geometry: adding
+    // half the stroke width after rotation misses its outer mitered corners.
+    function rotatedBounds(box: Box, picture: MockPicture, halfStroke = 0): Bounds {
+        const rotation = picture.ops.find((op) => op.op === "rotate");
+        const radians = ((rotation?.deg as number | undefined) ?? 0) * (Math.PI / 180);
+        const cx = (rotation?.px as number | undefined) ?? box.x + box.width / 2;
+        const cy = (rotation?.py as number | undefined) ?? box.y + box.height / 2;
+        const corners = [
+            [box.x - halfStroke, box.y - halfStroke],
+            [box.x + box.width + halfStroke, box.y - halfStroke],
+            [box.x + box.width + halfStroke, box.y + box.height + halfStroke],
+            [box.x - halfStroke, box.y + box.height + halfStroke],
+        ].map(([x, y]) => ({
+            x: cx + (x - cx) * Math.cos(radians) - (y - cy) * Math.sin(radians),
+            y: cy + (x - cx) * Math.sin(radians) + (y - cy) * Math.cos(radians),
+        }));
+        return {
+            minX: Math.min(...corners.map((point) => point.x)),
+            minY: Math.min(...corners.map((point) => point.y)),
+            maxX: Math.max(...corners.map((point) => point.x)),
+            maxY: Math.max(...corners.map((point) => point.y)),
+        };
+    }
+
+    function expectPaddedCull(picture: MockPicture, painted: Bounds) {
+        const cull = picture.bounds as Box;
+        const right = cull.x + cull.width;
+        const bottom = cull.y + cull.height;
+        // One raster pixel of antialias padding, then outward pixel snapping.
+        // Keep each margin below two pixels so a fixed world-unit heuristic
+        // or a very loose enclosing square cannot satisfy the regression.
+        for (const margin of [
+            painted.minX - cull.x,
+            painted.minY - cull.y,
+            right - painted.maxX,
+            bottom - painted.maxY,
+        ]) {
+            expect(margin).toBeGreaterThanOrEqual(1 - 1e-9);
+            expect(margin).toBeLessThan(2 + 1e-9);
+        }
+        for (const edge of [cull.x, cull.y, right, bottom]) {
+            expect(edge).toBeCloseTo(Math.round(edge), 9);
+        }
+    }
+
+    it.each<{ name: string; scale: number; item: Rect; strokeWidth: number }>([
+        {
+            name: "a large rotated nonsquare fill at negative fractional coordinates",
+            scale: 7.5,
+            item: { x: -12.25, y: -8.75, width: 32, height: 20, rotate: 45, style: { fillStyle: "#f00" } },
+            strokeWidth: 0,
+        },
+        {
+            name: "a self-origin rectangle with a thick world-unit stroke",
+            scale: 6.25,
+            item: {
+                x: -18.3,
+                y: -4.2,
+                width: 18,
+                height: 4,
+                origin: { mode: "self", x: 0, y: 1 },
+                rotate: -33,
+                style: { strokeStyle: "#f00", lineWidth: 6 },
+            },
+            strokeWidth: 37.5,
+        },
+        {
+            name: "a shifted cell origin and pixel stroke overriding world width",
+            scale: 3.5,
+            item: {
+                x: -4.3,
+                y: 2.1,
+                width: 2,
+                height: 12,
+                sizePx: 1000,
+                widthPx: 2000,
+                heightPx: 3000,
+                origin: { mode: "cell", x: -2, y: 3 },
+                rotate: 70,
+                style: { strokeStyle: "#00f", lineWidth: 100, lineWidthPx: 48 },
+            },
+            strokeWidth: 48,
+        },
+        {
+            name: "the default one-pixel stroke at a sub-unit recording scale",
+            scale: 0.5,
+            item: { x: -2.3, y: -5.7, width: 2, height: 4, style: { strokeStyle: "#000" } },
+            strokeWidth: 1,
+        },
+    ])("contains $name", ({ scale, item, strokeWidth }) => {
+        const { draw, render } = setup(scale);
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticRect([item], "painted-rect", 1);
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const rectOp = picture.ops.find((op) => op.op === "rect") as Op;
+        const rect = rectOp.rect as Box;
+        // Static geometry continues to use world dimensions, even if the
+        // item also contains dynamic-path sizePx/widthPx/heightPx fields.
+        expect(rect.width).toBe((item.width ?? item.size ?? 1) * scale);
+        expect(rect.height).toBe((item.height ?? item.size ?? 1) * scale);
+        if (strokeWidth > 0) {
+            expect(rectOp.strokeWidth).toBe(strokeWidth);
+        }
+        expectPaddedCull(picture, rotatedBounds(rect, picture, strokeWidth / 2));
+    });
+
+    it.each<{ name: string; scale: number; item: Circle; strokeWidth: number }>([
+        {
+            name: "a self-origin circle and its thick world stroke",
+            scale: 4.5,
+            item: {
+                x: -14.1,
+                y: -8.3,
+                size: 12,
+                sizePx: 2000,
+                origin: { mode: "self", x: 0, y: 1 },
+                style: { strokeStyle: "#0f0", lineWidth: 8 },
+            },
+            strokeWidth: 36,
+        },
+        {
+            name: "a shifted cell-origin circle with a pixel stroke",
+            scale: 2.75,
+            item: {
+                x: -10.2,
+                y: 3.1,
+                size: 4,
+                origin: { x: -3, y: 2 },
+                style: { strokeStyle: "#00f", lineWidth: 20, lineWidthPx: 50 },
+            },
+            strokeWidth: 50,
+        },
+    ])("contains $name", ({ scale, item, strokeWidth }) => {
+        const { draw, render } = setup(scale);
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticCircle([item], "painted-circle", 1);
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const circle = picture.ops.find((op) => op.op === "circle") as Op;
+        expect(circle.r).toBe(((item.size ?? 1) * scale) / 2);
+        expect(circle.strokeWidth).toBe(strokeWidth);
+        const radius = (circle.r as number) + strokeWidth / 2;
+        expectPaddedCull(picture, {
+            minX: (circle.cx as number) - radius,
+            minY: (circle.cy as number) - radius,
+            maxX: (circle.cx as number) + radius,
+            maxY: (circle.cy as number) + radius,
+        });
+    });
+
+    it.each([
+        { name: "the full image", sprite: undefined, width: 150, height: 50 },
+        { name: "a tall sprite from a wide image", sprite: { x: 6, y: 8, w: 24, h: 72 }, width: 50, height: 150 },
+    ])("tightly contains the rotated aspect-fit destination of $name", ({ sprite, width, height }) => {
+        const { draw, render } = setup(7.5);
+        const { canvas, ops } = makeCanvas();
+        const img = { width: () => 360, height: () => 120 } as unknown as import("@shopify/react-native-skia").SkImage;
+        draw.drawStaticImage(
+            [
+                {
+                    x: -18.4,
+                    y: -12.6,
+                    size: 20,
+                    sizePx: 3000,
+                    origin: { mode: "self", x: 1, y: 0 },
+                    rotate: -47,
+                    flipX: true,
+                    img,
+                    sprite,
+                },
+            ],
+            "painted-image",
+            1,
+        );
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const imageOp = picture.ops.find((op) => op.op === "image") as Op;
+        const dest = imageOp.dest as Box;
+        expect(dest).toMatchObject({ width, height });
+        expect(imageOp.src).toEqual(
+            sprite ? { x: 6, y: 8, width: 24, height: 72 } : { x: 0, y: 0, width: 360, height: 120 },
+        );
+        expectPaddedCull(picture, rotatedBounds(dest, picture));
+    });
+
+    it("excludes skipped zero-dimension images from a valid batch's bounds", () => {
+        const { draw, render } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        const empty = { width: () => 0, height: () => 0 } as unknown as import("@shopify/react-native-skia").SkImage;
+        const loaded = {
+            width: () => 100,
+            height: () => 100,
+        } as unknown as import("@shopify/react-native-skia").SkImage;
+        draw.drawStaticImage(
+            [
+                { x: 10000, y: 10000, img: empty },
+                { x: -4.2, y: -3.3, size: 4, img: loaded },
+            ],
+            "painted-image-skip-empty",
+            1,
+        );
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const images = picture.ops.filter((op) => op.op === "image");
+        expect(images).toHaveLength(1);
+        expectPaddedCull(picture, rotatedBounds(images[0].dest as Box, picture));
+    });
+
+    it("safely handles an image batch with no paintable dimensions", () => {
+        const { draw, render } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        const empty = { width: () => 0, height: () => 0 } as unknown as import("@shopify/react-native-skia").SkImage;
+        expect(() => {
+            draw.drawStaticImage([{ x: -20, y: -10, img: empty }], "painted-image-all-empty", 1);
+            render(canvas);
+        }).not.toThrow();
+
+        for (const op of ops.filter((op) => op.op === "picture")) {
+            const picture = op.picture as MockPicture;
+            expect(picture.ops.filter((entry) => entry.op === "image")).toHaveLength(0);
+            for (const value of Object.values(picture.bounds as Box)) {
+                expect(Number.isFinite(value)).toBe(true);
+            }
+        }
     });
 });
 
