@@ -576,13 +576,19 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.config._setPlatformReducedMotion(value);
     }
 
-    /** Snapshot of current normalized config. */
+    /**
+     * Snapshot of normalized config with live scale, scale limits and viewport size.
+     * Responsive limits may differ from the authored config; reading them does not
+     * change the baseline used to calculate limits on subsequent resizes.
+     */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
         const size = this.viewport.getSize();
         return {
             ...base,
             scale: this.camera.scale,
+            minScale: this.camera.minScale,
+            maxScale: this.camera.maxScale,
             size: { ...size },
         };
     }

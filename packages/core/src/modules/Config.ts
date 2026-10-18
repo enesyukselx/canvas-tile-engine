@@ -131,9 +131,12 @@ export class Config implements MotionPolicy {
 
     /**
      * Get the current configuration as an immutable snapshot.
+     * This stores authored settings, including runtime replacements; responsive
+     * camera limits do not overwrite the scale/size baseline here. The engine's
+     * public `getConfig()` overlays live camera values on this snapshot.
      *
      * The returned object is deeply frozen and shared — do not mutate it.
-     * Runtime updates (`updateEventHandlers`, `updateBounds`) replace the
+     * Runtime updates (`updateEventHandlers`, `updateBounds`, `updateScaleLimits`) replace the
      * snapshot with a new frozen object, so previously returned references
      * keep their old values. Returning the frozen instance avoids the deep
      * copy this method used to make on every call (it runs on every pointer
