@@ -441,7 +441,8 @@ export interface ICamera {
 
     pan(dx: number, dy: number): void;
     zoom(screenX: number, screenY: number, deltaY: number, bounds: ViewportBounds): void;
-    zoomByFactor(factor: number, centerX: number, centerY: number): void;
+    /** Zoom around a screen point, optionally moving it to targetX/targetY in the same transform. */
+    zoomByFactor(factor: number, centerX: number, centerY: number, targetX?: number, targetY?: number): void;
     setScale(scale: number): void;
     setScaleLimits(minScale: number, maxScale: number): void;
     setCenter(center: Coords, viewportWidth: number, viewportHeight: number): void;

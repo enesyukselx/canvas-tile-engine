@@ -49,6 +49,11 @@ Touch behavior: taps fire `onClick`; touch drags pan (when `drag` enabled);
 pinch zooms (when `zoom` enabled). A drag suppresses the click that would
 otherwise fire on release.
 
+In pointer zoom mode, a moving pinch midpoint keeps the same world point
+underneath it unless camera bounds constrain the result. This translation
+still works at `minScale`/`maxScale`. Center zoom mode ignores midpoint
+movement and keeps the viewport center anchored.
+
 ## Camera callbacks
 
 ```ts
