@@ -140,11 +140,11 @@ describe("touch transport (react-native-gesture-handler)", () => {
         );
         expect(fake.dispatchTouchEnd).toHaveBeenCalledWith([{ x: 100, y: 60, clientX: 100, clientY: 60 }]);
 
-        // Final lift: multi-touch disqualifies both the tap and the pointer-up.
+        // Final lift: multi-touch disqualifies the tap, but must release the press.
         up(touchEvent([{ id: 1, x: 100, y: 60 }]));
         expect(fake.dispatchTouchEnd).toHaveBeenLastCalledWith([]);
         expect(fake.dispatchTap).not.toHaveBeenCalled();
-        expect(fake.dispatchPointerUp).not.toHaveBeenCalled();
+        expect(fake.dispatchPointerUp).toHaveBeenCalledTimes(1);
     });
 
     it("resyncs the engine when a finger count change arrives only on move", () => {
