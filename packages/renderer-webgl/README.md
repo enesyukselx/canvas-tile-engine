@@ -76,12 +76,12 @@ export function Map() {
 | WebGL canvas      | Rects, circles, images, lines, paths, grid lines, and shape strokes.         |
 | 2D overlay canvas | Text, coordinate overlay, debug HUD, `addDrawFunction`, and `engine.onDraw`. |
 
-Geometry is batched by layer. Filled rects, rounded rects, and circles use shader-based rendering; lines and paths are expanded into triangles; images are uploaded as cached GPU textures.
+Geometry is drawn in layer order, batching consecutive compatible paints within each draw call. Each item's fill is painted before its stroke, and both precede the next item's fill. Mixed fills and strokes can require additional GPU calls to preserve this order. Filled rects, rounded rects, and circles use shader-based rendering; lines and paths are expanded into triangles; images are uploaded as cached GPU textures.
 
 ## Differences From Canvas2D
 
 - Text and user custom draw functions live on the upper 2D overlay, so they composite above every WebGL primitive even if their layer number is lower. Ordering within each surface is preserved.
-- `drawStaticRect`, `drawStaticCircle`, and `drawStaticImage` delegate to dynamic drawing. A WebGL layer is already batched, so the Canvas2D offscreen static cache is usually unnecessary.
+- `drawStaticRect`, `drawStaticCircle`, and `drawStaticImage` delegate to dynamic drawing and use the same order-preserving GPU batches instead of the Canvas2D offscreen static cache.
 - Image sources are uploaded to the GPU and cached. Dimension changes are detected automatically, but if you mutate pixels at the same size, call `renderer.invalidateTexture(source)`.
 - The renderer prefers WebGL 2 and falls back to WebGL 1. If neither is available, `init()` throws.
 
