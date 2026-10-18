@@ -55,12 +55,12 @@ const png = await renderToBuffer({
 
 ## Output Options
 
-| Option | Default | Description |
-| :-- | :-- | :-- |
-| `center` | `{ x: 0, y: 0 }` | Initial world center. |
-| `pixelRatio` | `1` | Physical output scale. Logical `config.size` stays unchanged. |
-| `format` | `"png"` | `"png"`, `"jpeg"`, or `"webp"`. |
-| `quality` | - | `0-100` for JPEG/WebP. Ignored for PNG. |
+| Option       | Default          | Description                                                   |
+| :----------- | :--------------- | :------------------------------------------------------------ |
+| `center`     | `{ x: 0, y: 0 }` | Initial world center.                                         |
+| `pixelRatio` | `1`              | Physical output scale. Logical `config.size` stays unchanged. |
+| `format`     | `"png"`          | `"png"`, `"jpeg"`, or `"webp"`.                               |
+| `quality`    | -                | `0-100` for JPEG/WebP. Ignored for PNG.                       |
 
 ## Low-Level API
 
@@ -83,12 +83,32 @@ const jpeg = await renderer.encode("jpeg", 80);
 engine.destroy();
 ```
 
-| Method | Description |
-| :-- | :-- |
-| `renderer.toBuffer(format?, quality?)` | Synchronous encode to `Buffer`. |
-| `renderer.encode(format?, quality?)` | Async encode to `Buffer`; better for request handlers. |
-| `renderer.getCanvas()` | Accesses the underlying `@napi-rs/canvas` canvas. |
-| `renderer.getContext()` | Accesses the underlying `SKRSContext2D`. |
+| Method                                 | Description                                            |
+| :------------------------------------- | :----------------------------------------------------- |
+| `renderer.toBuffer(format?, quality?)` | Synchronous encode to `Buffer`.                        |
+| `renderer.encode(format?, quality?)`   | Async encode to `Buffer`; better for request handlers. |
+| `renderer.getCanvas()`                 | Accesses the underlying `@napi-rs/canvas` canvas.      |
+| `renderer.getContext()`                | Accesses the underlying `SKRSContext2D`.               |
+
+## Native Types and Constructors
+
+`Image`, `Canvas`, and `SKRSContext2D` are **type-only** exports from
+`@canvas-tile-engine/renderer-server`. Use them with `import type` for annotations;
+`new Image()` or `new Canvas()` imported from this package is not supported.
+For native constructors or factories, add `@napi-rs/canvas` as a direct dependency
+and import the runtime values from it:
+
+```ts
+import type { Image, Canvas, SKRSContext2D } from "@canvas-tile-engine/renderer-server";
+import { Image as NativeImage, createCanvas } from "@napi-rs/canvas";
+
+const image: Image = new NativeImage();
+const canvas: Canvas = createCanvas(256, 256);
+const context: SKRSContext2D = canvas.getContext("2d");
+```
+
+`RendererServer`, `SERVER_MOUNT`, `renderToBuffer`, `registerFont`, and
+`GlobalFonts` are the package's runtime exports in both ESM and CommonJS.
 
 ## Fonts
 
@@ -99,10 +119,7 @@ import { registerFont } from "@canvas-tile-engine/renderer-server";
 
 registerFont("./fonts/Inter.ttf", "Inter");
 
-engine.drawText(
-    { x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#fff" } },
-    2,
-);
+engine.drawText({ x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#fff" } }, 2);
 ```
 
 `GlobalFonts` is also re-exported for advanced font management.
