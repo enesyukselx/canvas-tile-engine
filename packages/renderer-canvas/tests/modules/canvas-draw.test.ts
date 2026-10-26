@@ -451,6 +451,52 @@ function setupAtScale(scale: number) {
     return { draw, render };
 }
 
+describe("CanvasDraw text color", () => {
+    it("resolves black per item after styleOf, without inheriting context or previous text colors", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx } = makeTextRecordingCtx();
+        const colors: unknown[] = [];
+        ctx.fillText = () => colors.push(ctx.fillStyle);
+        let decorated = true;
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "default" },
+                { x: 2, y: 1, text: "explicit", style: { fillStyle: "#ff0000" } },
+                { x: 3, y: 1, text: "after", rotate: 30, style: {} },
+                { x: 4, y: 1, text: "font-only", style: { fillStyle: "#ff0000" } },
+                { x: 5, y: 1, text: "override", style: { fillStyle: "#ff0000" } },
+                { x: 6, y: 1, text: "reset", style: { fillStyle: "#ff0000" } },
+            ],
+            2,
+            {
+                styleOf: (item) => {
+                    if (item.text === "font-only") {
+                        return { fontWeight: "bold" };
+                    }
+                    if (item.text === "override" && decorated) {
+                        return { fillStyle: "#0000ff" };
+                    }
+                    if (item.text === "reset") {
+                        return { fillStyle: undefined };
+                    }
+                    return undefined;
+                },
+            },
+        );
+
+        ctx.fillStyle = "#ffffff";
+        render(ctx);
+        expect(colors).toEqual(["#000000", "#ff0000", "#000000", "#ff0000", "#0000ff", "#000000"]);
+
+        decorated = false;
+        colors.length = 0;
+        ctx.fillStyle = "#ffffff";
+        render(ctx);
+        expect(colors).toEqual(["#000000", "#ff0000", "#000000", "#ff0000", "#ff0000", "#000000"]);
+    });
+});
+
 // Font sizing contract shared by all renderers: px = fontPx ?? size * scale.
 // The same fixture values are asserted in the webgl, skia, and server suites.
 describe("CanvasDraw text font sizing", () => {

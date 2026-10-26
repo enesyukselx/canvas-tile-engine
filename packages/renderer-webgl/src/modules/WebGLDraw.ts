@@ -361,9 +361,8 @@ export class WebGLDraw {
                         ? `${style.fontWeight} ${pxSize}px ${family}`
                         : `${pxSize}px ${family}`;
 
-                if (style?.fillStyle) {
-                    ctx.fillStyle = style.fillStyle;
-                }
+                // Match Canvas2D and Skia instead of inheriting overlay state.
+                ctx.fillStyle = style?.fillStyle ?? "#000000";
                 ctx.textAlign = style?.textAlign ?? "center";
                 ctx.textBaseline = style?.textBaseline ?? "middle";
 

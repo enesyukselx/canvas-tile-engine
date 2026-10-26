@@ -258,6 +258,10 @@ engine.drawText({
 engine.drawText({ x: 0, y: 0, text: "Ankara", fontPx: 14 }, 2);
 ```
 
+Text color defaults to black (`"#000000"`) on every renderer, independently for
+each item after merging `styleOf`. Returning `undefined` from `styleOf` keeps
+the item's style; returning `{ fillStyle: undefined }` resets its color to black.
+
 On the WebGL renderer text is painted on a 2D overlay canvas and always
 composites ABOVE all GPU primitives regardless of layer (see
 [performance.md](performance.md)). On the server, register fonts first (see
