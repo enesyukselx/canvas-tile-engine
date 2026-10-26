@@ -22,15 +22,14 @@ import {
     computeOriginOffset,
     traceRoundedPath,
     traceCommands,
-    itemsBounds,
     pathItemBounds,
     type CommandTraceTarget,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
     FontWeight,
-    Bounds,
     AnchoredItem,
+    Bounds,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -63,6 +62,10 @@ import {
     linePaintBounds,
     pathPaintBounds,
     textPaintBounds,
+    staticCacheBounds,
+    staticRectPaintBounds,
+    staticCirclePaintBounds,
+    staticImagePaintBounds,
 } from "@canvas-tile-engine/renderer-shared/geometry";
 
 /** matchFont's weight argument; its input type is not exported by the package. */
@@ -707,20 +710,32 @@ export class SkiaDraw {
     // hold.
 
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintRect(canvas, item, pos, cellSize, false),
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            staticRectPaintBounds,
+            (canvas, item, pos, cellSize) => this.paintRect(canvas, item, pos, cellSize, false),
         );
     }
 
     drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintCircle(canvas, item, pos, cellSize, false),
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            staticCirclePaintBounds,
+            (canvas, item, pos, cellSize) => this.paintCircle(canvas, item, pos, cellSize, false),
         );
     }
 
     drawStaticImage(items: Array<ImageItem<SkImage>>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintImage(canvas, item, pos, cellSize, false),
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (item) => staticImagePaintBounds(item, item.img.width(), item.img.height()),
+            (canvas, item, pos, cellSize) => this.paintImage(canvas, item, pos, cellSize, false),
         );
     }
 
@@ -743,6 +758,7 @@ export class SkiaDraw {
         cacheKey: string,
         items: T[],
         layer: number,
+        boundsOf: (item: T, scale: number) => Bounds | null,
         paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
     ): DrawHandle {
         if (items.length === 0) {
@@ -751,7 +767,7 @@ export class SkiaDraw {
 
         let entry = this.staticPictureCache.get(cacheKey);
         if (!entry) {
-            entry = this.recordStaticPicture(items, paintItem);
+            entry = this.recordStaticPicture(items, boundsOf, paintItem);
             this.staticPictureCache.set(cacheKey, entry);
         }
         const { picture, recordScale } = entry;
@@ -773,28 +789,26 @@ export class SkiaDraw {
     /** Record `items` into a picture using a camera fixed at (0, 0) and the current scale. */
     private recordStaticPicture<T extends AnchoredItem>(
         items: T[],
+        boundsOf: (item: T, scale: number) => Bounds | null,
         paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
     ): { picture: SkPicture; recordScale: number } {
         const recordScale = this.camera.scale;
 
-        // Cull rect covering all items, padded by one world unit for origin
-        // offsets and rotation — same bounds heuristic as the Canvas2D cache,
-        // and now the same helper, so per-axis width/height cannot be missed
-        // (a wide rect used to record outside its own cull rect).
-        // An empty list never reaches here (addStaticPictureLayer returns
-        // early); the fallback keeps the rect finite rather than NaN if that
-        // ever changes.
-        const box = itemsBounds(items) ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-        const minX = box.minX - 1;
-        const minY = box.minY - 1;
-        const maxX = box.maxX + 1;
-        const maxY = box.maxY + 1;
+        // Same painted bounds as Canvas2D, already in corner-space with the
+        // cell-center offset, origins, rotation, and recorded strokes included.
+        // Empty registrations return before reaching this method.
+        const { minX, minY, maxX, maxY } = staticCacheBounds(items, recordScale, boundsOf) ?? {
+            minX: 0,
+            minY: 0,
+            maxX: 0,
+            maxY: 0,
+        };
 
         const recorder = Skia.PictureRecorder();
         const canvas = recorder.beginRecording(
             Skia.XYWHRect(
-                (minX + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
-                (minY + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+                minX * recordScale,
+                minY * recordScale,
                 (maxX - minX) * recordScale,
                 (maxY - minY) * recordScale,
             ),

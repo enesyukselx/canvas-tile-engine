@@ -24,12 +24,12 @@ import {
     computeOriginOffset,
     traceRoundedPath,
     traceCommands,
-    itemsBounds,
     pathItemBounds,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
     AnchoredItem,
+    Bounds,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -49,6 +49,12 @@ import {
     pathPaintBounds,
     textPaintBounds,
 } from "../geometry/paintedBounds";
+import {
+    staticCacheBounds,
+    staticRectPaintBounds,
+    staticCirclePaintBounds,
+    staticImagePaintBounds,
+} from "../geometry/staticBounds";
 import { applyLineWidth } from "./applyLineWidth";
 import { CanvasTextBounds } from "./CanvasTextBounds";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
@@ -706,6 +712,7 @@ export class CanvasDraw<
     >(
         items: T[],
         cacheKey: string,
+        boundsOf: (item: T, scale: number) => Bounds | null,
         renderFn: (ctx: TContext, item: T, x: number, y: number, pxW: number, pxH: number) => void,
     ): StaticCache<TContext, TCanvas> | null {
         if (!this.createOffscreen) {
@@ -716,25 +723,20 @@ export class CanvasDraw<
             return null;
         }
 
-        const box = itemsBounds(items);
+        const renderScale = this.camera.scale;
+        const box = staticCacheBounds(items, renderScale, boundsOf);
         if (!box) {
             return null;
         }
 
-        // One world unit of padding absorbs origin offsets and rotation, which
-        // itemsBounds leaves out.
-        const minX = box.minX - 1;
-        const minY = box.minY - 1;
-        const maxX = box.maxX + 1;
-        const maxY = box.maxY + 1;
+        const { minX, minY, maxX, maxY } = box;
 
         const worldWidth = maxX - minX;
         const worldHeight = maxY - minY;
 
-        // Use current scale for rendering
-        const renderScale = this.camera.scale;
-        const canvasWidth = Math.ceil(worldWidth * renderScale);
-        const canvasHeight = Math.ceil(worldHeight * renderScale);
+        // Bounds already snap outwards to integer raster coordinates.
+        const canvasWidth = Math.round(worldWidth * renderScale);
+        const canvasHeight = Math.round(worldHeight * renderScale);
 
         if (canvasWidth > MAX_STATIC_CANVAS_DIMENSION || canvasHeight > MAX_STATIC_CANVAS_DIMENSION) {
             if (!this.warnedStaticCacheDisabled) {
@@ -899,47 +901,52 @@ export class CanvasDraw<
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxW, pxH) => {
-            const style = item.style;
-            const rotationDeg = item.rotate ?? 0;
-            const rotation = rotationDeg * (Math.PI / 180);
-            // Cache renders at the current camera scale, so world-unit radii
-            // resolve against it (the cache rebuilds when the scale changes).
-            const radius = resolveRadiusPx(item.radius, this.camera.scale);
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            staticRectPaintBounds,
+            (ctx, item, x, y, pxW, pxH) => {
+                const style = item.style;
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+                // Cache renders at the current camera scale, so world-unit radii
+                // resolve against it (the cache rebuilds when the scale changes).
+                const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
-            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                ctx.fillStyle = style.fillStyle;
-                lastFillStyle = style.fillStyle;
-            }
-            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
-                ctx.strokeStyle = style.strokeStyle;
-                lastStrokeStyle = style.strokeStyle;
-            }
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
 
-            if (rotationDeg !== 0) {
-                const centerX = x + pxW / 2;
-                const centerY = y + pxH / 2;
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(rotation);
-                ctx.beginPath();
-                if (radius && ctx.roundRect) {
-                    ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
+                if (rotationDeg !== 0) {
+                    const centerX = x + pxW / 2;
+                    const centerY = y + pxH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
+                    } else {
+                        ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
+                    }
+                    this.fillStrokePath(ctx, style, this.camera.scale);
+                    ctx.restore();
                 } else {
-                    ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(x, y, pxW, pxH, radius);
+                    } else {
+                        ctx.rect(x, y, pxW, pxH);
+                    }
+                    this.fillStrokePath(ctx, style, this.camera.scale);
                 }
-                this.fillStrokePath(ctx, style, this.camera.scale);
-                ctx.restore();
-            } else {
-                ctx.beginPath();
-                if (radius && ctx.roundRect) {
-                    ctx.roundRect(x, y, pxW, pxH, radius);
-                } else {
-                    ctx.rect(x, y, pxW, pxH);
-                }
-                this.fillStrokePath(ctx, style, this.camera.scale);
-            }
-        });
+            },
+        );
 
         if (!cache) {
             // Every fallback keeps the static world-size contract, just like
@@ -962,49 +969,54 @@ export class CanvasDraw<
      * @param layer Layer order
      */
     drawStaticImage(items: Array<ImageItem<TImage>>, cacheKey: string, layer: number = 1): DrawHandle {
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
-            const img = item.img;
-            const sprite = item.sprite;
-            const opacity = item.opacity ?? 1;
-            const rotationDeg = item.rotate ?? 0;
-            const rotation = rotationDeg * (Math.PI / 180);
-            const flipX = item.flipX === true;
-            const flipY = item.flipY === true;
-            const srcW = sprite?.w ?? img.width;
-            const srcH = sprite?.h ?? img.height;
-            const aspect = srcW / srcH;
-            let drawW = pxSize;
-            let drawH = pxSize;
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            (item) => staticImagePaintBounds(item, item.img.width, item.img.height),
+            (ctx, item, x, y, pxSize, _pxH) => {
+                const img = item.img;
+                const sprite = item.sprite;
+                const opacity = item.opacity ?? 1;
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+                const flipX = item.flipX === true;
+                const flipY = item.flipY === true;
+                const srcW = sprite?.w ?? img.width;
+                const srcH = sprite?.h ?? img.height;
+                const aspect = srcW / srcH;
+                let drawW = pxSize;
+                let drawH = pxSize;
 
-            if (aspect > 1) {
-                drawH = pxSize / aspect;
-            } else {
-                drawW = pxSize * aspect;
-            }
-
-            // x, y are top-left of pxSize box, need to center image within it
-            const imgX = x + (pxSize - drawW) / 2;
-            const imgY = y + (pxSize - drawH) / 2;
-
-            if (rotationDeg !== 0 || flipX || flipY) {
-                const centerX = imgX + drawW / 2;
-                const centerY = imgY + drawH / 2;
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                if (rotationDeg !== 0) {
-                    ctx.rotate(rotation);
+                if (aspect > 1) {
+                    drawH = pxSize / aspect;
+                } else {
+                    drawW = pxSize * aspect;
                 }
-                // Flip is scale-independent, so unlike sizePx it is honored
-                // in static caches too (mirrored first, rotation second).
-                if (flipX || flipY) {
-                    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+
+                // x, y are top-left of pxSize box, need to center image within it
+                const imgX = x + (pxSize - drawW) / 2;
+                const imgY = y + (pxSize - drawH) / 2;
+
+                if (rotationDeg !== 0 || flipX || flipY) {
+                    const centerX = imgX + drawW / 2;
+                    const centerY = imgY + drawH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    if (rotationDeg !== 0) {
+                        ctx.rotate(rotation);
+                    }
+                    // Flip is scale-independent, so unlike sizePx it is honored
+                    // in static caches too (mirrored first, rotation second).
+                    if (flipX || flipY) {
+                        ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+                    }
+                    this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
+                    ctx.restore();
+                } else {
+                    this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH, opacity);
                 }
-                this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
-                ctx.restore();
-            } else {
-                this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH, opacity);
-            }
-        });
+            },
+        );
 
         if (!cache) {
             return this.drawImage(
@@ -1028,23 +1040,28 @@ export class CanvasDraw<
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
-            const style = item.style;
-            const radius = pxSize / 2;
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            staticCirclePaintBounds,
+            (ctx, item, x, y, pxSize, _pxH) => {
+                const style = item.style;
+                const radius = pxSize / 2;
 
-            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                ctx.fillStyle = style.fillStyle;
-                lastFillStyle = style.fillStyle;
-            }
-            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
-                ctx.strokeStyle = style.strokeStyle;
-                lastStrokeStyle = style.strokeStyle;
-            }
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
 
-            ctx.beginPath();
-            ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
-            this.fillStrokePath(ctx, style, this.camera.scale);
-        });
+                ctx.beginPath();
+                ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
+                this.fillStrokePath(ctx, style, this.camera.scale);
+            },
+        );
 
         if (!cache) {
             return this.drawCircle(
