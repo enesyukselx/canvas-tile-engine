@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasTileEngine } from "../../src/CanvasTileEngine";
 import { fitScale } from "../../src/utils/fitScale";
-import type { CanvasTileEngineConfig, Coords, IRenderer } from "../../src/types";
+import type { CanvasTileEngineConfig, Coords, IRenderer, PathItem } from "../../src/types";
 
 type Mount = Record<string, never>;
 
@@ -605,6 +605,7 @@ describe("CanvasTileEngine", () => {
                 addDrawFunction: (_fn: unknown, layer: number = 1) => ({ id: Symbol(`fn-${seq++}`), layer }),
                 drawRect: (_items: unknown, layer: number = 1) => ({ id: Symbol(`rect-${seq++}`), layer }),
                 drawCircle: (_items: unknown, layer: number = 1) => ({ id: Symbol(`circle-${seq++}`), layer }),
+                drawPath: (_items: unknown, layer: number = 1) => ({ id: Symbol(`path-${seq++}`), layer }),
                 drawStaticRect: (_items: unknown, _key: string, layer: number = 1) => ({
                     id: Symbol(`static-${seq++}`),
                     layer,
@@ -632,6 +633,37 @@ describe("CanvasTileEngine", () => {
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
             expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
             expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeDefined();
+        });
+
+        it("refreshes a mutated command path re-registered with the same id and scale", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const item: PathItem = {
+                commands: [
+                    { type: "moveTo", x: 0, y: 0 },
+                    { type: "lineTo", x: 4, y: 0 },
+                    { type: "lineTo", x: 4, y: 4 },
+                    { type: "lineTo", x: 0, y: 4 },
+                    { type: "closePath" },
+                ],
+                style: { fillStyle: "red" },
+            };
+            const first = e.drawPath(item, 1, { id: "zone" });
+            // Engine hit queries take raw coordinates, offset by half a cell.
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })?.item).toBe(item);
+
+            item.commands = item.commands!.map((command) =>
+                command.type === "moveTo" || command.type === "lineTo" ? { ...command, x: command.x + 20 } : command,
+            );
+            const second = e.drawPath(item, 1, { id: "zone" });
+
+            expect(e.getScale()).toBe(baseConfig.scale);
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
+            expect(e.hitTest({ x: 2.5, y: 2.5 })).toHaveLength(0);
+            const hits = e.hitTest({ x: 22.5, y: 2.5 });
+            expect(hits).toHaveLength(1);
+            expect(hits[0]).toMatchObject({ item, handle: second });
+            expect(e.hitTestRect({ minX: 0, minY: 0, maxX: 5, maxY: 5 })).toHaveLength(0);
+            expect(e.hitTestRect({ minX: 20, minY: 0, maxX: 25, maxY: 5 })).toHaveLength(1);
         });
 
         it("accumulates as before when no id is given", () => {
