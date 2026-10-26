@@ -42,6 +42,41 @@ describe("CanvasTileEngine", () => {
         engine.onCoordsChange = onCoordsChange;
     });
 
+    describe("binding event-handler subscriptions", () => {
+        it("notifies subscribers synchronously with the updated normalized config", () => {
+            const listener = vi.fn((handlers) => {
+                expect(handlers).toBe(engine.getConfig().eventHandlers);
+                expect(Object.isFrozen(handlers)).toBe(true);
+            });
+            engine._subscribeEventHandlers(listener);
+
+            engine.setEventHandlers({ drag: true, zoom: true });
+            expect(listener).toHaveBeenCalledExactlyOnceWith(engine.getConfig().eventHandlers);
+            expect(listener.mock.calls[0][0]).toMatchObject({ drag: true, zoom: "pointer" });
+
+            engine.setEventHandlers({ drag: false });
+            expect(listener).toHaveBeenCalledTimes(2);
+            expect(listener.mock.calls[1][0]).toMatchObject({ drag: false, zoom: "pointer" });
+        });
+
+        it("unsubscribes independently and clears remaining listeners on destroy", () => {
+            const first = vi.fn();
+            const second = vi.fn();
+            const unsubscribe = engine._subscribeEventHandlers(first);
+            engine._subscribeEventHandlers(second);
+
+            unsubscribe();
+            unsubscribe();
+            engine.setEventHandlers({ click: true });
+            expect(first).not.toHaveBeenCalled();
+            expect(second).toHaveBeenCalledTimes(1);
+
+            engine.destroy();
+            engine.setEventHandlers({ click: false });
+            expect(second).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("programmatic zoom fires onZoom", () => {
         it("fires onZoom when setScale changes the scale", () => {
             engine.setScale(1.5);

@@ -66,6 +66,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /** Registrations tracked by user-facing id (static draws: their cacheKey). */
     private drawIds = new Map<string, { handle: DrawHandle; cacheKey?: string }>();
     private drawIdByHandle = new Map<symbol, string>();
+    private eventHandlersListeners = new Set<(handlers: Readonly<EventHandlers>) => void>();
 
     public canvasWrapper: TMount;
     /**
@@ -394,6 +395,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /** Tear down listeners and observers. */
     destroy() {
+        this.eventHandlersListeners.clear();
         this.animationController.cancelAll();
         this.renderer.destroy();
         this.hitTester.clear();
@@ -759,6 +761,23 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     setEventHandlers(handlers: Partial<EventHandlers>) {
         this.config.updateEventHandlers(handlers);
+        const current = this.config.get().eventHandlers;
+        this.eventHandlersListeners.forEach((listener) => listener(current));
+    }
+
+    /**
+     * Binding hook for native gesture gates, which must update even when no
+     * frame is painted. Subscribe before reading getConfig() for the initial
+     * value; the returned function detaches this listener.
+     *
+     * Not part of the supported application API. Keep this declaration in
+     * the build because the React Native binding consumes it across packages.
+     */
+    _subscribeEventHandlers(listener: (handlers: Readonly<EventHandlers>) => void): () => void {
+        this.eventHandlersListeners.add(listener);
+        return () => {
+            this.eventHandlersListeners.delete(listener);
+        };
     }
 
     /**
