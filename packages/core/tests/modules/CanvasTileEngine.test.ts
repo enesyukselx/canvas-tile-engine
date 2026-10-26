@@ -730,6 +730,26 @@ describe("CanvasTileEngine", () => {
             e.addDrawFunction(() => {}, 1, { id: "hud" });
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(fn);
         });
+
+        it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+            "rejects invalid grid cellSize %s before replacing an existing registration",
+            (cellSize) => {
+                const { e, drawAPI } = createEngineWithDrawAPI();
+                const grid = e.drawGridLines(1, 1, "black", 0, { id: "grid" });
+                const register = vi.spyOn(drawAPI, "drawGridLines");
+
+                expect(() => e.drawGridLines(cellSize as number, 1, "black", 0, { id: "grid" })).toThrow(
+                    new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+                );
+                expect(register).not.toHaveBeenCalled();
+                expect(drawAPI.removeDrawHandle).not.toHaveBeenCalled();
+
+                // A rejected replacement leaves both the old handle and its id intact.
+                e.drawGridLines(0.5, 1, "black", 0, { id: "grid" });
+                expect(drawAPI.removeDrawHandle).toHaveBeenCalledExactlyOnceWith(grid);
+                expect(register).toHaveBeenCalledExactlyOnceWith(0.5, { lineWidth: 1, strokeStyle: "black" }, 0);
+            },
+        );
     });
 
     describe("styleOf paint-time decoration", () => {

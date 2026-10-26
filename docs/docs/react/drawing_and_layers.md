@@ -252,6 +252,8 @@ Keep `items` referentially stable (`useMemo`/state) — a new array identity re-
 
 Draw grid lines at specified intervals.
 
+`cellSize` must be a positive finite number; fractional intervals are supported. Invalid values throw a `RangeError` when the grid draw is registered. This also applies to React Native.
+
 | Prop          | Type     | Default      | Description                            |
 | :------------ | :------- | :----------- | :------------------------------------- |
 | `cellSize`    | `number` | **Required** | Size of each grid cell in world units. |

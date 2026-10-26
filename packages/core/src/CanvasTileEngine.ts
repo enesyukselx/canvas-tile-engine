@@ -1133,7 +1133,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Draw grid lines at specified cell size.
-     * @param cellSize Size of each grid cell in world units.
+     * @param cellSize Positive finite size of each grid cell in world units.
+     * @throws {RangeError} If cellSize is not a positive finite number.
      * @param options Optional `id`: re-registering with the same id replaces
      * the previous registration instead of accumulating alongside it.
      * @example
@@ -1148,6 +1149,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         layer: number = 0,
         options?: DrawOptions,
     ): DrawHandle {
+        if (!Number.isFinite(cellSize) || cellSize <= 0) {
+            throw new RangeError("[CanvasTileEngine] cellSize must be a positive finite number");
+        }
         this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
         this.trackDrawId(options?.id, handle);

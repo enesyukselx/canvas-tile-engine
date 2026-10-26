@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
@@ -41,6 +41,38 @@ function setup() {
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
     return { draw, render };
 }
+
+describe("CanvasDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setup();
+            const { ctx, strokes } = makeRecordingCtx();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(ctx);
+            expect(strokes).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeRecordingCtx();
+        const moveTo = vi.spyOn(ctx, "moveTo");
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+        expect(moveTo).toHaveBeenCalledTimes(2 * (10 / cellSize + 1));
+
+        draw.removeDrawHandle(handle);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+    });
+});
 
 describe("CanvasDraw lineWidth handling", () => {
     // Stroke unit contract shared by all renderers: lineWidth is world units

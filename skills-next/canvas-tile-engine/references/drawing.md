@@ -381,6 +381,12 @@ engine.drawGridLines(1, 1, "#1e293b", 0);
 
 Grid lines are infinite - they cover whatever the camera shows.
 
+`cellSize` must be a positive finite number; fractional intervals are valid.
+Zero, negative values, `NaN`, and infinities throw `RangeError` synchronously,
+before registering a draw or replacing an existing `id`. This requirement
+also applies to direct renderer `IDrawAPI.drawGridLines` calls and the React
+and React Native `GridLines` components.
+
 ## Static caching (`drawStaticRect` / `drawStaticCircle` / `drawStaticImage`)
 
 Renders ALL items once into an offscreen canvas, then blits only the visible

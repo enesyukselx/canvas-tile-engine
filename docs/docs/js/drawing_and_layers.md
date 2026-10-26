@@ -349,6 +349,8 @@ Dash patterns flow continuously around corners, including rounded ones.
 
 Draw grid lines at specified intervals. This is useful for creating grid overlays on your map.
 
+`cellSize` must be a positive finite number; fractional intervals are supported. Zero, negative values, `NaN`, and infinities throw a `RangeError` immediately, before registering a draw or replacing an existing `id`. Direct renderer `IDrawAPI.drawGridLines` calls enforce the same requirement.
+
 ```typescript
 drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number, options?: DrawOptions): DrawHandle
 ```
