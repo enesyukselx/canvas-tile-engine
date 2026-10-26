@@ -67,6 +67,10 @@ Every draw method accepts an optional `options` object as its last parameter. It
 | `radius` | `number \| number[]` | -                                  | Border radius in world units (scales with zoom). Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
 | `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.                                |
 
+Rounded rectangle radii apply to both the fill and border, including dashed and rotated WebGL borders. Arrays of one, two, or three radii expand like CSS border radii. If adjacent corners exceed their shared edge, all radii shrink by the same factor. Horizontal pairs use the width and vertical pairs use the height: `[20, 20, 0, 0]` screen-pixel radii fit a 100 x 20 rectangle unchanged.
+
+As with Canvas2D `roundRect`, WebGL rejects negative radii and arrays outside one to four entries with `RangeError` when rendering; non-finite radii produce no geometry.
+
 **Style Options:**
 
 - `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
@@ -349,6 +353,8 @@ Dash patterns flow continuously around corners, including rounded ones.
 
 Draw grid lines at specified intervals. This is useful for creating grid overlays on your map.
 
+`cellSize` must be a positive finite number; fractional intervals are supported. Zero, negative values, `NaN`, and infinities throw a `RangeError` immediately, before registering a draw or replacing an existing `id`. Direct renderer `IDrawAPI.drawGridLines` calls enforce the same requirement.
+
 ```typescript
 drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number, options?: DrawOptions): DrawHandle
 ```
@@ -397,7 +403,7 @@ drawText(items: Text | Text[], layer?: number, options?: DrawOptions): DrawHandl
 
 **Style Options:**
 
-- `fillStyle`: Text color
+- `fillStyle`: Text color (default: black, `"#000000"`, resolved separately for every item after `styleOf`)
 - `fontFamily`: Font family (default: `"sans-serif"`)
 - `fontWeight`: `"normal"`, `"bold"`, or `100`-`900` (default: the family's normal weight)
 - `textAlign`: `"left"`, `"center"`, `"right"`

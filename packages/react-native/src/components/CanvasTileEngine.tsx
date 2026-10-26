@@ -9,7 +9,11 @@ import {
     type SkPicture,
     type SkImage,
 } from "@shopify/react-native-skia";
-import { CanvasTileEngine as CanvasTileEngineCore, type NormalizedPointer } from "@canvas-tile-engine/core";
+import {
+    CanvasTileEngine as CanvasTileEngineCore,
+    type EventHandlers,
+    type NormalizedPointer,
+} from "@canvas-tile-engine/core";
 import type { SkiaMount } from "@canvas-tile-engine/renderer-skia";
 import { EngineContext, type EngineContextValue } from "../context";
 import type { CanvasTileEngineProps } from "../types";
@@ -40,6 +44,9 @@ const TAP_TIME_THRESHOLD = 300;
 // the responder while one finger is still down; that finger then re-grants as
 // a fresh gesture whose lift would otherwise register as a clean tap.
 const MULTI_TOUCH_TAP_COOLDOWN_MS = 400;
+
+const handlersClaimTouches = (handlers: Readonly<EventHandlers>): boolean =>
+    Boolean(handlers.click || handlers.drag || handlers.zoom || handlers.hover);
 
 interface TapState {
     x: number;
@@ -137,8 +144,10 @@ function CanvasTileEngineBase({
     // Local state starts false on every mount, so children always mount
     // after their own engine is attached.
     const [ready, setReady] = useState(false);
+    const [configClaimsTouches, setConfigClaimsTouches] = useState(false);
 
     const instanceRef = useRef<CanvasTileEngineCore<SkiaMount, SkImage> | null>(null);
+    const unsubscribeEventHandlersRef = useRef<(() => void) | null>(null);
     const sizeRef = useRef({ width: 0, height: 0 });
     const tapRef = useRef<TapState | null>(null);
     // The renderer actually wired to the engine. Captured at creation so gesture
@@ -292,6 +301,13 @@ function CanvasTileEngineBase({
                 instance._setPlatformReducedMotion(platformReducedMotionRef.current);
                 instanceRef.current = instance;
                 rendererRef.current = renderer;
+                // Subscribe at creation, before exposing the instance to
+                // consumers/child effects. Config changes do not paint a
+                // frame, so picture state cannot keep native gates current.
+                const updateGestureGate = (handlers: Readonly<EventHandlers>) =>
+                    setConfigClaimsTouches(handlersClaimTouches(handlers));
+                unsubscribeEventHandlersRef.current = instance._subscribeEventHandlers(updateGestureGate);
+                updateGestureGate(instance.getConfig().eventHandlers);
                 engine._setInstance(instance);
                 setReady(true);
                 instance.render();
@@ -307,6 +323,8 @@ function CanvasTileEngineBase({
     // Tear down on unmount.
     useEffect(() => {
         return () => {
+            unsubscribeEventHandlersRef.current?.();
+            unsubscribeEventHandlersRef.current = null;
             instanceRef.current?.destroy();
             instanceRef.current = null;
             engine._setInstance(null);
@@ -367,8 +385,7 @@ function CanvasTileEngineBase({
         if (!instance) {
             return false;
         }
-        const eventHandlers = instance.getConfig().eventHandlers;
-        if (eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover) {
+        if (handlersClaimTouches(instance.getConfig().eventHandlers)) {
             return true;
         }
         return Boolean(callbacksRef.current.onMouseDown || callbacksRef.current.onMouseUp);
@@ -505,10 +522,11 @@ function CanvasTileEngineBase({
     const onTouchesUp = useCallback((e: GestureTouchEvent) => endTouch(e, true), [endTouch]);
     const onTouchesCancelled = useCallback((e: GestureTouchEvent) => endTouch(e, false), [endTouch]);
 
-    // Blocker enablement is read at render time; the component re-renders on
-    // every engine frame (picture state), so a runtime setEventHandlers
-    // toggle is picked up on the next painted frame.
-    const interactionsClaimed = shouldClaimGesture();
+    // Use live subscription state and the current props, not callbacksRef:
+    // the callback ref updates after commit and would lag prop removals by
+    // one render. Keep the transport mounted so in-flight touch cleanup is
+    // still delivered when the native blocker is disabled.
+    const interactionsClaimed = ready && (configClaimsTouches || Boolean(onMouseDown || onMouseUp));
 
     // The transport reads live state through refs; runOnJS keeps the
     // callbacks on the JS thread (the engine is a plain JS object) even when

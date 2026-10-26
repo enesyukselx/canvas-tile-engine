@@ -21,6 +21,18 @@ Unparameterized core mount/image types default to `unknown` without DOM types;
 browser defaults remain the full DOM types. On the server `engine.canvas` is
 `undefined`; use `renderer.getCanvas()` for the native canvas.
 
+`Image`, `Canvas`, and `SKRSContext2D` are type-only convenience exports:
+
+```ts
+import type { Image, Canvas, SKRSContext2D } from "@canvas-tile-engine/renderer-server";
+```
+
+Do not import these as runtime values or call `new Image()` / `new Canvas()`
+from renderer-server. For constructors or factories, add `@napi-rs/canvas` as
+a direct application dependency and import `Image`, `Canvas`, or `createCanvas`
+from it. The renderer-server runtime exports are `RendererServer`,
+`SERVER_MOUNT`, `renderToBuffer`, `registerFont`, and `GlobalFonts`.
+
 ## Preferred API: `renderToBuffer` (one-shot)
 
 Creates engine + renderer, runs your draw callback, renders one frame,

@@ -45,4 +45,5 @@ jobs:
                   cache: "pnpm"
             - run: pnpm install --frozen-lockfile
             - run: pnpm run test --affected
+            - run: pnpm run test:package --affected
             - run: pnpm run test:platform-types

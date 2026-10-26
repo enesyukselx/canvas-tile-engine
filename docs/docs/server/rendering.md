@@ -119,6 +119,26 @@ engine.destroy();
 | `renderer.getCanvas()`                 | Accesses the underlying `@napi-rs/canvas` canvas.      |
 | `renderer.getContext()`                | Accesses the underlying `SKRSContext2D`.               |
 
+## Native Types and Constructors
+
+`Image`, `Canvas`, and `SKRSContext2D` are **type-only** exports from
+`@canvas-tile-engine/renderer-server`. Use them with `import type` for annotations;
+`new Image()` or `new Canvas()` imported from this package is not supported.
+For native constructors or factories, add `@napi-rs/canvas` as a direct dependency
+and import the runtime values from it:
+
+```ts
+import type { Image, Canvas, SKRSContext2D } from "@canvas-tile-engine/renderer-server";
+import { Image as NativeImage, createCanvas } from "@napi-rs/canvas";
+
+const image: Image = new NativeImage();
+const canvas: Canvas = createCanvas(256, 256);
+const context: SKRSContext2D = canvas.getContext("2d");
+```
+
+`RendererServer`, `SERVER_MOUNT`, `renderToBuffer`, `registerFont`, and
+`GlobalFonts` are the package's runtime exports in both ESM and CommonJS.
+
 ## Fonts
 
 Register fonts in headless environments before drawing text.
