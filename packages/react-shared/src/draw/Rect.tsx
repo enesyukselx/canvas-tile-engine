@@ -1,6 +1,7 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
 import type {
+    Bounds,
     Rect as RectType,
     ShapeDecorationStyle,
     StyleOf,
@@ -50,13 +51,31 @@ export interface RectProps {
      * floor tiles. Default `true`.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
  * Draws rectangles on the canvas.
  */
-export const Rect = memo(function Rect({ items, layer = 1, styleOf, visibleOf, interactiveOf, hitTest }: RectProps) {
+export const Rect = memo(function Rect({
+    items,
+    layer = 1,
+    styleOf,
+    visibleOf,
+    interactiveOf,
+    hitTest,
+    clip,
+}: RectProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
 
     // Read through refs so callback identity changes never re-register.
     const styleOfRef = useRef(styleOf);
@@ -82,6 +101,7 @@ export const Rect = memo(function Rect({ items, layer = 1, styleOf, visibleOf, i
             visibleOf: (item) => visibleOfRef.current?.(item),
             interactiveOf: (item) => interactiveOfRef.current?.(item),
             hitTest,
+            clip,
         });
         requestRender();
         return () => {
@@ -92,7 +112,7 @@ export const Rect = memo(function Rect({ items, layer = 1, styleOf, visibleOf, i
                 requestRender();
             }
         };
-    }, [engine, items, layer, hitTest, requestRender]);
+    }, [engine, items, layer, hitTest, requestRender, clipKey]);
 
     return null;
 });

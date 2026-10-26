@@ -6,6 +6,9 @@ import { CoordinateTransformer } from "../../src/modules/CoordinateTransformer";
 
 describe("GestureProcessor", () => {
     let mockCamera: ICamera;
+    // ICamera.scale is read-only, so the mock reads it through a getter over
+    // this, and the zoom mocks below write it the way a real camera would.
+    let cameraScale: number;
     let config: Config;
     let transformer: CoordinateTransformer;
     let processor: GestureProcessor;
@@ -22,15 +25,29 @@ describe("GestureProcessor", () => {
         clientY: clientY ?? y,
     });
 
+    // The mock camera mirrors the real one where onZoom cares: both zoom
+    // paths clamp into the scale limits, so a gesture at a limit leaves
+    // `scale` untouched.
+    const MIN_SCALE = 0.5;
+    const MAX_SCALE = 4;
+    const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+
     beforeEach(() => {
+        cameraScale = 1;
         panMock = vi.fn();
-        zoomMock = vi.fn();
-        zoomByFactorMock = vi.fn();
+        zoomMock = vi.fn((_mouseX: number, _mouseY: number, deltaY: number) => {
+            cameraScale = clampScale(cameraScale * Math.exp(-deltaY * 0.001));
+        });
+        zoomByFactorMock = vi.fn((factor: number) => {
+            cameraScale = clampScale(cameraScale * factor);
+        });
 
         mockCamera = {
             x: 0,
             y: 0,
-            scale: 1,
+            get scale() {
+                return cameraScale;
+            },
             pan: panMock,
             zoom: zoomMock,
             zoomByFactor: zoomByFactorMock,
@@ -222,6 +239,66 @@ describe("GestureProcessor", () => {
             processor.handlePointerLeave(createPointer(100, 100));
             expect(processor.dragging).toBe(false);
         });
+
+        it("preserves captured drags without suppressing the leave callback", () => {
+            processor.onMouseLeave = vi.fn();
+            processor.handlePointerDown(createPointer(100, 100));
+            processor.handlePointerLeave(createPointer(120, 100), true);
+            processor.handlePointerMove(createPointer(150, 120));
+            expect(processor.onMouseLeave).toHaveBeenCalledTimes(1);
+            expect(processor.dragging).toBe(true);
+            expect(panMock).toHaveBeenCalledExactlyOnceWith(50, 20);
+        });
+    });
+
+    describe("handleCancel", () => {
+        it.each(["mouse", "touch"])("does not restart a %s drag cancelled by its press callback", (input) => {
+            processor.onMouseDown = () => processor.handleCancel(createPointer(100, 100));
+            if (input === "mouse") {
+                processor.handlePointerDown(createPointer(100, 100));
+            } else {
+                processor.handleTouchStart([createPointer(100, 100)]);
+            }
+            expect(processor.dragging).toBe(false);
+        });
+
+        it("releases interrupted mouse input without a click or further panning", () => {
+            processor.onMouseUp = vi.fn();
+            processor.onClick = vi.fn();
+            processor.handlePointerDown(createPointer(100, 100));
+            processor.handleCancel(createPointer(120, 110));
+            processor.handleCancel(createPointer(120, 110));
+            processor.handlePointerMove(createPointer(150, 150));
+            processor.handleClick(createPointer(120, 110));
+            expect(processor.dragging).toBe(false);
+            expect(processor.onMouseUp).toHaveBeenCalledTimes(1);
+            expect(processor.onClick).not.toHaveBeenCalled();
+            expect(panMock).not.toHaveBeenCalled();
+        });
+
+        it("clears pinch state and does not zoom from stale touch moves", () => {
+            processor.onMouseUp = vi.fn();
+            processor.handleTouchStart([createPointer(100, 100), createPointer(200, 100)]);
+            processor.handleCancel(createPointer(100, 100));
+            processor.handleTouchMove([createPointer(50, 100), createPointer(250, 100)]);
+            expect(processor.pinching).toBe(false);
+            expect(processor.dragging).toBe(false);
+            expect(zoomByFactorMock).not.toHaveBeenCalled();
+            expect(processor.onMouseUp).not.toHaveBeenCalled();
+        });
+
+        it("allows the next mouse click and touch tap when drag is disabled", () => {
+            config.updateEventHandlers({ drag: false });
+            processor.onClick = vi.fn();
+            processor.handleCancel();
+            processor.handlePointerDown(createPointer(100, 100));
+            processor.handlePointerUp(createPointer(100, 100));
+            processor.handleClick(createPointer(100, 100));
+            processor.handleCancel();
+            processor.handleTouchStart([createPointer(100, 100)]);
+            processor.handleTouchEnd([], createPointer(100, 100));
+            expect(processor.onClick).toHaveBeenCalledTimes(2);
+        });
     });
 
     describe("handleWheel", () => {
@@ -239,6 +316,29 @@ describe("GestureProcessor", () => {
             processor.handleWheel(createPointer(100, 100), -50);
 
             expect(onZoom).toHaveBeenCalledWith(mockCamera.scale);
+        });
+
+        it("does not call onZoom when the scale is clamped at a limit", () => {
+            const onZoom = vi.fn();
+            processor.onZoom = onZoom;
+            cameraScale = MAX_SCALE;
+
+            // Keep scrolling in past the limit: the camera cannot move.
+            processor.handleWheel(createPointer(100, 100), -50);
+            processor.handleWheel(createPointer(100, 100), -50);
+
+            expect(zoomMock).toHaveBeenCalledTimes(2);
+            expect(onZoom).not.toHaveBeenCalled();
+        });
+
+        it("still fires onWheel when the scale is clamped at a limit", () => {
+            const onWheel = vi.fn();
+            processor.onWheel = onWheel;
+            cameraScale = MAX_SCALE;
+
+            processor.handleWheel(createPointer(100, 100), -50);
+
+            expect(onWheel).toHaveBeenCalledTimes(1);
         });
 
         it("does not zoom when zoom is disabled", () => {
@@ -411,6 +511,41 @@ describe("GestureProcessor", () => {
                 expect(zoomByFactorMock).toHaveBeenCalled();
             });
 
+            it("calls onZoom when a pinch changes the scale", () => {
+                const onZoom = vi.fn();
+                processor.onZoom = onZoom;
+
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
+
+                expect(onZoom).toHaveBeenCalledWith(mockCamera.scale);
+            });
+
+            it("does not call onZoom when a pinch is clamped at a limit", () => {
+                const onZoom = vi.fn();
+                processor.onZoom = onZoom;
+                cameraScale = MAX_SCALE;
+
+                // Keep spreading past the limit: the camera cannot move.
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
+                processor.handleTouchMove([createPointer(0, 0, 0, 0), createPointer(300, 300, 300, 300)]);
+
+                expect(zoomByFactorMock).toHaveBeenCalledTimes(2);
+                expect(onZoom).not.toHaveBeenCalled();
+            });
+
+            it("does not call onZoom when a pinch moves without changing distance", () => {
+                const onZoom = vi.fn();
+                processor.onZoom = onZoom;
+
+                processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(200, 200, 200, 200)]);
+                // Both fingers shift +60 on x: midpoint moves, distance unchanged
+                processor.handleTouchMove([createPointer(160, 100, 160, 100), createPointer(260, 200, 260, 200)]);
+
+                expect(onZoom).not.toHaveBeenCalled();
+            });
+
             it("anchors pinch zoom at the pinch midpoint in pointer mode", () => {
                 config.updateEventHandlers({ zoom: "pointer" });
 
@@ -418,7 +553,7 @@ describe("GestureProcessor", () => {
                 processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
 
                 // Pinch midpoint is (150, 150), canvas offset is (0, 0)
-                expect(zoomByFactorMock).toHaveBeenCalledWith(expect.any(Number), 150, 150);
+                expect(zoomByFactorMock).toHaveBeenCalledWith(expect.any(Number), 150, 150, 150, 150);
             });
 
             it("anchors pinch zoom at the canvas center in center mode", () => {
@@ -438,7 +573,8 @@ describe("GestureProcessor", () => {
                 // Both fingers shift +60 on x: midpoint moves (150, 150) -> (210, 150)
                 processor.handleTouchMove([createPointer(160, 100, 160, 100), createPointer(260, 200, 260, 200)]);
 
-                expect(panMock).toHaveBeenCalledWith(60, 0);
+                expect(zoomByFactorMock).toHaveBeenCalledWith(1, 150, 150, 210, 150);
+                expect(panMock).not.toHaveBeenCalled();
             });
 
             it("does not pan when the pinch midpoint moves in center mode", () => {
@@ -457,7 +593,7 @@ describe("GestureProcessor", () => {
                 processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(100, 100, 100, 100)]);
                 processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
 
-                expect(zoomByFactorMock).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+                expect(zoomByFactorMock).toHaveBeenCalledWith(1, 100, 100, 150, 150);
             });
         });
 

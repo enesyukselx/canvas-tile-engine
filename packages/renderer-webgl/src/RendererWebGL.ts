@@ -24,7 +24,7 @@ import {
 } from "@canvas-tile-engine/core";
 import { WebGLDraw, type WebGLDrawContext } from "./modules/WebGLDraw";
 import { CoordinateOverlayRenderer, DebugOverlay } from "@canvas-tile-engine/renderer-shared/canvas2d";
-import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { type ClipAdapter, clipRectPx, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import {
     EventBinder,
     ImageLoader,
@@ -71,6 +71,30 @@ export interface RendererWebGLOptions {
  * above every WebGL primitive regardless of their layer index. Within each
  * surface, layer ordering is preserved.
  */
+/**
+ * Clip adapter for WebGL, which paints on two surfaces and so cuts twice.
+ *
+ * The GL scissor covers the batched primitives; the transparent 2D overlay
+ * carries text, the coordinate overlay and `addDrawFunction`, and takes an
+ * ordinary path clip. Only the scissor needs releasing — the overlay's clip is
+ * context state inside the save/restore pair {@link Layer} already opened.
+ */
+const webglClipAdapter: ClipAdapter<WebGLDrawContext> = ({ ctx, gl, transformer }, clip) => {
+    const rect = clipRectPx(clip, (x, y) => transformer.worldToScreen(x, y));
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.width, rect.height);
+    ctx.clip();
+
+    gl.setScissor(rect.x, rect.y, rect.width, rect.height);
+
+    return () => {
+        gl.clearScissor();
+        ctx.restore();
+    };
+};
+
 export class RendererWebGL implements IRenderer {
     /** Transform helpers handed to the onDraw hook. */
     private drawTransform: DrawTransform = {
@@ -251,7 +275,7 @@ export class RendererWebGL implements IRenderer {
         this.transformer = deps.transformer;
         this.viewport = deps.viewport;
         this.camera = deps.camera;
-        this.layers = new Layer();
+        this.layers = new Layer(webglClipAdapter);
         this.drawAPI = new WebGLDraw(this.layers, deps.transformer, deps.camera);
 
         this.applyCanvasSize();
@@ -296,6 +320,7 @@ export class RendererWebGL implements IRenderer {
                 touchstart: this.handleTouchStart,
                 touchmove: this.handleTouchMove,
                 touchend: this.handleTouchEnd,
+                cancel: this.handleCancel,
                 keydown: createKeyDownHandler(this.gestureProcessor),
             },
             // keydown binds to the wrapper: it is what carries tabindex, and a key
@@ -430,8 +455,12 @@ export class RendererWebGL implements IRenderer {
         this.gestureProcessor.handlePointerDown(this.normalizePointer(e));
     };
 
-    private handleMouseMove = (e: MouseEvent): void => {
+    private handleMouseMove = (e: MouseEvent): boolean => {
+        if (e.currentTarget !== this.canvas && !this.gestureProcessor.dragging) {
+            return false;
+        }
         this.gestureProcessor.handlePointerMove(this.normalizePointer(e));
+        return true;
     };
 
     private handleMouseUp = (e: MouseEvent): void => {
@@ -444,7 +473,11 @@ export class RendererWebGL implements IRenderer {
     };
 
     private handleMouseLeave = (e: MouseEvent): void => {
-        this.gestureProcessor.handlePointerLeave(this.normalizePointer(e));
+        this.gestureProcessor.handlePointerLeave(this.normalizePointer(e), true);
+    };
+
+    private handleCancel = (pointer?: MouseEvent | Touch): void => {
+        this.gestureProcessor.handleCancel(pointer ? this.normalizePointer(pointer) : undefined);
     };
 
     private handleWheel = (e: WheelEvent): void => {
@@ -468,12 +501,13 @@ export class RendererWebGL implements IRenderer {
         return Boolean(eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover);
     }
 
-    private handleTouchStart = (e: TouchEvent): void => {
+    private handleTouchStart = (e: TouchEvent): boolean => {
         if (!this.touchInteractionsEnabled()) {
-            return;
+            return false;
         }
         e.preventDefault();
-        this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.touches));
+        this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.targetTouches));
+        return true;
     };
 
     private handleTouchMove = (e: TouchEvent): void => {
@@ -481,7 +515,7 @@ export class RendererWebGL implements IRenderer {
             return;
         }
         e.preventDefault();
-        this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.touches));
+        this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.targetTouches));
     };
 
     private handleTouchEnd = (e: TouchEvent): void => {
@@ -489,11 +523,11 @@ export class RendererWebGL implements IRenderer {
             // Handlers may have been disabled mid-gesture: reset the
             // processor's drag/pinch state (no changed pointer → no
             // callbacks) without claiming the event.
-            this.gestureProcessor.handleTouchEnd(this.normalizeTouches(e.touches));
+            this.gestureProcessor.handleTouchEnd(this.normalizeTouches(e.targetTouches));
             return;
         }
         e.preventDefault();
-        const remaining = this.normalizeTouches(e.touches);
+        const remaining = this.normalizeTouches(e.targetTouches);
         const changed = e.changedTouches.length > 0 ? this.normalizePointer(e.changedTouches[0]) : undefined;
         this.gestureProcessor.handleTouchEnd(remaining, changed);
     };

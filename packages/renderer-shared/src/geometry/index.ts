@@ -4,3 +4,19 @@
 // Item-bounds helpers live in core instead (`itemsBounds`, `pathItemBounds`):
 // app code needs those, so they are part of the public API.
 export { getViewportBounds, isVisible } from "./culling";
+export {
+    staticCacheBounds,
+    staticRectPaintBounds,
+    staticCirclePaintBounds,
+    staticImagePaintBounds,
+} from "./staticBounds";
+export {
+    boxPaintBounds,
+    boxPixelPadding,
+    linePaintBounds,
+    pathPaintBounds,
+    textPaintBounds,
+    intersectsBounds,
+    PaintedCuller,
+    UNBOUNDED,
+} from "./paintedBounds";

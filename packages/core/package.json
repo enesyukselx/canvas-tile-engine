@@ -48,6 +48,7 @@
         "format": "oxfmt",
         "format:check": "oxfmt --check",
         "test": "vitest run",
+        "test:platform-types": "node tests/package-types.mjs",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage"
     },

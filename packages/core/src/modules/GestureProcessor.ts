@@ -116,6 +116,7 @@ export interface CanvasBounds {
 export class GestureProcessor {
     // Gesture state
     private isDragging = false;
+    private pointerDown = false;
     private shouldPreventClick = false;
     private lastPos = { x: 0, y: 0 };
 
@@ -354,17 +355,19 @@ export class GestureProcessor {
     };
 
     handlePointerDown = (pointer: NormalizedPointer): void => {
+        this.pointerDown = true;
+        this.shouldPreventClick = false;
         if (this.onMouseDown) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseDown(coords, mouse, client);
         }
 
-        if (!this.config.get().eventHandlers.drag) {
+        // A press callback can tear down its renderer and cancel this input.
+        if (!this.pointerDown || !this.config.get().eventHandlers.drag) {
             return;
         }
 
         this.isDragging = true;
-        this.shouldPreventClick = false;
         this.lastPos = { x: pointer.clientX, y: pointer.clientY };
     };
 
@@ -388,6 +391,7 @@ export class GestureProcessor {
     };
 
     handlePointerUp = (pointer: NormalizedPointer): void => {
+        this.pointerDown = false;
         if (this.onMouseUp) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseUp(coords, mouse, client);
@@ -396,13 +400,29 @@ export class GestureProcessor {
         this.isDragging = false;
     };
 
-    handlePointerLeave = (pointer: NormalizedPointer): void => {
+    handlePointerLeave = (pointer: NormalizedPointer, preserveDrag = false): void => {
         if (this.onMouseLeave) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseLeave(coords, mouse, client);
         }
 
+        if (!preserveDrag) {
+            this.isDragging = false;
+        }
+    };
+
+    /** End interrupted input without synthesizing a click or continuing a pinch. */
+    handleCancel = (pointer?: NormalizedPointer): void => {
+        const wasDown = this.pointerDown;
+        this.pointerDown = false;
         this.isDragging = false;
+        this.isPinching = false;
+        this.lastPinchDistance = 0;
+        this.shouldPreventClick = true;
+        if (wasDown && pointer && this.onMouseUp) {
+            const { coords, mouse, client } = this.processCoords(pointer);
+            this.onMouseUp(coords, mouse, client);
+        }
     };
 
     // ─── Touch Handlers ───────────────────────────────
@@ -425,6 +445,9 @@ export class GestureProcessor {
         }
         const pointer = pointers[0];
 
+        this.pointerDown = true;
+        this.shouldPreventClick = false;
+
         // Fire onMouseDown callback for touch
         if (this.onMouseDown) {
             const { coords, mouse, client } = this.processCoords(pointer);
@@ -432,12 +455,11 @@ export class GestureProcessor {
         }
 
         // Handle single finger drag
-        if (!eventHandlers.drag) {
+        if (!this.pointerDown || !eventHandlers.drag) {
             return;
         }
         this.isDragging = true;
         this.isPinching = false;
-        this.shouldPreventClick = false;
         this.lastPos = { x: pointer.clientX, y: pointer.clientY };
     };
 
@@ -452,23 +474,21 @@ export class GestureProcessor {
             const scaleFactor =
                 this.lastPinchDistance >= MIN_PINCH_DISTANCE ? currentDistance / this.lastPinchDistance : 1;
 
-            // Zoom anchor relative to canvas: pinch midpoint, or canvas center in "center" mode
+            // Transform the previous pinch midpoint to the current one in a
+            // single camera update, including bounds constraints. Center mode
+            // deliberately ignores midpoint motion to keep its fixed anchor.
             const centerMode = this.config.get().eventHandlers.zoom === "center";
-            const centerX = centerMode ? bounds.width / 2 : currentCenter.x - bounds.left;
-            const centerY = centerMode ? bounds.height / 2 : currentCenter.y - bounds.top;
-
-            // Apply zoom
-            this.camera.zoomByFactor(scaleFactor, centerX, centerY);
-
-            // Also pan if pinch center moved. Skipped in "center" mode: fingers
-            // never move symmetrically, so following the midpoint would drift
-            // the camera away from the fixed anchor the mode promises.
-            if (!centerMode) {
-                const dx = currentCenter.x - this.lastPinchCenter.x;
-                const dy = currentCenter.y - this.lastPinchCenter.y;
-                if (dx !== 0 || dy !== 0) {
-                    this.camera.pan(dx, dy);
-                }
+            const prevScale = this.camera.scale;
+            if (centerMode) {
+                this.camera.zoomByFactor(scaleFactor, bounds.width / 2, bounds.height / 2);
+            } else {
+                this.camera.zoomByFactor(
+                    scaleFactor,
+                    this.lastPinchCenter.x - bounds.left,
+                    this.lastPinchCenter.y - bounds.top,
+                    currentCenter.x - bounds.left,
+                    currentCenter.y - bounds.top,
+                );
             }
 
             this.lastPinchDistance = currentDistance;
@@ -486,7 +506,11 @@ export class GestureProcessor {
                 scaleFactor === 1 ? 0 : -Math.log(scaleFactor) / DEFAULT_VALUES.ZOOM_SENSITIVITY,
                 "pinch",
             );
-            if (this.onZoom) {
+            // onZoom means "the zoom level changed": stay silent when the
+            // factor was a no-op or the camera clamped at a scale limit,
+            // matching the programmatic paths. onWheel above still fires,
+            // since it reports the gesture rather than the result.
+            if (this.onZoom && this.camera.scale !== prevScale) {
                 this.onZoom(this.camera.scale);
             }
             this.onCameraChange();
@@ -538,6 +562,8 @@ export class GestureProcessor {
             return;
         }
 
+        this.pointerDown = false;
+
         // Fire onMouseUp for touch end
         if (changedPointer && this.onMouseUp) {
             const { coords, mouse, client } = this.processCoords(changedPointer);
@@ -568,9 +594,12 @@ export class GestureProcessor {
             zoom === "center"
                 ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
                 : { x: pointer.clientX, y: pointer.clientY };
-        this.camera.zoom(anchor.x, anchor.y, deltaY, bounds as DOMRect);
+        const prevScale = this.camera.scale;
+        this.camera.zoom(anchor.x, anchor.y, deltaY, bounds);
         this.notifyWheel(pointer, deltaY, "wheel");
-        if (this.onZoom) {
+        // Scrolling on at a scale limit leaves the scale untouched: report it
+        // as onWheel only, so onZoom keeps meaning "the zoom level changed".
+        if (this.onZoom && this.camera.scale !== prevScale) {
             this.onZoom(this.camera.scale);
         }
         this.onCameraChange();

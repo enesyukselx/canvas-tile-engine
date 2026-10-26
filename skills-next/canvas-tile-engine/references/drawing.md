@@ -148,7 +148,7 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
         y?: number;               // 0..1, default 0.5
     };
     style?: {
-        fillStyle?: string;
+        fillStyle?: Paint;      // color string OR a linear gradient (see below)
         strokeStyle?: string;
         lineWidth?: number;    // border width in WORLD units (scales with zoom)
         lineWidthPx?: number;  // border width in screen px (zoom-independent); wins over lineWidth
@@ -177,6 +177,48 @@ is stroked; both work together. Any CSS color string works (`"#22c55e"`,
 `"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`). `lineDash`/`lineDashPx`
 dash the border (selection frames, ghost placements); omit for solid.
 
+### Gradient fills
+
+`fillStyle` on shapes (Rect/Circle) and on `PathStyle` accepts a linear
+gradient as well as a color string. `strokeStyle` and text fills stay strings:
+a stroke has no box to normalize an axis against, and "along" vs "across" the
+stroke are equally fair readings of one axis.
+
+```ts
+type Paint = string | {
+    type: "linear";
+    from: Coords;                  // axis start
+    to: Coords;                    // axis end
+    stops: Array<{ offset: number; color: string }>;
+    units?: "box" | "world";       // default "box"
+};
+```
+
+- `"box"` units (default): `from`/`to` are FRACTIONS of the item's own drawn
+  box, so one gradient object is "top to bottom" for every item that uses it,
+  whatever its size, position or rotation — a rotated shape's ramp turns with
+  the shape. This is what makes a single spec reusable across a whole series.
+- `"world"` units: `from`/`to` are world coordinates, so the ramp spans the
+  scene rather than the item and neighbouring items each show their own slice
+  of it. Moves and scales with the camera.
+- Stops are normalized before painting: offsets clamped to `0..1` and sorted
+  ascending; two stops at one offset make a hard break. An empty list paints
+  nothing, a single stop paints flat.
+- Identical on all four renderers, arbitrary stop counts and any axis angle
+  included. `drawStatic*` accepts gradients but bakes a `"world"` axis at the
+  scale its cache was recorded at.
+
+```ts
+const ramp = {
+    type: "linear",
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [{ offset: 0, color: "#f97316" }, { offset: 1, color: "#22d3ee" }],
+} as const;
+
+engine.drawRect(bars.map((b) => ({ ...b, style: { fillStyle: ramp } })), 1);
+```
+
 ## Primitives
 
 ### Rect
@@ -185,10 +227,18 @@ Adds to the shared fields:
 
 ```ts
 {
-    width?: number;   // world units, defaults to size - non-square rects
-    height?: number;  // world units, defaults to size
+    width?: number;    // world units, defaults to size - non-square rects
+    height?: number;   // world units, defaults to size
+    sizePx?: number;   // fixed screen-pixel size for both axes, wins over size/width/height
+    widthPx?: number;  // fixed screen-pixel width, wins over sizePx and width
+    heightPx?: number; // fixed screen-pixel height, wins over sizePx and height
 }
 ```
+
+Per axis the resolution order is `widthPx` -> `sizePx` -> `width` -> `size`,
+i.e. pixels before world units and the specific field before the shared one.
+The pixel fields are IGNORED by `drawStaticRect` (caches replay at a recorded
+scale), exactly like `drawStaticCircle` ignores a circle's `sizePx`.
 
 ```ts
 engine.drawRect({ x: 2, y: 3, size: 1, rotate: 45, radius: 0.12,
@@ -198,7 +248,17 @@ engine.drawRect(rectArray, 1);   // arrays are the fast path for many items
 // Non-square: one 4x2 zone floor instead of 8 one-cell rects
 engine.drawRect({ x: 5, y: 8, width: 4, height: 2,
                   style: { fillStyle: "rgba(34,197,94,0.3)" } }, 1);
+
+// Zoom-independent: a 14px square marker and a 120x24px label plate
+engine.drawRect({ x: 3, y: 3, sizePx: 14, style: { fillStyle: "#f43f5e" } }, 2);
+engine.drawRect({ x: 3, y: 4, widthPx: 120, heightPx: 24,
+                  style: { fillStyle: "#0f172acc" } }, 2);
 ```
+
+Rect radii apply to both fill and stroke, including dashed/rotated WebGL
+borders. One-to-four values expand CSS-style; overflow scales every radius
+uniformly against adjacent horizontal/vertical edge sums, not half the
+shortest edge. For example, pixel radii `[20, 20, 0, 0]` fit a 100x20 box.
 
 Origin anchoring applies per axis (cell mode centers the box on the anchor
 cell; self mode anchors to the box itself). Rotation spins around the box
@@ -235,6 +295,7 @@ engine.drawText({
     style: {
         fillStyle: "#e2e8f0",
         fontFamily: "sans-serif",          // default "sans-serif"
+        fontWeight: "bold",                // "normal"|"bold"|100..900; omit for the family default
         textAlign: "center",               // "center"|"end"|"left"|"right"|"start"
         textBaseline: "middle",            // "alphabetic"|"bottom"|"hanging"|"ideographic"|"middle"|"top"
     },
@@ -243,6 +304,10 @@ engine.drawText({
 // Zoom-independent label: always 14px on screen
 engine.drawText({ x: 0, y: 0, text: "Ankara", fontPx: 14 }, 2);
 ```
+
+Text color defaults to black (`"#000000"`) on every renderer, independently for
+each item after merging `styleOf`. Returning `undefined` from `styleOf` keeps
+the item's style; returning `{ fillStyle: undefined }` resets its color to black.
 
 On the WebGL renderer text is painted on a 2D overlay canvas and always
 composites ABOVE all GPU primitives regardless of layer (see
@@ -366,6 +431,37 @@ engine.drawGridLines(1, 1, "#1e293b", 0);
 ```
 
 Grid lines are infinite - they cover whatever the camera shows.
+
+`cellSize` must be a positive finite number; fractional intervals are valid.
+Zero, negative values, `NaN`, and infinities throw `RangeError` synchronously,
+before registering a draw or replacing an existing `id`. This requirement
+also applies to direct renderer `IDrawAPI.drawGridLines` calls and the React
+and React Native `GridLines` components.
+
+## Clipping a registration
+
+Every draw method's `options` takes a `clip`: a world rectangle the whole
+registration is confined to.
+
+```ts
+const plotArea = { minX: -0.5, maxX: 40, minY: -0.5, maxY: 20 };
+engine.drawRect(bars, 1, { clip: plotArea });
+engine.drawLine(series, { strokeStyle: "#22d3ee" }, 1, { clip: plotArea });
+```
+
+- WORLD (item) space, the same coordinates `fitBounds`/`hitTestRect` take, so
+  the clip pans and zooms with the scene. That is what a chart plot area
+  wants: pan cannot smear the series over the axes drawn outside it.
+- Applies to EVERY draw kind, `drawGridLines`, `drawStatic*` and
+  `addDrawFunction` included.
+- HIT TESTING FOLLOWS IT: a point outside cannot hit, and `hitTestRect` is
+  narrowed to the overlap. `padding`/`paddingPx` do NOT widen a clip - they
+  grow an item's own tap target, and a target that is not drawn has nothing
+  to grow.
+- Axis-aligned rectangles only (arbitrary shapes would need WebGL's stencil
+  buffer, which path fills already use).
+- React/RN: a `clip` prop on every draw component, compared BY VALUE, so an
+  inline literal is fine (unlike `items`, compared by reference).
 
 ## Static caching (`drawStaticRect` / `drawStaticCircle` / `drawStaticImage`)
 

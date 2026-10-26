@@ -97,6 +97,12 @@ mount-once `config`/`renderer`/`center`, `isReady` gating, referentially
 stable `items`, the same 12 compound components with the same props, static
 caching, layers.
 
+For drawing/selection tools, end the active press in both `onMouseUp` and
+`onMouseLeave`. A one-finger `onMouseDown` receives one `onMouseUp` at the
+final lift even after multitouch suppresses the click; cancellation or
+unmount uses `onMouseLeave` at that finger's last known position. A gesture
+starting with multiple fingers does not emit a single-pointer down/release.
+
 ## Reduced motion
 
 Wired automatically - apps do NOT subscribe to anything. The binding reads

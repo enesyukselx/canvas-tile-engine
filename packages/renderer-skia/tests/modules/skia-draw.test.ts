@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
+import { CoordinateTransformer, ICamera, type Circle, type Rect } from "@canvas-tile-engine/core";
 import type { SkCanvas } from "@shopify/react-native-skia";
 import { COLOR_CACHE_LIMIT, SkiaDraw } from "../../src/modules/SkiaDraw";
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import type { SkiaDrawContext } from "../../src/types";
-import { colorParseCalls, makeRecordingCanvas, matchFontCalls, type MockPicture } from "../mocks/react-native-skia";
+import {
+    colorParseCalls,
+    gradientCalls,
+    makeRecordingCanvas,
+    matchFontCalls,
+    type MockPicture,
+} from "../mocks/react-native-skia";
 
 interface Op {
     op: string;
@@ -38,6 +44,38 @@ function setup(scale = 10) {
 beforeEach(() => {
     colorParseCalls.length = 0;
     matchFontCalls.length = 0;
+    gradientCalls.length = 0;
+});
+
+describe("SkiaDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setup();
+            const { canvas, ops } = makeCanvas();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(canvas);
+            expect(ops).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(canvas);
+        const lineCount = 2 * (10 / cellSize + 1);
+        expect(ops.filter((op) => op.op === "line")).toHaveLength(lineCount);
+
+        draw.removeDrawHandle(handle);
+        render(canvas);
+        expect(ops).toHaveLength(lineCount);
+    });
 });
 
 describe("resolveRadius roundRect semantics", () => {
@@ -141,6 +179,51 @@ describe("color caching", () => {
 });
 
 describe("text rendering", () => {
+    it("resolves black per item after styleOf, preserving explicit and decorated colors", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        let decorated = true;
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "default" },
+                { x: 2, y: 1, text: "explicit", style: { fillStyle: "#ff0000" } },
+                { x: 3, y: 1, text: "after", rotate: 30, style: {} },
+                { x: 4, y: 1, text: "font-only", style: { fillStyle: "#ff0000" } },
+                { x: 5, y: 1, text: "override", style: { fillStyle: "#ff0000" } },
+                { x: 6, y: 1, text: "reset", style: { fillStyle: "#ff0000" } },
+            ],
+            2,
+            {
+                styleOf: (item) => {
+                    if (item.text === "font-only") {
+                        return { fontWeight: "bold" };
+                    }
+                    if (item.text === "override" && decorated) {
+                        return { fillStyle: "#0000ff" };
+                    }
+                    if (item.text === "reset") {
+                        return { fillStyle: undefined };
+                    }
+                    return undefined;
+                },
+            },
+        );
+
+        const colors = () => ops.filter((op) => op.op === "text").map((op) => op.color);
+        render(canvas);
+        expect(colors()).toEqual(
+            ["#000000", "#ff0000", "#000000", "#ff0000", "#0000ff", "#000000"].map((parsed) => ({ parsed })),
+        );
+
+        decorated = false;
+        ops.length = 0;
+        render(canvas);
+        expect(colors()).toEqual(
+            ["#000000", "#ff0000", "#000000", "#ff0000", "#ff0000", "#000000"].map((parsed) => ({ parsed })),
+        );
+    });
+
     it("uses the exact (unrounded) scaled font size", () => {
         const { draw, render } = setup(11.5);
         const { canvas, ops } = makeCanvas();
@@ -206,18 +289,18 @@ describe("text rendering", () => {
         }
     });
 
-    it("culls with the fontPx world-space extent (fontPx / scale)", () => {
+    it("culls with measured text width rather than a font-size estimate", () => {
         const { draw, render } = setup(10);
         const { canvas, ops } = makeCanvas();
-        // Viewport spans 10 world units (+1 tile buffer). x=20 with size 1 is
-        // out of reach, but a 140px label spans 14 world units and pokes in.
+        // The mock measures six pixels per character independently of size.
+        // A long label reaches the viewport even though its anchor is outside.
         draw.drawText(
             [
                 { x: 20, y: 1, text: "culled", style: { fillStyle: "#000" } },
                 {
                     x: 20,
                     y: 1,
-                    text: "visible",
+                    text: "visible".repeat(6),
                     fontPx: 140,
                     style: { fillStyle: "#000" },
                 },
@@ -227,7 +310,7 @@ describe("text rendering", () => {
         render(canvas);
 
         const texts = ops.filter((o) => o.op === "text").map((o) => o.text);
-        expect(texts).toEqual(["visible"]);
+        expect(texts).toEqual(["visible".repeat(6)]);
     });
 
     it("caches one font per family regardless of size", () => {
@@ -344,6 +427,26 @@ describe("static picture cache", () => {
         expect(staticRects).toEqual(dynamicRects);
     });
 
+    it("ignores pixel sizes in all static picture primitives", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        const fakeImage = {
+            width: () => 10,
+            height: () => 10,
+        } as unknown as import("@shopify/react-native-skia").SkImage;
+        const item = Object.freeze({ x: 2, y: 2, size: 1, sizePx: 60, style: { fillStyle: "#f00" } });
+        draw.drawStaticRect([{ ...item, width: 2, height: 1, widthPx: 70, heightPx: 80 }], "rect");
+        draw.drawStaticCircle([item], "circle");
+        draw.drawStaticImage([{ ...item, img: fakeImage }], "image");
+        render(canvas);
+
+        const recorded = ops.filter((o) => o.op === "picture").flatMap((o) => (o.picture as MockPicture).ops);
+        expect(recorded.find((o) => o.op === "rect")?.rect).toEqual({ x: 15, y: 20, width: 20, height: 10 });
+        expect(recorded.find((o) => o.op === "circle")).toMatchObject({ cx: 25, cy: 25, r: 5 });
+        expect(recorded.find((o) => o.op === "image")?.dest).toEqual({ x: 20, y: 20, width: 10, height: 10 });
+        expect(item.sizePx).toBe(60);
+    });
+
     it("replays with the scale ratio when the camera zooms after recording", () => {
         const { draw, render, camera } = setup(10);
         const { canvas, ops } = makeCanvas();
@@ -410,6 +513,260 @@ describe("static picture cache", () => {
         draw.drawStaticRect([], "cache-e", 1);
         render(canvas);
         expect(ops).toHaveLength(0);
+    });
+});
+
+describe("static picture painted bounds", () => {
+    interface Box {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }
+
+    interface Bounds {
+        minX: number;
+        minY: number;
+        maxX: number;
+        maxY: number;
+    }
+
+    function recordedPicture(ops: Op[]): MockPicture {
+        const picture = ops.find((op) => op.op === "picture")?.picture as MockPicture;
+        expect(picture).toBeDefined();
+        return picture;
+    }
+
+    // Inspect the actual recording, independently of the production bounds
+    // helper. A rectangle's stroke box must rotate with its geometry: adding
+    // half the stroke width after rotation misses its outer mitered corners.
+    function rotatedBounds(box: Box, picture: MockPicture, halfStroke = 0): Bounds {
+        const rotation = picture.ops.find((op) => op.op === "rotate");
+        const radians = ((rotation?.deg as number | undefined) ?? 0) * (Math.PI / 180);
+        const cx = (rotation?.px as number | undefined) ?? box.x + box.width / 2;
+        const cy = (rotation?.py as number | undefined) ?? box.y + box.height / 2;
+        const corners = [
+            [box.x - halfStroke, box.y - halfStroke],
+            [box.x + box.width + halfStroke, box.y - halfStroke],
+            [box.x + box.width + halfStroke, box.y + box.height + halfStroke],
+            [box.x - halfStroke, box.y + box.height + halfStroke],
+        ].map(([x, y]) => ({
+            x: cx + (x - cx) * Math.cos(radians) - (y - cy) * Math.sin(radians),
+            y: cy + (x - cx) * Math.sin(radians) + (y - cy) * Math.cos(radians),
+        }));
+        return {
+            minX: Math.min(...corners.map((point) => point.x)),
+            minY: Math.min(...corners.map((point) => point.y)),
+            maxX: Math.max(...corners.map((point) => point.x)),
+            maxY: Math.max(...corners.map((point) => point.y)),
+        };
+    }
+
+    function expectPaddedCull(picture: MockPicture, painted: Bounds) {
+        const cull = picture.bounds as Box;
+        const right = cull.x + cull.width;
+        const bottom = cull.y + cull.height;
+        // One raster pixel of antialias padding, then outward pixel snapping.
+        // Keep each margin below two pixels so a fixed world-unit heuristic
+        // or a very loose enclosing square cannot satisfy the regression.
+        for (const margin of [
+            painted.minX - cull.x,
+            painted.minY - cull.y,
+            right - painted.maxX,
+            bottom - painted.maxY,
+        ]) {
+            expect(margin).toBeGreaterThanOrEqual(1 - 1e-9);
+            expect(margin).toBeLessThan(2 + 1e-9);
+        }
+        for (const edge of [cull.x, cull.y, right, bottom]) {
+            expect(edge).toBeCloseTo(Math.round(edge), 9);
+        }
+    }
+
+    it.each<{ name: string; scale: number; item: Rect; strokeWidth: number }>([
+        {
+            name: "a large rotated nonsquare fill at negative fractional coordinates",
+            scale: 7.5,
+            item: { x: -12.25, y: -8.75, width: 32, height: 20, rotate: 45, style: { fillStyle: "#f00" } },
+            strokeWidth: 0,
+        },
+        {
+            name: "a self-origin rectangle with a thick world-unit stroke",
+            scale: 6.25,
+            item: {
+                x: -18.3,
+                y: -4.2,
+                width: 18,
+                height: 4,
+                origin: { mode: "self", x: 0, y: 1 },
+                rotate: -33,
+                style: { strokeStyle: "#f00", lineWidth: 6 },
+            },
+            strokeWidth: 37.5,
+        },
+        {
+            name: "a shifted cell origin and pixel stroke overriding world width",
+            scale: 3.5,
+            item: {
+                x: -4.3,
+                y: 2.1,
+                width: 2,
+                height: 12,
+                sizePx: 1000,
+                widthPx: 2000,
+                heightPx: 3000,
+                origin: { mode: "cell", x: -2, y: 3 },
+                rotate: 70,
+                style: { strokeStyle: "#00f", lineWidth: 100, lineWidthPx: 48 },
+            },
+            strokeWidth: 48,
+        },
+        {
+            name: "the default one-pixel stroke at a sub-unit recording scale",
+            scale: 0.5,
+            item: { x: -2.3, y: -5.7, width: 2, height: 4, style: { strokeStyle: "#000" } },
+            strokeWidth: 1,
+        },
+    ])("contains $name", ({ scale, item, strokeWidth }) => {
+        const { draw, render } = setup(scale);
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticRect([item], "painted-rect", 1);
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const rectOp = picture.ops.find((op) => op.op === "rect") as Op;
+        const rect = rectOp.rect as Box;
+        // Static geometry continues to use world dimensions, even if the
+        // item also contains dynamic-path sizePx/widthPx/heightPx fields.
+        expect(rect.width).toBe((item.width ?? item.size ?? 1) * scale);
+        expect(rect.height).toBe((item.height ?? item.size ?? 1) * scale);
+        if (strokeWidth > 0) {
+            expect(rectOp.strokeWidth).toBe(strokeWidth);
+        }
+        expectPaddedCull(picture, rotatedBounds(rect, picture, strokeWidth / 2));
+    });
+
+    it.each<{ name: string; scale: number; item: Circle; strokeWidth: number }>([
+        {
+            name: "a self-origin circle and its thick world stroke",
+            scale: 4.5,
+            item: {
+                x: -14.1,
+                y: -8.3,
+                size: 12,
+                sizePx: 2000,
+                origin: { mode: "self", x: 0, y: 1 },
+                style: { strokeStyle: "#0f0", lineWidth: 8 },
+            },
+            strokeWidth: 36,
+        },
+        {
+            name: "a shifted cell-origin circle with a pixel stroke",
+            scale: 2.75,
+            item: {
+                x: -10.2,
+                y: 3.1,
+                size: 4,
+                origin: { x: -3, y: 2 },
+                style: { strokeStyle: "#00f", lineWidth: 20, lineWidthPx: 50 },
+            },
+            strokeWidth: 50,
+        },
+    ])("contains $name", ({ scale, item, strokeWidth }) => {
+        const { draw, render } = setup(scale);
+        const { canvas, ops } = makeCanvas();
+        draw.drawStaticCircle([item], "painted-circle", 1);
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const circle = picture.ops.find((op) => op.op === "circle") as Op;
+        expect(circle.r).toBe(((item.size ?? 1) * scale) / 2);
+        expect(circle.strokeWidth).toBe(strokeWidth);
+        const radius = (circle.r as number) + strokeWidth / 2;
+        expectPaddedCull(picture, {
+            minX: (circle.cx as number) - radius,
+            minY: (circle.cy as number) - radius,
+            maxX: (circle.cx as number) + radius,
+            maxY: (circle.cy as number) + radius,
+        });
+    });
+
+    it.each([
+        { name: "the full image", sprite: undefined, width: 150, height: 50 },
+        { name: "a tall sprite from a wide image", sprite: { x: 6, y: 8, w: 24, h: 72 }, width: 50, height: 150 },
+    ])("tightly contains the rotated aspect-fit destination of $name", ({ sprite, width, height }) => {
+        const { draw, render } = setup(7.5);
+        const { canvas, ops } = makeCanvas();
+        const img = { width: () => 360, height: () => 120 } as unknown as import("@shopify/react-native-skia").SkImage;
+        draw.drawStaticImage(
+            [
+                {
+                    x: -18.4,
+                    y: -12.6,
+                    size: 20,
+                    sizePx: 3000,
+                    origin: { mode: "self", x: 1, y: 0 },
+                    rotate: -47,
+                    flipX: true,
+                    img,
+                    sprite,
+                },
+            ],
+            "painted-image",
+            1,
+        );
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const imageOp = picture.ops.find((op) => op.op === "image") as Op;
+        const dest = imageOp.dest as Box;
+        expect(dest).toMatchObject({ width, height });
+        expect(imageOp.src).toEqual(
+            sprite ? { x: 6, y: 8, width: 24, height: 72 } : { x: 0, y: 0, width: 360, height: 120 },
+        );
+        expectPaddedCull(picture, rotatedBounds(dest, picture));
+    });
+
+    it("excludes skipped zero-dimension images from a valid batch's bounds", () => {
+        const { draw, render } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        const empty = { width: () => 0, height: () => 0 } as unknown as import("@shopify/react-native-skia").SkImage;
+        const loaded = {
+            width: () => 100,
+            height: () => 100,
+        } as unknown as import("@shopify/react-native-skia").SkImage;
+        draw.drawStaticImage(
+            [
+                { x: 10000, y: 10000, img: empty },
+                { x: -4.2, y: -3.3, size: 4, img: loaded },
+            ],
+            "painted-image-skip-empty",
+            1,
+        );
+        render(canvas);
+
+        const picture = recordedPicture(ops);
+        const images = picture.ops.filter((op) => op.op === "image");
+        expect(images).toHaveLength(1);
+        expectPaddedCull(picture, rotatedBounds(images[0].dest as Box, picture));
+    });
+
+    it("safely handles an image batch with no paintable dimensions", () => {
+        const { draw, render } = setup(10);
+        const { canvas, ops } = makeCanvas();
+        const empty = { width: () => 0, height: () => 0 } as unknown as import("@shopify/react-native-skia").SkImage;
+        expect(() => {
+            draw.drawStaticImage([{ x: -20, y: -10, img: empty }], "painted-image-all-empty", 1);
+            render(canvas);
+        }).not.toThrow();
+
+        for (const op of ops.filter((op) => op.op === "picture")) {
+            const picture = op.picture as MockPicture;
+            expect(picture.ops.filter((entry) => entry.op === "image")).toHaveLength(0);
+            for (const value of Object.values(picture.bounds as Box)) {
+                expect(Number.isFinite(value)).toBe(true);
+            }
+        }
     });
 });
 
@@ -696,5 +1053,169 @@ describe("dashed rect/circle borders", () => {
         expect(ops).toHaveLength(2); // fill + stroke
         expect(ops[0].pathEffect).toBeNull();
         expect(ops[1].pathEffect).toEqual({ __dash: [4, 2], phase: 0 });
+    });
+});
+
+// Pixel-sized rect contract shared by all renderers; the same fixture values
+// are asserted in the canvas, webgl, and server suites.
+describe("pixel-sized rects", () => {
+    it("resolves each axis against the live scale", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 4, sizePx: 30, style: { fillStyle: "#f00" } },
+                { x: 2, y: 2, size: 4, sizePx: 30, widthPx: 50, style: { fillStyle: "#0f0" } },
+                { x: 2, y: 2, widthPx: 50, height: 4, style: { fillStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(canvas);
+
+        const rects = ops.filter((o) => o.op === "rect").map((o) => o.rect);
+        expect(rects).toEqual([
+            { x: 10, y: 10, width: 30, height: 30 },
+            { x: 0, y: 10, width: 50, height: 30 },
+            { x: 0, y: 5, width: 50, height: 40 },
+        ]);
+    });
+});
+
+// Font weight contract shared by all renderers; the canvas, webgl and server
+// suites assert the same fixture through their font shorthand.
+describe("text font weight", () => {
+    it("matches a typeface per weight and keeps them apart in the cache", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "plain" },
+                { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+                { x: 3, y: 1, text: "numeric", style: { fontWeight: 700 } },
+            ],
+            2,
+        );
+        render(canvas);
+        // Second frame: every font is served from the cache
+        render(canvas);
+
+        expect(matchFontCalls.map((call) => call.fontWeight)).toEqual([undefined, "bold", "700"]);
+    });
+});
+
+const topToBottom = {
+    type: "linear" as const,
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [
+        { offset: 0, color: "#f00" },
+        { offset: 1, color: "#00f" },
+    ],
+};
+
+// Gradient fill contract shared by all renderers; the canvas, webgl and
+// server suites assert the same geometry through their own recorders.
+describe("gradient fills", () => {
+    it("runs a box-unit axis across the item's drawn box", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { canvas, ops } = makeCanvas();
+
+        // size 2 at (2,2) -> screen box (15,15,20,20)
+        draw.drawRect([{ x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } }], 1);
+        render(canvas);
+
+        expect(gradientCalls).toHaveLength(1);
+        expect(gradientCalls[0].start).toEqual({ x: 15, y: 15 });
+        expect(gradientCalls[0].end).toEqual({ x: 15, y: 35 });
+        expect(gradientCalls[0].pos).toEqual([0, 1]);
+        expect(ops.filter((o) => o.op === "rect")).toHaveLength(1);
+    });
+
+    it("clears the shader again so later solid fills stay solid", () => {
+        // fillPaint is shared across the whole frame, so a leaked shader
+        // would tint every rect drawn after the gradient one
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } },
+                { x: 6, y: 2, size: 2, style: { fillStyle: "#0f0" } },
+            ],
+            1,
+        );
+        render(canvas);
+
+        const shaders = ops.filter((o) => o.op === "rect").map((o) => o.shader);
+        expect(shaders[0]).toBeTruthy();
+        expect(shaders[1]).toBeNull();
+    });
+
+    it("projects world units through the camera", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawRect(
+            [
+                {
+                    x: 2,
+                    y: 2,
+                    style: {
+                        fillStyle: {
+                            ...topToBottom,
+                            units: "world" as const,
+                            from: { x: 0, y: 0 },
+                            to: { x: 0, y: 4 },
+                        },
+                    },
+                },
+            ],
+            1,
+        );
+        render(canvas);
+
+        expect(gradientCalls[0].start).toEqual({ x: 5, y: 5 });
+        expect(gradientCalls[0].end).toEqual({ x: 5, y: 45 });
+    });
+
+    it("normalizes stops into ascending positions", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawRect(
+            [
+                {
+                    x: 2,
+                    y: 2,
+                    style: {
+                        fillStyle: {
+                            ...topToBottom,
+                            stops: [
+                                { offset: 2, color: "late" },
+                                { offset: -1, color: "early" },
+                            ],
+                        },
+                    },
+                },
+            ],
+            1,
+        );
+        render(canvas);
+
+        // MakeLinearGradient takes a position array it expects ascending
+        expect(gradientCalls[0].pos).toEqual([0, 1]);
+        expect(gradientCalls[0].colors).toEqual([{ parsed: "early" }, { parsed: "late" }]);
+    });
+
+    it("leaves a plain color string on the solid path", () => {
+        const { draw, render } = setup();
+        const { canvas } = makeCanvas();
+
+        draw.drawRect([{ x: 2, y: 2, style: { fillStyle: "#0f0" } }], 1);
+        render(canvas);
+
+        expect(gradientCalls).toHaveLength(0);
     });
 });

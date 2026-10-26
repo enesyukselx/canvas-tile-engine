@@ -3,7 +3,13 @@ import { defineConfig } from "tsup";
 export default defineConfig({
     entry: ["src/index.ts"],
     format: ["cjs", "esm"],
-    dts: true,
+    dts: {
+        // The DTS bundler widens external `export type` class re-exports to
+        // values. Bundle the remaining API, then append the native type-only
+        // facade verbatim. This also applies to watch builds and both formats.
+        entry: { index: "src/exports.ts" },
+        footer: 'export type { Image, Canvas, SKRSContext2D } from "@napi-rs/canvas";',
+    },
     sourcemap: true,
     minify: true,
     clean: true,

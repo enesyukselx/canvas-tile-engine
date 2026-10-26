@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
@@ -41,6 +41,38 @@ function setup() {
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
     return { draw, render };
 }
+
+describe("CanvasDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setup();
+            const { ctx, strokes } = makeRecordingCtx();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(ctx);
+            expect(strokes).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeRecordingCtx();
+        const moveTo = vi.spyOn(ctx, "moveTo");
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+        expect(moveTo).toHaveBeenCalledTimes(2 * (10 / cellSize + 1));
+
+        draw.removeDrawHandle(handle);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+    });
+});
 
 describe("CanvasDraw lineWidth handling", () => {
     // Stroke unit contract shared by all renderers: lineWidth is world units
@@ -343,6 +375,52 @@ describe("CanvasDraw non-square rects", () => {
     });
 });
 
+// Pixel-sized rect contract shared by all renderers; the same fixture values
+// are asserted in the webgl, skia, and server suites. Scale is 10, so one world unit is 10px
+// and the precedence chain widthPx -> sizePx -> width -> size is visible in
+// every box below.
+describe("CanvasDraw pixel-sized rects", () => {
+    it("resolves each axis against the live scale", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { ctx, rects } = makeRectRecordingCtx();
+
+        draw.drawRect(
+            [
+                // sizePx wins over size: 30px square centered on cell (2,2)
+                { x: 2, y: 2, size: 4, sizePx: 30, style: { fillStyle: "#f00" } },
+                // widthPx wins over sizePx on its own axis
+                { x: 2, y: 2, size: 4, sizePx: 30, widthPx: 50, style: { fillStyle: "#0f0" } },
+                // a pixel width beside a world height
+                { x: 2, y: 2, widthPx: 50, height: 4, style: { fillStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(rects).toEqual([
+            { x: 10, y: 10, w: 30, h: 30 },
+            { x: 0, y: 10, w: 50, h: 30 },
+            { x: 0, y: 5, w: 50, h: 40 },
+        ]);
+    });
+
+    it("keeps a pixel-sized rect the same size at any zoom", () => {
+        const item = { x: 2, y: 2, sizePx: 30, style: { fillStyle: "#f00" } };
+
+        const drawAt = (scale: number) => {
+            const { draw, render } = setupAtScale(scale);
+            const { ctx, rects } = makeRectRecordingCtx();
+            draw.drawRect([item], 1);
+            render(ctx);
+            return rects[0];
+        };
+
+        // The world-sized counterpart would double; the pixel-sized one holds
+        expect(drawAt(20)).toMatchObject({ w: 30, h: 30 });
+        expect(drawAt(10)).toMatchObject({ w: 30, h: 30 });
+    });
+});
+
 // Minimal fake 2D context that records the active font at every fillText() call.
 function makeTextRecordingCtx() {
     const texts: Array<{ text: string; font: string }> = [];
@@ -355,6 +433,23 @@ function makeTextRecordingCtx() {
         restore() {},
         translate() {},
         rotate() {},
+        measureText(text: string) {
+            const px = Number(ctx.font.match(/([\d.]+)px/)?.[1] ?? 10);
+            const width = text.length * px * 0.6;
+            const left =
+                ctx.textAlign === "right" || ctx.textAlign === "end"
+                    ? width
+                    : ctx.textAlign === "center"
+                      ? width / 2
+                      : 0;
+            return {
+                width,
+                actualBoundingBoxLeft: left,
+                actualBoundingBoxRight: width - left,
+                actualBoundingBoxAscent: px / 2,
+                actualBoundingBoxDescent: px / 2,
+            };
+        },
         fillText(text: string) {
             texts.push({ text, font: ctx.font });
         },
@@ -372,6 +467,52 @@ function setupAtScale(scale: number) {
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
     return { draw, render };
 }
+
+describe("CanvasDraw text color", () => {
+    it("resolves black per item after styleOf, without inheriting context or previous text colors", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx } = makeTextRecordingCtx();
+        const colors: unknown[] = [];
+        ctx.fillText = () => colors.push(ctx.fillStyle);
+        let decorated = true;
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "default" },
+                { x: 2, y: 1, text: "explicit", style: { fillStyle: "#ff0000" } },
+                { x: 3, y: 1, text: "after", rotate: 30, style: {} },
+                { x: 4, y: 1, text: "font-only", style: { fillStyle: "#ff0000" } },
+                { x: 5, y: 1, text: "override", style: { fillStyle: "#ff0000" } },
+                { x: 6, y: 1, text: "reset", style: { fillStyle: "#ff0000" } },
+            ],
+            2,
+            {
+                styleOf: (item) => {
+                    if (item.text === "font-only") {
+                        return { fontWeight: "bold" };
+                    }
+                    if (item.text === "override" && decorated) {
+                        return { fillStyle: "#0000ff" };
+                    }
+                    if (item.text === "reset") {
+                        return { fillStyle: undefined };
+                    }
+                    return undefined;
+                },
+            },
+        );
+
+        ctx.fillStyle = "#ffffff";
+        render(ctx);
+        expect(colors).toEqual(["#000000", "#ff0000", "#000000", "#ff0000", "#0000ff", "#000000"]);
+
+        decorated = false;
+        colors.length = 0;
+        ctx.fillStyle = "#ffffff";
+        render(ctx);
+        expect(colors).toEqual(["#000000", "#ff0000", "#000000", "#ff0000", "#ff0000", "#000000"]);
+    });
+});
 
 // Font sizing contract shared by all renderers: px = fontPx ?? size * scale.
 // The same fixture values are asserted in the webgl, skia, and server suites.
@@ -1053,5 +1194,234 @@ describe("CanvasDraw per-item line style", () => {
 
         expect(strokes).toHaveLength(1);
         expect(strokes[0].strokeStyle).toBe("#0f0");
+    });
+});
+
+// Font weight contract shared by all renderers: an unset weight is omitted
+// entirely rather than emitted as "normal", so existing callers keep the exact
+// font they had. The same fixture values are asserted in the webgl, skia, and server suites.
+describe("CanvasDraw text font weight", () => {
+    it("puts the weight in the font shorthand", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([
+            { x: 1, y: 1, text: "plain" },
+            { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+            { x: 3, y: 1, text: "numeric", fontPx: 14, style: { fontWeight: 700, fontFamily: "monospace" } },
+        ]);
+        render(ctx);
+
+        expect(texts).toEqual([
+            { text: "plain", font: "10px sans-serif" },
+            { text: "bold", font: "bold 10px sans-serif" },
+            { text: "numeric", font: "700 14px monospace" },
+        ]);
+    });
+
+    it("lets styleOf decorate the weight", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([{ x: 1, y: 1, text: "a", data: { hot: true } }], 2, {
+            styleOf: (item) => ((item.data as { hot: boolean }).hot ? { fontWeight: 800 } : undefined),
+        });
+        render(ctx);
+
+        expect(texts[0].font).toBe("800 10px sans-serif");
+    });
+});
+
+// Fake 2D context that records every gradient built and the fill it was used
+// for, so the axis a gradient runs along can be asserted directly.
+type FakeGradient = { id: number; axis: number[]; stops: Array<[number, string]> };
+
+function makeGradientRecordingCtx() {
+    const gradients: FakeGradient[] = [];
+    const fills: Array<FakeGradient | string> = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        fillStyle: "#000" as unknown,
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        closePath() {},
+        rect() {},
+        arc() {},
+        arcTo() {},
+        moveTo() {},
+        lineTo() {},
+        translate() {},
+        rotate() {},
+        setLineDash() {},
+        createLinearGradient(x0: number, y0: number, x1: number, y1: number) {
+            const gradient: FakeGradient = {
+                id: gradients.length,
+                axis: [x0, y0, x1, y1],
+                stops: [],
+                addColorStop(offset: number, color: string) {
+                    gradient.stops.push([offset, color]);
+                },
+            } as unknown as FakeGradient;
+            gradients.push(gradient);
+            return gradient;
+        },
+        fill() {
+            fills.push(ctx.fillStyle as FakeGradient | string);
+        },
+        stroke() {},
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, gradients, fills };
+}
+
+const topToBottom = {
+    type: "linear" as const,
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [
+        { offset: 0, color: "#f00" },
+        { offset: 1, color: "#00f" },
+    ],
+};
+
+// Gradient fill contract shared by all renderers; the webgl, skia and server
+// suites assert the same geometry through their own recorders.
+describe("CanvasDraw gradient fills", () => {
+    it("runs a box-unit axis across the item's drawn box", () => {
+        const { draw, render } = setup(); // scale 10, camera at (0,0)
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+
+        // size 2 at (2,2) -> screen box (15,15,20,20)
+        draw.drawRect([{ x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } }], 1);
+        render(ctx);
+
+        expect(gradients).toHaveLength(1);
+        expect(gradients[0].axis).toEqual([15, 15, 15, 35]);
+        expect(gradients[0].stops).toEqual([
+            [0, "#f00"],
+            [1, "#00f"],
+        ]);
+        expect(fills[0]).toBe(gradients[0]);
+    });
+
+    it("gives each item its own axis, so one spec fits every size", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 2, style: { fillStyle: topToBottom } },
+                { x: 6, y: 2, size: 1, style: { fillStyle: topToBottom } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(gradients.map((g) => g.axis)).toEqual([
+            [15, 15, 15, 35],
+            [60, 20, 60, 30],
+        ]);
+    });
+
+    it("projects world units through the camera and reuses one gradient", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+
+        const world = { ...topToBottom, units: "world" as const, from: { x: 0, y: 0 }, to: { x: 0, y: 4 } };
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 1, style: { fillStyle: world } },
+                { x: 4, y: 2, size: 1, style: { fillStyle: world } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        // A world axis does not depend on the item, so the per-frame memo
+        // collapses the batch onto one gradient object
+        expect(gradients).toHaveLength(1);
+        expect(gradients[0].axis).toEqual([5, 5, 5, 45]);
+        expect(fills[0]).toBe(fills[1]);
+    });
+
+    it("normalizes stops before handing them over", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        draw.drawRect(
+            [
+                {
+                    x: 2,
+                    y: 2,
+                    style: {
+                        fillStyle: {
+                            ...topToBottom,
+                            stops: [
+                                { offset: 2, color: "late" },
+                                { offset: -1, color: "early" },
+                            ],
+                        },
+                    },
+                },
+            ],
+            1,
+        );
+        render(ctx);
+
+        // addColorStop throws on an out-of-range offset, so clamping is not optional
+        expect(gradients[0].stops).toEqual([
+            [0, "early"],
+            [1, "late"],
+        ]);
+    });
+
+    it("rotates a box-unit axis with its shape", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        // Under the rotated transform the box is centered on the origin, so
+        // the axis is local: a 20px box spans -10..10 on both axes, and the
+        // gradient runs down its left edge (x is inert for a vertical ramp)
+        draw.drawRect([{ x: 2, y: 2, size: 2, rotate: 90, style: { fillStyle: topToBottom } }], 1);
+        render(ctx);
+
+        expect(gradients[0].axis).toEqual([-10, -10, -10, 10]);
+    });
+
+    it("spans a path's bounding box", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients } = makeGradientRecordingCtx();
+
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 1, y: 1 },
+                        { x: 3, y: 1 },
+                        { x: 3, y: 2 },
+                    ],
+                    closed: true,
+                    style: { fillStyle: topToBottom },
+                },
+            ],
+            1,
+        );
+        render(ctx);
+
+        // bounds (1,1)-(3,2) -> screen (15,15)-(35,25)
+        expect(gradients[0].axis).toEqual([15, 15, 15, 25]);
+    });
+
+    it("leaves a plain color string untouched", () => {
+        const { draw, render } = setup();
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+
+        draw.drawRect([{ x: 2, y: 2, style: { fillStyle: "#0f0" } }], 1);
+        render(ctx);
+
+        expect(gradients).toHaveLength(0);
+        expect(fills).toEqual(["#0f0"]);
     });
 });

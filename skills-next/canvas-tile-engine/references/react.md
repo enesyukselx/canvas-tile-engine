@@ -115,6 +115,7 @@ Handle members beyond the core engine API (see
 | `instance`               | The raw `CanvasTileEngine` instance or `null`. Escape hatch. |
 | `images`                 | The image loader, `undefined` before mount.                  |
 | `loadImage(src, retry?)` | `Promise<HTMLImageElement>`; rejects if called before ready. |
+| `getConfig()`            | Before mount: the engine's defaults for an UNCONFIGURED engine (`scale: 1`, `size` 0x0, interactions off), not the `config` prop - so `minScale`/`maxScale` read `0.5`/`2`, never `scale * 0.5`/`scale * 2` of YOUR scale. Frozen and shared. Gate config-derived reads (zoom slider ranges) on `isReady`. |
 
 The same handle can drive multiple concerns (toolbar buttons calling
 `engine.zoomIn()`, effects calling `engine.goCenter(...)`) without prop
@@ -151,6 +152,11 @@ Item shapes are identical to the core draw API: [drawing.md](drawing.md).
 Sprite semantics: [sprites.md](sprites.md). `hitTest={false}` keeps a
 component's items out of `hitTest`/`hitTestRect` queries (decorative floors,
 terrain, overlays) — the `pointer-events: none` of the draw components.
+
+Every draw component also takes `clip={{ minX, maxX, minY, maxY }}`: a world
+rectangle the registration is confined to, for a chart plot area or a minimap
+frame. Nothing outside it paints or hit-tests. Unlike `items` it is compared
+BY VALUE, so an inline literal does not re-register.
 
 All the types and helpers these components and handles use are re-exported from
 `@canvas-tile-engine/react` — import them from the binding instead of reaching

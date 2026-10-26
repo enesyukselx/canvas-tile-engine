@@ -43,7 +43,7 @@ type CanvasTileEngineConfig = {
                                        // (pixel-perfect grids). Integer ties snap
                                        // down, so N/2 lands on a 0-based board's
                                        // true center (N-1)/2.
-    responsive?: "preserve-scale" | "preserve-viewport" | false; // default false
+    responsive?: "preserve-scale" | "preserve-viewport" | "fill" | false; // default false
     eventHandlers?: {                  // ALL default false
         click?: boolean;
         rightClick?: boolean;          // DOM renderers only
@@ -99,6 +99,7 @@ type CanvasTileEngineConfig = {
 | :-- | :-- |
 | `"preserve-scale"` | Scale stays fixed; visible world area grows/shrinks with the wrapper. Width-responsive only: the wrapper is set to `width: 100%` and its height is PINNED to `config.size.height` via inline style (CSS heights are overridden). |
 | `"preserve-viewport"` | Configured tile count stays visible; scale changes with wrapper width. |
+| `"fill"` | Scale stays fixed and BOTH axes follow the container (`width: 100%; height: 100%`) - the panel/grid-cell/split-pane mode; `config.size` only seeds the first frame. The container must have a definite height (a flex/grid child also needs `min-height: 0`); the wrapper cannot supply one because the canvas is absolutely positioned. A zero-height first measurement warns once. |
 | `false` | Fixed `config.size` until `engine.resize()` or `eventHandlers.resize`. |
 
 When `responsive` is enabled, `engine.resize()` and `eventHandlers.resize`
@@ -108,10 +109,10 @@ via `onLayout` instead.
 
 Scale limits adapt to the container in responsive modes: `"preserve-viewport"`
 scales `minScale` with the base scale (a zoom-out factor of the configured
-`scale`), and `"preserve-scale"` lowers the minimum limit to the scale at
+`scale`), and `"preserve-scale"` / `"fill"` lower the minimum limit to the scale at
 which finite `bounds` fit the viewport (never raising it above the current
 scale). `maxScale` stays absolute in both modes - a px-per-tile quality cap,
-lifted only when a preserve-viewport base scale exceeds it. The camera
+lifted only when a preserve-viewport base scale or adapted runtime minimum exceeds it. The camera
 therefore never lands outside the gesture-reachable zoom range after a resize.
 
 When a `"preserve-viewport"` resize changes the scale, `onZoom` fires with the
@@ -136,6 +137,14 @@ after mount.
 
 ### Camera and viewport
 
+Interruption policy: `setCenter`/`goCenter` cancel the previous move;
+`setScale`/`zoomIn`/`zoomOut`/`goScale` cancel the previous zoom. The other
+channel continues, so concurrent move+zoom still works. `fitBounds` replaces
+both. This includes instant/reduced-motion commands and unchanged-value
+setters. Invalid `setCenter`/`setScale` calls throw without cancellation.
+Interrupted `goCenter`/`goScale` runs do not fire `onComplete`, including cancellation from
+`onCoordsChange`/`onZoom`; old callbacks cannot resume an interrupted run.
+
 | Signature | Notes |
 | :-- | :-- |
 | `getCenter(): Coords` | Current world center. |
@@ -145,13 +154,13 @@ after mount.
 | `setScale(n): void` | Set scale directly, clamped to min/max. Anchored at the viewport center. |
 | `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
 | `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
-| `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Throws on non-positive/non-finite values or `minScale > maxScale`. |
+| `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Future responsive resizes adapt these replacement limits against the original configured scale/size. Throws on non-positive/non-finite values or `minScale > maxScale`. |
 | `getSize(): { width, height }` | Current logical canvas size in px. |
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
 | `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |
 | `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
 | `fitBounds(bounds, opts?): { scale, fitted }` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. `bounds` is an AREA, not cell indices: cell k spans [k-0.5, k+0.5], so a board of cells 0..31 is `{ minX: -0.5, maxX: 31.5, ... }` and centers on 15.5 - passing 0..32 fits the same width but centers half a cell off. Returns the targeted scale and `fitted` - `false` ONLY when `minScale` floors the fit, so the whole rectangle is NOT visible; `maxScale` clamping keeps `fitted: true`. The React/RN handle returns `undefined` before mount. |
-| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. |
+| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale, minScale, maxScale and size, including responsive adjustments. Use the live limits for zoom controls; re-read after resizing or runtime updates. Treat snapshots as read-only. The React/RN handle answers it before mount with the frozen, shared `normalizeConfig({ scale: 1, size: { width: 0, height: 0 } })`; those placeholder values describe an unconfigured engine, not the `config` prop. Read configured/live values after `isReady`. |
 | `setAccessibility(patch): void` | Merge a patch into `config.accessibility` at runtime (label/description/role/focusable/reducedMotion). The DOM renderers re-apply their attributes. Needed because React reads config once on mount. |
 | `onAccessibilityChange(listener): () => void` | Subscribe to `setAccessibility` updates. Only needed by a host that renders the accessible surface itself — the DOM renderers and the React Native binding subscribe internally. |
 | `setReducedMotion(value): void` | `value: boolean \| "auto"` (default `"auto"` = follow platform). Collapses engine-driven camera animation to instant. OVERRIDES an explicitly passed `durationMs` - there is NO per-call escape, the escape is `false`. Covers goCenter/goScale/fitBounds/resize ONLY; `SpriteAnimator` and app drawing are OUT of scope (call `animator.stop()` yourself for SC 2.2.2). |
@@ -189,6 +198,12 @@ optional `options?` last parameter (core >= 0.10) with these fields:
   through to items below. The item-level counterpart of `hitTest: false`,
   for decorative items mixed into an interactive set or disabled entries.
   Items hidden by `visibleOf` never hit-test regardless of this callback.
+- `clip?: Bounds` - confine the registration to a world rectangle: nothing it
+  draws paints outside, and nothing outside hit-tests (point queries reject,
+  marquee queries narrow to the overlap; `padding` does not widen it).
+  Available on every draw kind including `drawGridLines`, `drawStatic*` and
+  `addDrawFunction`. World space, so it pans and zooms with the scene -
+  a chart plot area, a minimap frame. Axis-aligned rectangles only.
 - `hitTest?: boolean` - `false` keeps the registration out of hit testing
   (the `pointer-events: none` of the draw API). Declare decorative content
   (floor tiles, background images, zone overlays) once at registration and
@@ -431,8 +446,8 @@ job on one `PathItem` (null when it draws nothing).
 ## Exported types and classes (import from `@canvas-tile-engine/core`)
 
 Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`,
-`itemsBounds`, `pathItemBounds`, `SpatialIndex`, `Config`, `ViewportState`, `CoordinateTransformer`,
-`GestureProcessor`, `AnimationController`.
+`itemsBounds`, `pathItemBounds`, `normalizeConfig`, `SpatialIndex`, `Config`, `ViewportState`,
+`CoordinateTransformer`, `GestureProcessor`, `AnimationController`.
 
 Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `BoundedItem`, `DrawObject`, `Rect`,
 `Circle`, `Text`, `Line`, `PathItem`, `PathStyle`, `ImageItem<TImage>`, `SpriteRect`,
@@ -450,4 +465,6 @@ renderer authors; app code normally only needs `CanvasTileEngine`,
 `scale` must be a positive finite number and coordinates finite numbers;
 `setScale`, `goScale`, `setCenter`, and `goCenter` throw
 `ConfigValidationError` otherwise. Config normalization fills every optional field with the defaults
-listed above.
+listed above. `normalizeConfig(config)` runs that same normalization without an engine and returns
+the deeply frozen snapshot (`normalizeConfig({ scale: 32, size }).minScale === 16`); it does NOT
+validate, so values the constructor rejects come back normalized instead of throwing.

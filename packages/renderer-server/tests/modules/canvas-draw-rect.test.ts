@@ -137,3 +137,28 @@ describe("CanvasDraw dashed rect/circle borders", () => {
         expect(strokes()).toBe(2);
     });
 });
+
+// Pixel-sized rect contract shared by all renderers; the same fixture values
+// are asserted in the canvas, webgl, and skia suites.
+describe("CanvasDraw pixel-sized rects", () => {
+    it("resolves each axis against the live scale", () => {
+        const { draw, render } = setup();
+        const { ctx, rects } = makeRectRecordingCtx();
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: 4, sizePx: 30, style: { fillStyle: "#f00" } },
+                { x: 2, y: 2, size: 4, sizePx: 30, widthPx: 50, style: { fillStyle: "#0f0" } },
+                { x: 2, y: 2, widthPx: 50, height: 4, style: { fillStyle: "#00f" } },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(rects).toEqual([
+            { x: 10, y: 10, w: 30, h: 30 },
+            { x: 0, y: 10, w: 50, h: 30 },
+            { x: 0, y: 5, w: 50, h: 40 },
+        ]);
+    });
+});

@@ -12,12 +12,14 @@ export interface MockPaint {
     strokeWidth: number;
     alphaf: number;
     pathEffect: unknown;
+    shader: unknown;
     setAntiAlias(v: boolean): void;
     setStyle(v: number): void;
     setColor(c: unknown): void;
     setStrokeWidth(w: number): void;
     setAlphaf(a: number): void;
     setPathEffect(e: unknown): void;
+    setShader(s: unknown): void;
 }
 
 const makePaint = (): MockPaint => {
@@ -27,6 +29,7 @@ const makePaint = (): MockPaint => {
         strokeWidth: 1,
         alphaf: 1,
         pathEffect: null,
+        shader: null,
         setAntiAlias() {},
         setStyle(v: number) {
             paint.style = v;
@@ -43,9 +46,20 @@ const makePaint = (): MockPaint => {
         setPathEffect(e: unknown) {
             paint.pathEffect = e;
         },
+        setShader(shader: unknown) {
+            paint.shader = shader;
+        },
     };
     return paint;
 };
+
+/** Every gradient handed to Skia.Shader.MakeLinearGradient. */
+export const gradientCalls: Array<{
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+    colors: unknown[];
+    pos: number[] | null;
+}> = [];
 
 /** Every string passed to Skia.Color, for asserting parse/cache behavior. */
 export const colorParseCalls: string[] = [];
@@ -88,6 +102,7 @@ export function makeRecordingCanvas() {
                 color: paint.color,
                 strokeWidth: paint.strokeWidth,
                 pathEffect: paint.pathEffect,
+                shader: paint.shader,
             });
         },
         drawRRect(rrect: unknown, paint: MockPaint) {
@@ -102,6 +117,7 @@ export function makeRecordingCanvas() {
                 style: paint.style,
                 strokeWidth: paint.strokeWidth,
                 pathEffect: paint.pathEffect,
+                shader: paint.shader,
             });
         },
         drawLine(x1: number, y1: number, x2: number, y2: number, paint: MockPaint) {
@@ -116,8 +132,8 @@ export function makeRecordingCanvas() {
                 pathEffect: paint.pathEffect,
             });
         },
-        drawText(text: string, x: number, y: number, _paint: MockPaint, font: { size: number }) {
-            ops.push({ op: "text", text, x, y, fontSize: font.size });
+        drawText(text: string, x: number, y: number, paint: MockPaint, font: { size: number }) {
+            ops.push({ op: "text", text, x, y, fontSize: font.size, color: paint.color });
         },
         drawPath(_path: unknown, paint: MockPaint) {
             ops.push({ op: "path", style: paint.style, strokeWidth: paint.strokeWidth });
@@ -132,8 +148,21 @@ export function makeRecordingCanvas() {
     return { canvas, ops };
 }
 
+export const TileMode = { Clamp: 0, Repeat: 1, Mirror: 2, Decal: 3 };
+
 export const Skia = {
     Paint: makePaint,
+    Shader: {
+        MakeLinearGradient: (
+            start: { x: number; y: number },
+            end: { x: number; y: number },
+            colors: unknown[],
+            pos: number[] | null,
+        ) => {
+            gradientCalls.push({ start, end, colors, pos });
+            return { __gradient: gradientCalls.length - 1 };
+        },
+    },
     Color: (value: string) => {
         colorParseCalls.push(value);
         return { parsed: value };
@@ -181,9 +210,9 @@ export interface MockFont {
 }
 
 /** Every style passed to matchFont, for asserting font cache behavior. */
-export const matchFontCalls: Array<{ fontFamily: string; fontSize: number }> = [];
+export const matchFontCalls: Array<{ fontFamily: string; fontSize: number; fontWeight?: string }> = [];
 
-export const matchFont = (style: { fontFamily: string; fontSize: number }): MockFont => {
+export const matchFont = (style: { fontFamily: string; fontSize: number; fontWeight?: string }): MockFont => {
     matchFontCalls.push(style);
     const font: MockFont = {
         size: style.fontSize,

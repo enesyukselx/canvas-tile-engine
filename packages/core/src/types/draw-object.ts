@@ -1,4 +1,46 @@
 import { Coords, LineStyle } from ".";
+import type { DefaultImage } from "./platform";
+
+/** One color stop of a gradient ramp. `offset` is `0..1` along the axis. */
+export type ColorStop = {
+    offset: number;
+    color: string;
+};
+
+/**
+ * A linear gradient fill: a color ramp along the axis from {@link from} to
+ * {@link to}.
+ *
+ * With the default `"box"` units the endpoints are fractions of the drawn
+ * box — `{ x: 0, y: 0 }` to `{ x: 0, y: 1 }` is "top to bottom" for every item
+ * that uses it, whatever its size or position, so one gradient object can be
+ * shared by a whole series. `"world"` units place the endpoints in world
+ * coordinates instead, for a ramp that spans the scene rather than the item;
+ * it then moves and scales with the camera like any other world geometry.
+ *
+ * Stops are normalized before painting: offsets are clamped to `0..1` and
+ * sorted ascending, with stops sharing an offset keeping their authored order
+ * so a hard color break stays a hard break. An empty list paints nothing; a
+ * single stop paints that color flat.
+ */
+export type LinearGradient = {
+    type: "linear";
+    from: Coords;
+    to: Coords;
+    stops: ColorStop[];
+    /** Default `"box"`. */
+    units?: "box" | "world";
+};
+
+/**
+ * Anything that can fill a shape: a CSS color string or a gradient.
+ *
+ * Strokes and text stay plain color strings. A stroke has no box to normalize
+ * a gradient against, and "along the stroke" and "across the stroke" are both
+ * reasonable readings of the same axis, so the ambiguity is left out of the
+ * API rather than resolved differently per renderer.
+ */
+export type Paint = string | LinearGradient;
 
 export type DrawObject<TData = unknown> = {
     x: number;
@@ -10,7 +52,8 @@ export type DrawObject<TData = unknown> = {
         y?: number; // 0 to 1
     };
     style?: {
-        fillStyle?: string;
+        /** Fill color, or a gradient. See {@link Paint}. */
+        fillStyle?: Paint;
         strokeStyle?: string;
         /**
          * Border width in world units; scales with zoom like the item's
@@ -55,6 +98,22 @@ export type Rect<TData = unknown> = DrawObject<TData> & {
     width?: number;
     /** Height in world units. Defaults to `size`. */
     height?: number;
+    /**
+     * Fixed size in screen pixels for both axes, independent of zoom — the
+     * Rect counterpart of {@link Circle.sizePx} and Text's `fontPx`. Takes
+     * precedence over {@link DrawObject.size} and {@link width}/{@link height},
+     * and is itself overridden per axis by {@link widthPx}/{@link heightPx}.
+     * Ignored by `drawStaticRect`: static caches replay at their recorded
+     * scale, so pixel sizing cannot hold there.
+     */
+    sizePx?: number;
+    /**
+     * Fixed width in screen pixels. Wins over {@link sizePx} and
+     * {@link width}. Same static-cache caveat as {@link sizePx}.
+     */
+    widthPx?: number;
+    /** Fixed height in screen pixels. See {@link widthPx}. */
+    heightPx?: number;
 };
 
 export type Circle<TData = unknown> = Omit<DrawObject<TData>, "rotate" | "radius"> & {
@@ -82,6 +141,15 @@ export type TextAlign = "center" | "end" | "left" | "right" | "start";
 export type TextBaseline = "alphabetic" | "bottom" | "hanging" | "ideographic" | "middle" | "top";
 
 /**
+ * Font weight. The portable intersection of the platforms: Canvas2D's font
+ * shorthand also accepts the relative `bolder`/`lighter`, which Skia has no
+ * equivalent for, so they are left out rather than silently ignored on
+ * native. Declared locally for the same platform-agnostic reason as
+ * {@link TextAlign}.
+ */
+export type FontWeight = "normal" | "bold" | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
+
+/**
  * A source rectangle inside a spritesheet image, in sheet pixels.
  * Used to draw a sub-region (frame) of a larger image.
  */
@@ -94,9 +162,10 @@ export type SpriteRect = {
 
 /**
  * An image to draw. `TImage` is the platform-specific image handle and defaults
- * to `HTMLImageElement` (DOM); other renderers parameterize it (e.g. `SkImage`).
+ * to `HTMLImageElement` when DOM types are available, or `unknown` otherwise.
+ * Other renderers parameterize it (e.g. `SkImage` or the server's `Image`).
  */
-export type ImageItem<TImage = HTMLImageElement, TData = unknown> = Omit<DrawObject<TData>, "style" | "radius"> & {
+export type ImageItem<TImage = DefaultImage, TData = unknown> = Omit<DrawObject<TData>, "style" | "radius"> & {
     img: TImage;
     /**
      * Source rectangle in sheet pixels. When set, only this sub-region of
@@ -143,6 +212,8 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size" | 
         fillStyle?: string;
         /** Font family (default: "sans-serif") */
         fontFamily?: string;
+        /** Font weight (default: the family's normal weight). */
+        fontWeight?: FontWeight;
         textAlign?: TextAlign;
         textBaseline?: TextBaseline;
     };
@@ -171,9 +242,11 @@ export type Line<TData = unknown> = {
  * plain values are world units and scale with zoom; `*Px` variants are screen
  * pixels and take precedence over their world counterpart. */
 export type PathStyle = {
-    /** Fill color. Setting it makes the path a filled shape: the outline is
-     * implicitly closed for filling and hit testing covers the interior. */
-    fillStyle?: string;
+    /** Fill color, or a gradient ({@link Paint}). Setting it makes the path a
+     * filled shape: the outline is implicitly closed for filling and hit
+     * testing covers the interior. A gradient's `"box"` units are relative to
+     * the path's bounding box. */
+    fillStyle?: Paint;
     strokeStyle?: string;
     /** Stroke width in world units; scales with zoom. Ignored when
      * {@link lineWidthPx} is set. Default: 1px hairline. */
