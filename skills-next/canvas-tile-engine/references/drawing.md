@@ -148,7 +148,7 @@ An item at integer coordinate `k` is centered on its cell. Concretely:
         y?: number;               // 0..1, default 0.5
     };
     style?: {
-        fillStyle?: string;
+        fillStyle?: Paint;      // color string OR a linear gradient (see below)
         strokeStyle?: string;
         lineWidth?: number;    // border width in WORLD units (scales with zoom)
         lineWidthPx?: number;  // border width in screen px (zoom-independent); wins over lineWidth
@@ -176,6 +176,48 @@ Styles: if `fillStyle` is set the shape is filled; if `strokeStyle` is set it
 is stroked; both work together. Any CSS color string works (`"#22c55e"`,
 `"rgba(56,189,248,0.25)"`, `"hsl(200 80% 50%)"`). `lineDash`/`lineDashPx`
 dash the border (selection frames, ghost placements); omit for solid.
+
+### Gradient fills
+
+`fillStyle` on shapes (Rect/Circle) and on `PathStyle` accepts a linear
+gradient as well as a color string. `strokeStyle` and text fills stay strings:
+a stroke has no box to normalize an axis against, and "along" vs "across" the
+stroke are equally fair readings of one axis.
+
+```ts
+type Paint = string | {
+    type: "linear";
+    from: Coords;                  // axis start
+    to: Coords;                    // axis end
+    stops: Array<{ offset: number; color: string }>;
+    units?: "box" | "world";       // default "box"
+};
+```
+
+- `"box"` units (default): `from`/`to` are FRACTIONS of the item's own drawn
+  box, so one gradient object is "top to bottom" for every item that uses it,
+  whatever its size, position or rotation — a rotated shape's ramp turns with
+  the shape. This is what makes a single spec reusable across a whole series.
+- `"world"` units: `from`/`to` are world coordinates, so the ramp spans the
+  scene rather than the item and neighbouring items each show their own slice
+  of it. Moves and scales with the camera.
+- Stops are normalized before painting: offsets clamped to `0..1` and sorted
+  ascending; two stops at one offset make a hard break. An empty list paints
+  nothing, a single stop paints flat.
+- Identical on all four renderers, arbitrary stop counts and any axis angle
+  included. `drawStatic*` accepts gradients but bakes a `"world"` axis at the
+  scale its cache was recorded at.
+
+```ts
+const ramp = {
+    type: "linear",
+    from: { x: 0, y: 0 },
+    to: { x: 0, y: 1 },
+    stops: [{ offset: 0, color: "#f97316" }, { offset: 1, color: "#22d3ee" }],
+} as const;
+
+engine.drawRect(bars.map((b) => ({ ...b, style: { fillStyle: ramp } })), 1);
+```
 
 ## Primitives
 

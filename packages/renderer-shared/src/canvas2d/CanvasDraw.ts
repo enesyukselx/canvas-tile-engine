@@ -15,6 +15,10 @@ import {
     Text,
     resolveLineWidthPx,
     resolveBoxPx,
+    isGradient,
+    normalizeStops,
+    gradientAxisPx,
+    paintKey,
     resolveSizeWorld,
     resolveLineDashPx,
     overlayLineStyle,
@@ -30,6 +34,8 @@ import {
 import type {
     AnchoredItem,
     Bounds,
+    Paint,
+    PaintBox,
     RendererClipOptions,
     LineStyle,
     LineDecorationStyle,
@@ -58,7 +64,22 @@ import {
 } from "../geometry/staticBounds";
 import { applyLineWidth } from "./applyLineWidth";
 import { CanvasTextBounds } from "./CanvasTextBounds";
-import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
+import type { Canvas2DContextLike, CanvasGradientLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
+
+/**
+ * Map a screen point into the local frame of a shape rotated by `rotation`
+ * about (`cx`, `cy`) — the inverse of the transform the context is under while
+ * a rotated item paints. Only world-unit gradients need it: their axis is
+ * projected in screen space, but it has to be handed to `createLinearGradient`
+ * in the space the fill actually happens in.
+ */
+function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coords {
+    const dx = point.x - cx;
+    const dy = point.y - cy;
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+}
 
 // Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
@@ -152,8 +173,9 @@ export class CanvasDraw<
             const visibleItems = culler.query(bounds, this.camera.scale);
 
             ctx.save();
-            let lastFillStyle: string | undefined;
+            let lastFillStyle: string | CanvasGradientLike | undefined;
             let lastStrokeStyle: string | undefined;
+            const gradients = new Map<string, CanvasGradientLike>();
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -172,22 +194,38 @@ export class CanvasDraw<
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
 
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+
+                // Inside the rotated transform the box is centered on the
+                // origin, so a gradient rotates with its shape; a world-unit
+                // axis is projected and then un-rotated into the same frame.
+                const rotated = rotationDeg !== 0;
+                const box: PaintBox = rotated
+                    ? { x: -pxW / 2, y: -pxH / 2, width: pxW, height: pxH }
+                    : { x: drawX, y: drawY, width: pxW, height: pxH };
+                const toScreen = rotated
+                    ? (wx: number, wy: number) =>
+                          unrotate(this.transformer.worldToScreen(wx, wy), drawX + pxW / 2, drawY + pxH / 2, rotation)
+                    : undefined;
+
                 // Only update style when changed (reduces state changes)
-                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                    ctx.fillStyle = style.fillStyle;
-                    lastFillStyle = style.fillStyle;
+                const fill =
+                    style?.fillStyle !== undefined
+                        ? this.toFillStyle(ctx, style.fillStyle, box, gradients, toScreen)
+                        : undefined;
+                if (fill !== undefined && fill !== lastFillStyle) {
+                    ctx.fillStyle = fill;
+                    lastFillStyle = fill;
                 }
                 if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
                     ctx.strokeStyle = style.strokeStyle;
                     lastStrokeStyle = style.strokeStyle;
                 }
 
-                const rotationDeg = item.rotate ?? 0;
-                const rotation = rotationDeg * (Math.PI / 180);
-
                 const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
-                if (rotationDeg !== 0) {
+                if (rotated) {
                     const centerX = drawX + pxW / 2;
                     const centerY = drawY + pxH / 2;
                     ctx.save();
@@ -326,8 +364,9 @@ export class CanvasDraw<
             const visibleItems = culler.query(bounds, this.camera.scale);
 
             ctx.save();
-            let lastFillStyle: string | undefined;
+            let lastFillStyle: string | CanvasGradientLike | undefined;
             let lastStrokeStyle: string | undefined;
+            const gradients = new Map<string, CanvasGradientLike>();
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -349,9 +388,18 @@ export class CanvasDraw<
                 const { x: drawX, y: drawY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
 
                 // Only update style when changed
-                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                    ctx.fillStyle = style.fillStyle;
-                    lastFillStyle = style.fillStyle;
+                const fill =
+                    style?.fillStyle !== undefined
+                        ? this.toFillStyle(
+                              ctx,
+                              style.fillStyle,
+                              { x: drawX, y: drawY, width: pxSize, height: pxSize },
+                              gradients,
+                          )
+                        : undefined;
+                if (fill !== undefined && fill !== lastFillStyle) {
+                    ctx.fillStyle = fill;
+                    lastFillStyle = fill;
                 }
                 if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
                     ctx.strokeStyle = style.strokeStyle;
@@ -461,6 +509,7 @@ export class CanvasDraw<
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const viewport = getViewportBounds(topLeft, config);
+            const gradients = new Map<string, CanvasGradientLike>();
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
@@ -501,7 +550,22 @@ export class CanvasDraw<
                 }
 
                 if (filled) {
-                    ctx.fillStyle = style!.fillStyle!;
+                    // A path's box is its bounding box on screen, so a
+                    // box-unit gradient spans the shape the same way it does
+                    // on a rect.
+                    const topLeftPx = this.transformer.worldToScreen(bounds.minX, bounds.minY);
+                    const bottomRightPx = this.transformer.worldToScreen(bounds.maxX, bounds.maxY);
+                    ctx.fillStyle = this.toFillStyle(
+                        ctx,
+                        style!.fillStyle!,
+                        {
+                            x: topLeftPx.x,
+                            y: topLeftPx.y,
+                            width: bottomRightPx.x - topLeftPx.x,
+                            height: bottomRightPx.y - topLeftPx.y,
+                        },
+                        gradients,
+                    );
                     ctx.fill(item.fillRule ?? "nonzero");
                 }
                 // A fill-only item draws no outline; everything else strokes
@@ -682,6 +746,50 @@ export class CanvasDraw<
     }
 
     /**
+     * Turn a {@link Paint} into something `ctx.fillStyle` accepts: a color
+     * string passes through, a gradient becomes a context-bound
+     * `CanvasGradient`.
+     *
+     * `box` is the item's drawn box in the coordinate space that is in effect
+     * at fill time — local coordinates inside a rotated transform, screen
+     * coordinates otherwise — because that is the space the gradient's own
+     * endpoints are read in. `toScreen` projects world coordinates into that
+     * same space, and is only consulted for `units: "world"`.
+     *
+     * `perFrame` is a memo scoped to one frame of one draw call. It exists for
+     * world-unit gradients, whose axis does not depend on the box and so
+     * resolves identically for every item in the batch; box-unit gradients
+     * move with their item and legitimately miss. Gradients are cheap objects
+     * and a static scene only paints on demand, so nothing is cached beyond
+     * the frame.
+     */
+    private toFillStyle(
+        ctx: TContext,
+        paint: Paint,
+        box: PaintBox,
+        perFrame: Map<string, CanvasGradientLike>,
+        toScreen: (x: number, y: number) => Coords = (x, y) => this.transformer.worldToScreen(x, y),
+    ): string | CanvasGradientLike {
+        if (!isGradient(paint)) {
+            return paint;
+        }
+
+        const axis = gradientAxisPx(paint, box, toScreen);
+        const key = `${paintKey(paint)}|${axis.x0},${axis.y0},${axis.x1},${axis.y1}`;
+        const memoized = perFrame.get(key);
+        if (memoized) {
+            return memoized;
+        }
+
+        const gradient = ctx.createLinearGradient(axis.x0, axis.y0, axis.x1, axis.y1);
+        for (const stop of normalizeStops(paint.stops)) {
+            gradient.addColorStop(stop.offset, stop.color);
+        }
+        perFrame.set(key, gradient);
+        return gradient;
+    }
+
+    /**
      * Fill and/or stroke the current path based on the item's style.
      * Stroke width resolves through the world/px unit convention (world
      * `lineWidth` scales with `scale`, `lineWidthPx` stays fixed); the width
@@ -692,7 +800,7 @@ export class CanvasDraw<
         ctx: TContext,
         style:
             | {
-                  fillStyle?: string;
+                  fillStyle?: Paint;
                   strokeStyle?: string;
                   lineWidth?: number;
                   lineWidthPx?: number;
@@ -732,7 +840,16 @@ export class CanvasDraw<
         items: T[],
         cacheKey: string,
         boundsOf: (item: T, scale: number) => Bounds | null,
-        renderFn: (ctx: TContext, item: T, x: number, y: number, pxW: number, pxH: number) => void,
+        renderFn: (
+            ctx: TContext,
+            item: T,
+            x: number,
+            y: number,
+            pxW: number,
+            pxH: number,
+            /** World -> cache pixels, the cache-space counterpart of `worldToScreen`. */
+            toCacheSpace: (wx: number, wy: number) => Coords,
+        ) => void,
     ): StaticCache<TContext, TCanvas> | null {
         if (!this.createOffscreen) {
             if (!this.warnedStaticCacheDisabled) {
@@ -786,6 +903,15 @@ export class CanvasDraw<
                 return null;
             }
 
+            // Cache pixel 0 is world minX/minY at renderScale — the same
+            // mapping the per-item `pos` below uses, exposed so callbacks can
+            // place world-space geometry (a world-unit gradient axis) inside
+            // the cache.
+            const toCacheSpace = (wx: number, wy: number) => ({
+                x: (wx + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
+                y: (wy + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
+            });
+
             // Render all items using the provided render function
             for (const item of items) {
                 // World units only: the cache is rendered once at renderScale
@@ -803,7 +929,7 @@ export class CanvasDraw<
                 };
                 const { x, y } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
 
-                renderFn(offscreen.ctx, item, x, y, pxW, pxH);
+                renderFn(offscreen.ctx, item, x, y, pxW, pxH, toCacheSpace);
             }
 
             cache = {
@@ -921,14 +1047,16 @@ export class CanvasDraw<
      * @param layer Layer order
      */
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1, options?: RendererClipOptions): DrawHandle {
-        let lastFillStyle: string | undefined;
+        let lastFillStyle: string | CanvasGradientLike | undefined;
         let lastStrokeStyle: string | undefined;
+        // The cache is built in one pass, so this memo spans that whole pass.
+        const gradients = new Map<string, CanvasGradientLike>();
 
         const cache = this.getOrCreateStaticCache(
             items,
             cacheKey,
             staticRectPaintBounds,
-            (ctx, item, x, y, pxW, pxH) => {
+            (ctx, item, x, y, pxW, pxH, toCacheSpace) => {
                 const style = item.style;
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
@@ -936,9 +1064,23 @@ export class CanvasDraw<
                 // resolve against it (the cache rebuilds when the scale changes).
                 const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
-                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                    ctx.fillStyle = style.fillStyle;
-                    lastFillStyle = style.fillStyle;
+                const fill =
+                    style?.fillStyle !== undefined
+                        ? this.toFillStyle(
+                              ctx,
+                              style.fillStyle,
+                              rotationDeg !== 0
+                                  ? { x: -pxW / 2, y: -pxH / 2, width: pxW, height: pxH }
+                                  : { x, y, width: pxW, height: pxH },
+                              gradients,
+                              rotationDeg !== 0
+                                  ? (wx, wy) => unrotate(toCacheSpace(wx, wy), x + pxW / 2, y + pxH / 2, rotation)
+                                  : toCacheSpace,
+                          )
+                        : undefined;
+                if (fill !== undefined && fill !== lastFillStyle) {
+                    ctx.fillStyle = fill;
+                    lastFillStyle = fill;
                 }
                 if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
                     ctx.strokeStyle = style.strokeStyle;
@@ -1072,20 +1214,31 @@ export class CanvasDraw<
         layer: number = 1,
         options?: RendererClipOptions,
     ): DrawHandle {
-        let lastFillStyle: string | undefined;
+        let lastFillStyle: string | CanvasGradientLike | undefined;
         let lastStrokeStyle: string | undefined;
+        const gradients = new Map<string, CanvasGradientLike>();
 
         const cache = this.getOrCreateStaticCache(
             items,
             cacheKey,
             staticCirclePaintBounds,
-            (ctx, item, x, y, pxSize, _pxH) => {
+            (ctx, item, x, y, pxSize, _pxH, toCacheSpace) => {
                 const style = item.style;
                 const radius = pxSize / 2;
 
-                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                    ctx.fillStyle = style.fillStyle;
-                    lastFillStyle = style.fillStyle;
+                const fill =
+                    style?.fillStyle !== undefined
+                        ? this.toFillStyle(
+                              ctx,
+                              style.fillStyle,
+                              { x, y, width: pxSize, height: pxSize },
+                              gradients,
+                              toCacheSpace,
+                          )
+                        : undefined;
+                if (fill !== undefined && fill !== lastFillStyle) {
+                    ctx.fillStyle = fill;
+                    lastFillStyle = fill;
                 }
                 if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
                     ctx.strokeStyle = style.strokeStyle;

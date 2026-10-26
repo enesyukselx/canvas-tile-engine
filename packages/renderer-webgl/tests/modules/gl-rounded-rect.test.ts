@@ -39,9 +39,9 @@ describe("rounded rectangle GPU commands", () => {
             { cx: 50, cy: 10, halfW: 50, halfH: 10, radius: [20, 20, 0, 0], rotation: 0, color: [1, 0, 0, 1] },
         ]);
         expect(buffers).toHaveLength(1);
-        expect(buffers[0]).toHaveLength(6 * 14);
+        expect(buffers[0]).toHaveLength(6 * 16);
         for (let i = 0; i < 6; i++) {
-            expect(Array.from(buffers[0].slice(i * 14 + 6, i * 14 + 10))).toEqual([0, 20, 0, 20]);
+            expect(Array.from(buffers[0].slice(i * 16 + 6, i * 16 + 10))).toEqual([0, 20, 0, 20]);
         }
     });
 
@@ -51,7 +51,7 @@ describe("rounded rectangle GPU commands", () => {
             { x1: 0, y1: 0, x2: 10, y2: 0, width: 2, color: [1, 0, 0, 0.5], endOffset: { x: -1, y: 1 } },
             { x1: 10, y1: 0, x2: 10, y2: 10, width: 2, color: [1, 0, 0, 0.5], startOffset: { x: -1, y: 1 } },
         ]);
-        const vertices = Array.from({ length: 12 }, (_, i) => Array.from(buffers[0].slice(i * 6, i * 6 + 2)));
+        const vertices = Array.from({ length: 12 }, (_, i) => Array.from(buffers[0].slice(i * 8, i * 8 + 2)));
         expect(vertices[2]).toEqual([9, 1]);
         expect(vertices[4]).toEqual([11, -1]);
         expect(vertices[6]).toEqual(vertices[2]);

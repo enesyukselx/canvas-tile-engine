@@ -40,10 +40,10 @@ function setup() {
         },
         drawArrays(_mode: number, _first: number, vertices: number) {
             const stride = data.length / vertices;
-            const kind = stencil ? (colorWrites ? "cover" : "stencil") : stride === 14 ? "shapes" : "lines";
+            const kind = stencil ? (colorWrites ? "cover" : "stencil") : stride === 16 ? "shapes" : "lines";
             const colors: number[][] = [];
             for (let vertex = 0; vertex < vertices; vertex += 6) {
-                const offset = vertex * stride + stride - 4;
+                const offset = vertex * stride + stride - 6;
                 colors.push(Array.from(data.slice(offset, offset + 4)));
             }
             commands.push({ kind, colors, vertices });

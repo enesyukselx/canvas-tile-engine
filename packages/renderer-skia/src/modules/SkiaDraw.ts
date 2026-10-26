@@ -14,6 +14,9 @@ import {
     resolveLineWidthPx,
     resolveSizePx,
     resolveBoxPx,
+    isGradient,
+    normalizeStops,
+    gradientAxisPx,
     resolveLineDashPx,
     overlayLineStyle,
     resolveRadiusPx,
@@ -28,6 +31,8 @@ import {
 } from "@canvas-tile-engine/core";
 import type {
     FontWeight,
+    Paint,
+    PaintBox,
     RendererClipOptions,
     AnchoredItem,
     Bounds,
@@ -44,6 +49,7 @@ import {
     matchFont,
     PaintStyle,
     Skia,
+    TileMode,
     type InputRRect,
     type SkCanvas,
     type SkColor,
@@ -240,12 +246,13 @@ export class SkiaDraw {
         const rect = Skia.XYWHRect(drawX, drawY, pxW, pxH);
         const rounded = this.hasRadius(radius);
         if (style?.fillStyle) {
-            this.fillPaint.setColor(this.color(style.fillStyle));
+            const resetFill = this.applyFill(style.fillStyle, { x: drawX, y: drawY, width: pxW, height: pxH });
             if (rounded) {
                 canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
             } else {
                 canvas.drawRect(rect, this.fillPaint);
             }
+            resetFill();
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
@@ -326,8 +333,14 @@ export class SkiaDraw {
         const cy = drawY + radius;
 
         if (style?.fillStyle) {
-            this.fillPaint.setColor(this.color(style.fillStyle));
+            const resetFill = this.applyFill(style.fillStyle, {
+                x: cx - radius,
+                y: cy - radius,
+                width: radius * 2,
+                height: radius * 2,
+            });
             canvas.drawCircle(cx, cy, radius, this.fillPaint);
+            resetFill();
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
@@ -548,8 +561,18 @@ export class SkiaDraw {
 
                 if (filled) {
                     path.setFillType(item.fillRule === "evenodd" ? FillType.EvenOdd : FillType.Winding);
-                    this.fillPaint.setColor(this.color(style!.fillStyle!));
+                    // A path's box is its bounding box on screen, matching the
+                    // Canvas2D and WebGL paths.
+                    const topLeftPx = this.transformer.worldToScreen(bounds.minX, bounds.minY);
+                    const bottomRightPx = this.transformer.worldToScreen(bounds.maxX, bounds.maxY);
+                    const resetFill = this.applyFill(style!.fillStyle!, {
+                        x: topLeftPx.x,
+                        y: topLeftPx.y,
+                        width: bottomRightPx.x - topLeftPx.x,
+                        height: bottomRightPx.y - topLeftPx.y,
+                    });
                     canvas.drawPath(path, this.fillPaint);
+                    resetFill();
                 }
                 // A fill-only item draws no outline; everything else strokes
                 // (defaulting to a hairline, matching the legacy behavior).
@@ -889,6 +912,38 @@ export class SkiaDraw {
      * The cache is bounded: a `styleOf` that computes a color string per frame
      * would otherwise add a permanent entry for every value it ever produced.
      */
+    /**
+     * Point `fillPaint` at a {@link Paint} and hand back a reset function.
+     *
+     * The paint is shared across every item of a frame, so a gradient shader
+     * has to be cleared again afterwards — a leaked shader would tint every
+     * later solid fill. `box` is the item's drawn box in canvas pixels;
+     * `toScreen` is only consulted for world units.
+     */
+    private applyFill(
+        paint: Paint,
+        box: PaintBox,
+        toScreen: (x: number, y: number) => Coords = (x, y) => this.transformer.worldToScreen(x, y),
+    ): () => void {
+        if (!isGradient(paint)) {
+            this.fillPaint.setColor(this.color(paint));
+            return () => {};
+        }
+
+        const axis = gradientAxisPx(paint, box, toScreen);
+        const stops = normalizeStops(paint.stops);
+        this.fillPaint.setShader(
+            Skia.Shader.MakeLinearGradient(
+                { x: axis.x0, y: axis.y0 },
+                { x: axis.x1, y: axis.y1 },
+                stops.map((stop) => this.color(stop.color)),
+                stops.map((stop) => stop.offset),
+                TileMode.Clamp,
+            ),
+        );
+        return () => this.fillPaint.setShader(null);
+    }
+
     private color(value: string): SkColor {
         let parsed = this.colorCache.get(value);
         if (!parsed) {

@@ -10,12 +10,28 @@
 
 // ─── Shape program (anti-aliased rounded boxes / circles) ───
 
+/**
+ * Gradient fills ride along every colored program as two extra per-vertex
+ * floats plus one shared ramp texture.
+ *
+ * `a_gradT` is the gradient parameter at that vertex, computed on the CPU.
+ * That is exact rather than approximate: the parameter is an affine function
+ * of position, so interpolating it across the triangles reproduces it exactly,
+ * however many color stops the ramp has and whatever angle the axis runs at.
+ * The fragment shader then samples the ramp, so the stop count never touches
+ * the vertex count.
+ *
+ * `a_gradRow` selects the ramp row, or is negative for a solid fill — which is
+ * every vertex of every shape that never asked for a gradient.
+ */
 export const SHAPE_VERTEX_SHADER = `
 attribute vec2 a_position;
 attribute vec2 a_local;
 attribute vec2 a_halfSize;
 attribute vec4 a_radius;
 attribute vec4 a_color;
+attribute float a_gradT;
+attribute float a_gradRow;
 
 uniform vec2 u_resolution;
 
@@ -23,6 +39,8 @@ varying vec2 v_local;
 varying vec2 v_halfSize;
 varying vec4 v_radius;
 varying vec4 v_color;
+varying float v_gradT;
+varying float v_gradRow;
 
 void main() {
     vec2 clip = (a_position / u_resolution) * 2.0 - 1.0;
@@ -31,6 +49,8 @@ void main() {
     v_halfSize = a_halfSize;
     v_radius = a_radius;
     v_color = a_color;
+    v_gradT = a_gradT;
+    v_gradRow = a_gradRow;
 }
 `;
 
@@ -69,6 +89,11 @@ varying vec2 v_local;
 varying vec2 v_halfSize;
 varying vec4 v_radius;
 varying vec4 v_color;
+varying float v_gradT;
+varying float v_gradRow;
+
+uniform sampler2D u_ramp;
+uniform float u_rampRows;
 
 ${ROUND_BOX_DISTANCE}
 
@@ -76,7 +101,11 @@ void main() {
     float dist = sdRoundBox(v_local, v_halfSize, v_radius);
     float alpha = EDGE_ALPHA;
     if (alpha <= 0.0) discard;
-    gl_FragColor = vec4(v_color.rgb, v_color.a * alpha);
+    vec4 base = v_color;
+    if (v_gradRow >= 0.0) {
+        base = texture2D(u_ramp, vec2(clamp(v_gradT, 0.0, 1.0), (v_gradRow + 0.5) / u_rampRows));
+    }
+    gl_FragColor = vec4(base.rgb, base.a * alpha);
 }
 `;
 
@@ -112,6 +141,8 @@ in vec2 a_local;
 in vec2 a_halfSize;
 in vec4 a_radius;
 in vec4 a_color;
+in float a_gradT;
+in float a_gradRow;
 
 uniform vec2 u_resolution;
 
@@ -119,6 +150,8 @@ out vec2 v_local;
 out vec2 v_halfSize;
 out vec4 v_radius;
 out vec4 v_color;
+out float v_gradT;
+out float v_gradRow;
 
 void main() {
     vec2 clip = (a_position / u_resolution) * 2.0 - 1.0;
@@ -127,6 +160,8 @@ void main() {
     v_halfSize = a_halfSize;
     v_radius = a_radius;
     v_color = a_color;
+    v_gradT = a_gradT;
+    v_gradRow = a_gradRow;
 }
 `;
 
@@ -138,6 +173,11 @@ in vec2 v_local;
 in vec2 v_halfSize;
 in vec4 v_radius;
 in vec4 v_color;
+in float v_gradT;
+in float v_gradRow;
+
+uniform sampler2D u_ramp;
+uniform float u_rampRows;
 
 out vec4 outColor;
 
@@ -147,7 +187,11 @@ void main() {
     float dist = sdRoundBox(v_local, v_halfSize, v_radius);
     float alpha = 1.0 - smoothstep(-fwidth(dist), fwidth(dist), dist);
     if (alpha <= 0.0) discard;
-    outColor = vec4(v_color.rgb, v_color.a * alpha);
+    vec4 base = v_color;
+    if (v_gradRow >= 0.0) {
+        base = texture(u_ramp, vec2(clamp(v_gradT, 0.0, 1.0), (v_gradRow + 0.5) / u_rampRows));
+    }
+    outColor = vec4(base.rgb, base.a * alpha);
 }
 `;
 
@@ -156,23 +200,43 @@ void main() {
 export const LINE_VERTEX_SHADER = `
 attribute vec2 a_position;
 attribute vec4 a_color;
+attribute float a_gradT;
+attribute float a_gradRow;
 
 uniform vec2 u_resolution;
 
 varying vec4 v_color;
+varying float v_gradT;
+varying float v_gradRow;
 
 void main() {
     vec2 clip = (a_position / u_resolution) * 2.0 - 1.0;
     gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
     v_color = a_color;
+    v_gradT = a_gradT;
+    v_gradRow = a_gradRow;
 }
 `;
 
+/**
+ * Strokes are always solid, but path fills are covered by a quad drawn through
+ * this same program, so it carries the ramp too.
+ */
 export const LINE_FRAGMENT_SHADER = `
 precision mediump float;
 varying vec4 v_color;
+varying float v_gradT;
+varying float v_gradRow;
+
+uniform sampler2D u_ramp;
+uniform float u_rampRows;
+
 void main() {
-    gl_FragColor = v_color;
+    if (v_gradRow >= 0.0) {
+        gl_FragColor = texture2D(u_ramp, vec2(clamp(v_gradT, 0.0, 1.0), (v_gradRow + 0.5) / u_rampRows));
+    } else {
+        gl_FragColor = v_color;
+    }
 }
 `;
 
