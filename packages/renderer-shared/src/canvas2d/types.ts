@@ -36,6 +36,22 @@ export interface Canvas2DContextLike<TDrawable = never> extends CommandTraceTarg
     scale(x: number, y: number): void;
     fillRect(x: number, y: number, w: number, h: number): void;
     fillText(text: string, x: number, y: number): void;
+    /** Older/minimal adapters can omit ink metrics; text then remains uncullable. */
+    measureText?(text: string): {
+        actualBoundingBoxLeft?: number;
+        actualBoundingBoxRight?: number;
+        actualBoundingBoxAscent?: number;
+        actualBoundingBoxDescent?: number;
+    };
+    readonly direction?: string;
+    readonly letterSpacing?: string;
+    readonly wordSpacing?: string;
+    readonly fontKerning?: string;
+    readonly fontStretch?: string;
+    readonly fontVariantCaps?: string;
+    readonly textRendering?: string;
+    /** Used only to observe an owning browser document's font loading events. */
+    readonly canvas?: object;
     drawImage(image: TDrawable, dx: number, dy: number, dw: number, dh: number): void;
     drawImage(
         image: TDrawable,

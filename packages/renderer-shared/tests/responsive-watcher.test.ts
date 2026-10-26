@@ -72,7 +72,7 @@ function createCanvas(): HTMLCanvasElement {
 }
 
 function createWatcher(options: {
-    responsive: "preserve-scale" | "preserve-viewport";
+    responsive: "preserve-scale" | "preserve-viewport" | "fill";
     wrapperWidth: number;
     wrapperHeight: number;
     minScale: number;
@@ -295,6 +295,233 @@ describe("ResponsiveWatcher scale limits", () => {
 
             expect(state.minScale).toBe(5);
             expect(state.scale).toBe(10);
+        });
+    });
+
+    describe("fill", () => {
+        it("hands both axes to the wrapper", () => {
+            // preserve-scale pins the height to config.size.height; fill must not
+            const { watcher, wrapper } = createWatcher({
+                responsive: "fill",
+                wrapperWidth: 600,
+                wrapperHeight: 400,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(wrapper.style.width).toBe("100%");
+            expect(wrapper.style.height).toBe("100%");
+        });
+
+        it("tracks container height as well as width", () => {
+            const { watcher, viewport } = createWatcher({
+                responsive: "fill",
+                wrapperWidth: 1000,
+                wrapperHeight: 800,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            FakeResizeObserver.instance!.trigger(640, 360);
+
+            expect(viewport.getSize()).toEqual({ width: 640, height: 360 });
+        });
+
+        it("keeps the scale fixed while the container changes", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "fill",
+                wrapperWidth: 1000,
+                wrapperHeight: 800,
+                minScale: 10,
+                maxScale: 40,
+            });
+            const scales: number[] = [];
+            watcher.onScaleChange = (scale) => scales.push(scale);
+            watcher.start();
+
+            FakeResizeObserver.instance!.trigger(640, 360);
+
+            expect(state.scale).toBe(10);
+            expect(scales).toEqual([]);
+        });
+
+        it("lets the height axis drive the min limit of bounded content", () => {
+            // The behavior preserve-scale cannot reach: bounds span 80 world
+            // units vertically and fit the configured 800px at scale 10, so a
+            // 400px-tall container halves the fit scale even at full width
+            const { watcher, state } = createWatcher({
+                responsive: "fill",
+                wrapperWidth: 1000,
+                wrapperHeight: 800,
+                minScale: 10,
+                maxScale: 40,
+                bounds: { minX: 0, maxX: 100, minY: 0, maxY: 80 },
+            });
+            watcher.start();
+            expect(state.minScale).toBe(10);
+
+            FakeResizeObserver.instance!.trigger(1000, 400);
+
+            expect(state.minScale).toBe(5);
+            expect(state.scale).toBe(10);
+        });
+
+        it("warns when the container collapses to zero height", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const { watcher } = createWatcher({
+                responsive: "fill",
+                wrapperWidth: 600,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+
+            watcher.start();
+
+            expect(warn).toHaveBeenCalledOnce();
+            expect(warn.mock.calls[0][0]).toContain("zero-height container");
+            warn.mockRestore();
+        });
+
+        it("stays quiet when the container has a height", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const { watcher } = createWatcher({
+                responsive: "fill",
+                wrapperWidth: 600,
+                wrapperHeight: 400,
+                minScale: 10,
+                maxScale: 40,
+            });
+
+            watcher.start();
+
+            expect(warn).not.toHaveBeenCalled();
+            warn.mockRestore();
+        });
+    });
+
+    describe("zero-size mount (issue #191)", () => {
+        it("sizes immediately when preserve-viewport measures a real width but no height on start (ordinary visible mount)", () => {
+            // A real preserve-viewport wrapper has no CSS height of its own: initStyles
+            // only sets position/overflow, the canvas is position:absolute so it
+            // contributes no flow height, and applySize is what assigns the wrapper's
+            // height (via `initialVisibleTiles.y * newScale`). So on a perfectly visible
+            // mount getBoundingClientRect() legitimately reports height 0 — this must
+            // still size immediately, not be treated as hidden.
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 600,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(state.scale).toBe(6);
+            expect(state.minScale).toBe(6);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("does not corrupt the camera when preserve-viewport measures 0x0 on start", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            // Camera stays at its configured values instead of collapsing to 0/NaN
+            expect(state.scale).toBe(10);
+            expect(state.minScale).toBe(10);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers once the observer reports a real size after a 0x0 preserve-viewport mount", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            // A real preserve-viewport wrapper still reports height 0 here too — nothing
+            // has assigned it one yet. Feeding a non-zero height would not reflect what
+            // the DOM actually delivers on recovery.
+            FakeResizeObserver.instance!.trigger(600, 0);
+
+            expect(state.scale).toBe(6);
+            expect(state.minScale).toBe(6);
+            expect(state.maxScale).toBe(40);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers even when the reported size matches the viewport's initial (pre-mount) size", () => {
+            // Guards the ResizeObserver dedupe: before sizing has ever run, a wrapper
+            // resolving to exactly the configured/initial viewport size must not be
+            // mistaken for "already sized" and skipped, or preserve-viewport's wrapper
+            // height never gets assigned.
+            const { watcher, wrapper } = createWatcher({
+                responsive: "preserve-viewport",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(wrapper.style.height).toBeUndefined();
+
+            // ViewportState in this test harness starts at the configured 1000x800,
+            // which is exactly what the wrapper reports here.
+            FakeResizeObserver.instance!.trigger(1000, 800);
+
+            expect(wrapper.style.height).toBe("800px");
+        });
+
+        it("does not corrupt the camera when preserve-scale measures 0x0 on start", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-scale",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+            });
+            watcher.start();
+
+            expect(state.scale).toBe(10);
+            expect(state.minScale).toBe(10);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
+        });
+
+        it("recovers once the observer reports a real size after a 0x0 preserve-scale mount", () => {
+            const { watcher, state } = createWatcher({
+                responsive: "preserve-scale",
+                wrapperWidth: 0,
+                wrapperHeight: 0,
+                minScale: 10,
+                maxScale: 40,
+                bounds: { minX: 0, maxX: 100, minY: 0, maxY: 80 },
+            });
+            watcher.start();
+
+            FakeResizeObserver.instance!.trigger(500, 800);
+
+            expect(state.minScale).toBe(5);
+            expect(state.scale).toBe(10);
+            expect(Number.isNaN(state.x)).toBe(false);
+            expect(Number.isNaN(state.y)).toBe(false);
         });
     });
 });

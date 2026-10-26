@@ -11,7 +11,7 @@ import {
 import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
 import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
-import { resolveSizeWorld } from "../utils/itemSize";
+import { maxPxExtent, resolveBoxWorld, resolveSizeWorld } from "../utils/itemSize";
 import { resolveOrigin, computeOriginOffset } from "../utils/origin";
 import { SpatialIndex } from "./SpatialIndex";
 
@@ -165,14 +165,23 @@ export class HitTester {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
         let maxSizePx = 0;
-        if (kind !== "path" && kind !== "line") {
+        if (kind === "path") {
+            // Re-registration is the geometry update boundary, including
+            // in-place command edits. Invalidate by item so every registration
+            // sharing that object sees the refreshed geometry at the same scale.
+            for (const item of list) {
+                this.flattenCache.delete(item as PathItem);
+            }
+        } else if (kind !== "line") {
             for (const item of list) {
                 const rect = item as Rect;
                 const extent = Math.max(rect.size ?? 1, rect.width ?? 0, rect.height ?? 0);
                 if (extent > maxSize) {
                     maxSize = extent;
                 }
-                const sizePx = (item as Circle).sizePx ?? 0;
+                // Rects carry per-axis pixel sizes on top of the shared one;
+                // circles and images only have `sizePx`.
+                const sizePx = maxPxExtent(rect);
                 if (sizePx > maxSizePx) {
                     maxSizePx = sizePx;
                 }
@@ -301,16 +310,22 @@ export class HitTester {
         kind: HitKind,
         useSizePx: boolean,
     ): { left: number; top: number; w: number; h: number } {
-        // Circles/images may be pixel-sized (sizePx wins over size); rects and
-        // static entries stay world-sized. Resolved per query because a sizePx
-        // item's world box changes with the camera scale.
-        const size =
-            useSizePx && kind !== "rect" ? resolveSizeWorld(item as Circle, this.getScale()) : (item.size ?? 1);
+        // Every anchored kind may be pixel-sized (pixels win over world units);
+        // static entries stay world-sized because their cache replays at the
+        // recorded scale. Resolved per query because a pixel-sized item's world
+        // box changes with the camera scale.
+        const size = useSizePx ? resolveSizeWorld(item as Circle, this.getScale()) : (item.size ?? 1);
         // Only rects support per-axis dimensions; circle stays size (diameter)
         // and image keeps its aspect-fit size box below.
         const rect = item as Rect;
-        const w = kind === "rect" ? (rect.width ?? size) : size;
-        const h = kind === "rect" ? (rect.height ?? size) : size;
+        const box =
+            kind === "rect"
+                ? useSizePx
+                    ? resolveBoxWorld(rect, this.getScale())
+                    : { width: rect.width ?? size, height: rect.height ?? size }
+                : { width: size, height: size };
+        const w = box.width;
+        const h = box.height;
         const origin = resolveOrigin(item.origin);
         // World-unit call (renderers use px, cellSize = camera.scale); here a
         // cell is exactly 1 world unit, so cellSize = 1.
@@ -380,7 +395,8 @@ export class HitTester {
      * Flattened-subpath cache for command paths, re-flattened when the
      * camera scale drifts beyond 2x of the cached bucket (the polyline's
      * deviation from the true curve stays far below hit tolerances inside
-     * that window, and hover-frequency queries stay cheap).
+     * that window, and hover-frequency queries stay cheap). Registering a
+     * path invalidates its cached geometry even if its object identity is reused.
      */
     private flattenCache = new WeakMap<PathItem, { scale: number; subpaths: Subpath[] }>();
 

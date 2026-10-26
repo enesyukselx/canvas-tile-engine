@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HitTester } from "../../src/modules/HitTester";
-import type { DrawHandle } from "../../src/types";
+import type { DrawHandle, PathItem } from "../../src/types";
 
 const handle = (layer: number): DrawHandle => ({ id: Symbol("h"), layer });
 
@@ -514,6 +514,57 @@ describe("HitTester sizePx items", () => {
         expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeUndefined();
     });
 
+    it("hits a pixel-sized rect inside its scale-converted box", () => {
+        // 24px square at scale 40 -> 0.6 world, so the box spans [4.7, 5.3]
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, size: 2, sizePx: 24 }, 1);
+
+        expect(ht.hitTestFirst({ x: 5.25, y: 5 })).toBeDefined();
+        // Inside the world-size box (size 2 -> [4, 6]) but outside the sizePx box
+        expect(ht.hitTestFirst({ x: 5.6, y: 5 })).toBeUndefined();
+    });
+
+    it("lets widthPx and heightPx override sizePx per axis", () => {
+        // 80x20 px at scale 40 -> 2 x 0.5 world
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, sizePx: 24, widthPx: 80, heightPx: 20 }, 1);
+
+        expect(ht.hitTestFirst({ x: 5.9, y: 5 })).toBeDefined();
+        // The shared sizePx would have made this axis 0.6 world tall
+        expect(ht.hitTestFirst({ x: 5, y: 5.4 })).toBeUndefined();
+    });
+
+    it("mixes a pixel width with a world height", () => {
+        // widthPx 80 at scale 40 -> 2 world; height stays the world value 3
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, widthPx: 80, height: 3 }, 1);
+
+        expect(ht.hitTestFirst({ x: 5.9, y: 6.4 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeUndefined();
+    });
+
+    it("ignores rect pixel sizes for static entries, matching the drawn geometry", () => {
+        const ht = new HitTester(() => 40);
+        ht.register(handle(1), "rect", { x: 5, y: 5, size: 2, sizePx: 24 }, 1, { ignoreSizePx: true });
+
+        // Static caches draw the world size ([4, 6]), not the 24px square
+        expect(ht.hitTestFirst({ x: 5.9, y: 5 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 6.1, y: 5 })).toBeUndefined();
+    });
+
+    it("pads spatial-index queries by a rect's per-axis pixel size", () => {
+        // Same setup as the circle case, but the extent comes from widthPx/
+        // heightPx with no sizePx to fall back on.
+        const ht = new HitTester(() => 5);
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i * 20, y: 0, widthPx: 30, heightPx: 30 }));
+        ht.register(handle(1), "rect", items, 1);
+
+        const hit = ht.hitTestFirst({ x: 202.9, y: 0 });
+        expect(hit).toBeDefined();
+        expect(hit?.index).toBe(10);
+        expect(ht.hitTestFirst({ x: 203.2, y: 0 })).toBeUndefined();
+    });
+
     it("pads spatial-index queries by the scale-converted max sizePx", () => {
         // Zoomed far out: 30px markers at scale 5 span 6 world units, far
         // beyond the default anchor pad. 600 items forces the R-Tree path.
@@ -532,6 +583,92 @@ describe("HitTester sizePx items", () => {
 
 describe("HitTester command paths", () => {
     const scaled = () => new HitTester(() => 40);
+
+    it.each([40, 60])("refreshes in-place command edits when re-registered at scale %s", (nextScale) => {
+        let scale = 40;
+        const ht = new HitTester(() => scale);
+        const h = handle(1);
+        const from = { type: "moveTo" as const, x: 0, y: 0 };
+        const to = { type: "lineTo" as const, x: 2, y: 0 };
+        const item: PathItem = { commands: [from, to], style: { lineWidthPx: 8 } };
+        ht.register(h, "path", item, 1);
+        expect(ht.hitTestFirst({ x: 1, y: 0 })?.item).toBe(item);
+
+        // Keep both the PathItem and its commands array; the scale remains
+        // within the old cache bucket, so zoom cannot hide stale geometry.
+        from.y = 20;
+        to.y = 20;
+        scale = nextScale;
+        ht.register(h, "path", item, 1);
+
+        expect(ht.hitTest({ x: 1, y: 0 })).toHaveLength(0);
+        expect(ht.hitTestFirst({ x: 1, y: 20 })).toMatchObject({ item, handle: h });
+        expect(ht.hitTestRect({ minX: -1, minY: -1, maxX: 3, maxY: 1 })).toHaveLength(0);
+        const region = { minX: -1, minY: 19, maxX: 3, maxY: 21 };
+        expect(ht.hitTestRect(region)).toHaveLength(1);
+        expect(ht.hitTestRect(region, { mode: "contain" })).toHaveLength(1);
+
+        // Subsequent zooms still use the updated path and live pixel width.
+        scale = 10;
+        expect(ht.hitTestFirst({ x: 1, y: 20.3 })?.item).toBe(item);
+        scale = 160;
+        expect(ht.hitTestFirst({ x: 1, y: 20.3 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 1, y: 20 })?.item).toBe(item);
+    });
+
+    it("refreshes a shared item's geometry for every registration", () => {
+        const ht = scaled();
+        const low = handle(1);
+        const high = handle(2);
+        const item: PathItem = {
+            commands: [{ type: "arc", x: 0, y: 0, radius: 2, startAngle: 0, endAngle: 360 }],
+            style: { fillStyle: "red" },
+        };
+        ht.register(low, "path", item, 1);
+        ht.register(high, "path", [item], 2);
+        expect(ht.hitTestRect({ minX: -1, minY: -1, maxX: 1, maxY: 1 })).toHaveLength(2);
+
+        item.commands = [{ type: "arc", x: 20, y: 0, radius: 2, startAngle: 0, endAngle: 360 }];
+        ht.register(high, "path", [item], 2);
+
+        expect(ht.hitTest({ x: 0, y: 0 })).toHaveLength(0);
+        const hits = ht.hitTest({ x: 20, y: 0 });
+        expect(hits.map((hit) => hit.handle)).toEqual([high, low]);
+        expect(hits.every((hit) => hit.item === item)).toBe(true);
+        const region = { minX: 17, minY: -3, maxX: 23, maxY: 3 };
+        expect(ht.hitTestRect(region, { mode: "contain" }).map((hit) => hit.handle)).toEqual([high, low]);
+    });
+
+    it.each(["remove", "clearLayer", "clear"] as const)(
+        "refreshes a reused path after %s and registration with a new handle",
+        (cleanup) => {
+            const ht = scaled();
+            const first = handle(1);
+            const item: PathItem = {
+                commands: [
+                    { type: "moveTo", x: 0, y: 0 },
+                    { type: "lineTo", x: 2, y: 0 },
+                ],
+            };
+            ht.register(first, "path", item, 1);
+            expect(ht.hitTestFirst({ x: 1, y: 0 })?.item).toBe(item);
+            if (cleanup === "remove") {
+                ht.remove(first);
+            } else if (cleanup === "clearLayer") {
+                ht.clearLayer(1);
+            } else {
+                ht.clear();
+            }
+            item.commands = [
+                { type: "moveTo", x: 0, y: 20 },
+                { type: "lineTo", x: 2, y: 20 },
+            ];
+            const second = handle(1);
+            ht.register(second, "path", item, 1);
+            expect(ht.hitTest({ x: 1, y: 0 })).toHaveLength(0);
+            expect(ht.hitTestFirst({ x: 1, y: 20 })).toMatchObject({ item, handle: second });
+        },
+    );
 
     // Donut: outer CW square, inner CCW square (opposite winding -> nonzero hole)
     const donut = [

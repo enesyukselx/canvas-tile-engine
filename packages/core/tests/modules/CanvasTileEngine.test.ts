@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasTileEngine } from "../../src/CanvasTileEngine";
 import { fitScale } from "../../src/utils/fitScale";
-import type { CanvasTileEngineConfig, Coords, IRenderer } from "../../src/types";
+import type { CanvasTileEngineConfig, Coords, IRenderer, PathItem } from "../../src/types";
 
 type Mount = Record<string, never>;
 
@@ -40,6 +40,41 @@ describe("CanvasTileEngine", () => {
         onCoordsChange = vi.fn<(coords: Coords) => void>();
         engine.onZoom = onZoom;
         engine.onCoordsChange = onCoordsChange;
+    });
+
+    describe("binding event-handler subscriptions", () => {
+        it("notifies subscribers synchronously with the updated normalized config", () => {
+            const listener = vi.fn((handlers) => {
+                expect(handlers).toBe(engine.getConfig().eventHandlers);
+                expect(Object.isFrozen(handlers)).toBe(true);
+            });
+            engine._subscribeEventHandlers(listener);
+
+            engine.setEventHandlers({ drag: true, zoom: true });
+            expect(listener).toHaveBeenCalledExactlyOnceWith(engine.getConfig().eventHandlers);
+            expect(listener.mock.calls[0][0]).toMatchObject({ drag: true, zoom: "pointer" });
+
+            engine.setEventHandlers({ drag: false });
+            expect(listener).toHaveBeenCalledTimes(2);
+            expect(listener.mock.calls[1][0]).toMatchObject({ drag: false, zoom: "pointer" });
+        });
+
+        it("unsubscribes independently and clears remaining listeners on destroy", () => {
+            const first = vi.fn();
+            const second = vi.fn();
+            const unsubscribe = engine._subscribeEventHandlers(first);
+            engine._subscribeEventHandlers(second);
+
+            unsubscribe();
+            unsubscribe();
+            engine.setEventHandlers({ click: true });
+            expect(first).not.toHaveBeenCalled();
+            expect(second).toHaveBeenCalledTimes(1);
+
+            engine.destroy();
+            engine.setEventHandlers({ click: false });
+            expect(second).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe("programmatic zoom fires onZoom", () => {
@@ -605,6 +640,7 @@ describe("CanvasTileEngine", () => {
                 addDrawFunction: (_fn: unknown, layer: number = 1) => ({ id: Symbol(`fn-${seq++}`), layer }),
                 drawRect: (_items: unknown, layer: number = 1) => ({ id: Symbol(`rect-${seq++}`), layer }),
                 drawCircle: (_items: unknown, layer: number = 1) => ({ id: Symbol(`circle-${seq++}`), layer }),
+                drawPath: (_items: unknown, layer: number = 1) => ({ id: Symbol(`path-${seq++}`), layer }),
                 drawStaticRect: (_items: unknown, _key: string, layer: number = 1) => ({
                     id: Symbol(`static-${seq++}`),
                     layer,
@@ -632,6 +668,37 @@ describe("CanvasTileEngine", () => {
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
             expect(e.hitTestFirst({ x: 2.5, y: 2.5 })).toBeUndefined();
             expect(e.hitTestFirst({ x: 5.5, y: 5.5 })).toBeDefined();
+        });
+
+        it("refreshes a mutated command path re-registered with the same id and scale", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const item: PathItem = {
+                commands: [
+                    { type: "moveTo", x: 0, y: 0 },
+                    { type: "lineTo", x: 4, y: 0 },
+                    { type: "lineTo", x: 4, y: 4 },
+                    { type: "lineTo", x: 0, y: 4 },
+                    { type: "closePath" },
+                ],
+                style: { fillStyle: "red" },
+            };
+            const first = e.drawPath(item, 1, { id: "zone" });
+            // Engine hit queries take raw coordinates, offset by half a cell.
+            expect(e.hitTestFirst({ x: 2.5, y: 2.5 })?.item).toBe(item);
+
+            item.commands = item.commands!.map((command) =>
+                command.type === "moveTo" || command.type === "lineTo" ? { ...command, x: command.x + 20 } : command,
+            );
+            const second = e.drawPath(item, 1, { id: "zone" });
+
+            expect(e.getScale()).toBe(baseConfig.scale);
+            expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(first);
+            expect(e.hitTest({ x: 2.5, y: 2.5 })).toHaveLength(0);
+            const hits = e.hitTest({ x: 22.5, y: 2.5 });
+            expect(hits).toHaveLength(1);
+            expect(hits[0]).toMatchObject({ item, handle: second });
+            expect(e.hitTestRect({ minX: 0, minY: 0, maxX: 5, maxY: 5 })).toHaveLength(0);
+            expect(e.hitTestRect({ minX: 20, minY: 0, maxX: 25, maxY: 5 })).toHaveLength(1);
         });
 
         it("accumulates as before when no id is given", () => {
@@ -730,6 +797,28 @@ describe("CanvasTileEngine", () => {
             e.addDrawFunction(() => {}, 1, { id: "hud" });
             expect(drawAPI.removeDrawHandle).toHaveBeenCalledWith(fn);
         });
+
+        it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+            "rejects invalid grid cellSize %s before replacing an existing registration",
+            (cellSize) => {
+                const { e, drawAPI } = createEngineWithDrawAPI();
+                const grid = e.drawGridLines(1, 1, "black", 0, { id: "grid" });
+                const register = vi.spyOn(drawAPI, "drawGridLines");
+
+                expect(() => e.drawGridLines(cellSize as number, 1, "black", 0, { id: "grid" })).toThrow(
+                    new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+                );
+                expect(register).not.toHaveBeenCalled();
+                expect(drawAPI.removeDrawHandle).not.toHaveBeenCalled();
+
+                // A rejected replacement leaves both the old handle and its id intact.
+                e.drawGridLines(0.5, 1, "black", 0, { id: "grid" });
+                expect(drawAPI.removeDrawHandle).toHaveBeenCalledExactlyOnceWith(grid);
+                expect(register).toHaveBeenCalledExactlyOnceWith(0.5, { lineWidth: 1, strokeStyle: "black" }, 0, {
+                    clip: undefined,
+                });
+            },
+        );
     });
 
     describe("styleOf paint-time decoration", () => {

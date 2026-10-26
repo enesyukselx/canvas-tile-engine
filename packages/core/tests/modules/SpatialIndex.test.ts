@@ -118,6 +118,78 @@ describe("SpatialIndex", () => {
         });
     });
 
+    describe("registration order", () => {
+        it.each([499, 500, 501])("preserves input order for %i overlapping items", (count) => {
+            const items = Array.from({ length: count }, (_, id) => ({ id, x: 0, y: 0, size: 2 }));
+            index.load(items);
+
+            expect(index.query(-1, -1, 1, 1)).toEqual(items);
+        });
+
+        it("preserves relative input order for spatially scattered query subsets", () => {
+            const items = Array.from({ length: 1000 }, (_, id) => ({
+                id,
+                x: (id * 37) % 101,
+                y: (id * 17) % 97,
+                size: 2,
+            }));
+            index.load(items);
+
+            for (const [minX, minY, maxX, maxY] of [
+                [20, 30, 60, 70],
+                [0, 0, 20, 20],
+                [50, 50, 100, 100],
+            ]) {
+                const expected = items.filter(
+                    (item) => item.x + 1 >= minX && item.x - 1 <= maxX && item.y + 1 >= minY && item.y - 1 <= maxY,
+                );
+                expect(expected.length).toBeGreaterThan(1);
+                expect(expected.length).toBeLessThan(items.length);
+                expect(index.query(minX, minY, maxX, maxY)).toEqual(expected);
+            }
+            // Sorting a query's results must not change later queries or the caller's array.
+            expect(index.query(-1, -1, 102, 98)).toEqual(items);
+            expect(items.map((item) => item.id)).toEqual(Array.from({ length: 1000 }, (_, id) => id));
+        });
+
+        it("appends batches and individual items in load order", () => {
+            const items = Array.from({ length: 700 }, (_, id) => ({ id, x: id % 23, y: id % 31 }));
+            index.load(items.slice(0, 199));
+            index.load([]);
+            index.load(items.slice(199, 699));
+            index.load(items.slice(699));
+
+            expect(index.query(-1, -1, 32, 32)).toEqual(items);
+            expect(index.query(5, 10, 15, 20)).toEqual(
+                items.filter((item) => item.x >= 5 && item.x <= 15 && item.y >= 10 && item.y <= 20),
+            );
+        });
+
+        it("keeps repeated object references at their own registration positions without mutating items", () => {
+            const repeated = Object.freeze({ id: -1, x: 0, y: 0 });
+            const middle = Array.from({ length: 501 }, (_, id) => Object.freeze({ id, x: 0, y: 0 }));
+            const items = [repeated, ...middle, repeated];
+            index.load(items.slice(0, 250));
+            index.load(items.slice(250));
+
+            const results = index.query(-1, -1, 1, 1);
+            expect(results).toEqual(items);
+            results.forEach((item, i) => expect(item).toBe(items[i]));
+            expect(Object.keys(repeated)).toEqual(["id", "x", "y"]);
+        });
+
+        it("preserves new load order after clearing a populated index", () => {
+            index.load(Array.from({ length: 501 }, (_, id) => ({ id, x: 0, y: 0 })));
+            index.clear();
+            expect(index.query(-1, -1, 1, 1)).toEqual([]);
+
+            const items = Array.from({ length: 501 }, (_, i) => ({ id: 1000 - i, x: 0, y: 0 }));
+            index.load(items.slice(0, 300));
+            index.load(items.slice(300));
+            expect(index.query(-1, -1, 1, 1)).toEqual(items);
+        });
+    });
+
     describe("clear", () => {
         it("removes all items from the index", () => {
             index.load([

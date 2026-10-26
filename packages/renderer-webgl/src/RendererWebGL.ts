@@ -314,6 +314,7 @@ export class RendererWebGL implements IRenderer {
             touchstart: this.handleTouchStart,
             touchmove: this.handleTouchMove,
             touchend: this.handleTouchEnd,
+            cancel: this.handleCancel,
         });
 
         // Initialize AnimationController and SizeController
@@ -433,8 +434,12 @@ export class RendererWebGL implements IRenderer {
         this.gestureProcessor.handlePointerDown(this.normalizePointer(e));
     };
 
-    private handleMouseMove = (e: MouseEvent): void => {
+    private handleMouseMove = (e: MouseEvent): boolean => {
+        if (e.currentTarget !== this.canvas && !this.gestureProcessor.dragging) {
+            return false;
+        }
         this.gestureProcessor.handlePointerMove(this.normalizePointer(e));
+        return true;
     };
 
     private handleMouseUp = (e: MouseEvent): void => {
@@ -447,7 +452,11 @@ export class RendererWebGL implements IRenderer {
     };
 
     private handleMouseLeave = (e: MouseEvent): void => {
-        this.gestureProcessor.handlePointerLeave(this.normalizePointer(e));
+        this.gestureProcessor.handlePointerLeave(this.normalizePointer(e), true);
+    };
+
+    private handleCancel = (pointer?: MouseEvent | Touch): void => {
+        this.gestureProcessor.handleCancel(pointer ? this.normalizePointer(pointer) : undefined);
     };
 
     private handleWheel = (e: WheelEvent): void => {
@@ -471,12 +480,13 @@ export class RendererWebGL implements IRenderer {
         return Boolean(eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover);
     }
 
-    private handleTouchStart = (e: TouchEvent): void => {
+    private handleTouchStart = (e: TouchEvent): boolean => {
         if (!this.touchInteractionsEnabled()) {
-            return;
+            return false;
         }
         e.preventDefault();
-        this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.touches));
+        this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.targetTouches));
+        return true;
     };
 
     private handleTouchMove = (e: TouchEvent): void => {
@@ -484,7 +494,7 @@ export class RendererWebGL implements IRenderer {
             return;
         }
         e.preventDefault();
-        this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.touches));
+        this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.targetTouches));
     };
 
     private handleTouchEnd = (e: TouchEvent): void => {
@@ -492,11 +502,11 @@ export class RendererWebGL implements IRenderer {
             // Handlers may have been disabled mid-gesture: reset the
             // processor's drag/pinch state (no changed pointer → no
             // callbacks) without claiming the event.
-            this.gestureProcessor.handleTouchEnd(this.normalizeTouches(e.touches));
+            this.gestureProcessor.handleTouchEnd(this.normalizeTouches(e.targetTouches));
             return;
         }
         e.preventDefault();
-        const remaining = this.normalizeTouches(e.touches);
+        const remaining = this.normalizeTouches(e.targetTouches);
         const changed = e.changedTouches.length > 0 ? this.normalizePointer(e.changedTouches[0]) : undefined;
         this.gestureProcessor.handleTouchEnd(remaining, changed);
     };

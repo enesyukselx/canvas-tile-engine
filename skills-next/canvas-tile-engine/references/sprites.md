@@ -101,6 +101,11 @@ Options: `frames: SpriteRect[]` (required), `fps: number` (required),
 | `isRunning()` | Whether playback is scheduled. |
 | `frameAt(elapsedMs)` | Pure timing math - frame for a given elapsed time (testing). |
 
+Frame callbacks may call `stop()` or `start()` safely, including during the
+immediate first frame. This cancels the old run's remaining frames and
+`onComplete`; a replacement run keeps its own scheduling. `onComplete` may
+also start a new run.
+
 One-shot effect (explosion etc.):
 
 ```ts

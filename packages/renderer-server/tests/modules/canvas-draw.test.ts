@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import type { Canvas, Image, SKRSContext2D } from "@napi-rs/canvas";
 import { CanvasDraw, type OffscreenCanvasFactory } from "@canvas-tile-engine/renderer-shared/canvas2d";
@@ -16,6 +16,23 @@ function makeTextRecordingCtx() {
         restore() {},
         translate() {},
         rotate() {},
+        measureText(text: string) {
+            const px = Number(ctx.font.match(/([\d.]+)px/)?.[1] ?? 10);
+            const width = text.length * px * 0.6;
+            const left =
+                ctx.textAlign === "right" || ctx.textAlign === "end"
+                    ? width
+                    : ctx.textAlign === "center"
+                      ? width / 2
+                      : 0;
+            return {
+                width,
+                actualBoundingBoxLeft: left,
+                actualBoundingBoxRight: width - left,
+                actualBoundingBoxAscent: px / 2,
+                actualBoundingBoxDescent: px / 2,
+            };
+        },
         fillText(text: string) {
             texts.push({ text, font: ctx.font });
         },
@@ -110,6 +127,38 @@ function makeLineStyleRecordingCtx() {
     return { ctx: ctx as unknown as SKRSContext2D, strokes };
 }
 
+describe("Server CanvasDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setupAtScale(10);
+            const { ctx, strokes } = makeLineStyleRecordingCtx();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(ctx);
+            expect(strokes).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, strokes } = makeLineStyleRecordingCtx();
+        const moveTo = vi.spyOn(ctx, "moveTo");
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+        expect(moveTo).toHaveBeenCalledTimes(2 * (10 / cellSize + 1));
+
+        draw.removeDrawHandle(handle);
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+    });
+});
+
 // Per-item line style contract shared by all renderers (mirrors the canvas
 // suite): item.style overlays the call-level style field by field.
 describe("CanvasDraw per-item line style", () => {
@@ -132,6 +181,29 @@ describe("CanvasDraw per-item line style", () => {
             ["#00f", 2],
             ["#f00", 6],
             ["#00f", 2],
+        ]);
+    });
+});
+
+// Font weight contract shared by all renderers: an unset weight is omitted
+// entirely rather than emitted as "normal". The same fixture values are
+// asserted in the canvas, webgl, and skia suites.
+describe("CanvasDraw text font weight", () => {
+    it("puts the weight in the font shorthand", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx, texts } = makeTextRecordingCtx();
+
+        draw.drawText([
+            { x: 1, y: 1, text: "plain" },
+            { x: 2, y: 1, text: "bold", style: { fontWeight: "bold" } },
+            { x: 3, y: 1, text: "numeric", fontPx: 14, style: { fontWeight: 700, fontFamily: "monospace" } },
+        ]);
+        render(ctx);
+
+        expect(texts).toEqual([
+            { text: "plain", font: "10px sans-serif" },
+            { text: "bold", font: "bold 10px sans-serif" },
+            { text: "numeric", font: "700 14px monospace" },
         ]);
     });
 });

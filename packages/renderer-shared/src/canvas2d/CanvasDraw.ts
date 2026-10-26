@@ -11,10 +11,10 @@ import {
     Line,
     PathItem,
     Rect,
-    SpatialIndex,
     SpriteRect,
     Text,
     resolveLineWidthPx,
+    resolveBoxPx,
     resolveSizeWorld,
     resolveLineDashPx,
     overlayLineStyle,
@@ -24,12 +24,12 @@ import {
     computeOriginOffset,
     traceRoundedPath,
     traceCommands,
-    itemsBounds,
     pathItemBounds,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
     AnchoredItem,
+    Bounds,
     RendererClipOptions,
     LineStyle,
     LineDecorationStyle,
@@ -40,12 +40,26 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { DrawCallback, DrawContext, Layer } from "../scene/Layer";
-import { getViewportBounds, isVisible } from "../geometry/culling";
+import { getViewportBounds } from "../geometry/culling";
+import {
+    boxPaintBounds,
+    boxPixelPadding,
+    intersectsBounds,
+    linePaintBounds,
+    PaintedCuller,
+    pathPaintBounds,
+    textPaintBounds,
+} from "../geometry/paintedBounds";
+import {
+    staticCacheBounds,
+    staticRectPaintBounds,
+    staticCirclePaintBounds,
+    staticImagePaintBounds,
+} from "../geometry/staticBounds";
 import { applyLineWidth } from "./applyLineWidth";
+import { CanvasTextBounds } from "./CanvasTextBounds";
 import type { Canvas2DContextLike, CanvasImageSourceLike, OffscreenCanvasFactory } from "./types";
 
-// Threshold for using spatial indexing (below this, linear scan is faster)
-const SPATIAL_INDEX_THRESHOLD = 500;
 // Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
@@ -76,6 +90,7 @@ export class CanvasDraw<
     };
     private staticCaches = new Map<string, StaticCache<TContext, TCanvas>>();
     private warnedStaticCacheDisabled = false;
+    private textBounds = new CanvasTextBounds();
 
     /**
      * @param createOffscreen Offscreen canvas factory for static caching, or
@@ -125,15 +140,16 @@ export class CanvasDraw<
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             ctx.save();
             let lastFillStyle: string | undefined;
@@ -143,21 +159,17 @@ export class CanvasDraw<
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const size = item.size ?? 1;
-                const w = item.width ?? size;
-                const h = item.height ?? size;
+                // Pixel sizes win over world units, resolved against the live scale
+                const { width: pxW, height: pxH } = resolveBoxPx(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, Math.max(w, h) / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const pxW = w * this.camera.scale;
-                const pxH = h * this.camera.scale;
                 const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
 
                 // Only update style when changed (reduces state changes)
@@ -214,6 +226,7 @@ export class CanvasDraw<
         const visibleOf = options?.visibleOf;
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
+            const bounds = getViewportBounds(topLeft, config);
             ctx.save();
             const baseStroke = style?.strokeStyle ?? "#000000";
             ctx.strokeStyle = baseStroke;
@@ -243,10 +256,7 @@ export class CanvasDraw<
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const centerX = (item.from.x + item.to.x) / 2;
-                const centerY = (item.from.y + item.to.y) / 2;
-                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(bounds, linePaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
@@ -304,24 +314,16 @@ export class CanvasDraw<
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style, false),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             ctx.save();
             let lastFillStyle: string | undefined;
@@ -337,8 +339,7 @@ export class CanvasDraw<
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style, false))) {
                     continue;
                 }
 
@@ -370,19 +371,26 @@ export class CanvasDraw<
         layer: number = 2,
         options?: RendererDrawOptions<Text, TextDecorationStyle>,
     ): DrawHandle {
+        // Re-registration also refreshes metrics after platform font changes
+        // on hosts without a font-loading event source (e.g. server canvas).
+        this.textBounds.clear();
         const list = Array.isArray(items) ? items : [items];
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        let culler: PaintedCuller<Text>;
+        let measuringContext: TContext;
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
-                : list;
+            measuringContext = ctx;
+            culler ??= new PaintedCuller(
+                list,
+                (item, scale) =>
+                    textPaintBounds(item, scale, this.textBounds.measure(measuringContext, item, item.style, scale)),
+                !!styleOf,
+            );
+            const visibleItems = culler.query(bounds, this.camera.scale, this.textBounds.getRevision(ctx));
 
             ctx.save();
 
@@ -394,21 +402,32 @@ export class CanvasDraw<
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // fontPx is zoom-independent; its world-space extent shrinks as scale grows
-                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
-
-                // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
+                if (
+                    !intersectsBounds(
+                        bounds,
+                        textPaintBounds(
+                            item,
+                            this.camera.scale,
+                            this.textBounds.measure(ctx, item, style, this.camera.scale),
+                        ),
+                    )
+                ) {
                     continue;
                 }
 
                 const pxSize = item.fontPx ?? size * this.camera.scale;
                 const family = style?.fontFamily ?? "sans-serif";
-                ctx.font = `${pxSize}px ${family}`;
+                // Weight is omitted entirely when unset: the CSS font shorthand
+                // resets every unlisted property, so an explicit "normal" would
+                // be a behavior change for callers who never asked for one.
+                ctx.font =
+                    style?.fontWeight !== undefined
+                        ? `${style.fontWeight} ${pxSize}px ${family}`
+                        : `${pxSize}px ${family}`;
 
-                if (style?.fillStyle) {
-                    ctx.fillStyle = style.fillStyle;
-                }
+                // Resolve every item, including after a styleOf override, so
+                // text never inherits the frame background or a previous label.
+                ctx.fillStyle = style?.fillStyle ?? "#000000";
                 ctx.textAlign = style?.textAlign ?? "center";
                 ctx.textBaseline = style?.textBaseline ?? "middle";
 
@@ -441,6 +460,7 @@ export class CanvasDraw<
         const itemBounds = items.map((item) => pathItemBounds(item));
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
+            const viewport = getViewportBounds(topLeft, config);
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
@@ -448,10 +468,7 @@ export class CanvasDraw<
                     continue;
                 }
 
-                const centerX = (bounds.minX + bounds.maxX) / 2;
-                const centerY = (bounds.minY + bounds.maxY) / 2;
-                const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(viewport, pathPaintBounds(bounds, item.style, this.camera.scale))) {
                     continue;
                 }
 
@@ -544,24 +561,16 @@ export class CanvasDraw<
         const list = Array.isArray(items) ? items : [items];
         const visibleOf = options?.visibleOf;
 
-        // Build spatial index for large datasets (RBush R-Tree)
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale),
+            false,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
+        );
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -571,8 +580,7 @@ export class CanvasDraw<
                 const sizeWorld = resolveSizeWorld(item, this.camera.scale);
                 const origin = resolveOrigin(item.origin);
 
-                // Skip visibility check if using spatial index (already filtered)
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale))) {
                     continue;
                 }
 
@@ -634,6 +642,9 @@ export class CanvasDraw<
         layer: number = 0,
         options?: RendererClipOptions,
     ): DrawHandle {
+        if (!Number.isFinite(cellSize) || cellSize <= 0) {
+            throw new RangeError("[CanvasTileEngine] cellSize must be a positive finite number");
+        }
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
@@ -720,6 +731,7 @@ export class CanvasDraw<
     >(
         items: T[],
         cacheKey: string,
+        boundsOf: (item: T, scale: number) => Bounds | null,
         renderFn: (ctx: TContext, item: T, x: number, y: number, pxW: number, pxH: number) => void,
     ): StaticCache<TContext, TCanvas> | null {
         if (!this.createOffscreen) {
@@ -730,25 +742,20 @@ export class CanvasDraw<
             return null;
         }
 
-        const box = itemsBounds(items);
+        const renderScale = this.camera.scale;
+        const box = staticCacheBounds(items, renderScale, boundsOf);
         if (!box) {
             return null;
         }
 
-        // One world unit of padding absorbs origin offsets and rotation, which
-        // itemsBounds leaves out.
-        const minX = box.minX - 1;
-        const minY = box.minY - 1;
-        const maxX = box.maxX + 1;
-        const maxY = box.maxY + 1;
+        const { minX, minY, maxX, maxY } = box;
 
         const worldWidth = maxX - minX;
         const worldHeight = maxY - minY;
 
-        // Use current scale for rendering
-        const renderScale = this.camera.scale;
-        const canvasWidth = Math.ceil(worldWidth * renderScale);
-        const canvasHeight = Math.ceil(worldHeight * renderScale);
+        // Bounds already snap outwards to integer raster coordinates.
+        const canvasWidth = Math.round(worldWidth * renderScale);
+        const canvasHeight = Math.round(worldHeight * renderScale);
 
         if (canvasWidth > MAX_STATIC_CANVAS_DIMENSION || canvasHeight > MAX_STATIC_CANVAS_DIMENSION) {
             if (!this.warnedStaticCacheDisabled) {
@@ -781,6 +788,10 @@ export class CanvasDraw<
 
             // Render all items using the provided render function
             for (const item of items) {
+                // World units only: the cache is rendered once at renderScale
+                // and blitted afterwards, so a screen-pixel size could not hold
+                // its size across zooms. `ignoreSizePx` keeps hit testing in
+                // step with what is drawn here.
                 const size = item.size ?? 1;
                 const pxW = (item.width ?? size) * renderScale;
                 const pxH = (item.height ?? size) * renderScale;
@@ -913,50 +924,61 @@ export class CanvasDraw<
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxW, pxH) => {
-            const style = item.style;
-            const rotationDeg = item.rotate ?? 0;
-            const rotation = rotationDeg * (Math.PI / 180);
-            // Cache renders at the current camera scale, so world-unit radii
-            // resolve against it (the cache rebuilds when the scale changes).
-            const radius = resolveRadiusPx(item.radius, this.camera.scale);
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            staticRectPaintBounds,
+            (ctx, item, x, y, pxW, pxH) => {
+                const style = item.style;
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+                // Cache renders at the current camera scale, so world-unit radii
+                // resolve against it (the cache rebuilds when the scale changes).
+                const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
-            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                ctx.fillStyle = style.fillStyle;
-                lastFillStyle = style.fillStyle;
-            }
-            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
-                ctx.strokeStyle = style.strokeStyle;
-                lastStrokeStyle = style.strokeStyle;
-            }
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
 
-            if (rotationDeg !== 0) {
-                const centerX = x + pxW / 2;
-                const centerY = y + pxH / 2;
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(rotation);
-                ctx.beginPath();
-                if (radius && ctx.roundRect) {
-                    ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
+                if (rotationDeg !== 0) {
+                    const centerX = x + pxW / 2;
+                    const centerY = y + pxH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(rotation);
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(-pxW / 2, -pxH / 2, pxW, pxH, radius);
+                    } else {
+                        ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
+                    }
+                    this.fillStrokePath(ctx, style, this.camera.scale);
+                    ctx.restore();
                 } else {
-                    ctx.rect(-pxW / 2, -pxH / 2, pxW, pxH);
+                    ctx.beginPath();
+                    if (radius && ctx.roundRect) {
+                        ctx.roundRect(x, y, pxW, pxH, radius);
+                    } else {
+                        ctx.rect(x, y, pxW, pxH);
+                    }
+                    this.fillStrokePath(ctx, style, this.camera.scale);
                 }
-                this.fillStrokePath(ctx, style, this.camera.scale);
-                ctx.restore();
-            } else {
-                ctx.beginPath();
-                if (radius && ctx.roundRect) {
-                    ctx.roundRect(x, y, pxW, pxH, radius);
-                } else {
-                    ctx.rect(x, y, pxW, pxH);
-                }
-                this.fillStrokePath(ctx, style, this.camera.scale);
-            }
-        });
+            },
+        );
 
         if (!cache) {
-            return this.drawRect(items, layer, options);
+            // Every fallback keeps the static world-size contract, just like
+            // the cache and hit tester, without mutating the caller's items.
+            return this.drawRect(
+                items.map(({ sizePx: _sizePx, widthPx: _widthPx, heightPx: _heightPx, ...rest }) => rest),
+                layer,
+                options,
+            );
         }
 
         return this.addStaticCacheLayer(cache, layer, options)!;
@@ -976,52 +998,61 @@ export class CanvasDraw<
         layer: number = 1,
         options?: RendererClipOptions,
     ): DrawHandle {
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
-            const img = item.img;
-            const sprite = item.sprite;
-            const opacity = item.opacity ?? 1;
-            const rotationDeg = item.rotate ?? 0;
-            const rotation = rotationDeg * (Math.PI / 180);
-            const flipX = item.flipX === true;
-            const flipY = item.flipY === true;
-            const srcW = sprite?.w ?? img.width;
-            const srcH = sprite?.h ?? img.height;
-            const aspect = srcW / srcH;
-            let drawW = pxSize;
-            let drawH = pxSize;
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            (item) => staticImagePaintBounds(item, item.img.width, item.img.height),
+            (ctx, item, x, y, pxSize, _pxH) => {
+                const img = item.img;
+                const sprite = item.sprite;
+                const opacity = item.opacity ?? 1;
+                const rotationDeg = item.rotate ?? 0;
+                const rotation = rotationDeg * (Math.PI / 180);
+                const flipX = item.flipX === true;
+                const flipY = item.flipY === true;
+                const srcW = sprite?.w ?? img.width;
+                const srcH = sprite?.h ?? img.height;
+                const aspect = srcW / srcH;
+                let drawW = pxSize;
+                let drawH = pxSize;
 
-            if (aspect > 1) {
-                drawH = pxSize / aspect;
-            } else {
-                drawW = pxSize * aspect;
-            }
-
-            // x, y are top-left of pxSize box, need to center image within it
-            const imgX = x + (pxSize - drawW) / 2;
-            const imgY = y + (pxSize - drawH) / 2;
-
-            if (rotationDeg !== 0 || flipX || flipY) {
-                const centerX = imgX + drawW / 2;
-                const centerY = imgY + drawH / 2;
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                if (rotationDeg !== 0) {
-                    ctx.rotate(rotation);
+                if (aspect > 1) {
+                    drawH = pxSize / aspect;
+                } else {
+                    drawW = pxSize * aspect;
                 }
-                // Flip is scale-independent, so unlike sizePx it is honored
-                // in static caches too (mirrored first, rotation second).
-                if (flipX || flipY) {
-                    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+
+                // x, y are top-left of pxSize box, need to center image within it
+                const imgX = x + (pxSize - drawW) / 2;
+                const imgY = y + (pxSize - drawH) / 2;
+
+                if (rotationDeg !== 0 || flipX || flipY) {
+                    const centerX = imgX + drawW / 2;
+                    const centerY = imgY + drawH / 2;
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    if (rotationDeg !== 0) {
+                        ctx.rotate(rotation);
+                    }
+                    // Flip is scale-independent, so unlike sizePx it is honored
+                    // in static caches too (mirrored first, rotation second).
+                    if (flipX || flipY) {
+                        ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+                    }
+                    this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
+                    ctx.restore();
+                } else {
+                    this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH, opacity);
                 }
-                this.blitImage(ctx, img, sprite, -drawW / 2, -drawH / 2, drawW, drawH, opacity);
-                ctx.restore();
-            } else {
-                this.blitImage(ctx, img, sprite, imgX, imgY, drawW, drawH, opacity);
-            }
-        });
+            },
+        );
 
         if (!cache) {
-            return this.drawImage(items, layer, options);
+            return this.drawImage(
+                items.map(({ sizePx: _sizePx, ...rest }) => rest),
+                layer,
+                options,
+            );
         }
 
         return this.addStaticCacheLayer(cache, layer, options)!;
@@ -1044,26 +1075,35 @@ export class CanvasDraw<
         let lastFillStyle: string | undefined;
         let lastStrokeStyle: string | undefined;
 
-        const cache = this.getOrCreateStaticCache(items, cacheKey, (ctx, item, x, y, pxSize, _pxH) => {
-            const style = item.style;
-            const radius = pxSize / 2;
+        const cache = this.getOrCreateStaticCache(
+            items,
+            cacheKey,
+            staticCirclePaintBounds,
+            (ctx, item, x, y, pxSize, _pxH) => {
+                const style = item.style;
+                const radius = pxSize / 2;
 
-            if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
-                ctx.fillStyle = style.fillStyle;
-                lastFillStyle = style.fillStyle;
-            }
-            if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
-                ctx.strokeStyle = style.strokeStyle;
-                lastStrokeStyle = style.strokeStyle;
-            }
+                if (style?.fillStyle && style.fillStyle !== lastFillStyle) {
+                    ctx.fillStyle = style.fillStyle;
+                    lastFillStyle = style.fillStyle;
+                }
+                if (style?.strokeStyle && style.strokeStyle !== lastStrokeStyle) {
+                    ctx.strokeStyle = style.strokeStyle;
+                    lastStrokeStyle = style.strokeStyle;
+                }
 
-            ctx.beginPath();
-            ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
-            this.fillStrokePath(ctx, style, this.camera.scale);
-        });
+                ctx.beginPath();
+                ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
+                this.fillStrokePath(ctx, style, this.camera.scale);
+            },
+        );
 
         if (!cache) {
-            return this.drawCircle(items, layer, options);
+            return this.drawCircle(
+                items.map(({ sizePx: _sizePx, ...rest }) => rest),
+                layer,
+                options,
+            );
         }
 
         return this.addStaticCacheLayer(cache, layer, options)!;
@@ -1130,6 +1170,7 @@ export class CanvasDraw<
      * Release cached canvases and layer callbacks.
      */
     destroy() {
+        this.textBounds.clear();
         this.staticCaches.clear();
         this.layers.clear();
     }

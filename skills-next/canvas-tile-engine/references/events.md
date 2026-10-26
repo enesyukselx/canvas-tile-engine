@@ -49,6 +49,20 @@ Touch behavior: taps fire `onClick`; touch drags pan (when `drag` enabled);
 pinch zooms (when `zoom` enabled). A drag suppresses the click that would
 otherwise fire on release.
 
+In pointer zoom mode, a moving pinch midpoint keeps the same world point
+underneath it unless camera bounds constrain the result. This translation
+still works at `minScale`/`maxScale`. Center zoom mode ignores midpoint
+movement and keeps the viewport center anchored.
+
+Browser Canvas2D/WebGL drags track mouse movement and release outside the
+canvas. `onMouseLeave` still fires immediately but does not stop the drag;
+ordinary hover remains local. Release coordinates can be outside the canvas.
+`touchcancel`, window blur, lost mouse buttons, and renderer teardown cancel
+the gesture without clicking, release an active press once via `onMouseUp`
+(last known position if needed), and clear drag/pinch state. Remaining fingers
+from a cancelled touch gesture are ignored until a fresh gesture. Only touches
+that started on the canvas participate; other elements' contacts are excluded.
+
 ## Camera callbacks
 
 ```ts
@@ -58,9 +72,11 @@ engine.onCoordsChange = (center: Coords) => {};
 // minimaps, URL state, or coordinate readouts.
 
 engine.onZoom = (scale: number) => {};
-// Fires on ANY scale change: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
+// Fires on ANY scale CHANGE: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
 // setScaleLimits clamping the current scale into a new range, and
 // preserve-viewport responsive resizes (the resize changes the scale).
+// Silent when the scale does not actually move (a wheel/pinch at minScale or
+// maxScale), so non-idempotent handlers are safe here.
 
 engine.onWheel = (coords, mouse, client, wheel) => {};
 // Fires for wheel (desktop) and pinch (touch) zoom gestures — requires

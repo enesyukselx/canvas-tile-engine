@@ -1,5 +1,6 @@
 // Canvas2D drawing pipeline shared by renderer-canvas and renderer-server.
 export { CanvasDraw } from "./CanvasDraw";
+export { CanvasTextBounds } from "./CanvasTextBounds";
 export { CoordinateOverlayRenderer } from "./CoordinateOverlayRenderer";
 export { DebugOverlay } from "./DebugOverlay";
 export { applyLineWidth } from "./applyLineWidth";

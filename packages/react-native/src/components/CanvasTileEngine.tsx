@@ -9,7 +9,11 @@ import {
     type SkPicture,
     type SkImage,
 } from "@shopify/react-native-skia";
-import { CanvasTileEngine as CanvasTileEngineCore, type NormalizedPointer } from "@canvas-tile-engine/core";
+import {
+    CanvasTileEngine as CanvasTileEngineCore,
+    type EventHandlers,
+    type NormalizedPointer,
+} from "@canvas-tile-engine/core";
 import type { SkiaMount } from "@canvas-tile-engine/renderer-skia";
 import { EngineContext, type EngineContextValue } from "../context";
 import type { CanvasTileEngineProps } from "../types";
@@ -40,6 +44,9 @@ const TAP_TIME_THRESHOLD = 300;
 // the responder while one finger is still down; that finger then re-grants as
 // a fresh gesture whose lift would otherwise register as a clean tap.
 const MULTI_TOUCH_TAP_COOLDOWN_MS = 400;
+
+const handlersClaimTouches = (handlers: Readonly<EventHandlers>): boolean =>
+    Boolean(handlers.click || handlers.drag || handlers.zoom || handlers.hover);
 
 interface TapState {
     x: number;
@@ -137,8 +144,10 @@ function CanvasTileEngineBase({
     // Local state starts false on every mount, so children always mount
     // after their own engine is attached.
     const [ready, setReady] = useState(false);
+    const [configClaimsTouches, setConfigClaimsTouches] = useState(false);
 
     const instanceRef = useRef<CanvasTileEngineCore<SkiaMount, SkImage> | null>(null);
+    const unsubscribeEventHandlersRef = useRef<(() => void) | null>(null);
     const sizeRef = useRef({ width: 0, height: 0 });
     const tapRef = useRef<TapState | null>(null);
     // The renderer actually wired to the engine. Captured at creation so gesture
@@ -292,6 +301,13 @@ function CanvasTileEngineBase({
                 instance._setPlatformReducedMotion(platformReducedMotionRef.current);
                 instanceRef.current = instance;
                 rendererRef.current = renderer;
+                // Subscribe at creation, before exposing the instance to
+                // consumers/child effects. Config changes do not paint a
+                // frame, so picture state cannot keep native gates current.
+                const updateGestureGate = (handlers: Readonly<EventHandlers>) =>
+                    setConfigClaimsTouches(handlersClaimTouches(handlers));
+                unsubscribeEventHandlersRef.current = instance._subscribeEventHandlers(updateGestureGate);
+                updateGestureGate(instance.getConfig().eventHandlers);
                 engine._setInstance(instance);
                 setReady(true);
                 instance.render();
@@ -303,15 +319,6 @@ function CanvasTileEngineBase({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [engine, mount, renderer, wireCallbacks],
     );
-
-    // Tear down on unmount.
-    useEffect(() => {
-        return () => {
-            instanceRef.current?.destroy();
-            instanceRef.current = null;
-            engine._setInstance(null);
-        };
-    }, [engine]);
 
     // ─── Touch → renderer gesture forwarding (react-native-gesture-handler) ───
     //
@@ -350,6 +357,58 @@ function CanvasTileEngineBase({
     const multiTouchRef = useRef(false);
     // Timestamp of the last multi-touch evidence, for the tap cooldown window.
     const lastMultiTouchAtRef = useRef(0);
+    // A single-pointer touchStart emits mouseDown in core. Keep its release
+    // obligation separate from tap eligibility: adding a finger must cancel
+    // the click, not strand application drawing/selection state as pressed.
+    const pressRef = useRef<{ id: number; pointer: NormalizedPointer } | null>(null);
+
+    const updatePressPosition = useCallback((e: GestureTouchEvent) => {
+        const press = pressRef.current;
+        if (!press) {
+            return;
+        }
+        const touch = e.changedTouches.find((t) => t.id === press.id) ?? e.allTouches.find((t) => t.id === press.id);
+        if (touch) {
+            press.pointer = toPointer(touch);
+        }
+    }, []);
+
+    const finishGesture = useCallback((cancelled: boolean) => {
+        if (!claimRef.current) {
+            return;
+        }
+        const pointer = pressRef.current?.pointer;
+        // Clear ownership before notifying application callbacks. Repeated
+        // up/cancel events and unmount cleanup must not release twice.
+        claimRef.current = false;
+        touchCountRef.current = 0;
+        pressRef.current = null;
+        tapRef.current = null;
+        multiTouchRef.current = false;
+        // Never pass a changed pointer here: core's touchEnd can also click.
+        // Release and click are independent, with taps owned by this wrapper.
+        const activeRenderer = rendererRef.current;
+        activeRenderer.dispatchTouchEnd([]);
+        if (pointer) {
+            if (cancelled) {
+                activeRenderer.dispatchPointerLeave(pointer);
+            } else {
+                activeRenderer.dispatchPointerUp(pointer);
+            }
+        }
+    }, []);
+
+    // Cancel an outstanding press while the engine can still deliver callbacks.
+    useEffect(() => {
+        return () => {
+            finishGesture(true);
+            unsubscribeEventHandlersRef.current?.();
+            unsubscribeEventHandlersRef.current = null;
+            instanceRef.current?.destroy();
+            instanceRef.current = null;
+            engine._setInstance(null);
+        };
+    }, [engine, finishGesture]);
 
     const markMultiTouch = useCallback(() => {
         multiTouchRef.current = true;
@@ -367,8 +426,7 @@ function CanvasTileEngineBase({
         if (!instance) {
             return false;
         }
-        const eventHandlers = instance.getConfig().eventHandlers;
-        if (eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover) {
+        if (handlersClaimTouches(instance.getConfig().eventHandlers)) {
             return true;
         }
         return Boolean(callbacksRef.current.onMouseDown || callbacksRef.current.onMouseUp);
@@ -377,6 +435,9 @@ function CanvasTileEngineBase({
     const onTouchesDown = useCallback(
         (e: GestureTouchEvent) => {
             const pointers = e.allTouches.map(toPointer);
+            if (pointers.length === 0) {
+                return;
+            }
 
             if (touchCountRef.current === 0) {
                 claimRef.current = shouldClaimGesture();
@@ -388,10 +449,12 @@ function CanvasTileEngineBase({
                     pointers.length === 1
                         ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false }
                         : null;
+                pressRef.current = pointers.length === 1 ? { id: e.allTouches[0].id, pointer: pointers[0] } : null;
             }
             if (!claimRef.current) {
                 return;
             }
+            updatePressPosition(e);
 
             if (pointers.length > 1) {
                 markMultiTouch();
@@ -404,7 +467,7 @@ function CanvasTileEngineBase({
             // enters/rebases pinch mode.
             rendererRef.current.dispatchTouchStart(pointers);
         },
-        [markMultiTouch, shouldClaimGesture],
+        [markMultiTouch, shouldClaimGesture, updatePressPosition],
     );
 
     const onTouchesMove = useCallback(
@@ -412,7 +475,13 @@ function CanvasTileEngineBase({
             if (!claimRef.current) {
                 return;
             }
+            updatePressPosition(e);
             const pointers = e.allTouches.map(toPointer);
+            if (pointers.length === 0) {
+                // A missing native terminal event is cancellation, never a tap.
+                finishGesture(true);
+                return;
+            }
             if (pointers.length > 1) {
                 markMultiTouch();
             }
@@ -440,7 +509,7 @@ function CanvasTileEngineBase({
                 tapRef.current = null;
             }
         },
-        [markMultiTouch],
+        [finishGesture, markMultiTouch, updatePressPosition],
     );
 
     const endTouch = useCallback(
@@ -448,8 +517,18 @@ function CanvasTileEngineBase({
             if (!claimRef.current) {
                 return;
             }
+            updatePressPosition(e);
             const remaining = remainingPointers(e);
             const changed = e.changedTouches.length > 0 ? toPointer(e.changedTouches[0]) : undefined;
+            if (e.allTouches.length > 1 || e.changedTouches.length > 1) {
+                markMultiTouch();
+            }
+            // Cancellation ends the entire claimed stream, even when native
+            // bookkeeping still lists touches or supplies no changed pointer.
+            if (!allowTap) {
+                finishGesture(true);
+                return;
+            }
 
             if (remaining.length > 0) {
                 // A finger lifted while others remain: proves multi-touch, and
@@ -469,46 +548,34 @@ function CanvasTileEngineBase({
             // a clean tap.
             const suppressTap =
                 multiTouchRef.current || Date.now() - lastMultiTouchAtRef.current < MULTI_TOUCH_TAP_COOLDOWN_MS;
-            // touchEnd is dispatched without the changed pointer: the engine's
-            // touch-end mouseUp/click path would double-fire onClick alongside
-            // dispatchTap below. onMouseUp is raised via dispatchPointerUp
-            // instead, and click is owned solely by this component's tap
-            // detection (whose move threshold tolerates finger jitter the
-            // engine's path does not).
-            touchCountRef.current = 0;
-            rendererRef.current.dispatchTouchEnd([]);
-            // Withheld whenever taps are suppressed: if iOS dropped the second
-            // finger's start event, the engine never entered pinch mode and
-            // would otherwise treat the final lift as a clean single-pointer
-            // release.
-            if (!suppressTap && changed) {
-                rendererRef.current.dispatchPointerUp(changed);
-            }
-
             const tap = tapRef.current;
+            const instance = instanceRef.current;
+            finishGesture(false);
             if (
-                allowTap &&
+                instanceRef.current === instance &&
+                !claimRef.current &&
                 !suppressTap &&
                 changed &&
                 tap &&
                 !tap.moved &&
                 Date.now() - tap.time < TAP_TIME_THRESHOLD
             ) {
+                // onMouseUp may synchronously unmount or start another gesture.
+                // Do not deliver this old tap into the replacement lifecycle.
                 rendererRef.current.dispatchTap(changed);
             }
-            tapRef.current = null;
-            multiTouchRef.current = false;
         },
-        [markMultiTouch],
+        [finishGesture, markMultiTouch, updatePressPosition],
     );
 
     const onTouchesUp = useCallback((e: GestureTouchEvent) => endTouch(e, true), [endTouch]);
     const onTouchesCancelled = useCallback((e: GestureTouchEvent) => endTouch(e, false), [endTouch]);
 
-    // Blocker enablement is read at render time; the component re-renders on
-    // every engine frame (picture state), so a runtime setEventHandlers
-    // toggle is picked up on the next painted frame.
-    const interactionsClaimed = shouldClaimGesture();
+    // Use live subscription state and the current props, not callbacksRef:
+    // the callback ref updates after commit and would lag prop removals by
+    // one render. Keep the transport mounted so in-flight touch cleanup is
+    // still delivered when the native blocker is disabled.
+    const interactionsClaimed = ready && (configClaimsTouches || Boolean(onMouseDown || onMouseUp));
 
     // The transport reads live state through refs; runOnJS keeps the
     // callbacks on the JS thread (the engine is a plain JS object) even when
@@ -536,15 +603,14 @@ function CanvasTileEngineBase({
         <EngineContext.Provider value={contextValue}>
             <GestureDetector gesture={gesture}>
                 <View style={[styles.fill, style]} onLayout={handleLayout}>
-                    {size.width > 0 &&
-                        size.height > 0 && (
-                            // pointerEvents="none": the canvas is purely visual — all
-                            // gestures are handled by the wrapper's GestureDetector, so
-                            // the Skia view must never intercept touches itself.
-                            <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
-                                {picture && <Picture picture={picture} />}
-                            </Canvas>
-                        )}
+                    {size.width > 0 && size.height > 0 && (
+                        // pointerEvents="none": the canvas is purely visual — all
+                        // gestures are handled by the wrapper's GestureDetector, so
+                        // the Skia view must never intercept touches itself.
+                        <Canvas pointerEvents="none" style={{ width: size.width, height: size.height }}>
+                            {picture && <Picture picture={picture} />}
+                        </Canvas>
+                    )}
                 </View>
             </GestureDetector>
             {/* Render children (draw components) only after this component's engine exists */}
