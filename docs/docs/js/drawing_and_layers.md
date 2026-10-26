@@ -67,6 +67,10 @@ Every draw method accepts an optional `options` object as its last parameter. It
 | `radius` | `number \| number[]` | -                                  | Border radius in world units (scales with zoom). Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `drawRect`). |
 | `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.                                |
 
+Rounded rectangle radii apply to both the fill and border, including dashed and rotated WebGL borders. Arrays of one, two, or three radii expand like CSS border radii. If adjacent corners exceed their shared edge, all radii shrink by the same factor. Horizontal pairs use the width and vertical pairs use the height: `[20, 20, 0, 0]` screen-pixel radii fit a 100 x 20 rectangle unchanged.
+
+As with Canvas2D `roundRect`, WebGL rejects negative radii and arrays outside one to four entries with `RangeError` when rendering; non-finite radii produce no geometry.
+
 **Style Options:**
 
 - `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`)
