@@ -20,6 +20,11 @@ export class AnimationController {
     private moveAnimationId?: number;
     private zoomAnimationId?: number;
     private resizeAnimationId?: number;
+    // Cancellation can happen inside a camera callback, or after a frame was
+    // already dispatched. A generation guards both camera writes and the work
+    // after callbacks, so an old frame cannot revive or complete a canceled run.
+    private moveGeneration = 0;
+    private zoomGeneration = 0;
 
     constructor(
         private camera: ICamera,
@@ -49,6 +54,7 @@ export class AnimationController {
     ) {
         // Cancel any existing move animation
         this.cancelMove();
+        const generation = this.moveGeneration;
 
         // Reduced motion collapses the duration to 0 — including one the
         // caller passed explicitly, which is the point of the preference.
@@ -61,7 +67,9 @@ export class AnimationController {
             const size = this.viewport.getSize();
             this.camera.setCenter({ x: targetX, y: targetY }, size.width, size.height);
             this.onAnimationFrame();
-            onComplete?.();
+            if (generation === this.moveGeneration) {
+                onComplete?.();
+            }
             return;
         }
 
@@ -70,6 +78,9 @@ export class AnimationController {
         const startTime = performance.now();
 
         const step = (currentTime: number) => {
+            if (generation !== this.moveGeneration) {
+                return;
+            }
             const elapsed = currentTime - startTime;
             // Flipping the preference mid-flight ends the animation on its
             // target rather than freezing it partway.
@@ -84,6 +95,9 @@ export class AnimationController {
             const size = this.viewport.getSize();
             this.camera.setCenter({ x: currentX, y: currentY }, size.width, size.height);
             this.onAnimationFrame();
+            if (generation !== this.moveGeneration) {
+                return;
+            }
 
             if (progress < 1) {
                 this.moveAnimationId = requestAnimationFrame(step);
@@ -112,6 +126,7 @@ export class AnimationController {
     ) {
         // Cancel any existing zoom animation
         this.cancelZoom();
+        const generation = this.zoomGeneration;
 
         // Re-center after setScale because the camera anchors scale changes at
         // the top-left corner. Reading the center each frame (instead of
@@ -123,7 +138,9 @@ export class AnimationController {
             this.camera.setScale(scale);
             this.camera.setCenter(center, size.width, size.height);
             onZoomFrame?.(prevScale);
-            this.onAnimationFrame();
+            if (generation === this.zoomGeneration) {
+                this.onAnimationFrame();
+            }
         };
 
         const duration = this.motion.effectiveDuration(durationMs);
@@ -131,7 +148,9 @@ export class AnimationController {
         // Instant change if duration is 0/negative or frames can't be scheduled
         if (duration <= 0 || !canAnimate()) {
             applyScale(targetScale);
-            onComplete?.();
+            if (generation === this.zoomGeneration) {
+                onComplete?.();
+            }
             return;
         }
 
@@ -139,6 +158,9 @@ export class AnimationController {
         const startTime = performance.now();
 
         const step = (currentTime: number) => {
+            if (generation !== this.zoomGeneration) {
+                return;
+            }
             const elapsed = currentTime - startTime;
             // Flipping the preference mid-flight ends the animation on its
             // target rather than freezing it partway.
@@ -150,6 +172,9 @@ export class AnimationController {
             // Geometric interpolation: zoom speed is perceptually uniform
             // (linear interpolation front-loads the zoom-in half).
             applyScale(startScale * Math.pow(targetScale / startScale, eased));
+            if (generation !== this.zoomGeneration) {
+                return;
+            }
 
             if (progress < 1) {
                 this.zoomAnimationId = requestAnimationFrame(step);
@@ -228,6 +253,7 @@ export class AnimationController {
      * Cancel the current move animation if running.
      */
     cancelMove() {
+        this.moveGeneration++;
         if (this.moveAnimationId !== undefined) {
             cancelAnimationFrame(this.moveAnimationId);
             this.moveAnimationId = undefined;
@@ -238,6 +264,7 @@ export class AnimationController {
      * Cancel the current zoom animation if running.
      */
     cancelZoom() {
+        this.zoomGeneration++;
         if (this.zoomAnimationId !== undefined) {
             cancelAnimationFrame(this.zoomAnimationId);
             this.zoomAnimationId = undefined;

@@ -213,6 +213,11 @@ engine.drawRect({ x: 3, y: 4, widthPx: 120, heightPx: 24,
                   style: { fillStyle: "#0f172acc" } }, 2);
 ```
 
+Rect radii apply to both fill and stroke, including dashed/rotated WebGL
+borders. One-to-four values expand CSS-style; overflow scales every radius
+uniformly against adjacent horizontal/vertical edge sums, not half the
+shortest edge. For example, pixel radii `[20, 20, 0, 0]` fit a 100x20 box.
+
 Origin anchoring applies per axis (cell mode centers the box on the anchor
 cell; self mode anchors to the box itself). Rotation spins around the box
 center. `width`/`height` are Rect-only - Circle stays `size` (diameter) and
@@ -257,6 +262,10 @@ engine.drawText({
 // Zoom-independent label: always 14px on screen
 engine.drawText({ x: 0, y: 0, text: "Ankara", fontPx: 14 }, 2);
 ```
+
+Text color defaults to black (`"#000000"`) on every renderer, independently for
+each item after merging `styleOf`. Returning `undefined` from `styleOf` keeps
+the item's style; returning `{ fillStyle: undefined }` resets its color to black.
 
 On the WebGL renderer text is painted on a 2D overlay canvas and always
 composites ABOVE all GPU primitives regardless of layer (see
@@ -380,6 +389,12 @@ engine.drawGridLines(1, 1, "#1e293b", 0);
 ```
 
 Grid lines are infinite - they cover whatever the camera shows.
+
+`cellSize` must be a positive finite number; fractional intervals are valid.
+Zero, negative values, `NaN`, and infinities throw `RangeError` synchronously,
+before registering a draw or replacing an existing `id`. This requirement
+also applies to direct renderer `IDrawAPI.drawGridLines` calls and the React
+and React Native `GridLines` components.
 
 ## Static caching (`drawStaticRect` / `drawStaticCircle` / `drawStaticImage`)
 

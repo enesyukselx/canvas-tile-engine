@@ -10,3 +10,13 @@ export {
     staticCirclePaintBounds,
     staticImagePaintBounds,
 } from "./staticBounds";
+export {
+    boxPaintBounds,
+    boxPixelPadding,
+    linePaintBounds,
+    pathPaintBounds,
+    textPaintBounds,
+    intersectsBounds,
+    PaintedCuller,
+    UNBOUNDED,
+} from "./paintedBounds";

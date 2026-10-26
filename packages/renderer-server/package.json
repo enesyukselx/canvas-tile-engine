@@ -49,6 +49,7 @@
         "typecheck": "tsc --noEmit",
         "lint": "oxlint",
         "test": "vitest run",
+        "test:package": "node tests/package-contract.mjs",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "format": "oxfmt",

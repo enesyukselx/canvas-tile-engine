@@ -16,6 +16,16 @@ The engine uses a virtual camera system to navigate the infinite grid. The camer
 
 You can move the camera using the engine instance.
 
+### Interrupting an Animation
+
+Camera commands replace earlier work on the same channel:
+
+- `setCenter` and `goCenter` cancel the previous move, including a move started by `fitBounds`, while a concurrent zoom keeps running.
+- `setScale`, `zoomIn`, `zoomOut`, and `goScale` cancel the previous zoom while a concurrent move keeps running.
+- `fitBounds` replaces both the move and zoom, including when it lands instantly.
+
+This also applies to zero-duration and reduced-motion commands and to setters that leave the current value unchanged. Invalid `setCenter`/`setScale` inputs throw before interrupting anything. Interrupted `goCenter` and `goScale` runs do not call their `onComplete` callback. You can issue a replacement command from `onCoordsChange` or `onZoom`; the interrupted frame will not resume the old animation afterward.
+
 ### Moving the Camera
 
 #### `goCenter(x, y, duration?)`

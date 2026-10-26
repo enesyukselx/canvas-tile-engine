@@ -98,7 +98,7 @@ scales `minScale` with the base scale (a zoom-out factor of the configured
 `scale`), and `"preserve-scale"` / `"fill"` lower the minimum limit to the scale at
 which finite `bounds` fit the viewport (never raising it above the current
 scale). `maxScale` stays absolute in both modes - a px-per-tile quality cap,
-lifted only when a preserve-viewport base scale exceeds it. The camera
+lifted only when a preserve-viewport base scale or adapted runtime minimum exceeds it. The camera
 therefore never lands outside the gesture-reachable zoom range after a resize.
 
 When a `"preserve-viewport"` resize changes the scale, `onZoom` fires with the
@@ -123,6 +123,14 @@ after mount.
 
 ### Camera and viewport
 
+Interruption policy: `setCenter`/`goCenter` cancel the previous move;
+`setScale`/`zoomIn`/`zoomOut`/`goScale` cancel the previous zoom. The other
+channel continues, so concurrent move+zoom still works. `fitBounds` replaces
+both. This includes instant/reduced-motion commands and unchanged-value
+setters. Invalid `setCenter`/`setScale` calls throw without cancellation.
+Interrupted `goCenter`/`goScale` runs do not fire `onComplete`, including cancellation from
+`onCoordsChange`/`onZoom`; old callbacks cannot resume an interrupted run.
+
 | Signature | Notes |
 | :-- | :-- |
 | `getCenter(): Coords` | Current world center. |
@@ -132,13 +140,13 @@ after mount.
 | `setScale(n): void` | Set scale directly, clamped to min/max. Anchored at the viewport center. |
 | `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
 | `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
-| `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Throws on non-positive/non-finite values or `minScale > maxScale`. |
+| `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Future responsive resizes adapt these replacement limits against the original configured scale/size. Throws on non-positive/non-finite values or `minScale > maxScale`. |
 | `getSize(): { width, height }` | Current logical canvas size in px. |
 | `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
 | `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |
 | `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
 | `fitBounds(bounds, opts?): { scale, fitted }` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. `bounds` is an AREA, not cell indices: cell k spans [k-0.5, k+0.5], so a board of cells 0..31 is `{ minX: -0.5, maxX: 31.5, ... }` and centers on 15.5 - passing 0..32 fits the same width but centers half a cell off. Returns the targeted scale and `fitted` - `false` ONLY when `minScale` floors the fit, so the whole rectangle is NOT visible; `maxScale` clamping keeps `fitted: true`. The React/RN handle returns `undefined` before mount. |
-| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale/size. Deeply frozen - do not mutate. The React/RN handle answers it before mount with `normalizeConfig({ scale: 1, size: { width: 0, height: 0 } })`, so nothing flips on attach, but scale-derived fields describe THAT placeholder, not the `config` prop. |
+| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale, minScale, maxScale and size, including responsive adjustments. Use the live limits for zoom controls; re-read after resizing or runtime updates. Treat snapshots as read-only. The React/RN handle answers it before mount with the frozen, shared `normalizeConfig({ scale: 1, size: { width: 0, height: 0 } })`; those placeholder values describe an unconfigured engine, not the `config` prop. Read configured/live values after `isReady`. |
 | `setReducedMotion(value): void` | `value: boolean \| "auto"` (default `"auto"` = follow platform). Collapses engine-driven camera animation to instant. OVERRIDES an explicitly passed `durationMs` - there is NO per-call escape, the escape is `false`. Covers goCenter/goScale/fitBounds/resize ONLY; `SpriteAnimator` and app drawing are OUT of scope (call `animator.stop()` yourself for SC 2.2.2). |
 | `getReducedMotion(): boolean` | The RESOLVED value in effect. `getConfig().accessibility.reducedMotion` reports the PREFERENCE instead, which may be `"auto"`. Handle returns `false` before mount. |
 | `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |

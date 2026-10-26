@@ -23,6 +23,8 @@ const config = {
 
 `zoom: true` is shorthand for `"pointer"`. Use `zoom: "center"` when wheel and pinch gestures should zoom around the viewport center instead of the cursor or pinch midpoint.
 
+In pointer mode, moving both fingers while pinching keeps the same world point beneath their midpoint, unless camera bounds constrain the result. Midpoint movement still pans at `minScale` or `maxScale`. Center mode ignores midpoint movement and keeps the viewport center anchored.
+
 ## Event Handlers
 
 Assign callbacks directly on the engine instance.

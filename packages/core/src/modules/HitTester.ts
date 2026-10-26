@@ -147,7 +147,14 @@ export class HitTester {
         const list = Array.isArray(items) ? items : [items];
         let maxSize = 0;
         let maxSizePx = 0;
-        if (kind !== "path" && kind !== "line") {
+        if (kind === "path") {
+            // Re-registration is the geometry update boundary, including
+            // in-place command edits. Invalidate by item so every registration
+            // sharing that object sees the refreshed geometry at the same scale.
+            for (const item of list) {
+                this.flattenCache.delete(item as PathItem);
+            }
+        } else if (kind !== "line") {
             for (const item of list) {
                 const rect = item as Rect;
                 const extent = Math.max(rect.size ?? 1, rect.width ?? 0, rect.height ?? 0);
@@ -360,7 +367,8 @@ export class HitTester {
      * Flattened-subpath cache for command paths, re-flattened when the
      * camera scale drifts beyond 2x of the cached bucket (the polyline's
      * deviation from the true curve stays far below hit tolerances inside
-     * that window, and hover-frequency queries stay cheap).
+     * that window, and hover-frequency queries stay cheap). Registering a
+     * path invalidates its cached geometry even if its object identity is reused.
      */
     private flattenCache = new WeakMap<PathItem, { scale: number; subpaths: Subpath[] }>();
 
