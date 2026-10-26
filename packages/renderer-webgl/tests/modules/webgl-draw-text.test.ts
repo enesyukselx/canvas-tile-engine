@@ -16,6 +16,16 @@ function makeTextRecordingCtx() {
         restore() {},
         translate() {},
         rotate() {},
+        measureText(text: string) {
+            const size = Number(/([\d.]+)px/.exec(ctx.font)?.[1] ?? 10);
+            const halfWidth = (text.length * size * 0.6) / 2;
+            return {
+                actualBoundingBoxLeft: halfWidth,
+                actualBoundingBoxRight: halfWidth,
+                actualBoundingBoxAscent: size / 2,
+                actualBoundingBoxDescent: size / 2,
+            };
+        },
         fillText(text: string) {
             texts.push({ text, font: ctx.font });
         },
@@ -35,6 +45,52 @@ function setupAtScale(scale: number) {
         layers.drawAll({ gl, ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
     return { draw, render };
 }
+
+describe("WebGLDraw text color", () => {
+    it("resolves black per item after styleOf, without inheriting overlay or previous text colors", () => {
+        const { draw, render } = setupAtScale(10);
+        const { ctx } = makeTextRecordingCtx();
+        const colors: unknown[] = [];
+        ctx.fillText = () => colors.push(ctx.fillStyle);
+        let decorated = true;
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "default" },
+                { x: 2, y: 1, text: "explicit", style: { fillStyle: "#ff0000" } },
+                { x: 3, y: 1, text: "after", rotate: 30, style: {} },
+                { x: 4, y: 1, text: "font-only", style: { fillStyle: "#ff0000" } },
+                { x: 5, y: 1, text: "override", style: { fillStyle: "#ff0000" } },
+                { x: 6, y: 1, text: "reset", style: { fillStyle: "#ff0000" } },
+            ],
+            2,
+            {
+                styleOf: (item) => {
+                    if (item.text === "font-only") {
+                        return { fontWeight: "bold" };
+                    }
+                    if (item.text === "override" && decorated) {
+                        return { fillStyle: "#0000ff" };
+                    }
+                    if (item.text === "reset") {
+                        return { fillStyle: undefined };
+                    }
+                    return undefined;
+                },
+            },
+        );
+
+        ctx.fillStyle = "#ffffff";
+        render(ctx);
+        expect(colors).toEqual(["#000000", "#ff0000", "#000000", "#ff0000", "#0000ff", "#000000"]);
+
+        decorated = false;
+        colors.length = 0;
+        ctx.fillStyle = "#ffffff";
+        render(ctx);
+        expect(colors).toEqual(["#000000", "#ff0000", "#000000", "#ff0000", "#ff0000", "#000000"]);
+    });
+});
 
 // Font sizing contract shared by all renderers: px = fontPx ?? size * scale.
 // Mirrors the fixture values in the canvas, skia, and server suites.
@@ -73,7 +129,7 @@ describe("WebGLDraw text font sizing", () => {
         }
     });
 
-    it("culls with the fontPx world-space extent (fontPx / scale)", () => {
+    it("culls with the measured fontPx ink bounds", () => {
         const { draw, render } = setupAtScale(10);
         const { ctx, texts } = makeTextRecordingCtx();
 

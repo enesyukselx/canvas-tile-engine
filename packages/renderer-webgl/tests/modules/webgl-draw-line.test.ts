@@ -28,6 +28,37 @@ function setup() {
     return { draw, render };
 }
 
+describe("WebGLDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setup();
+            const { gl, lines } = makeLineRecordingGL();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(gl);
+            expect(lines).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setup();
+        const { gl, lines } = makeLineRecordingGL();
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(gl);
+        const lineCount = 2 * (10 / cellSize + 1);
+        expect(lines).toHaveLength(lineCount);
+
+        draw.removeDrawHandle(handle);
+        render(gl);
+        expect(lines).toHaveLength(lineCount);
+    });
+});
+
 // Per-item line style contract shared by all renderers: item.style overlays
 // the call-level style field by field; each LineInstance already carries its
 // own color/width, so overrides map straight onto the batch geometry.

@@ -209,6 +209,7 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
         layer?: number,
         options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
     ): DrawHandle;
+    /** Register a grid with a positive finite cellSize; otherwise throw RangeError synchronously. */
     drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
     drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
     drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
@@ -441,7 +442,8 @@ export interface ICamera {
 
     pan(dx: number, dy: number): void;
     zoom(screenX: number, screenY: number, deltaY: number, bounds: ViewportBounds): void;
-    zoomByFactor(factor: number, centerX: number, centerY: number): void;
+    /** Zoom around a screen point, optionally moving it to targetX/targetY in the same transform. */
+    zoomByFactor(factor: number, centerX: number, centerY: number, targetX?: number, targetY?: number): void;
     setScale(scale: number): void;
     setScaleLimits(minScale: number, maxScale: number): void;
     setCenter(center: Coords, viewportWidth: number, viewportHeight: number): void;

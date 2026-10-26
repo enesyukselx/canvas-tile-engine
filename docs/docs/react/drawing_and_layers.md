@@ -252,6 +252,8 @@ Keep `items` referentially stable (`useMemo`/state) — a new array identity re-
 
 Draw grid lines at specified intervals.
 
+`cellSize` must be a positive finite number; fractional intervals are supported. Invalid values throw a `RangeError` when the grid draw is registered. This also applies to React Native.
+
 | Prop          | Type     | Default      | Description                            |
 | :------------ | :------- | :----------- | :------------------------------------- |
 | `cellSize`    | `number` | **Required** | Size of each grid cell in world units. |
@@ -303,7 +305,7 @@ Render text at world coordinates. Text size scales with zoom.
 
 **Style Options:**
 
-- `fillStyle`: Text color
+- `fillStyle`: Text color (default: black, `"#000000"`, resolved separately for every item after `styleOf`)
 - `fontFamily`: Font family (default: `"sans-serif"`)
 - `fontWeight`: `"normal"`, `"bold"`, or `100`-`900` (default: the family's normal weight)
 - `textAlign`: `"left"`, `"center"`, `"right"`

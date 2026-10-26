@@ -66,6 +66,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /** Registrations tracked by user-facing id (static draws: their cacheKey). */
     private drawIds = new Map<string, { handle: DrawHandle; cacheKey?: string }>();
     private drawIdByHandle = new Map<symbol, string>();
+    private eventHandlersListeners = new Set<(handlers: Readonly<EventHandlers>) => void>();
 
     public canvasWrapper: TMount;
     /**
@@ -394,6 +395,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /** Tear down listeners and observers. */
     destroy() {
+        this.eventHandlersListeners.clear();
         this.animationController.cancelAll();
         this.renderer.destroy();
         this.hitTester.clear();
@@ -446,11 +448,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /**
      * Set the canvas scale directly, clamped to min/max bounds.
      * The change is anchored at the viewport center, matching goScale/zoomIn/zoomOut.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param newScale The desired scale value.
      * @throws {ConfigValidationError} If scale is not a positive finite number.
      */
     setScale(newScale: number) {
         validateScale(newScale);
+        this.animationController.cancelZoom();
         const prevScale = this.camera.scale;
         const size = this.viewport.getSize();
         // Restore the center after the scale change: camera.setScale alone
@@ -485,9 +489,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Zoom in by a given factor, centered on the viewport.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom in more.
      */
     zoomIn(factor: number = 1.5) {
+        this.animationController.cancelZoom();
         const size = this.viewport.getSize();
         const prevScale = this.camera.scale;
         this.camera.zoomByFactor(factor, size.width / 2, size.height / 2);
@@ -497,9 +503,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Zoom out by a given factor, centered on the viewport.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom out more.
      */
     zoomOut(factor: number = 1.5) {
+        this.animationController.cancelZoom();
         const size = this.viewport.getSize();
         const prevScale = this.camera.scale;
         this.camera.zoomByFactor(1 / factor, size.width / 2, size.height / 2);
@@ -576,13 +584,19 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.config._setPlatformReducedMotion(value);
     }
 
-    /** Snapshot of current normalized config. */
+    /**
+     * Snapshot of normalized config with live scale, scale limits and viewport size.
+     * Responsive limits may differ from the authored config; reading them does not
+     * change the baseline used to calculate limits on subsequent resizes.
+     */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
         const size = this.viewport.getSize();
         return {
             ...base,
             scale: this.camera.scale,
+            minScale: this.camera.minScale,
+            maxScale: this.camera.maxScale,
             size: { ...size },
         };
     }
@@ -616,11 +630,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Move the view center to new world coordinates instantly.
+     * Cancels the active move animation; a concurrent zoom keeps running.
      * @param newCenter The new center coordinates.
      * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
     setCenter(newCenter: Coords) {
         validateCoords(newCenter.x, newCenter.y);
+        this.animationController.cancelMove();
         const size = this.viewport.getSize();
         this.camera.setCenter(newCenter, size.width, size.height);
         this.handleCameraChange();
@@ -745,6 +761,23 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     setEventHandlers(handlers: Partial<EventHandlers>) {
         this.config.updateEventHandlers(handlers);
+        const current = this.config.get().eventHandlers;
+        this.eventHandlersListeners.forEach((listener) => listener(current));
+    }
+
+    /**
+     * Binding hook for native gesture gates, which must update even when no
+     * frame is painted. Subscribe before reading getConfig() for the initial
+     * value; the returned function detaches this listener.
+     *
+     * Not part of the supported application API. Keep this declaration in
+     * the build because the React Native binding consumes it across packages.
+     */
+    _subscribeEventHandlers(listener: (handlers: Readonly<EventHandlers>) => void): () => void {
+        this.eventHandlersListeners.add(listener);
+        return () => {
+            this.eventHandlersListeners.delete(listener);
+        };
     }
 
     /**
@@ -1133,7 +1166,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Draw grid lines at specified cell size.
-     * @param cellSize Size of each grid cell in world units.
+     * @param cellSize Positive finite size of each grid cell in world units.
+     * @throws {RangeError} If cellSize is not a positive finite number.
      * @param options Optional `id`: re-registering with the same id replaces
      * the previous registration instead of accumulating alongside it.
      * @example
@@ -1148,6 +1182,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         layer: number = 0,
         options?: DrawOptions,
     ): DrawHandle {
+        if (!Number.isFinite(cellSize) || cellSize <= 0) {
+            throw new RangeError("[CanvasTileEngine] cellSize must be a positive finite number");
+        }
         this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
         this.trackDrawId(options?.id, handle);

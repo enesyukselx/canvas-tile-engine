@@ -40,6 +40,37 @@ beforeEach(() => {
     matchFontCalls.length = 0;
 });
 
+describe("SkiaDraw grid intervals", () => {
+    it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(
+        "rejects invalid cellSize %s synchronously without registering a draw",
+        (cellSize) => {
+            const { draw, render } = setup();
+            const { canvas, ops } = makeCanvas();
+
+            expect(() => draw.drawGridLines(cellSize as number, { lineWidth: 1, strokeStyle: "#000" })).toThrow(
+                new RangeError("[CanvasTileEngine] cellSize must be a positive finite number"),
+            );
+            render(canvas);
+            expect(ops).toHaveLength(0);
+        },
+    );
+
+    it.each([0.5, 2])("renders positive cellSize %s and returns a removable handle", (cellSize) => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        const handle = draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" }, 3);
+        expect(handle.layer).toBe(3);
+        render(canvas);
+        const lineCount = 2 * (10 / cellSize + 1);
+        expect(ops.filter((op) => op.op === "line")).toHaveLength(lineCount);
+
+        draw.removeDrawHandle(handle);
+        render(canvas);
+        expect(ops).toHaveLength(lineCount);
+    });
+});
+
 describe("resolveRadius roundRect semantics", () => {
     const rectWithRadius = (radius: number | number[]) => ({
         x: 1,
@@ -141,6 +172,51 @@ describe("color caching", () => {
 });
 
 describe("text rendering", () => {
+    it("resolves black per item after styleOf, preserving explicit and decorated colors", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        let decorated = true;
+
+        draw.drawText(
+            [
+                { x: 1, y: 1, text: "default" },
+                { x: 2, y: 1, text: "explicit", style: { fillStyle: "#ff0000" } },
+                { x: 3, y: 1, text: "after", rotate: 30, style: {} },
+                { x: 4, y: 1, text: "font-only", style: { fillStyle: "#ff0000" } },
+                { x: 5, y: 1, text: "override", style: { fillStyle: "#ff0000" } },
+                { x: 6, y: 1, text: "reset", style: { fillStyle: "#ff0000" } },
+            ],
+            2,
+            {
+                styleOf: (item) => {
+                    if (item.text === "font-only") {
+                        return { fontWeight: "bold" };
+                    }
+                    if (item.text === "override" && decorated) {
+                        return { fillStyle: "#0000ff" };
+                    }
+                    if (item.text === "reset") {
+                        return { fillStyle: undefined };
+                    }
+                    return undefined;
+                },
+            },
+        );
+
+        const colors = () => ops.filter((op) => op.op === "text").map((op) => op.color);
+        render(canvas);
+        expect(colors()).toEqual(
+            ["#000000", "#ff0000", "#000000", "#ff0000", "#0000ff", "#000000"].map((parsed) => ({ parsed })),
+        );
+
+        decorated = false;
+        ops.length = 0;
+        render(canvas);
+        expect(colors()).toEqual(
+            ["#000000", "#ff0000", "#000000", "#ff0000", "#ff0000", "#000000"].map((parsed) => ({ parsed })),
+        );
+    });
+
     it("uses the exact (unrounded) scaled font size", () => {
         const { draw, render } = setup(11.5);
         const { canvas, ops } = makeCanvas();
@@ -206,18 +282,18 @@ describe("text rendering", () => {
         }
     });
 
-    it("culls with the fontPx world-space extent (fontPx / scale)", () => {
+    it("culls with measured text width rather than a font-size estimate", () => {
         const { draw, render } = setup(10);
         const { canvas, ops } = makeCanvas();
-        // Viewport spans 10 world units (+1 tile buffer). x=20 with size 1 is
-        // out of reach, but a 140px label spans 14 world units and pokes in.
+        // The mock measures six pixels per character independently of size.
+        // A long label reaches the viewport even though its anchor is outside.
         draw.drawText(
             [
                 { x: 20, y: 1, text: "culled", style: { fillStyle: "#000" } },
                 {
                     x: 20,
                     y: 1,
-                    text: "visible",
+                    text: "visible".repeat(6),
                     fontPx: 140,
                     style: { fillStyle: "#000" },
                 },
@@ -227,7 +303,7 @@ describe("text rendering", () => {
         render(canvas);
 
         const texts = ops.filter((o) => o.op === "text").map((o) => o.text);
-        expect(texts).toEqual(["visible"]);
+        expect(texts).toEqual(["visible".repeat(6)]);
     });
 
     it("caches one font per family regardless of size", () => {
@@ -342,6 +418,26 @@ describe("static picture cache", () => {
         const staticRects = picture.ops.filter((o) => o.op === "rect").map((o) => o.rect);
 
         expect(staticRects).toEqual(dynamicRects);
+    });
+
+    it("ignores pixel sizes in all static picture primitives", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        const fakeImage = {
+            width: () => 10,
+            height: () => 10,
+        } as unknown as import("@shopify/react-native-skia").SkImage;
+        const item = Object.freeze({ x: 2, y: 2, size: 1, sizePx: 60, style: { fillStyle: "#f00" } });
+        draw.drawStaticRect([{ ...item, width: 2, height: 1, widthPx: 70, heightPx: 80 }], "rect");
+        draw.drawStaticCircle([item], "circle");
+        draw.drawStaticImage([{ ...item, img: fakeImage }], "image");
+        render(canvas);
+
+        const recorded = ops.filter((o) => o.op === "picture").flatMap((o) => (o.picture as MockPicture).ops);
+        expect(recorded.find((o) => o.op === "rect")?.rect).toEqual({ x: 15, y: 20, width: 20, height: 10 });
+        expect(recorded.find((o) => o.op === "circle")).toMatchObject({ cx: 25, cy: 25, r: 5 });
+        expect(recorded.find((o) => o.op === "image")?.dest).toEqual({ x: 20, y: 20, width: 10, height: 10 });
+        expect(item.sizePx).toBe(60);
     });
 
     it("replays with the scale ratio when the camera zooms after recording", () => {
