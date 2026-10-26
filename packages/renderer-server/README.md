@@ -15,6 +15,19 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 
 `@napi-rs/canvas` ships prebuilt native binaries for common platforms, so most installs do not need a compiler toolchain.
 
+### Node-only TypeScript
+
+With `typescript` and `@types/node` installed, strict Node consumers can use
+`lib: ["ES2022"]`, `types: ["node"]`, and `skipLibCheck: false`. No DOM library
+or browser ambient declarations are needed. `renderToBuffer` and the low-level
+engine constructor infer native image types from `RendererServer`.
+
+For standalone image annotations, use core's `ImageItem<Image>` with `Image`
+from `@napi-rs/canvas`. Unparameterized core mount/image types default to
+`unknown` outside DOM projects; browser defaults remain unchanged. The server's
+native canvas is available through `renderer.getCanvas()`; `engine.canvas`
+is `undefined`.
+
 ## Quick Start
 
 `renderToBuffer` creates the engine and renderer, runs your draw callback, renders one frame, encodes it, and destroys the engine.

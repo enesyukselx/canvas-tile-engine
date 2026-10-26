@@ -14,6 +14,7 @@ import {
 } from "./callback";
 import { Circle, DrawObject, ImageItem, Line, PathItem, PathStyle, Rect, Text } from "./draw-object";
 import { CanvasTileEngineConfig } from "./config";
+import type { DefaultImage, DefaultMount } from "./platform";
 
 export type Coords = {
     x: number;
@@ -120,11 +121,11 @@ export interface ViewportBounds {
  * Dependencies injected into a renderer's `init`.
  *
  * `TMount` is the platform-specific mount target the engine is constructed with.
- * It defaults to `HTMLDivElement` so existing DOM renderers stay source- and
- * type-compatible; non-DOM renderers (e.g. React Native / Skia) parameterize it
- * with their own mount type.
+ * It defaults to `HTMLDivElement` when the consumer includes DOM types, or
+ * `unknown` otherwise. Non-DOM renderers (e.g. Node / Skia) parameterize it
+ * with their own mount type, inferred from the renderer by the engine.
  */
-export interface RendererDependencies<TMount = HTMLDivElement> {
+export interface RendererDependencies<TMount = DefaultMount> {
     wrapper: TMount;
     camera: ICamera;
     viewport: ViewportState;
@@ -132,7 +133,7 @@ export interface RendererDependencies<TMount = HTMLDivElement> {
     transformer: CoordinateTransformer;
 }
 
-export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
+export interface IRenderer<TMount = DefaultMount, TImage = DefaultImage> {
     // ─── Lifecycle ───
     init(deps: RendererDependencies<TMount>): void;
     render(): void;
@@ -170,7 +171,7 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     onDraw?: onDrawCallback;
 }
 
-export interface IDrawAPI<TImage = HTMLImageElement> {
+export interface IDrawAPI<TImage = DefaultImage> {
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
@@ -405,7 +406,7 @@ export interface PathDrawOptions<TData = unknown> extends DrawOptions {
  * Platform-agnostic image loader interface.
  * Each renderer implements this with platform-specific image handling.
  */
-export interface IImageLoader<TImage = HTMLImageElement> {
+export interface IImageLoader<TImage = DefaultImage> {
     /**
      * Load an image from URL, with caching.
      * @param src Image URL.

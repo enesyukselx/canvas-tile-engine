@@ -436,7 +436,7 @@ export class GestureProcessor {
                 ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
                 : { x: pointer.clientX, y: pointer.clientY };
         const prevScale = this.camera.scale;
-        this.camera.zoom(anchor.x, anchor.y, deltaY, bounds as DOMRect);
+        this.camera.zoom(anchor.x, anchor.y, deltaY, bounds);
         this.notifyWheel(pointer, deltaY, "wheel");
         // Scrolling on at a scale limit leaves the scale untouched: report it
         // as onWheel only, so onZoom keeps meaning "the zoom level changed".

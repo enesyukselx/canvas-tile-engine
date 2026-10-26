@@ -14,6 +14,35 @@ Use it for Open Graph images, thumbnails, email/PDF previews, CDN pre-rendering,
 npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 ```
 
+## TypeScript without DOM types
+
+Node-only projects can use strict declaration checking without adding the DOM
+library or ambient browser declarations:
+
+```json
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "lib": ["ES2022"],
+        "types": ["node"],
+        "strict": true,
+        "skipLibCheck": false
+    }
+}
+```
+
+Install `typescript` and `@types/node` as development dependencies. Both
+`renderToBuffer` and `new CanvasTileEngine(SERVER_MOUNT, config, renderer)` infer
+the native image type. Use `renderer.getCanvas()` for the native canvas;
+`engine.canvas` is `undefined` on the server.
+
+Core's unparameterized mount/image types default to `unknown` when DOM types are
+absent. For standalone image annotations, supply `ImageItem<Image>` with `Image`
+from `@napi-rs/canvas`. Browser consumers retain their existing `HTMLDivElement`,
+`HTMLImageElement`, and `HTMLCanvasElement` types when their project includes DOM.
+
 ## One-Shot Rendering
 
 `renderToBuffer` creates the engine and renderer, runs your draw callback, renders one frame, encodes it, and destroys the engine.

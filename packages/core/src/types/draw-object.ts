@@ -1,4 +1,5 @@
 import { Coords, LineStyle } from ".";
+import type { DefaultImage } from "./platform";
 
 export type DrawObject<TData = unknown> = {
     x: number;
@@ -119,9 +120,10 @@ export type SpriteRect = {
 
 /**
  * An image to draw. `TImage` is the platform-specific image handle and defaults
- * to `HTMLImageElement` (DOM); other renderers parameterize it (e.g. `SkImage`).
+ * to `HTMLImageElement` when DOM types are available, or `unknown` otherwise.
+ * Other renderers parameterize it (e.g. `SkImage` or the server's `Image`).
  */
-export type ImageItem<TImage = HTMLImageElement, TData = unknown> = Omit<DrawObject<TData>, "style" | "radius"> & {
+export type ImageItem<TImage = DefaultImage, TData = unknown> = Omit<DrawObject<TData>, "style" | "radius"> & {
     img: TImage;
     /**
      * Source rectangle in sheet pixels. When set, only this sub-region of

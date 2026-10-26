@@ -11,6 +11,16 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 
 Works in CommonJS and ESM projects.
 
+TypeScript: install `typescript` and `@types/node`. A Node-only configuration
+with `lib: ["ES2022"]`, `types: ["node"]`, `strict: true`, and
+`skipLibCheck: false` is supported; do not add DOM libs or browser shims.
+`RendererServer` preserves native mount/image inference in the engine
+constructor and `renderToBuffer` callback. For standalone image annotations,
+use `ImageItem<Image>` from core with `Image` from `@napi-rs/canvas`.
+Unparameterized core mount/image types default to `unknown` without DOM types;
+browser defaults remain the full DOM types. On the server `engine.canvas` is
+`undefined`; use `renderer.getCanvas()` for the native canvas.
+
 `Image`, `Canvas`, and `SKRSContext2D` are type-only convenience exports:
 
 ```ts
