@@ -196,6 +196,10 @@ const png = await renderToBuffer({
 - **React props are mount-only**: `config`, `renderer`, and `center` are read
   once. Changing them later is ignored - use runtime APIs
   (`engine.setBounds`, `engine.setCenter`, ...) or remount with a `key`.
+- **Camera commands interrupt their own animation**: `setCenter`/`goCenter`
+  replace movement; `setScale`/`zoomIn`/`zoomOut`/`goScale` replace zoom.
+  The other channel continues; `fitBounds` replaces both. Instant commands
+  follow the same rule; interrupted `goCenter`/`goScale` runs do not call `onComplete`.
 - **React items stability**: `items` props are compared by reference. Inline
   array literals cause re-registration (and spatial index rebuilds) every
   render. Use `useMemo` or state.

@@ -446,11 +446,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /**
      * Set the canvas scale directly, clamped to min/max bounds.
      * The change is anchored at the viewport center, matching goScale/zoomIn/zoomOut.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param newScale The desired scale value.
      * @throws {ConfigValidationError} If scale is not a positive finite number.
      */
     setScale(newScale: number) {
         validateScale(newScale);
+        this.animationController.cancelZoom();
         const prevScale = this.camera.scale;
         const size = this.viewport.getSize();
         // Restore the center after the scale change: camera.setScale alone
@@ -485,9 +487,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Zoom in by a given factor, centered on the viewport.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom in more.
      */
     zoomIn(factor: number = 1.5) {
+        this.animationController.cancelZoom();
         const size = this.viewport.getSize();
         const prevScale = this.camera.scale;
         this.camera.zoomByFactor(factor, size.width / 2, size.height / 2);
@@ -497,9 +501,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Zoom out by a given factor, centered on the viewport.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom out more.
      */
     zoomOut(factor: number = 1.5) {
+        this.animationController.cancelZoom();
         const size = this.viewport.getSize();
         const prevScale = this.camera.scale;
         this.camera.zoomByFactor(1 / factor, size.width / 2, size.height / 2);
@@ -616,11 +622,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Move the view center to new world coordinates instantly.
+     * Cancels the active move animation; a concurrent zoom keeps running.
      * @param newCenter The new center coordinates.
      * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
     setCenter(newCenter: Coords) {
         validateCoords(newCenter.x, newCenter.y);
+        this.animationController.cancelMove();
         const size = this.viewport.getSize();
         this.camera.setCenter(newCenter, size.width, size.height);
         this.handleCameraChange();

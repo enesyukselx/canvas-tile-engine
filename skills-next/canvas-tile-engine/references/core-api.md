@@ -123,6 +123,14 @@ after mount.
 
 ### Camera and viewport
 
+Interruption policy: `setCenter`/`goCenter` cancel the previous move;
+`setScale`/`zoomIn`/`zoomOut`/`goScale` cancel the previous zoom. The other
+channel continues, so concurrent move+zoom still works. `fitBounds` replaces
+both. This includes instant/reduced-motion commands and unchanged-value
+setters. Invalid `setCenter`/`setScale` calls throw without cancellation.
+Interrupted `goCenter`/`goScale` runs do not fire `onComplete`, including cancellation from
+`onCoordsChange`/`onZoom`; old callbacks cannot resume an interrupted run.
+
 | Signature | Notes |
 | :-- | :-- |
 | `getCenter(): Coords` | Current world center. |

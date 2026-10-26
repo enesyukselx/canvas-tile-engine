@@ -31,6 +31,12 @@ Set the initial camera position with the `center` prop:
 
 Access camera methods through the engine handle when `engine.isReady` is `true`.
 
+### Interrupting an Animation
+
+`setCenter` and `goCenter` replace the active move while a concurrent zoom continues. `setScale`, `zoomIn`, `zoomOut`, and `goScale` replace the active zoom while a concurrent move continues. `fitBounds` replaces both. These rules also apply to instant commands and reduced motion, including when a setter keeps the current value unchanged. Interrupted `goCenter` and `goScale` runs do not call their `onComplete` callback. A command issued from `onCoordsChange` or `onZoom` also interrupts the old animation safely.
+
+The same rules apply to the React Native engine handle. See [the JavaScript camera guide](../js/camera_and_viewport.md#interrupting-an-animation) for details.
+
 ### Moving the Camera
 
 #### `goCenter(x, y, duration?)`
