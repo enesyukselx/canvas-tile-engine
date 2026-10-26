@@ -957,7 +957,12 @@ export class CanvasDraw<
         });
 
         if (!cache) {
-            return this.drawRect(items, layer);
+            // Every fallback keeps the static world-size contract, just like
+            // the cache and hit tester, without mutating the caller's items.
+            return this.drawRect(
+                items.map(({ sizePx: _sizePx, widthPx: _widthPx, heightPx: _heightPx, ...rest }) => rest),
+                layer,
+            );
         }
 
         return this.addStaticCacheLayer(cache, layer)!;
@@ -1017,7 +1022,10 @@ export class CanvasDraw<
         });
 
         if (!cache) {
-            return this.drawImage(items, layer);
+            return this.drawImage(
+                items.map(({ sizePx: _sizePx, ...rest }) => rest),
+                layer,
+            );
         }
 
         return this.addStaticCacheLayer(cache, layer)!;
@@ -1054,7 +1062,10 @@ export class CanvasDraw<
         });
 
         if (!cache) {
-            return this.drawCircle(items, layer);
+            return this.drawCircle(
+                items.map(({ sizePx: _sizePx, ...rest }) => rest),
+                layer,
+            );
         }
 
         return this.addStaticCacheLayer(cache, layer)!;

@@ -175,9 +175,24 @@ describe("WebGLDraw pixel-sized rects", () => {
         const { draw, render } = setup();
         const { gl, shapes } = makeRecordingGL();
 
-        draw.drawStaticRect([{ x: 2, y: 2, size: 1, sizePx: 30, widthPx: 50, style: { fillStyle: "#f00" } }], "k", 1);
+        draw.drawStaticRect(
+            [{ x: 2, y: 2, size: 1, sizePx: 30, widthPx: 50, heightPx: 60, style: { fillStyle: "#f00" } }],
+            "k",
+            1,
+        );
         render(gl);
 
         expect(shapes.map(({ halfW, halfH }) => ({ halfW, halfH }))).toEqual([{ halfW: 5, halfH: 5 }]);
+    });
+
+    it("strips pixel sizes from static circles without changing the source item", () => {
+        const { draw, render } = setup();
+        const { gl, shapes } = makeRecordingGL();
+        const item = Object.freeze({ x: 2, y: 2, size: 1, sizePx: 60, style: { fillStyle: "#f00" } });
+        draw.drawStaticCircle([item], "circle");
+        render(gl);
+
+        expect(shapes.map(({ halfW, halfH }) => ({ halfW, halfH }))).toEqual([{ halfW: 5, halfH: 5 }]);
+        expect(item.sizePx).toBe(60);
     });
 });
