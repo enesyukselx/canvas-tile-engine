@@ -433,6 +433,23 @@ function makeTextRecordingCtx() {
         restore() {},
         translate() {},
         rotate() {},
+        measureText(text: string) {
+            const px = Number(ctx.font.match(/([\d.]+)px/)?.[1] ?? 10);
+            const width = text.length * px * 0.6;
+            const left =
+                ctx.textAlign === "right" || ctx.textAlign === "end"
+                    ? width
+                    : ctx.textAlign === "center"
+                      ? width / 2
+                      : 0;
+            return {
+                width,
+                actualBoundingBoxLeft: left,
+                actualBoundingBoxRight: width - left,
+                actualBoundingBoxAscent: px / 2,
+                actualBoundingBoxDescent: px / 2,
+            };
+        },
         fillText(text: string) {
             texts.push({ text, font: ctx.font });
         },

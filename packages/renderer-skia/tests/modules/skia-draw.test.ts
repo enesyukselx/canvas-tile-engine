@@ -282,18 +282,18 @@ describe("text rendering", () => {
         }
     });
 
-    it("culls with the fontPx world-space extent (fontPx / scale)", () => {
+    it("culls with measured text width rather than a font-size estimate", () => {
         const { draw, render } = setup(10);
         const { canvas, ops } = makeCanvas();
-        // Viewport spans 10 world units (+1 tile buffer). x=20 with size 1 is
-        // out of reach, but a 140px label spans 14 world units and pokes in.
+        // The mock measures six pixels per character independently of size.
+        // A long label reaches the viewport even though its anchor is outside.
         draw.drawText(
             [
                 { x: 20, y: 1, text: "culled", style: { fillStyle: "#000" } },
                 {
                     x: 20,
                     y: 1,
-                    text: "visible",
+                    text: "visible".repeat(6),
                     fontPx: 140,
                     style: { fillStyle: "#000" },
                 },
@@ -303,7 +303,7 @@ describe("text rendering", () => {
         render(canvas);
 
         const texts = ops.filter((o) => o.op === "text").map((o) => o.text);
-        expect(texts).toEqual(["visible"]);
+        expect(texts).toEqual(["visible".repeat(6)]);
     });
 
     it("caches one font per family regardless of size", () => {
