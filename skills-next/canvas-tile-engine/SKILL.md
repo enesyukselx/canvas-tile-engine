@@ -47,11 +47,16 @@ Canvas2D; switch to WebGL only for very heavy dynamic scenes (see
    The same rule covers styling: `lineWidth`, `radius`, and `lineDash` are
    world units that scale with zoom; the `lineWidthPx`/`lineDashPx` opt-ins
    are screen pixels and take precedence (GridLines' `lineWidth` is the one
-   px exception).
+   px exception). Item geometry follows the same pattern: Rect takes
+   `sizePx`/`widthPx`/`heightPx`, Circle and Image take `sizePx`, and every
+   one of them wins over its world counterpart and is ignored by the
+   `drawStatic*` variants.
    Crucially, an item at integer `k` is centered on its
    cell: cell `k` spans world `[k - 0.5, k + 0.5]`, grid lines fall on
    half-integers, and a board of cells `0..N-1` is centered at `(N-1)/2`
    (NOT `N/2` - that is half a cell off).
+   GridLines `cellSize` must be a positive finite number (fractions are
+   supported); invalid intervals throw `RangeError` when registered.
 2. **Retained draw model.** `engine.drawRect(...)` does NOT paint immediately.
    It registers a persistent draw callback on a layer and returns a
    `DrawHandle`. The callback re-runs on every frame. Call `engine.render()`
@@ -185,9 +190,11 @@ const png = await renderToBuffer({
   `scale * 2`. If the user wants deep zooming, set them explicitly. In
   responsive modes the minimum adapts to the container: `preserve-viewport`
   treats `minScale` as a zoom-out factor of the base scale, `preserve-scale`
-  lowers it so finite `bounds` stay fully viewable at any width. `maxScale`
+  and `fill` lower it so finite `bounds` stay fully viewable at any size. `maxScale`
   stays absolute (px-per-tile quality cap; lifted only if the base scale
-  exceeds it).
+  or adapted runtime minimum exceeds it). Read `engine.getConfig()` after
+  mount/resizes for the live `minScale`/`maxScale` used by zoom controls;
+  authored scale/size stay separate to avoid accumulating resize ratios.
 - **Fixed boards MUST set the center**: a board of cells `0..N-1` is centered
   at `(N-1)/2`, not `N/2` and not the default `(0, 0)`. Use the `center`
   returned by `gridToSize` (core >= 0.5): `const { center, ...board } =
@@ -197,6 +204,10 @@ const png = await renderToBuffer({
 - **React props are mount-only**: `config`, `renderer`, and `center` are read
   once. Changing them later is ignored - use runtime APIs
   (`engine.setBounds`, `engine.setCenter`, ...) or remount with a `key`.
+- **Camera commands interrupt their own animation**: `setCenter`/`goCenter`
+  replace movement; `setScale`/`zoomIn`/`zoomOut`/`goScale` replace zoom.
+  The other channel continues; `fitBounds` replaces both. Instant commands
+  follow the same rule; interrupted `goCenter`/`goScale` runs do not call `onComplete`.
 - **React items stability**: `items` props are compared by reference. Inline
   array literals cause re-registration (and spatial index rebuilds) every
   render. Use `useMemo` or state.

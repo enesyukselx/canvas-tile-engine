@@ -10,11 +10,10 @@ import {
     Line,
     PathItem,
     Rect,
-    SpatialIndex,
     Text,
     resolveLineWidthPx,
     resolveSizePx,
-    resolveSizeWorld,
+    resolveBoxPx,
     isGradient,
     normalizeStops,
     gradientAxisPx,
@@ -26,22 +25,23 @@ import {
     computeOriginOffset,
     traceRoundedPath,
     traceCommands,
-    itemsBounds,
     pathItemBounds,
     type CommandTraceTarget,
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    FontWeight,
     Paint,
     PaintBox,
+    RendererClipOptions,
     AnchoredItem,
+    Bounds,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
     RendererDrawOptions,
     RendererImageDrawOptions,
     ShapeDecorationStyle,
-    StyleOf,
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import {
@@ -60,14 +60,34 @@ import {
     type SkPicture,
     type SkRect,
 } from "@shopify/react-native-skia";
-import { getViewportBounds, isVisible } from "@canvas-tile-engine/renderer-shared/geometry";
-import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import {
+    PaintedCuller,
+    boxPaintBounds,
+    boxPixelPadding,
+    getViewportBounds,
+    intersectsBounds,
+    linePaintBounds,
+    pathPaintBounds,
+    textPaintBounds,
+    staticCacheBounds,
+    staticRectPaintBounds,
+    staticCirclePaintBounds,
+    staticImagePaintBounds,
+} from "@canvas-tile-engine/renderer-shared/geometry";
+
+/** matchFont's weight argument; its input type is not exported by the package. */
+type SkiaFontWeight = NonNullable<NonNullable<Parameters<typeof matchFont>[0]>["fontWeight"]>;
+import { type DrawCallback, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 import type { SkiaDrawContext } from "../types";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
 
-// Threshold for using spatial indexing (below this, linear scan is faster)
-const SPATIAL_INDEX_THRESHOLD = 500;
+const TEXT_BOUNDS_CACHE_LIMIT = 2048;
+
+interface TextLayout {
+    bounds: Bounds;
+    offset: Coords;
+}
 
 /**
  * Upper bound on the parsed-color cache.
@@ -109,6 +129,7 @@ export class SkiaDraw {
     private strokePaint: SkPaint;
     private imagePaint: SkPaint;
     private fontCache = new Map<string, SkFont>();
+    private textLayoutCache = new LruCache<string, TextLayout>(TEXT_BOUNDS_CACHE_LIMIT);
     private colorCache = new LruCache<string, SkColor>(COLOR_CACHE_LIMIT);
     // Pre-recorded pictures for the drawStatic* variants, keyed by cacheKey.
     private staticPictureCache = new Map<string, { picture: SkPicture; recordScale: number }>();
@@ -130,6 +151,18 @@ export class SkiaDraw {
         this.imagePaint.setAntiAlias(true);
     }
 
+    /**
+     * Register a layer callback, forwarding the registration's clip. Every
+     * draw method funnels through here so a new draw kind cannot forget it.
+     */
+    private register(
+        layer: number,
+        options: RendererClipOptions | undefined,
+        fn: DrawCallback<SkiaDrawContext>,
+    ): DrawHandle {
+        return this.layers.add(layer, fn, options?.clip);
+    }
+
     addDrawFunction(
         fn: (
             canvas: SkCanvas,
@@ -138,8 +171,9 @@ export class SkiaDraw {
             transform: DrawTransform,
         ) => void,
         layer: number = 1,
+        options?: RendererClipOptions,
     ): DrawHandle {
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             fn(canvas, topLeft, config, this.drawTransform);
         });
     }
@@ -153,48 +187,54 @@ export class SkiaDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const size = item.size ?? 1;
-                const extent = Math.max(item.width ?? size, item.height ?? size) / 2;
-
-                if (!spatialIndex && !isVisible(item.x, item.y, extent, topLeft, config)) {
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintRect(canvas, item, pos, this.camera.scale, styleOf);
+                this.paintRect(canvas, item, pos, this.camera.scale, true, deco);
             }
         });
     }
 
     /** Paint a single rect at a resolved position; `cellSize` is the pixel
-     * size of one world cell. `styleOf` is dynamic-path only — the static
-     * picture path records without decorations. */
+     * size of one world cell. `useSizePx` is false on the static picture path,
+     * which replays at a recorded scale where a screen size cannot hold.
+     * `deco` is dynamic-path only — the static path records without
+     * decorations. */
     private paintRect(
         canvas: SkCanvas,
         item: Rect,
         pos: Coords,
         cellSize: number,
-        styleOf?: StyleOf<Rect, ShapeDecorationStyle>,
+        useSizePx: boolean,
+        deco?: ShapeDecorationStyle,
     ) {
         const size = item.size ?? 1;
         const origin = resolveOrigin(item.origin);
-        const deco = styleOf?.(item);
         const style = deco ? { ...item.style, ...deco } : item.style;
-        const pxW = (item.width ?? size) * cellSize;
-        const pxH = (item.height ?? size) * cellSize;
+        const box = useSizePx
+            ? resolveBoxPx(item, cellSize)
+            : { width: (item.width ?? size) * cellSize, height: (item.height ?? size) * cellSize };
+        const pxW = box.width;
+        const pxH = box.height;
         const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, cellSize);
         const cx = drawX + pxW / 2;
         const cy = drawY + pxH / 2;
@@ -245,37 +285,29 @@ export class SkiaDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale, item.style, false),
+            !!styleOf,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+        );
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                // sizePx wins over size, resolved against the live scale
-                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                const deco = styleOf?.(item);
+                const style = deco ? { ...item.style, ...deco } : item.style;
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale, style, false))) {
                     continue;
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintCircle(canvas, item, pos, this.camera.scale, true, styleOf);
+                this.paintCircle(canvas, item, pos, this.camera.scale, true, deco);
             }
         });
     }
@@ -283,17 +315,16 @@ export class SkiaDraw {
     /** Paint a single circle at a resolved position; `cellSize` is the pixel
      * size of one world cell. `useSizePx` is false on the static picture
      * path, which records at a fixed scale where pixel sizing cannot hold.
-     * `styleOf` is dynamic-path only — static pictures record undecorated. */
+     * `deco` is dynamic-path only — static pictures record undecorated. */
     private paintCircle(
         canvas: SkCanvas,
         item: Circle,
         pos: Coords,
         cellSize: number,
         useSizePx: boolean,
-        styleOf?: StyleOf<Circle, ShapeDecorationStyle>,
+        deco?: ShapeDecorationStyle,
     ) {
         const origin = resolveOrigin(item.origin);
-        const deco = styleOf?.(item);
         const style = deco ? { ...item.style, ...deco } : item.style;
         const pxSize = useSizePx ? resolveSizePx(item, cellSize) : (item.size ?? 1) * cellSize;
         const radius = pxSize / 2;
@@ -335,7 +366,8 @@ export class SkiaDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
+            const bounds = getViewportBounds(topLeft, config);
             const baseColor = this.color(style?.strokeStyle ?? "#000000");
             const baseWidth = resolveLineWidthPx(style, this.camera.scale);
             this.strokePaint.setColor(baseColor);
@@ -350,10 +382,7 @@ export class SkiaDraw {
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                const centerX = (item.from.x + item.to.x) / 2;
-                const centerY = (item.from.y + item.to.y) / 2;
-                const halfExtent = Math.max(Math.abs(item.from.x - item.to.x), Math.abs(item.from.y - item.to.y)) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(bounds, linePaintBounds(item, this.camera.scale, style))) {
                     continue;
                 }
 
@@ -398,14 +427,19 @@ export class SkiaDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => {
+                const pxSize = item.fontPx ?? (item.size ?? 1) * scale;
+                const font = this.getFont(item.style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize, item.style?.fontWeight);
+                return textPaintBounds(item, scale, this.layoutText(item, item.style, pxSize, font).bounds);
+            },
+            !!styleOf,
+        );
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY)
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -415,20 +449,18 @@ export class SkiaDraw {
                 const deco = styleOf?.(item);
                 const style = deco ? { ...item.style, ...deco } : item.style;
 
-                // fontPx is zoom-independent; its world-space extent shrinks as scale grows
-                const extentWorld = item.fontPx !== undefined ? item.fontPx / this.camera.scale : size;
-
-                if (!spatialIndex && !isVisible(item.x, item.y, extentWorld, topLeft, config)) {
-                    continue;
-                }
-
                 // Font sizing matches the Canvas2D renderer: fontPx wins, else size * scale.
                 const pxSize = item.fontPx ?? size * this.camera.scale;
-                const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize);
+                const font = this.getFont(style?.fontFamily ?? DEFAULT_SANS_SERIF, pxSize, style?.fontWeight);
+                const layout = this.layoutText(item, style, pxSize, font);
+                if (!intersectsBounds(bounds, textPaintBounds(item, this.camera.scale, layout.bounds))) {
+                    continue;
+                }
                 this.fillPaint.setColor(this.color(style?.fillStyle ?? "#000000"));
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                const { x, y } = this.alignText(item.text, pos, font, style?.textAlign, style?.textBaseline);
+                const x = pos.x + layout.offset.x;
+                const y = pos.y + layout.offset.y;
 
                 const rotation = item.rotate ?? 0;
                 const count = rotation !== 0 ? this.withRotation(canvas, rotation, pos.x, pos.y) : -1;
@@ -487,7 +519,8 @@ export class SkiaDraw {
         // Conservative world bounds per item for culling, computed once.
         const itemBounds = items.map((item) => pathItemBounds(item));
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
+            const viewport = getViewportBounds(topLeft, config);
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
                 const bounds = itemBounds[n];
@@ -495,10 +528,7 @@ export class SkiaDraw {
                     continue;
                 }
 
-                const centerX = (bounds.minX + bounds.maxX) / 2;
-                const centerY = (bounds.minY + bounds.maxY) / 2;
-                const halfExtent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
-                if (!isVisible(centerX, centerY, halfExtent, topLeft, config)) {
+                if (!intersectsBounds(viewport, pathPaintBounds(bounds, item.style, this.camera.scale))) {
                     continue;
                 }
 
@@ -574,32 +604,22 @@ export class SkiaDraw {
         const list = Array.isArray(items) ? items : [items];
         const visibleOf = options?.visibleOf;
 
-        const useSpatialIndex = list.length > SPATIAL_INDEX_THRESHOLD;
-        const spatialIndex = useSpatialIndex ? SpatialIndex.fromArray(list) : null;
-        // Pixel-sized items grow in world units as the camera zooms out, so
-        // the anchor-index query is padded by this per frame (scale-divided).
-        const maxSizePx = list.reduce((max, item) => Math.max(max, item.sizePx ?? 0), 0);
+        const culler = new PaintedCuller(
+            list,
+            (item, scale) => boxPaintBounds(item, scale),
+            false,
+            list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
+        );
 
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
-            const sizePxPad = maxSizePx / this.camera.scale;
-            const visibleItems = spatialIndex
-                ? spatialIndex.query(
-                      bounds.minX - sizePxPad,
-                      bounds.minY - sizePxPad,
-                      bounds.maxX + sizePxPad,
-                      bounds.maxY + sizePxPad,
-                  )
-                : list;
+            const visibleItems = culler.query(bounds, this.camera.scale);
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
                     continue;
                 }
-                // sizePx wins over size, resolved against the live scale
-                const sizeWorld = resolveSizeWorld(item, this.camera.scale);
-
-                if (!spatialIndex && !isVisible(item.x, item.y, sizeWorld / 2, topLeft, config)) {
+                if (!intersectsBounds(bounds, boxPaintBounds(item, this.camera.scale))) {
                     continue;
                 }
 
@@ -681,8 +701,16 @@ export class SkiaDraw {
         }
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
-        return this.layers.add(layer, ({ ctx: canvas, config, topLeft }) => {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        if (!Number.isFinite(cellSize) || cellSize <= 0) {
+            throw new RangeError("[CanvasTileEngine] cellSize must be a positive finite number");
+        }
+        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -723,21 +751,46 @@ export class SkiaDraw {
     // — use the dynamic draw methods when a zoom-independent px value must
     // hold.
 
-    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintRect(canvas, item, pos, cellSize),
+    drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1, options?: RendererClipOptions): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            staticRectPaintBounds,
+            (canvas, item, pos, cellSize) => this.paintRect(canvas, item, pos, cellSize, false),
+            options,
         );
     }
 
-    drawStaticCircle(items: Array<Circle>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintCircle(canvas, item, pos, cellSize, false),
+    drawStaticCircle(
+        items: Array<Circle>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            staticCirclePaintBounds,
+            (canvas, item, pos, cellSize) => this.paintCircle(canvas, item, pos, cellSize, false),
+            options,
         );
     }
 
-    drawStaticImage(items: Array<ImageItem<SkImage>>, cacheKey: string, layer: number = 1): DrawHandle {
-        return this.addStaticPictureLayer(cacheKey, items, layer, (canvas, item, pos, cellSize) =>
-            this.paintImage(canvas, item, pos, cellSize, false),
+    drawStaticImage(
+        items: Array<ImageItem<SkImage>>,
+        cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
+        return this.addStaticPictureLayer(
+            cacheKey,
+            items,
+            layer,
+            (item) => staticImagePaintBounds(item, item.img.width(), item.img.height()),
+            (canvas, item, pos, cellSize) => this.paintImage(canvas, item, pos, cellSize, false),
+            options,
         );
     }
 
@@ -760,20 +813,22 @@ export class SkiaDraw {
         cacheKey: string,
         items: T[],
         layer: number,
+        boundsOf: (item: T, scale: number) => Bounds | null,
         paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
+        options?: RendererClipOptions,
     ): DrawHandle {
         if (items.length === 0) {
-            return this.layers.add(layer, () => {});
+            return this.register(layer, options, () => {});
         }
 
         let entry = this.staticPictureCache.get(cacheKey);
         if (!entry) {
-            entry = this.recordStaticPicture(items, paintItem);
+            entry = this.recordStaticPicture(items, boundsOf, paintItem);
             this.staticPictureCache.set(cacheKey, entry);
         }
         const { picture, recordScale } = entry;
 
-        return this.layers.add(layer, ({ ctx: canvas, topLeft }) => {
+        return this.register(layer, options, ({ ctx: canvas, topLeft }) => {
             // worldToScreen(w) = (w + CELL_CENTER_OFFSET - topLeft) * scale, and
             // the picture was recorded with a camera at (0, 0, recordScale), so
             // the recorded coordinates only miss the -topLeft term and the
@@ -790,28 +845,26 @@ export class SkiaDraw {
     /** Record `items` into a picture using a camera fixed at (0, 0) and the current scale. */
     private recordStaticPicture<T extends AnchoredItem>(
         items: T[],
+        boundsOf: (item: T, scale: number) => Bounds | null,
         paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
     ): { picture: SkPicture; recordScale: number } {
         const recordScale = this.camera.scale;
 
-        // Cull rect covering all items, padded by one world unit for origin
-        // offsets and rotation — same bounds heuristic as the Canvas2D cache,
-        // and now the same helper, so per-axis width/height cannot be missed
-        // (a wide rect used to record outside its own cull rect).
-        // An empty list never reaches here (addStaticPictureLayer returns
-        // early); the fallback keeps the rect finite rather than NaN if that
-        // ever changes.
-        const box = itemsBounds(items) ?? { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-        const minX = box.minX - 1;
-        const minY = box.minY - 1;
-        const maxX = box.maxX + 1;
-        const maxY = box.maxY + 1;
+        // Same painted bounds as Canvas2D, already in corner-space with the
+        // cell-center offset, origins, rotation, and recorded strokes included.
+        // Empty registrations return before reaching this method.
+        const { minX, minY, maxX, maxY } = staticCacheBounds(items, recordScale, boundsOf) ?? {
+            minX: 0,
+            minY: 0,
+            maxX: 0,
+            maxY: 0,
+        };
 
         const recorder = Skia.PictureRecorder();
         const canvas = recorder.beginRecording(
             Skia.XYWHRect(
-                (minX + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
-                (minY + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+                minX * recordScale,
+                minY * recordScale,
                 (maxX - minX) * recordScale,
                 (maxY - minY) * recordScale,
             ),
@@ -845,6 +898,7 @@ export class SkiaDraw {
     destroy() {
         this.layers.clear();
         this.fontCache.clear();
+        this.textLayoutCache.clear();
         this.colorCache.clear();
         this.staticPictureCache.clear();
     }
@@ -962,14 +1016,51 @@ export class SkiaDraw {
      * continuously with zoom (fonts are snapshotted into the recorded picture
      * at draw time, so mutating the shared instance between draws is safe).
      */
-    private getFont(family: string, size: number): SkFont {
-        let font = this.fontCache.get(family);
+    private getFont(family: string, size: number, weight?: FontWeight): SkFont {
+        // Weight is part of the key: a typeface is matched once and reused at
+        // every size (setSize below), so a family-only key would hand back the
+        // regular face for a bold request.
+        const key = weight === undefined ? family : `${family}|${weight}`;
+        let font = this.fontCache.get(key);
         if (!font) {
-            font = matchFont({ fontFamily: family, fontSize: size });
-            this.fontCache.set(family, font);
+            font = matchFont({
+                fontFamily: family,
+                fontSize: size,
+                // matchFont takes the CSS keywords and the numeric weights as
+                // strings; core's numeric literals map straight across.
+                ...(weight === undefined ? {} : { fontWeight: String(weight) as SkiaFontWeight }),
+            });
+            this.fontCache.set(key, font);
         }
         font.setSize(size);
         return font;
+    }
+
+    /** Cache native ink measurements together with the exact paint origin. */
+    private layoutText(item: Text, style: Text["style"], pxSize: number, font: SkFont): TextLayout {
+        const key = JSON.stringify([
+            style?.fontFamily ?? DEFAULT_SANS_SERIF,
+            style?.fontWeight,
+            pxSize,
+            item.text,
+            style?.textAlign ?? "center",
+            style?.textBaseline ?? "middle",
+        ]);
+        const cached = this.textLayoutCache.get(key);
+        if (cached) {
+            return cached;
+        }
+        const ink = font.measureText(item.text);
+        const offset = this.alignText({ x: 0, y: 0 }, font, ink.width, style?.textAlign, style?.textBaseline);
+        const bounds = {
+            minX: offset.x + ink.x - 1,
+            minY: offset.y + ink.y - 1,
+            maxX: offset.x + ink.x + ink.width + 1,
+            maxY: offset.y + ink.y + ink.height + 1,
+        };
+        const layout = { bounds, offset };
+        this.textLayoutCache.set(key, layout);
+        return layout;
     }
 
     /**
@@ -977,16 +1068,15 @@ export class SkiaDraw {
      * `drawText` origin by offsetting the draw position.
      */
     private alignText(
-        text: string,
         pos: Coords,
         font: SkFont,
+        width: number,
         textAlign: string | undefined,
         textBaseline: string | undefined,
     ): Coords {
         let x = pos.x;
         let y = pos.y;
 
-        const width = font.measureText(text).width;
         switch (textAlign ?? "center") {
             case "center":
                 x -= width / 2;

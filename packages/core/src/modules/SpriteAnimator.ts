@@ -48,6 +48,7 @@ export class SpriteAnimator {
     private readonly frameDurationMs: number;
     private readonly loop: boolean;
     private animationId?: number;
+    private playbackGeneration = 0;
 
     constructor(animation: SpriteAnimation) {
         if (animation.frames.length === 0) {
@@ -83,13 +84,18 @@ export class SpriteAnimator {
     /**
      * Start playback. Restarts from the first frame if already running.
      * @param onFrame Called with the new frame whenever the frame changes
-     * (including once immediately with the first frame).
+     * (including once immediately with the first frame). May stop or restart playback.
      * @param onComplete Called when a non-looping animation reaches its last frame.
+     * Not called if onFrame stops or replaces that run.
      */
     start(onFrame: (frame: SpriteRect, index: number) => void, onComplete?: () => void) {
         this.stop();
+        const generation = this.playbackGeneration;
 
         onFrame(this.frames[0], 0);
+        if (generation !== this.playbackGeneration) {
+            return;
+        }
 
         // Headless: no frame scheduling — leave the first frame applied.
         if (!canAnimate()) {
@@ -110,15 +116,23 @@ export class SpriteAnimator {
         let lastIndex = 0;
 
         const step = (now: number) => {
+            // A canceled callback may already be queued. It must not touch a newer run.
+            if (generation !== this.playbackGeneration) {
+                return;
+            }
             const index = this.frameIndexAt(now - startTime);
 
             if (index !== lastIndex) {
                 lastIndex = index;
                 onFrame(this.frames[index], index);
+                if (generation !== this.playbackGeneration) {
+                    return;
+                }
             }
 
             if (!this.loop && index === this.frames.length - 1) {
                 this.animationId = undefined;
+                this.playbackGeneration++;
                 onComplete?.();
                 return;
             }
@@ -133,6 +147,8 @@ export class SpriteAnimator {
      * Stop playback. The last applied frame stays drawn.
      */
     stop() {
+        // Invalidate even before the first rAF exists, including inside the initial callback.
+        this.playbackGeneration++;
         if (this.animationId !== undefined) {
             cancelAnimationFrame(this.animationId);
             this.animationId = undefined;

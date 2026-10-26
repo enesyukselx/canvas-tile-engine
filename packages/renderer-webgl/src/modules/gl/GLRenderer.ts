@@ -51,6 +51,11 @@ export interface LineInstance {
     /** Stroke width in CSS pixels. */
     width: number;
     color: RGBA;
+    /** Shared offsets at joined contour vertices; omitted for flat butt caps. */
+    startOffset?: Coords;
+    endOffset?: Coords;
+    /** One contour: translucent self-overlap must be painted only once. */
+    strokeGroup?: object;
 }
 
 /** A textured quad (image) in CSS-pixel space. */
@@ -127,9 +132,9 @@ interface TextureProgram {
  * Thin batched drawing layer over a raw WebGL context.
  *
  * Each `draw*` call uploads a freshly built vertex array and issues a single
- * draw call, so a layer that paints thousands of rects collapses into one GPU
- * batch. Calls execute immediately and in order, which preserves the engine's
- * layer-based paint order.
+ * draw call, so a contiguous run of thousands of fill-only rects collapses into
+ * one GPU batch. Calls execute immediately and in order; callers must split
+ * batches when switching between fills and strokes to preserve paint order.
  * @internal
  */
 export class GLRenderer {
@@ -155,6 +160,8 @@ export class GLRenderer {
 
     private cssWidth = 0;
     private cssHeight = 0;
+    /** Backing-store pixels per CSS pixel; scissor rectangles are device-space. */
+    private dpr = 1;
 
     constructor(gl: GL) {
         this.gl = gl;
@@ -241,7 +248,33 @@ export class GLRenderer {
     setSize(physicalWidth: number, physicalHeight: number, cssWidth: number, cssHeight: number) {
         this.cssWidth = cssWidth;
         this.cssHeight = cssHeight;
+        this.dpr = cssHeight > 0 ? physicalHeight / cssHeight : 1;
         this.gl.viewport(0, 0, physicalWidth, physicalHeight);
+    }
+
+    /**
+     * Confine drawing to a rectangle given in CSS pixels with a top-left
+     * origin — the space every other coordinate here uses.
+     *
+     * The scissor box is neither: it is device pixels measured from the
+     * BOTTOM, so both conversions happen here rather than at each call site.
+     * Scissor is global GL state, outside any save/restore stack, so callers
+     * must pair this with {@link clearScissor}.
+     */
+    setScissor(x: number, y: number, width: number, height: number) {
+        const gl = this.gl;
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(
+            Math.round(x * this.dpr),
+            Math.round((this.cssHeight - (y + height)) * this.dpr),
+            Math.max(0, Math.round(width * this.dpr)),
+            Math.max(0, Math.round(height * this.dpr)),
+        );
+    }
+
+    /** Release {@link setScissor}. */
+    clearScissor() {
+        this.gl.disable(this.gl.SCISSOR_TEST);
     }
 
     /** Clear the framebuffer with a background color. */
@@ -416,7 +449,7 @@ export class GLRenderer {
                 data[o++] = ly;
                 data[o++] = s.halfW;
                 data[o++] = s.halfH;
-                // Shader quadrant-select order: (bottomRight, topRight, bottomLeft, topLeft)
+                // Shader corner order: (bottomRight, topRight, bottomLeft, topLeft)
                 data[o++] = s.radius[2];
                 data[o++] = s.radius[1];
                 data[o++] = s.radius[3];
@@ -452,6 +485,8 @@ export class GLRenderer {
         this.disableAttrib(this.shape.a_halfSize);
         this.disableAttrib(this.shape.a_radius);
         this.disableAttrib(this.shape.a_color);
+        this.disableAttrib(this.shape.a_gradT);
+        this.disableAttrib(this.shape.a_gradRow);
     }
 
     // ─── Lines ───
@@ -475,12 +510,14 @@ export class GLRenderer {
             // Perpendicular offset
             const nx = -dy * half;
             const ny = dx * half;
+            const start = l.startOffset ?? { x: nx, y: ny };
+            const end = l.endOffset ?? { x: nx, y: ny };
 
             const corners = [
-                [l.x1 + nx, l.y1 + ny],
-                [l.x1 - nx, l.y1 - ny],
-                [l.x2 + nx, l.y2 + ny],
-                [l.x2 - nx, l.y2 - ny],
+                [l.x1 + start.x, l.y1 + start.y],
+                [l.x1 - start.x, l.y1 - start.y],
+                [l.x2 + end.x, l.y2 + end.y],
+                [l.x2 - end.x, l.y2 - end.y],
             ];
 
             const order = [0, 1, 2, 1, 3, 2];
@@ -509,7 +546,32 @@ export class GLRenderer {
         this.enableAttrib(this.line.a_gradT, 1, stride, 6 * 4);
         this.enableAttrib(this.line.a_gradRow, 1, stride, 7 * 4);
 
-        gl.drawArrays(gl.TRIANGLES, 0, lines.length * 6);
+        // A wide stroke can cover its own interior (e.g. a corner radius less
+        // than half the width). Mark the first fragment of each translucent
+        // contour in stencil so overlapping triangles do not blend again.
+        // Opaque contours and ordinary lines still share one draw batch.
+        let start = 0;
+        while (start < lines.length) {
+            const group = lines[start].color[3] < 1 ? lines[start].strokeGroup : undefined;
+            let end = start + 1;
+            while (
+                end < lines.length &&
+                (group ? lines[end].strokeGroup === group : !(lines[end].strokeGroup && lines[end].color[3] < 1))
+            ) {
+                end++;
+            }
+            if (group) {
+                gl.enable(gl.STENCIL_TEST);
+                gl.stencilFunc(gl.EQUAL, 0, 0xff);
+                gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
+            }
+            gl.drawArrays(gl.TRIANGLES, start * 6, (end - start) * 6);
+            if (group) {
+                gl.clear(gl.STENCIL_BUFFER_BIT);
+                gl.disable(gl.STENCIL_TEST);
+            }
+            start = end;
+        }
 
         this.disableAttrib(this.line.a_position);
         this.disableAttrib(this.line.a_color);

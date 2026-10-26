@@ -193,7 +193,7 @@ Key public contracts:
 `@canvas-tile-engine/react-native`:
 
 - Mirrors the React API and component names.
-- `engine.getConfig()` returns the same default snapshot as the web hook before mount (never `undefined`).
+- `engine.getConfig()` returns the same default snapshot as the web hook before mount (never `undefined`). Both build it with core's `normalizeConfig`, so it agrees with the engine's own defaults as well as with the other hook; never hand-maintain a second copy of the defaults.
 - Uses `RendererSkia`; styling is `ViewStyle`; image handles are `SkImage`.
 - `config.size` is a placeholder because the native component measures its `View` with `onLayout`.
 - Native touch input feeds the same callback names; do not document separate gesture event names unless the public API adds them.

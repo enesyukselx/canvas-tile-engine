@@ -54,7 +54,9 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | :------- | :------------------- | :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `x`, `y` | `number`             | **Required**                       | World coordinates.                                                                                                                                  |
 | `size`   | `number`             | `1`                                | Size in grid units.                                                                                                                                 |
-| `sizePx` | `number`             | -                                  | Fixed diameter in screen pixels, independent of zoom — marker dots (only for `Circle`, analog of Text's `fontPx`). Wins over `size`. Ignored by `StaticCircle`.      |
+| `sizePx` | `number`             | -                                  | Fixed size in screen pixels for both axes, independent of zoom (`Rect` and `Circle`; on a circle it is the diameter). Wins over `size`/`width`/`height`. Ignored by the `Static*` variants. |
+| `widthPx` | `number`            | -                                  | Fixed width in screen pixels (only for `Rect`). Wins over `sizePx` and `width`. Ignored by `StaticRect`.                                                             |
+| `heightPx` | `number`           | -                                  | Fixed height in screen pixels (only for `Rect`). Wins over `sizePx` and `height`. Ignored by `StaticRect`.                                                           |
 | `style`  | `object`             | `{}`                               | Styling options.                                                                                                                                    |
 | `origin` | `object`             | `{ mode: "cell", x: 0.5, y: 0.5 }` | Anchor point.                                                                                                                                       |
 | `width`  | `number`             | `size`                             | Width in world units (only for `Rect`). Combine with `height` for non-square rectangles: bars, cards, zone floors.                                  |
@@ -282,6 +284,8 @@ Keep `items` referentially stable (`useMemo`/state) — a new array identity re-
 
 Draw grid lines at specified intervals.
 
+`cellSize` must be a positive finite number; fractional intervals are supported. Invalid values throw a `RangeError` when the grid draw is registered. This also applies to React Native.
+
 | Prop          | Type     | Default      | Description                            |
 | :------------ | :------- | :----------- | :------------------------------------- |
 | `cellSize`    | `number` | **Required** | Size of each grid cell in world units. |
@@ -333,8 +337,9 @@ Render text at world coordinates. Text size scales with zoom.
 
 **Style Options:**
 
-- `fillStyle`: Text color
+- `fillStyle`: Text color (default: black, `"#000000"`, resolved separately for every item after `styleOf`)
 - `fontFamily`: Font family (default: `"sans-serif"`)
+- `fontWeight`: `"normal"`, `"bold"`, or `100`-`900` (default: the family's normal weight)
 - `textAlign`: `"left"`, `"center"`, `"right"`
 - `textBaseline`: `"top"`, `"middle"`, `"bottom"`
 
@@ -467,6 +472,27 @@ function MapWithImages() {
     );
 }
 ```
+
+### Clipping a Registration
+
+Every draw component takes a `clip` prop: a world rectangle the registration is confined to. Nothing it draws paints outside, and nothing outside it hit-tests.
+
+```tsx
+const plotArea = { minX: -0.5, maxX: 40, minY: -0.5, maxY: 20 };
+
+<CanvasTileEngine.Rect items={bars} layer={1} clip={plotArea} />
+<CanvasTileEngine.Line items={series} layer={1} clip={plotArea} />;
+```
+
+The `clip` prop is compared by value, so an inline object literal does not re-register the draw call on every render (unlike `items`, which is compared by reference).
+
+The rectangle is world (item) space — the same coordinates `fitBounds` and `hitTestRect` take — so it pans and zooms with the rest of the scene. That is what a chart's plot area wants: axes and labels drawn outside the clip stay put relative to the data, and panning cannot smear the series over them.
+
+| | |
+| :-- | :-- |
+| Applies to | Every draw kind, including grid lines, the `Static*` components and `DrawFunction`. |
+| Hit testing | Follows the clip. A point outside it cannot hit, and a marquee is narrowed to the overlap, so a selection half inside the clip cannot reach what is cut away. `padding` does not widen a clip — it grows an item's own tap target, and a target that is not drawn has nothing to grow. |
+| Shape | Axis-aligned rectangles only. An arbitrary shape would need the stencil buffer on WebGL, where path fills already live. |
 
 ## Advanced
 

@@ -17,7 +17,7 @@ export {
 export { cornerArc } from "./utils/pathCorners";
 export { traceRoundedPath, traceCommands, type PathTraceTarget, type CommandTraceTarget } from "./utils/tracePath";
 export { roundedPolyline, roundedRing, ARC_SEGMENT_LENGTH } from "./utils/pathFlatten";
-export { resolveSizePx, resolveSizeWorld } from "./utils/itemSize";
+export { resolveSizePx, resolveSizeWorld, resolveBoxPx, resolveBoxWorld, maxPxExtent } from "./utils/itemSize";
 export { isGradient, normalizeStops, gradientAxisPx, gradientT, paintKey } from "./utils/paint";
 export type { PaintBox } from "./utils/paint";
 export {
@@ -32,7 +32,7 @@ export { resolveOrigin, computeOriginOffset, type Origin, type RawOrigin } from 
 export { flattenPathCommands, pathCommandsBounds, type Subpath } from "./utils/flattenPath";
 export type { CornerArc } from "./utils/pathCorners";
 // Additional core modules
-export { Config } from "./modules/Config";
+export { Config, normalizeConfig } from "./modules/Config";
 export { ViewportState } from "./modules/ViewportState";
 export { CoordinateTransformer } from "./modules/CoordinateTransformer";
 export { SpatialIndex } from "./modules/SpatialIndex";

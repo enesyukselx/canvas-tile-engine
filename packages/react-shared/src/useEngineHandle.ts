@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
+import { normalizeConfig } from "@canvas-tile-engine/core";
 import type {
+    DrawOptions,
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
     Coords,
@@ -48,64 +50,23 @@ function droppedDraw(method: string): DrawHandle {
     return DUMMY_DRAW_HANDLE;
 }
 
-/** Default config returned by `getConfig` when the engine is not ready */
-const DEFAULT_CONFIG: Required<CanvasTileEngineConfig> = {
-    size: {
-        width: 0,
-        height: 0,
-        minWidth: 100,
-        minHeight: 100,
-        maxWidth: Infinity,
-        maxHeight: Infinity,
-    },
-    responsive: false,
-    scale: 1,
-    minScale: 0.5,
-    maxScale: 2,
-    backgroundColor: "#ffffff",
-    gridAligned: false,
-    eventHandlers: {
-        drag: true,
-        zoom: "pointer",
-        hover: false,
-        click: false,
-        rightClick: false,
-        resize: false,
-    },
-    bounds: {
-        minX: -Infinity,
-        maxX: Infinity,
-        minY: -Infinity,
-        maxY: Infinity,
-    },
-    coordinates: {
-        enabled: false,
-        shownScaleRange: { min: 0, max: Infinity },
-    },
-    // The preference default, not the resolved value: this snapshot must match
-    // what the real engine reports once mounted.
-    accessibility: {
-        reducedMotion: "auto",
-    },
-    debug: {
-        enabled: false,
-        hud: {
-            enabled: false,
-            topLeftCoordinates: false,
-            coordinates: false,
-            scale: false,
-            tilesInView: false,
-            fps: false,
-        },
-        eventHandlers: {
-            click: false,
-            hover: false,
-            drag: false,
-            zoom: false,
-            resize: false,
-        },
-    },
-};
+/**
+ * Config snapshot `getConfig` returns while the engine is not ready.
+ *
+ * Built with the engine's own normalization so the two can never disagree:
+ * every field is exactly what `Config` resolves for the same input, instead of
+ * a hand-maintained copy that drifted (it claimed drag and pointer zoom were
+ * on by default, and the debug event logs off). The placeholder input is
+ * `scale: 1` at a zero size — the same size the pre-mount `getSize()` reports —
+ * so the scale-derived fields, `minScale` and `maxScale`, describe that
+ * placeholder and not the `config` the component has yet to mount with. Read
+ * those after `isReady` if they matter.
+ *
+ * Deeply frozen, like the snapshots `Config.get()` hands out: this object is
+ * shared by every pre-mount call, so a consumer mutating it would corrupt all
+ * the later ones.
+ */
+const DEFAULT_CONFIG = normalizeConfig({ scale: 1, size: { width: 0, height: 0 } });
 
 /**
  * Platform-agnostic engine handle shared by the `useCanvasTileEngine` hooks.
@@ -183,7 +144,16 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
      */
     getReducedMotion(): boolean;
 
-    /** Get current config */
+    /**
+     * Get the current normalized config snapshot (deeply frozen, never
+     * `undefined`). Before mount this is the engine's defaults for an
+     * *unconfigured* engine, resolved by the engine's own normalization, so
+     * nothing here contradicts a default-constructed engine — but the handle
+     * cannot see the `config` prop, so every field that prop sets still
+     * changes when the engine attaches: `scale` (and the `minScale`/`maxScale`
+     * derived from it), `size`, `eventHandlers`, `backgroundColor`,
+     * `coordinates`, `bounds`, `debug`. Gate on `isReady` for those.
+     */
     getConfig(): Required<CanvasTileEngineConfig>;
 
     /** Set map boundaries */
@@ -207,6 +177,7 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     addDrawFunction(
         fn: (ctx: TCtx, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
+        options?: DrawOptions,
     ): DrawHandle;
 
     /** Draw rectangles */
@@ -267,7 +238,13 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     ): DrawHandle;
 
     /** Draw grid lines */
-    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
+    drawGridLines(
+        cellSize: number,
+        lineWidth?: number,
+        strokeStyle?: string,
+        layer?: number,
+        options?: DrawOptions,
+    ): DrawHandle;
 
     /** Clear a specific layer */
     clearLayer(layer: number): void;
@@ -442,7 +419,7 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                 instanceRef.current?.setEventHandlers(handlers);
             },
 
-            addDrawFunction(fn, layer) {
+            addDrawFunction(fn, layer, options) {
                 // The core API is renderer-agnostic (`ctx: unknown`); each
                 // platform handle narrows the context type (TCtx), so widen it
                 // back here to keep the cast out of user code.
@@ -455,6 +432,7 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                             transform: DrawTransform,
                         ) => void,
                         layer,
+                        options,
                     ) ?? droppedDraw("addDrawFunction")
                 );
             },
@@ -504,9 +482,9 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                 );
             },
 
-            drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
+            drawGridLines(cellSize, lineWidth, strokeStyle, layer, options) {
                 return (
-                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ??
+                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer, options) ??
                     droppedDraw("drawGridLines")
                 );
             },

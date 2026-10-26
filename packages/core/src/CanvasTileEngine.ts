@@ -8,6 +8,7 @@ import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateScale } from "./utils/validateConfig";
 import { fitScale } from "./utils/fitScale";
 import { snapCenterToGrid } from "./utils/viewport";
+import type { BrowserCanvas, BrowserElement, DefaultImage, DefaultMount } from "./types/platform";
 import {
     Bounds,
     Coords,
@@ -55,7 +56,7 @@ import {
 /**
  * Core engine wiring camera, config, renderer, events, and draw helpers.
  */
-export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement> {
+export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
     private config: Config;
     private camera: Camera;
     private viewport: ViewportState;
@@ -66,6 +67,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /** Registrations tracked by user-facing id (static draws: their cacheKey). */
     private drawIds = new Map<string, { handle: DrawHandle; cacheKey?: string }>();
     private drawIdByHandle = new Map<symbol, string>();
+    private eventHandlersListeners = new Set<(handlers: Readonly<EventHandlers>) => void>();
 
     public canvasWrapper: TMount;
     /**
@@ -73,7 +75,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      * On non-DOM mounts (e.g. React Native / Skia) this is `undefined` at
      * runtime, and the type reflects that so consumers must null-check.
      */
-    public canvas: TMount extends HTMLElement ? HTMLCanvasElement : HTMLCanvasElement | undefined;
+    public canvas: TMount extends BrowserElement ? BrowserCanvas : BrowserCanvas | undefined;
 
     /**
      * Image loader for loading and caching images.
@@ -332,7 +334,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.canvasWrapper = canvasWrapper;
         // Resolve the DOM canvas only when the mount target is a DOM element.
         // Non-DOM platforms (e.g. React Native) leave this undefined.
-        const maybeDom = canvasWrapper as { querySelector?: (selector: string) => HTMLCanvasElement | null };
+        const maybeDom = canvasWrapper as { querySelector?: (selector: string) => BrowserCanvas | null };
         const resolvedCanvas =
             typeof maybeDom?.querySelector === "function" ? (maybeDom.querySelector("canvas") ?? undefined) : undefined;
         this.canvas = resolvedCanvas as this["canvas"];
@@ -394,6 +396,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /** Tear down listeners and observers. */
     destroy() {
+        this.eventHandlersListeners.clear();
         this.animationController.cancelAll();
         this.renderer.destroy();
         this.hitTester.clear();
@@ -446,11 +449,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
     /**
      * Set the canvas scale directly, clamped to min/max bounds.
      * The change is anchored at the viewport center, matching goScale/zoomIn/zoomOut.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param newScale The desired scale value.
      * @throws {ConfigValidationError} If scale is not a positive finite number.
      */
     setScale(newScale: number) {
         validateScale(newScale);
+        this.animationController.cancelZoom();
         const prevScale = this.camera.scale;
         const size = this.viewport.getSize();
         // Restore the center after the scale change: camera.setScale alone
@@ -485,9 +490,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Zoom in by a given factor, centered on the viewport.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom in more.
      */
     zoomIn(factor: number = 1.5) {
+        this.animationController.cancelZoom();
         const size = this.viewport.getSize();
         const prevScale = this.camera.scale;
         this.camera.zoomByFactor(factor, size.width / 2, size.height / 2);
@@ -497,9 +504,11 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Zoom out by a given factor, centered on the viewport.
+     * Cancels the active zoom animation; a concurrent move keeps running.
      * @param factor Zoom multiplier (default: 1.5). Higher values zoom out more.
      */
     zoomOut(factor: number = 1.5) {
+        this.animationController.cancelZoom();
         const size = this.viewport.getSize();
         const prevScale = this.camera.scale;
         this.camera.zoomByFactor(1 / factor, size.width / 2, size.height / 2);
@@ -576,13 +585,19 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         this.config._setPlatformReducedMotion(value);
     }
 
-    /** Snapshot of current normalized config. */
+    /**
+     * Snapshot of normalized config with live scale, scale limits and viewport size.
+     * Responsive limits may differ from the authored config; reading them does not
+     * change the baseline used to calculate limits on subsequent resizes.
+     */
     getConfig(): Required<CanvasTileEngineConfig> {
         const base = this.config.get();
         const size = this.viewport.getSize();
         return {
             ...base,
             scale: this.camera.scale,
+            minScale: this.camera.minScale,
+            maxScale: this.camera.maxScale,
             size: { ...size },
         };
     }
@@ -616,11 +631,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Move the view center to new world coordinates instantly.
+     * Cancels the active move animation; a concurrent zoom keeps running.
      * @param newCenter The new center coordinates.
      * @throws {ConfigValidationError} If coordinates are not finite numbers.
      */
     setCenter(newCenter: Coords) {
         validateCoords(newCenter.x, newCenter.y);
+        this.animationController.cancelMove();
         const size = this.viewport.getSize();
         this.camera.setCenter(newCenter, size.width, size.height);
         this.handleCameraChange();
@@ -745,6 +762,23 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     setEventHandlers(handlers: Partial<EventHandlers>) {
         this.config.updateEventHandlers(handlers);
+        const current = this.config.get().eventHandlers;
+        this.eventHandlersListeners.forEach((listener) => listener(current));
+    }
+
+    /**
+     * Binding hook for native gesture gates, which must update even when no
+     * frame is painted. Subscribe before reading getConfig() for the initial
+     * value; the returned function detaches this listener.
+     *
+     * Not part of the supported application API. Keep this declaration in
+     * the build because the React Native binding consumes it across packages.
+     */
+    _subscribeEventHandlers(listener: (handlers: Readonly<EventHandlers>) => void): () => void {
+        this.eventHandlersListeners.add(listener);
+        return () => {
+            this.eventHandlersListeners.delete(listener);
+        };
     }
 
     /**
@@ -846,11 +880,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawRect(items, layer, {
             styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Rect> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "rect", items, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -872,9 +908,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
      */
     drawStaticRect(items: Array<Rect>, cacheKey: string, layer: number = 1, options?: StaticDrawOptions): DrawHandle {
         this.replacePreviousDraw(cacheKey);
-        const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticRect(items, cacheKey, layer, { clip: options?.clip });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true });
+            this.hitTester.register(handle, "rect", items, layer, { ignoreSizePx: true, clip: options?.clip });
         }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
@@ -899,9 +935,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: StaticDrawOptions,
     ): DrawHandle {
         this.replacePreviousDraw(cacheKey);
-        const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticCircle(items, cacheKey, layer, { clip: options?.clip });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true });
+            this.hitTester.register(handle, "circle", items, layer, { ignoreSizePx: true, clip: options?.clip });
         }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
@@ -927,9 +963,9 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: StaticDrawOptions,
     ): DrawHandle {
         this.replacePreviousDraw(cacheKey);
-        const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer);
+        const handle = this.renderer.getDrawAPI().drawStaticImage(items, cacheKey, layer, { clip: options?.clip });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true });
+            this.hitTester.register(handle, "image", items, layer, { ignoreSizePx: true, clip: options?.clip });
         }
         this.trackDrawId(cacheKey, handle, cacheKey);
         return handle;
@@ -968,12 +1004,14 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawLine(items, style, layer, {
             styleOf: options?.styleOf as StyleOf<Line, LineDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Line> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "line", items, layer, {
                 style,
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1000,11 +1038,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawCircle(items, layer, {
             styleOf: options?.styleOf as StyleOf<Circle, ShapeDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Circle> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "circle", items, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1046,6 +1086,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawText(items, layer, {
             styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Text> | undefined,
+            clip: options?.clip,
         });
         this.trackDrawId(options?.id, handle);
         return handle;
@@ -1089,11 +1130,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         const handle = this.renderer.getDrawAPI().drawPath(list, layer, {
             styleOf: options?.styleOf as StyleOf<PathItem, PathDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<PathItem> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "path", list, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1125,6 +1168,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
             this.hitTester.register(handle, "image", items, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
+                clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
@@ -1133,7 +1177,8 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
 
     /**
      * Draw grid lines at specified cell size.
-     * @param cellSize Size of each grid cell in world units.
+     * @param cellSize Positive finite size of each grid cell in world units.
+     * @throws {RangeError} If cellSize is not a positive finite number.
      * @param options Optional `id`: re-registering with the same id replaces
      * the previous registration instead of accumulating alongside it.
      * @example
@@ -1148,8 +1193,13 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         layer: number = 0,
         options?: DrawOptions,
     ): DrawHandle {
+        if (!Number.isFinite(cellSize) || cellSize <= 0) {
+            throw new RangeError("[CanvasTileEngine] cellSize must be a positive finite number");
+        }
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawGridLines(cellSize, { lineWidth, strokeStyle }, layer);
+        const handle = this.renderer
+            .getDrawAPI()
+            .drawGridLines(cellSize, { lineWidth, strokeStyle }, layer, { clip: options?.clip });
         this.trackDrawId(options?.id, handle);
         return handle;
     }
@@ -1180,7 +1230,7 @@ export class CanvasTileEngine<TMount = HTMLDivElement, TImage = HTMLImageElement
         options?: DrawOptions,
     ): DrawHandle {
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().addDrawFunction(fn, layer);
+        const handle = this.renderer.getDrawAPI().addDrawFunction(fn, layer, { clip: options?.clip });
         this.trackDrawId(options?.id, handle);
         return handle;
     }

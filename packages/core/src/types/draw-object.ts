@@ -1,4 +1,5 @@
 import { Coords, LineStyle } from ".";
+import type { DefaultImage } from "./platform";
 
 /** One color stop of a gradient ramp. `offset` is `0..1` along the axis. */
 export type ColorStop = {
@@ -97,6 +98,22 @@ export type Rect<TData = unknown> = DrawObject<TData> & {
     width?: number;
     /** Height in world units. Defaults to `size`. */
     height?: number;
+    /**
+     * Fixed size in screen pixels for both axes, independent of zoom — the
+     * Rect counterpart of {@link Circle.sizePx} and Text's `fontPx`. Takes
+     * precedence over {@link DrawObject.size} and {@link width}/{@link height},
+     * and is itself overridden per axis by {@link widthPx}/{@link heightPx}.
+     * Ignored by `drawStaticRect`: static caches replay at their recorded
+     * scale, so pixel sizing cannot hold there.
+     */
+    sizePx?: number;
+    /**
+     * Fixed width in screen pixels. Wins over {@link sizePx} and
+     * {@link width}. Same static-cache caveat as {@link sizePx}.
+     */
+    widthPx?: number;
+    /** Fixed height in screen pixels. See {@link widthPx}. */
+    heightPx?: number;
 };
 
 export type Circle<TData = unknown> = Omit<DrawObject<TData>, "rotate" | "radius"> & {
@@ -124,6 +141,15 @@ export type TextAlign = "center" | "end" | "left" | "right" | "start";
 export type TextBaseline = "alphabetic" | "bottom" | "hanging" | "ideographic" | "middle" | "top";
 
 /**
+ * Font weight. The portable intersection of the platforms: Canvas2D's font
+ * shorthand also accepts the relative `bolder`/`lighter`, which Skia has no
+ * equivalent for, so they are left out rather than silently ignored on
+ * native. Declared locally for the same platform-agnostic reason as
+ * {@link TextAlign}.
+ */
+export type FontWeight = "normal" | "bold" | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
+
+/**
  * A source rectangle inside a spritesheet image, in sheet pixels.
  * Used to draw a sub-region (frame) of a larger image.
  */
@@ -136,9 +162,10 @@ export type SpriteRect = {
 
 /**
  * An image to draw. `TImage` is the platform-specific image handle and defaults
- * to `HTMLImageElement` (DOM); other renderers parameterize it (e.g. `SkImage`).
+ * to `HTMLImageElement` when DOM types are available, or `unknown` otherwise.
+ * Other renderers parameterize it (e.g. `SkImage` or the server's `Image`).
  */
-export type ImageItem<TImage = HTMLImageElement, TData = unknown> = Omit<DrawObject<TData>, "style" | "radius"> & {
+export type ImageItem<TImage = DefaultImage, TData = unknown> = Omit<DrawObject<TData>, "style" | "radius"> & {
     img: TImage;
     /**
      * Source rectangle in sheet pixels. When set, only this sub-region of
@@ -185,6 +212,8 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size" | 
         fillStyle?: string;
         /** Font family (default: "sans-serif") */
         fontFamily?: string;
+        /** Font weight (default: the family's normal weight). */
+        fontWeight?: FontWeight;
         textAlign?: TextAlign;
         textBaseline?: TextBaseline;
     };

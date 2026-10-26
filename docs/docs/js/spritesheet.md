@@ -121,6 +121,8 @@ Because the callback just mutates the item and re-renders, animation works ident
 | `isRunning()`                   | Whether the loop is currently scheduled.                                 |
 | `frameAt(elapsedMs)`            | Pure timing math — the frame for a given elapsed time (useful in tests). |
 
+Frame callbacks may call `stop()` or `start()` safely, including during the immediate first frame. This cancels the old run's remaining frames and `onComplete`; a replacement run keeps its own scheduling. `onComplete` may also start a new run.
+
 ```typescript
 // One-shot animation (e.g. an explosion)
 const boom = new SpriteAnimator({ frames: explosionFrames, fps: 12, loop: false });

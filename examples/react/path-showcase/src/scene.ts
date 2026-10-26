@@ -291,7 +291,7 @@ const ACROSS_THE_SCENE = {
 export const gradientRects: Rect<ShapeData>[] = [
     {
         x: 2,
-        y: 8.5,
+        y: 25,
         width: 4,
         height: 3,
         style: { fillStyle: RAMP },
@@ -299,7 +299,7 @@ export const gradientRects: Rect<ShapeData>[] = [
     },
     {
         x: 7.5,
-        y: 8.5,
+        y: 25,
         width: 4,
         height: 3,
         style: { fillStyle: DIAGONAL },
@@ -307,7 +307,7 @@ export const gradientRects: Rect<ShapeData>[] = [
     },
     {
         x: 13,
-        y: 8.5,
+        y: 25,
         size: 3,
         rotate: 30,
         radius: 0.4,
@@ -317,7 +317,7 @@ export const gradientRects: Rect<ShapeData>[] = [
     // Two neighbours sharing one world-unit ramp: each shows its own slice
     {
         x: 21.5,
-        y: 8.5,
+        y: 25,
         width: 3,
         height: 3,
         style: { fillStyle: ACROSS_THE_SCENE },
@@ -325,7 +325,7 @@ export const gradientRects: Rect<ShapeData>[] = [
     },
     {
         x: 25.5,
-        y: 8.5,
+        y: 25,
         width: 3,
         height: 3,
         style: { fillStyle: ACROSS_THE_SCENE },
@@ -336,7 +336,7 @@ export const gradientRects: Rect<ShapeData>[] = [
 export const gradientCircles: Circle<ShapeData>[] = [
     {
         x: 17.5,
-        y: 8.5,
+        y: 25,
         size: 3,
         style: { fillStyle: RAMP },
         data: { name: "Circles fill the same way" },
@@ -346,13 +346,50 @@ export const gradientCircles: Circle<ShapeData>[] = [
 export const gradientPaths: PathItem<ShapeData>[] = [
     {
         points: [
-            { x: 29.5, y: 10 },
-            { x: 32, y: 7 },
-            { x: 34.5, y: 10 },
+            { x: 29.5, y: 26.5 },
+            { x: 32, y: 23.5 },
+            { x: 34.5, y: 26.5 },
         ],
         closed: true,
         style: { fillStyle: RAMP, strokeStyle: "#0f172a", lineWidthPx: 2 },
         data: { name: "Path fill — box units span the path's bounding box" },
+    },
+];
+
+/**
+ * Clipping. Every draw registration accepts a `clip`: a world rectangle it is
+ * confined to, both for painting and for hit testing.
+ *
+ * The field below deliberately overflows the window on all four sides — it
+ * would otherwise run into the commands row underneath — so the cut is the
+ * visible part. Because the rectangle is world space it pans and zooms with
+ * the scene: drag the map and the window stays over the same cells rather
+ * than sliding across the viewport.
+ */
+export const CLIP_WINDOW = { minX: 2.5, maxX: 12.5, minY: 6.4, maxY: 10.4 };
+
+/** Overflows CLIP_WINDOW on every side; only the middle survives. */
+export const clippedField: Circle<ShapeData>[] = Array.from({ length: 16 * 7 }, (_, i) => {
+    const x = (i % 16) + 1;
+    const y = Math.floor(i / 16) + 5;
+    return {
+        x,
+        y,
+        size: 0.7,
+        style: { fillStyle: `hsl(${(x * 14 + y * 20) % 360} 70% 62%)` },
+        data: { name: `Clipped dot (${x}, ${y}) — outside the window it neither paints nor hit-tests` },
+    };
+});
+
+/** Drawn unclipped, so it frames the window the field is cut to. */
+export const clipFrame: Rect<ShapeData>[] = [
+    {
+        x: (CLIP_WINDOW.minX + CLIP_WINDOW.maxX) / 2,
+        y: (CLIP_WINDOW.minY + CLIP_WINDOW.maxY) / 2,
+        width: CLIP_WINDOW.maxX - CLIP_WINDOW.minX,
+        height: CLIP_WINDOW.maxY - CLIP_WINDOW.minY,
+        style: { strokeStyle: "#64748b", lineWidthPx: 2, lineDashPx: [6, 4] },
+        data: { name: "The clip window itself — drawn unclipped, and hitTest={false}" },
     },
 ];
 
@@ -379,8 +416,8 @@ export const labelItems: Text[] = [
     },
     {
         x: 1.2,
-        y: 6.6,
-        text: "gradient fills",
+        y: 5.6,
+        text: "clipped to a window",
         fontPx: 13,
         style: { fillStyle: "#94a3b8", textAlign: "left" },
     },
@@ -388,6 +425,13 @@ export const labelItems: Text[] = [
         x: 1.2,
         y: 10.8,
         text: "commands form",
+        fontPx: 13,
+        style: { fillStyle: "#94a3b8", textAlign: "left" },
+    },
+    {
+        x: 1.2,
+        y: 22.8,
+        text: "gradient fills",
         fontPx: 13,
         style: { fillStyle: "#94a3b8", textAlign: "left" },
     },

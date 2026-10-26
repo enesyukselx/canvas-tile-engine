@@ -61,7 +61,24 @@ export type CanvasTileEngineConfig = {
         maxWidth?: number;
         maxHeight?: number;
     };
-    responsive?: "preserve-scale" | "preserve-viewport" | false;
+    /**
+     * Hand canvas sizing to the wrapper element (browser renderers only).
+     * `engine.resize()` and `eventHandlers.resize` are ignored while any mode
+     * is active — style the wrapper with CSS instead.
+     *
+     * - `"preserve-scale"`: width follows the container, height stays at
+     *   `size.height`. The visible world area grows with the container.
+     * - `"preserve-viewport"`: width follows the container and the scale
+     *   changes to keep the configured tile count visible; height is derived
+     *   from the configured width/height ratio.
+     * - `"fill"`: both axes follow the container and the scale stays fixed —
+     *   the mode for a canvas that must fill a panel, grid cell, or split
+     *   pane. The container needs a definite height (a flex/grid child also
+     *   needs `min-height: 0`), because the wrapper's own content height is
+     *   zero.
+     * - `false`: fixed `size` until `engine.resize()` or `eventHandlers.resize`.
+     */
+    responsive?: "preserve-scale" | "preserve-viewport" | "fill" | false;
     eventHandlers?: EventHandlers;
     bounds?: {
         minX: number;

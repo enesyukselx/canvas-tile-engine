@@ -23,6 +23,8 @@ const config = {
 
 `zoom: true` is shorthand for `"pointer"`. Use `zoom: "center"` when wheel and pinch gestures should zoom around the viewport center instead of the cursor or pinch midpoint.
 
+In pointer mode, moving both fingers while pinching keeps the same world point beneath their midpoint, unless camera bounds constrain the result. Midpoint movement still pans at `minScale` or `maxScale`. Center mode ignores midpoint movement and keeps the viewport center anchored.
+
 ## Event Handlers
 
 Assign callbacks directly on the engine instance.
@@ -83,6 +85,19 @@ browsers these fire for the **primary (left) button only** — right clicks go
 through `onRightClick`, and the middle button is left to the browser. Touch
 input also feeds them (touch start/end).
 
+For the Canvas2D and WebGL renderers, a primary-button press started on the
+canvas is tracked until release, even outside the canvas. Camera dragging
+continues outside and `onMouseUp` reports the release position in the same
+coordinate spaces (canvas-relative coordinates can be outside its bounds).
+Ordinary hover remains local to the canvas.
+
+Browser interruption (`touchcancel`, window blur, or a lost mouse release)
+and renderer teardown clear drag/pinch state without firing `onClick`.
+An active press is released once through `onMouseUp`, using the last known
+pointer position when no release position is available. For a cancelled
+multi-touch gesture, remaining contacts are ignored until a fresh gesture.
+Touches that started on other elements do not participate in the canvas gesture.
+
 ```ts
 let selecting = false;
 let selectionStart = { x: 0, y: 0 };
@@ -102,6 +117,9 @@ engine.onMouseUp = (coords) => {
 ### `onMouseLeave`
 
 Triggered when the pointer leaves the canvas. Use it to clear transient UI state.
+
+On the browser renderers, this notification does not end an active camera
+drag: dragging continues until release or cancellation, including after re-entry.
 
 ```ts
 engine.onMouseLeave = () => {
@@ -126,7 +144,7 @@ engine.onCoordsChange = (center) => {
 
 ### `onZoom`
 
-Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping the current scale into a new range.
+Fires when the scale changes through wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping the current scale into a new range. A gesture that leaves the scale untouched — scrolling on at `minScale`/`maxScale`, or a pinch that holds the finger distance — does not fire it, so non-idempotent handlers (state updates, analytics, tile-level fetches) run once per real zoom step. Use `onWheel` to observe the gesture itself.
 
 ```ts
 engine.onZoom = (scale) => {

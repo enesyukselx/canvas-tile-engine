@@ -14,6 +14,7 @@ import {
 } from "./callback";
 import { Circle, DrawObject, ImageItem, Line, PathItem, PathStyle, Rect, Text } from "./draw-object";
 import { CanvasTileEngineConfig } from "./config";
+import type { DefaultImage, DefaultMount } from "./platform";
 
 export type Coords = {
     x: number;
@@ -120,11 +121,11 @@ export interface ViewportBounds {
  * Dependencies injected into a renderer's `init`.
  *
  * `TMount` is the platform-specific mount target the engine is constructed with.
- * It defaults to `HTMLDivElement` so existing DOM renderers stay source- and
- * type-compatible; non-DOM renderers (e.g. React Native / Skia) parameterize it
- * with their own mount type.
+ * It defaults to `HTMLDivElement` when the consumer includes DOM types, or
+ * `unknown` otherwise. Non-DOM renderers (e.g. Node / Skia) parameterize it
+ * with their own mount type, inferred from the renderer by the engine.
  */
-export interface RendererDependencies<TMount = HTMLDivElement> {
+export interface RendererDependencies<TMount = DefaultMount> {
     wrapper: TMount;
     camera: ICamera;
     viewport: ViewportState;
@@ -132,7 +133,7 @@ export interface RendererDependencies<TMount = HTMLDivElement> {
     transformer: CoordinateTransformer;
 }
 
-export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
+export interface IRenderer<TMount = DefaultMount, TImage = DefaultImage> {
     // ─── Lifecycle ───
     init(deps: RendererDependencies<TMount>): void;
     render(): void;
@@ -170,10 +171,11 @@ export interface IRenderer<TMount = HTMLDivElement, TImage = HTMLImageElement> {
     onDraw?: onDrawCallback;
 }
 
-export interface IDrawAPI<TImage = HTMLImageElement> {
+export interface IDrawAPI<TImage = DefaultImage> {
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
+        options?: RendererClipOptions,
     ): DrawHandle;
     drawRect(
         items: Rect | Rect[],
@@ -209,10 +211,21 @@ export interface IDrawAPI<TImage = HTMLImageElement> {
         layer?: number,
         options?: RendererDrawOptions<PathItem, PathDecorationStyle>,
     ): DrawHandle;
-    drawGridLines(cellSize: number, style: { lineWidth: number; strokeStyle: string }, layer?: number): DrawHandle;
-    drawStaticRect(items: Rect[], cacheKey: string, layer?: number): DrawHandle;
-    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number): DrawHandle;
-    drawStaticImage(items: ImageItem<TImage>[], cacheKey: string, layer?: number): DrawHandle;
+    /** Register a grid with a positive finite cellSize; otherwise throw RangeError synchronously. */
+    drawGridLines(
+        cellSize: number,
+        style: { lineWidth: number; strokeStyle: string },
+        layer?: number,
+        options?: RendererClipOptions,
+    ): DrawHandle;
+    drawStaticRect(items: Rect[], cacheKey: string, layer?: number, options?: RendererClipOptions): DrawHandle;
+    drawStaticCircle(items: Circle[], cacheKey: string, layer?: number, options?: RendererClipOptions): DrawHandle;
+    drawStaticImage(
+        items: ImageItem<TImage>[],
+        cacheKey: string,
+        layer?: number,
+        options?: RendererClipOptions,
+    ): DrawHandle;
     removeDrawHandle(handle: DrawHandle): void;
     clearLayer(layer: number): void;
     clearAll(): void;
@@ -263,16 +276,27 @@ export type InteractiveOf<TItem> = (item: TItem) => boolean | undefined;
  * concerns (`id`) and hit-test concerns (`interactiveOf`) are resolved in
  * the engine.
  */
-export interface RendererDrawOptions<TItem, TStyle> {
+export interface RendererDrawOptions<TItem, TStyle> extends RendererClipOptions {
     styleOf?: StyleOf<TItem, TStyle>;
     visibleOf?: VisibleOf<TItem>;
+}
+
+/**
+ * The clip a renderer receives for any registration, including the kinds that
+ * take no other paint-time options (grid lines, statics, custom draw
+ * functions). Renderers apply it through their layer manager rather than
+ * per primitive.
+ */
+export interface RendererClipOptions {
+    /** World rectangle to confine the registration to; see {@link DrawOptions.clip}. */
+    clip?: Bounds;
 }
 
 /**
  * Paint-time options for `drawImage` — images carry no `style`, so only
  * `visibleOf` reaches renderers.
  */
-export interface RendererImageDrawOptions<TImage> {
+export interface RendererImageDrawOptions<TImage> extends RendererClipOptions {
     visibleOf?: VisibleOf<ImageItem<TImage>>;
 }
 
@@ -321,15 +345,30 @@ export interface DrawOptions {
      * regardless of this flag.
      */
     hitTest?: boolean;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside, and nothing outside hit-tests either.
+     *
+     * The rectangle is world (item) space, so it pans and zooms with the rest
+     * of the scene — the same coordinates `fitBounds` and `hitTestRect` take.
+     * That is the plot-area of a chart, the frame of a minimap inset, or any
+     * "this layer belongs inside that box" region.
+     *
+     * Axis-aligned rectangles only. Arbitrary shapes would need a stencil
+     * pass on WebGL, where the stencil buffer already belongs to path fills.
+     */
+    clip?: Bounds;
 }
 
 /** Options for the static draw helpers (`drawStaticRect`, ...). Their
  * `cacheKey` already plays the registration-id role, so only the hit-test
- * opt-out applies. */
+ * opt-out and the clip apply. */
 export interface StaticDrawOptions {
     /** Set to `false` to keep this registration out of hit testing; see
      * {@link DrawOptions.hitTest}. */
     hitTest?: boolean;
+    /** Confine the registration to a world rectangle; see {@link DrawOptions.clip}. */
+    clip?: Bounds;
 }
 
 /** Options for {@link CanvasTileEngine.drawRect}. */
@@ -404,7 +443,7 @@ export interface PathDrawOptions<TData = unknown> extends DrawOptions {
  * Platform-agnostic image loader interface.
  * Each renderer implements this with platform-specific image handling.
  */
-export interface IImageLoader<TImage = HTMLImageElement> {
+export interface IImageLoader<TImage = DefaultImage> {
     /**
      * Load an image from URL, with caching.
      * @param src Image URL.
@@ -441,7 +480,8 @@ export interface ICamera {
 
     pan(dx: number, dy: number): void;
     zoom(screenX: number, screenY: number, deltaY: number, bounds: ViewportBounds): void;
-    zoomByFactor(factor: number, centerX: number, centerY: number): void;
+    /** Zoom around a screen point, optionally moving it to targetX/targetY in the same transform. */
+    zoomByFactor(factor: number, centerX: number, centerY: number, targetX?: number, targetY?: number): void;
     setScale(scale: number): void;
     setScaleLimits(minScale: number, maxScale: number): void;
     setCenter(center: Coords, viewportWidth: number, viewportHeight: number): void;

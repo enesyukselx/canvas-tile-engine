@@ -36,6 +36,7 @@ export interface Canvas2DContextLike<TDrawable = never> extends CommandTraceTarg
     /** Optional: callers guard, falling back to `rect` (older environments). */
     roundRect?(x: number, y: number, w: number, h: number, radii?: number | number[]): void;
     fill(fillRule?: "nonzero" | "evenodd"): void;
+    clip(fillRule?: "nonzero" | "evenodd"): void;
     stroke(): void;
     setLineDash(segments: number[]): void;
     translate(x: number, y: number): void;
@@ -44,6 +45,22 @@ export interface Canvas2DContextLike<TDrawable = never> extends CommandTraceTarg
     fillRect(x: number, y: number, w: number, h: number): void;
     fillText(text: string, x: number, y: number): void;
     createLinearGradient(x0: number, y0: number, x1: number, y1: number): CanvasGradientLike;
+    /** Older/minimal adapters can omit ink metrics; text then remains uncullable. */
+    measureText?(text: string): {
+        actualBoundingBoxLeft?: number;
+        actualBoundingBoxRight?: number;
+        actualBoundingBoxAscent?: number;
+        actualBoundingBoxDescent?: number;
+    };
+    readonly direction?: string;
+    readonly letterSpacing?: string;
+    readonly wordSpacing?: string;
+    readonly fontKerning?: string;
+    readonly fontStretch?: string;
+    readonly fontVariantCaps?: string;
+    readonly textRendering?: string;
+    /** Used only to observe an owning browser document's font loading events. */
+    readonly canvas?: object;
     drawImage(image: TDrawable, dx: number, dy: number, dw: number, dh: number): void;
     drawImage(
         image: TDrawable,

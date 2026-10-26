@@ -62,6 +62,26 @@ void main() {
  * Radius packing (local space is y-down): x = bottom-right, y = top-right,
  * z = bottom-left, w = top-left.
  */
+const ROUND_BOX_DISTANCE = `
+float cornerDistance(vec2 fromCorner, float radius, float dist) {
+    if (fromCorner.x < radius && fromCorner.y < radius) {
+        return max(dist, length(fromCorner - vec2(radius)) - radius);
+    }
+    return dist;
+}
+
+float sdRoundBox(vec2 p, vec2 b, vec4 r) {
+    vec2 q = abs(p) - b;
+    float dist = min(max(q.x, q.y), 0.0) + length(max(q, 0.0));
+    // Test each corner's actual arc region. A valid asymmetric radius can
+    // cross either center axis, so choosing by quadrant would clip the arc.
+    dist = cornerDistance(b - p, r.x, dist);
+    dist = cornerDistance(vec2(b.x - p.x, b.y + p.y), r.y, dist);
+    dist = cornerDistance(vec2(b.x + p.x, b.y - p.y), r.z, dist);
+    return cornerDistance(b + p, r.w, dist);
+}
+`;
+
 const SHAPE_FRAGMENT_BODY = `
 precision mediump float;
 
@@ -75,16 +95,10 @@ varying float v_gradRow;
 uniform sampler2D u_ramp;
 uniform float u_rampRows;
 
-float sdRoundBox(vec2 p, vec2 b, vec4 r) {
-    vec2 rr = (p.x > 0.0) ? r.xy : r.zw;
-    float cr = (p.y > 0.0) ? rr.x : rr.y;
-    vec2 q = abs(p) - b + cr;
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - cr;
-}
+${ROUND_BOX_DISTANCE}
 
 void main() {
-    vec4 r = min(v_radius, vec4(min(v_halfSize.x, v_halfSize.y)));
-    float dist = sdRoundBox(v_local, v_halfSize, r);
+    float dist = sdRoundBox(v_local, v_halfSize, v_radius);
     float alpha = EDGE_ALPHA;
     if (alpha <= 0.0) discard;
     vec4 base = v_color;
@@ -167,16 +181,10 @@ uniform float u_rampRows;
 
 out vec4 outColor;
 
-float sdRoundBox(vec2 p, vec2 b, vec4 r) {
-    vec2 rr = (p.x > 0.0) ? r.xy : r.zw;
-    float cr = (p.y > 0.0) ? rr.x : rr.y;
-    vec2 q = abs(p) - b + cr;
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - cr;
-}
+${ROUND_BOX_DISTANCE}
 
 void main() {
-    vec4 r = min(v_radius, vec4(min(v_halfSize.x, v_halfSize.y)));
-    float dist = sdRoundBox(v_local, v_halfSize, r);
+    float dist = sdRoundBox(v_local, v_halfSize, v_radius);
     float alpha = 1.0 - smoothstep(-fwidth(dist), fwidth(dist), dist);
     if (alpha <= 0.0) discard;
     vec4 base = v_color;

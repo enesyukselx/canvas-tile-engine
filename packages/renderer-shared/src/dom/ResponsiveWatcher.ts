@@ -3,9 +3,10 @@ import { Config, ICamera, ViewportState } from "@canvas-tile-engine/core";
 /**
  * Watches wrapper element size changes and handles responsive resizing.
  * Resizes every managed canvas (renderers with an overlay pass both).
- * Supports two modes:
- * - "preserve-scale": Scale stays constant, visible tile count changes
+ * Supports three modes:
+ * - "preserve-scale": Scale stays constant, visible tile count changes (width only)
  * - "preserve-viewport": Visible tile count stays constant, scale changes
+ * - "fill": Like "preserve-scale", but the height follows the container too
  * @internal
  */
 export class ResponsiveWatcher {
@@ -16,14 +17,14 @@ export class ResponsiveWatcher {
     /** Initial visible tiles (used for preserve-viewport mode) */
     private initialVisibleTiles: { x: number; y: number };
 
-    /** Minimum scale limit relative to the base scale (preserve-viewport mode) */
-    private minScaleRatio: number;
-
     /** Callback fired after responsive resize */
     public onResize?: () => void;
 
     /** Callback fired when a responsive resize changes the camera scale (preserve-viewport) */
     public onScaleChange?: (scale: number) => void;
+
+    /** Whether applySize has run at least once (see the ResizeObserver dedupe below) */
+    private sizedOnce = false;
 
     constructor(
         private wrapper: HTMLDivElement,
@@ -41,11 +42,6 @@ export class ResponsiveWatcher {
             x: cfg.size.width / cfg.scale,
             y: cfg.size.height / cfg.scale,
         };
-
-        // The zoom-out limit is a view intent ("don't zoom out past the base
-        // view"), so it is kept as a factor of the base scale. The zoom-in
-        // limit is a px-per-tile quality cap and stays absolute.
-        this.minScaleRatio = cfg.minScale / cfg.scale;
     }
 
     start() {
@@ -63,6 +59,11 @@ export class ResponsiveWatcher {
             // Width follows the container; scale limits adapt in applySize,
             // so no CSS min/max width is needed to protect them
             this.wrapper.style.width = "100%";
+        } else if (responsiveMode === "fill") {
+            // Both axes follow the container: the host element owns the box
+            // and config.size only seeds the first frame
+            this.wrapper.style.width = "100%";
+            this.wrapper.style.height = "100%";
         } else {
             // preserve-scale: width is responsive, height stays at initial config value
             const cfg = this.config.get();
@@ -75,8 +76,30 @@ export class ResponsiveWatcher {
         const initialWidth = Math.round(wrapperRect.width);
         const initialHeight = Math.round(wrapperRect.height);
 
-        // Apply initial size
-        this.applySize(initialWidth, initialHeight, responsiveMode);
+        // A `height: 100%` wrapper collapses when its container has no definite
+        // height — the canvas is absolutely positioned, so the wrapper has no
+        // content height of its own. The ResizeObserver below then skips every
+        // zero-sized entry and the canvas silently stays blank, so say so once.
+        if (responsiveMode === "fill" && initialHeight <= 0) {
+            console.warn(
+                'Canvas Tile Engine: responsive "fill" measured a zero-height container. ' +
+                    "Give the wrapper's parent a definite height (a flex/grid child also needs " +
+                    "min-height: 0), otherwise the canvas cannot be sized.",
+            );
+        }
+
+        // A wrapper measuring zero (hidden tab, collapsed accordion,
+        // not-yet-opened modal, flex parent on first paint) must not reach
+        // applySize: the derived scale collapses to 0 and setCenter then
+        // divides by it, permanently NaN-ing the camera. preserve-viewport
+        // derives the height from the width and is itself what assigns the
+        // wrapper a height, so a zero height there is the normal first
+        // measurement, not a hidden mount — only the width may be required.
+        const hasInitialSize =
+            responsiveMode === "preserve-viewport" ? initialWidth > 0 : initialWidth > 0 && initialHeight > 0;
+        if (hasInitialSize) {
+            this.applySize(initialWidth, initialHeight, responsiveMode);
+        }
 
         // Setup ResizeObserver to watch wrapper
         this.resizeObserver = new ResizeObserver((entries) => {
@@ -85,12 +108,19 @@ export class ResponsiveWatcher {
                 const width = Math.round(rawW);
                 const height = Math.round(rawH);
 
-                if (width <= 0 || height <= 0) {
+                // Same mode-aware zero check as the initial sizing above:
+                // preserve-viewport can legitimately report a zero height
+                // (the wrapper has none until applySize assigns one).
+                if (width <= 0 || (responsiveMode !== "preserve-viewport" && height <= 0)) {
                     continue;
                 }
 
                 const prev = this.viewport.getSize();
-                if (width === prev.width && height === prev.height) {
+                // Only dedupe once sizing has actually applied at least once:
+                // before that, a wrapper that happens to already match the
+                // configured size (e.g. it starts equal to viewport's initial
+                // size) must not be treated as "already sized".
+                if (this.sizedOnce && width === prev.width && height === prev.height) {
                     continue;
                 }
 
@@ -118,7 +148,23 @@ export class ResponsiveWatcher {
         }
     }
 
-    private applySize(width: number, height: number, mode: "preserve-scale" | "preserve-viewport") {
+    /**
+     * `"fill"` shares the `"preserve-scale"` branch below deliberately: keeping
+     * the scale and re-anchoring the camera is the same work on both axes as on
+     * one. The modes differ only in what `start()` lets the wrapper's height do.
+     */
+    private applySize(width: number, height: number, mode: "preserve-scale" | "preserve-viewport" | "fill") {
+        // Defensive: a zero-size call must never reach the camera math below
+        // (the derived scale would collapse to 0 and setCenter divides by it,
+        // permanently NaN-ing the camera). Callers already guard this; this is
+        // a backstop. preserve-viewport recomputes the height from the width,
+        // so only a zero width is degenerate there.
+        if (width <= 0 || (mode !== "preserve-viewport" && height <= 0)) {
+            return;
+        }
+
+        this.sizedOnce = true;
+
         const dpr = this.viewport.dpr;
         const prev = this.viewport.getSize();
         const prevScale = this.camera.scale;
@@ -142,12 +188,19 @@ export class ResponsiveWatcher {
             this.viewport.setSize(width, height);
 
             // Rescale the zoom-out limit with the base scale so it keeps its
-            // meaning at every container width; keep the zoom-in limit at its
-            // configured px value, only lifting it when the base scale itself
-            // exceeds it, so the camera never lands outside gesture-reachable
-            // limits
-            const maxScale = Math.max(this.config.get().maxScale, newScale);
-            this.camera.setScaleLimits(newScale * this.minScaleRatio, maxScale);
+            // meaning at every container width. The zoom-in limit stays at
+            // its configured px value unless the adapted range requires more.
+            // Read authored limits afresh so setScaleLimits takes effect on
+            // future resizes too. Config retains the original scale/size;
+            // feeding live camera limits back here would accumulate ratios.
+            const cfg = this.config.get();
+            // This is equivalent to newScale * (min / baseScale), without
+            // overflowing min / baseScale for large runtime replacements.
+            const minScale = cfg.minScale * (width / cfg.size.width);
+            // Runtime limits can put the minimum above the original base
+            // scale. Keep the resulting range ordered even in that case.
+            const maxScale = Math.max(cfg.maxScale, newScale, minScale);
+            this.camera.setScaleLimits(minScale, maxScale);
             this.camera.setScale(newScale);
 
             // Restore center after scale change (must use new dimensions)

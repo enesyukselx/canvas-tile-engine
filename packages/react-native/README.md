@@ -129,6 +129,7 @@ Everything else - hook handle, draw components, layers, culling, camera math, co
 - `config`, `center`, and `renderer` are read when the native engine is created. Remount with a new `key` to apply a new full config or renderer.
 - Use `engine.setEventHandlers`, `engine.setBounds`, `engine.setCenter`, `engine.goCenter`, `engine.setScale`, `zoomIn`, and `zoomOut` for runtime changes.
 - `onDraw` and `DrawFunction` receive a Skia `SkCanvas`.
+- A one-finger `onMouseDown` is paired with one `onMouseUp` when all fingers lift, even if multitouch suppresses the click. Cancellation or unmount instead sends `onMouseLeave` at the pressed finger's last known position. Drawing/selection tools should end their active press in either callback.
 - Static draw helpers record and replay Skia pictures, which is useful for thousands of non-changing items.
 
 ## Documentation

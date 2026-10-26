@@ -1,6 +1,6 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
-import type { Text as TextType, TextDecorationStyle, StyleOf, VisibleOf } from "@canvas-tile-engine/core";
+import type { Bounds, Text as TextType, TextDecorationStyle, StyleOf, VisibleOf } from "@canvas-tile-engine/core";
 
 export interface TextProps {
     /**
@@ -28,6 +28,12 @@ export interface TextProps {
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     visibleOf?: VisibleOf<TextType<any>>;
+    /**
+     * Confine this registration to a world rectangle: nothing it draws paints
+     * outside it, and nothing outside it hit-tests. Compared by value, so an
+     * inline object literal does not re-register on every render.
+     */
+    clip?: Bounds;
 }
 
 /**
@@ -45,8 +51,12 @@ export interface TextProps {
  * />
  * ```
  */
-export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf }: TextProps) {
+export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf, clip }: TextProps) {
     const { engine, requestRender } = useEngineContext();
+
+    // Value-compared so an inline clip literal does not re-register the
+    // draw call on every render.
+    const clipKey = clip ? `${clip.minX},${clip.maxX},${clip.minY},${clip.maxY}` : "";
 
     // Read through refs so callback identity changes never re-register.
     const styleOfRef = useRef(styleOf);
@@ -64,6 +74,7 @@ export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf }:
         const handle = engine.drawText(items, layer, {
             styleOf: (item) => styleOfRef.current?.(item),
             visibleOf: (item) => visibleOfRef.current?.(item),
+            clip,
         });
         requestRender();
         return () => {
@@ -74,7 +85,7 @@ export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf }:
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender]);
+    }, [engine, items, layer, requestRender, clipKey]);
 
     return null;
 });

@@ -3,6 +3,9 @@ import { CanvasTileEngine, useCanvasTileEngine, type CanvasTileEngineConfig } fr
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 import {
+    clipFrame,
+    clippedField,
+    CLIP_WINDOW,
     gradientCircles,
     gradientPaths,
     gradientRects,
@@ -71,6 +74,9 @@ export default function App() {
                 <CanvasTileEngine.Rect items={gradientRects} layer={1} />
                 <CanvasTileEngine.Circle items={gradientCircles} layer={1} />
                 <CanvasTileEngine.Path items={gradientPaths} layer={1} />
+                <CanvasTileEngine.Circle items={clippedField} layer={1} clip={CLIP_WINDOW} />
+                {/* Decorative: its box would otherwise swallow clicks meant for the dots */}
+                <CanvasTileEngine.Rect items={clipFrame} layer={2} hitTest={false} />
                 <CanvasTileEngine.Line
                     items={lineItems}
                     style={{

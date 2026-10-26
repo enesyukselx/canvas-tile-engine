@@ -156,7 +156,7 @@ Use `coords.snapped` for map logic and `client.raw` for DOM popovers.
 | Prop             | Description                                                                                                                                   |
 | :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
 | `onCoordsChange` | Fires after pan, zoom, animated moves, bounds clamping, and resize-centered camera changes.                                                   |
-| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping changes the scale.                         |
+| `onZoom`         | Fires after wheel, pinch, `setScale`, `goScale`, `zoomIn`, `zoomOut`, or `setScaleLimits` clamping changes the scale. Silent when the scale is clamped at a limit. |
 | `onWheel`        | Fires for wheel/pinch zoom gestures with the standard coordinate payload plus `{ deltaY, direction, source }`. Requires `eventHandlers.zoom`. |
 | `onResize`       | Fires after manual or observed resize.                                                                                                        |
 
