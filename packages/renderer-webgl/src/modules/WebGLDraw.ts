@@ -61,9 +61,9 @@ const CIRCLE_STROKE_SEGMENTS = 48;
  * WebGL implementation of the engine draw API.
  *
  * Mirrors the Canvas2D `CanvasDraw` (culling, spatial indexing, origin handling,
- * rotation), but instead of issuing immediate Canvas2D calls it accumulates GPU
- * primitives per layer and flushes each as a single batched draw call. Text and
- * raw draw functions are delegated to the 2D overlay context.
+ * rotation), but instead of issuing immediate Canvas2D calls it batches
+ * consecutive compatible GPU primitives without reordering fills and strokes.
+ * Text and raw draw functions are delegated to the 2D overlay context.
  * @internal
  */
 /**
@@ -125,8 +125,8 @@ export class WebGLDraw {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
-            const shapes: ShapeInstance[] = [];
-            const lines: LineInstance[] = [];
+            let shapes: ShapeInstance[] = [];
+            let lines: LineInstance[] = [];
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -156,6 +156,12 @@ export class WebGLDraw {
                 }
 
                 if (style?.fillStyle && pxW > 0 && pxH > 0) {
+                    // A later fill must cover earlier strokes. Only adjacent
+                    // paints using the same GPU pipeline can share a batch.
+                    if (lines.length > 0) {
+                        gl.drawLines(lines);
+                        lines = [];
+                    }
                     shapes.push({
                         cx,
                         cy,
@@ -168,6 +174,10 @@ export class WebGLDraw {
                 }
 
                 if (style?.strokeStyle) {
+                    if (shapes.length > 0) {
+                        gl.drawShapes(shapes);
+                        shapes = [];
+                    }
                     this.pushRectStroke(
                         lines,
                         cx,
@@ -208,8 +218,8 @@ export class WebGLDraw {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
-            const shapes: ShapeInstance[] = [];
-            const lines: LineInstance[] = [];
+            let shapes: ShapeInstance[] = [];
+            let lines: LineInstance[] = [];
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -233,6 +243,12 @@ export class WebGLDraw {
                 const cy = drawY + radius;
 
                 if (style?.fillStyle) {
+                    // Preserve each item's fill-then-stroke order, including
+                    // when a later translucent fill overlaps an outline.
+                    if (lines.length > 0) {
+                        gl.drawLines(lines);
+                        lines = [];
+                    }
                     shapes.push({
                         cx,
                         cy,
@@ -245,6 +261,10 @@ export class WebGLDraw {
                 }
 
                 if (style?.strokeStyle) {
+                    if (shapes.length > 0) {
+                        gl.drawShapes(shapes);
+                        shapes = [];
+                    }
                     this.pushCircleStroke(
                         lines,
                         cx,
@@ -415,7 +435,7 @@ export class WebGLDraw {
 
         return this.layers.add(layer, ({ gl, config, topLeft }) => {
             const viewport = getViewportBounds(topLeft, config);
-            const lines: LineInstance[] = [];
+            let lines: LineInstance[] = [];
 
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
@@ -454,6 +474,12 @@ export class WebGLDraw {
                 }
 
                 if (filled) {
+                    // Stencil fills execute immediately, so earlier strokes
+                    // must reach the GPU before this item's fill begins.
+                    if (lines.length > 0) {
+                        gl.drawLines(lines);
+                        lines = [];
+                    }
                     // Like Canvas2D fill(), open subpaths close implicitly.
                     // Multi-ring stencil-then-cover: winding accumulates
                     // across subpaths, so holes match Canvas2D/Skia exactly.
@@ -625,8 +651,8 @@ export class WebGLDraw {
     // ─── Static variants ───
     //
     // The Canvas2D renderer pre-renders static content into an offscreen canvas
-    // and blits it each frame. With WebGL the per-frame cost of a batched draw is
-    // already a single GPU call, so the static variants reuse the dynamic path.
+    // and blits it each frame. WebGL batches consecutive compatible paints, so
+    // the static variants reuse the dynamic path.
 
     drawStaticRect(items: Array<Rect>, _cacheKey: string, layer: number = 1): DrawHandle {
         // Pixel sizes are stripped for the same reason as drawStaticCircle's:

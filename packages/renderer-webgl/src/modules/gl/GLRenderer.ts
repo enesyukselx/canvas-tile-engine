@@ -105,9 +105,9 @@ interface TextureProgram {
  * Thin batched drawing layer over a raw WebGL context.
  *
  * Each `draw*` call uploads a freshly built vertex array and issues a single
- * draw call, so a layer that paints thousands of rects collapses into one GPU
- * batch. Calls execute immediately and in order, which preserves the engine's
- * layer-based paint order.
+ * draw call, so a contiguous run of thousands of fill-only rects collapses into
+ * one GPU batch. Calls execute immediately and in order; callers must split
+ * batches when switching between fills and strokes to preserve paint order.
  * @internal
  */
 export class GLRenderer {
