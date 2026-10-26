@@ -54,12 +54,14 @@ export interface ICamera {
     adjustForResize(deltaWidthPx: number, deltaHeightPx: number): void;
 
     /**
-     * Zoom by a scale factor around a specific point (for pinch-to-zoom).
+     * Zoom around a screen point, optionally moving that anchor in the same transform.
      * @param factor Scale multiplier (>1 zooms in, <1 zooms out).
      * @param centerX Center X in screen coordinates.
      * @param centerY Center Y in screen coordinates.
+     * @param targetX New screen X of the anchor; defaults to centerX.
+     * @param targetY New screen Y of the anchor; defaults to centerY.
      */
-    zoomByFactor(factor: number, centerX: number, centerY: number): void;
+    zoomByFactor(factor: number, centerX: number, centerY: number, targetX?: number, targetY?: number): void;
 
     /**
      * Set the camera scale directly, clamped to min/max bounds.
@@ -235,20 +237,24 @@ export class Camera implements ICamera {
     }
 
     /**
-     * Zoom by a scale factor around a specific point (for pinch-to-zoom).
+     * Zoom around a screen point, optionally moving that anchor in the same transform.
      * @param factor Scale multiplier (>1 zooms in, <1 zooms out).
      * @param centerX Center X in screen coordinates.
      * @param centerY Center Y in screen coordinates.
+     * @param targetX New screen X of the anchor; defaults to centerX.
+     * @param targetY New screen Y of the anchor; defaults to centerY.
      */
-    zoomByFactor(factor: number, centerX: number, centerY: number) {
+    zoomByFactor(factor: number, centerX: number, centerY: number, targetX = centerX, targetY = centerY) {
         const newScale = Math.min(this.maxScale, Math.max(this.minScale, this._scale * factor));
-        if (newScale === this._scale) {
+        if (newScale === this._scale && centerX === targetX && centerY === targetY) {
             return;
         }
 
-        // Adjust top-left to keep the pinch center stationary
-        this._x = this._x + centerX * (1 / this._scale - 1 / newScale);
-        this._y = this._y + centerY * (1 / this._scale - 1 / newScale);
+        // Keep the world point under the previous anchor under its new screen
+        // position. Use the clamped scale and constrain bounds only after both
+        // zoom and translation, so an intermediate clamp cannot lose motion.
+        this._x += centerX / this._scale - targetX / newScale;
+        this._y += centerY / this._scale - targetY / newScale;
         this._scale = newScale;
         this.clampToBounds();
     }

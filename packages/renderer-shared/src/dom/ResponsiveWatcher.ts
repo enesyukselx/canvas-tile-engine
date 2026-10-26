@@ -17,9 +17,6 @@ export class ResponsiveWatcher {
     /** Initial visible tiles (used for preserve-viewport mode) */
     private initialVisibleTiles: { x: number; y: number };
 
-    /** Minimum scale limit relative to the base scale (preserve-viewport mode) */
-    private minScaleRatio: number;
-
     /** Callback fired after responsive resize */
     public onResize?: () => void;
 
@@ -45,11 +42,6 @@ export class ResponsiveWatcher {
             x: cfg.size.width / cfg.scale,
             y: cfg.size.height / cfg.scale,
         };
-
-        // The zoom-out limit is a view intent ("don't zoom out past the base
-        // view"), so it is kept as a factor of the base scale. The zoom-in
-        // limit is a px-per-tile quality cap and stays absolute.
-        this.minScaleRatio = cfg.minScale / cfg.scale;
     }
 
     start() {
@@ -196,12 +188,19 @@ export class ResponsiveWatcher {
             this.viewport.setSize(width, height);
 
             // Rescale the zoom-out limit with the base scale so it keeps its
-            // meaning at every container width; keep the zoom-in limit at its
-            // configured px value, only lifting it when the base scale itself
-            // exceeds it, so the camera never lands outside gesture-reachable
-            // limits
-            const maxScale = Math.max(this.config.get().maxScale, newScale);
-            this.camera.setScaleLimits(newScale * this.minScaleRatio, maxScale);
+            // meaning at every container width. The zoom-in limit stays at
+            // its configured px value unless the adapted range requires more.
+            // Read authored limits afresh so setScaleLimits takes effect on
+            // future resizes too. Config retains the original scale/size;
+            // feeding live camera limits back here would accumulate ratios.
+            const cfg = this.config.get();
+            // This is equivalent to newScale * (min / baseScale), without
+            // overflowing min / baseScale for large runtime replacements.
+            const minScale = cfg.minScale * (width / cfg.size.width);
+            // Runtime limits can put the minimum above the original base
+            // scale. Keep the resulting range ordered even in that case.
+            const maxScale = Math.max(cfg.maxScale, newScale, minScale);
+            this.camera.setScaleLimits(minScale, maxScale);
             this.camera.setScale(newScale);
 
             // Restore center after scale change (must use new dimensions)
