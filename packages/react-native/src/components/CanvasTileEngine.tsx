@@ -320,17 +320,6 @@ function CanvasTileEngineBase({
         [engine, mount, renderer, wireCallbacks],
     );
 
-    // Tear down on unmount.
-    useEffect(() => {
-        return () => {
-            unsubscribeEventHandlersRef.current?.();
-            unsubscribeEventHandlersRef.current = null;
-            instanceRef.current?.destroy();
-            instanceRef.current = null;
-            engine._setInstance(null);
-        };
-    }, [engine]);
-
     // ─── Touch → renderer gesture forwarding (react-native-gesture-handler) ───
     //
     // Two composed RNGH gestures, deliberately avoiding the GestureStateManager:
@@ -368,6 +357,58 @@ function CanvasTileEngineBase({
     const multiTouchRef = useRef(false);
     // Timestamp of the last multi-touch evidence, for the tap cooldown window.
     const lastMultiTouchAtRef = useRef(0);
+    // A single-pointer touchStart emits mouseDown in core. Keep its release
+    // obligation separate from tap eligibility: adding a finger must cancel
+    // the click, not strand application drawing/selection state as pressed.
+    const pressRef = useRef<{ id: number; pointer: NormalizedPointer } | null>(null);
+
+    const updatePressPosition = useCallback((e: GestureTouchEvent) => {
+        const press = pressRef.current;
+        if (!press) {
+            return;
+        }
+        const touch = e.changedTouches.find((t) => t.id === press.id) ?? e.allTouches.find((t) => t.id === press.id);
+        if (touch) {
+            press.pointer = toPointer(touch);
+        }
+    }, []);
+
+    const finishGesture = useCallback((cancelled: boolean) => {
+        if (!claimRef.current) {
+            return;
+        }
+        const pointer = pressRef.current?.pointer;
+        // Clear ownership before notifying application callbacks. Repeated
+        // up/cancel events and unmount cleanup must not release twice.
+        claimRef.current = false;
+        touchCountRef.current = 0;
+        pressRef.current = null;
+        tapRef.current = null;
+        multiTouchRef.current = false;
+        // Never pass a changed pointer here: core's touchEnd can also click.
+        // Release and click are independent, with taps owned by this wrapper.
+        const activeRenderer = rendererRef.current;
+        activeRenderer.dispatchTouchEnd([]);
+        if (pointer) {
+            if (cancelled) {
+                activeRenderer.dispatchPointerLeave(pointer);
+            } else {
+                activeRenderer.dispatchPointerUp(pointer);
+            }
+        }
+    }, []);
+
+    // Cancel an outstanding press while the engine can still deliver callbacks.
+    useEffect(() => {
+        return () => {
+            finishGesture(true);
+            unsubscribeEventHandlersRef.current?.();
+            unsubscribeEventHandlersRef.current = null;
+            instanceRef.current?.destroy();
+            instanceRef.current = null;
+            engine._setInstance(null);
+        };
+    }, [engine, finishGesture]);
 
     const markMultiTouch = useCallback(() => {
         multiTouchRef.current = true;
@@ -394,6 +435,9 @@ function CanvasTileEngineBase({
     const onTouchesDown = useCallback(
         (e: GestureTouchEvent) => {
             const pointers = e.allTouches.map(toPointer);
+            if (pointers.length === 0) {
+                return;
+            }
 
             if (touchCountRef.current === 0) {
                 claimRef.current = shouldClaimGesture();
@@ -405,10 +449,12 @@ function CanvasTileEngineBase({
                     pointers.length === 1
                         ? { x: pointers[0].x, y: pointers[0].y, time: Date.now(), moved: false }
                         : null;
+                pressRef.current = pointers.length === 1 ? { id: e.allTouches[0].id, pointer: pointers[0] } : null;
             }
             if (!claimRef.current) {
                 return;
             }
+            updatePressPosition(e);
 
             if (pointers.length > 1) {
                 markMultiTouch();
@@ -421,7 +467,7 @@ function CanvasTileEngineBase({
             // enters/rebases pinch mode.
             rendererRef.current.dispatchTouchStart(pointers);
         },
-        [markMultiTouch, shouldClaimGesture],
+        [markMultiTouch, shouldClaimGesture, updatePressPosition],
     );
 
     const onTouchesMove = useCallback(
@@ -429,7 +475,13 @@ function CanvasTileEngineBase({
             if (!claimRef.current) {
                 return;
             }
+            updatePressPosition(e);
             const pointers = e.allTouches.map(toPointer);
+            if (pointers.length === 0) {
+                // A missing native terminal event is cancellation, never a tap.
+                finishGesture(true);
+                return;
+            }
             if (pointers.length > 1) {
                 markMultiTouch();
             }
@@ -457,7 +509,7 @@ function CanvasTileEngineBase({
                 tapRef.current = null;
             }
         },
-        [markMultiTouch],
+        [finishGesture, markMultiTouch, updatePressPosition],
     );
 
     const endTouch = useCallback(
@@ -465,8 +517,18 @@ function CanvasTileEngineBase({
             if (!claimRef.current) {
                 return;
             }
+            updatePressPosition(e);
             const remaining = remainingPointers(e);
             const changed = e.changedTouches.length > 0 ? toPointer(e.changedTouches[0]) : undefined;
+            if (e.allTouches.length > 1 || e.changedTouches.length > 1) {
+                markMultiTouch();
+            }
+            // Cancellation ends the entire claimed stream, even when native
+            // bookkeeping still lists touches or supplies no changed pointer.
+            if (!allowTap) {
+                finishGesture(true);
+                return;
+            }
 
             if (remaining.length > 0) {
                 // A finger lifted while others remain: proves multi-touch, and
@@ -486,37 +548,24 @@ function CanvasTileEngineBase({
             // a clean tap.
             const suppressTap =
                 multiTouchRef.current || Date.now() - lastMultiTouchAtRef.current < MULTI_TOUCH_TAP_COOLDOWN_MS;
-            // touchEnd is dispatched without the changed pointer: the engine's
-            // touch-end mouseUp/click path would double-fire onClick alongside
-            // dispatchTap below. onMouseUp is raised via dispatchPointerUp
-            // instead, and click is owned solely by this component's tap
-            // detection (whose move threshold tolerates finger jitter the
-            // engine's path does not).
-            touchCountRef.current = 0;
-            rendererRef.current.dispatchTouchEnd([]);
-            // Withheld whenever taps are suppressed: if iOS dropped the second
-            // finger's start event, the engine never entered pinch mode and
-            // would otherwise treat the final lift as a clean single-pointer
-            // release.
-            if (!suppressTap && changed) {
-                rendererRef.current.dispatchPointerUp(changed);
-            }
-
             const tap = tapRef.current;
+            const instance = instanceRef.current;
+            finishGesture(false);
             if (
-                allowTap &&
+                instanceRef.current === instance &&
+                !claimRef.current &&
                 !suppressTap &&
                 changed &&
                 tap &&
                 !tap.moved &&
                 Date.now() - tap.time < TAP_TIME_THRESHOLD
             ) {
+                // onMouseUp may synchronously unmount or start another gesture.
+                // Do not deliver this old tap into the replacement lifecycle.
                 rendererRef.current.dispatchTap(changed);
             }
-            tapRef.current = null;
-            multiTouchRef.current = false;
         },
-        [markMultiTouch],
+        [finishGesture, markMultiTouch, updatePressPosition],
     );
 
     const onTouchesUp = useCallback((e: GestureTouchEvent) => endTouch(e, true), [endTouch]);

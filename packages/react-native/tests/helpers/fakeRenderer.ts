@@ -5,13 +5,17 @@ import type {
     IImageLoader,
     Rect as RectType,
     RendererDependencies,
+    NormalizedPointer,
 } from "@canvas-tile-engine/core";
+import { GestureProcessor } from "@canvas-tile-engine/core";
 import type { RendererSkia, SkiaMount, SkImage } from "@canvas-tile-engine/renderer-skia";
 
 /**
  * Recording stand-in for `RendererSkia`: enough of the renderer contract for
  * the real core engine to mount, plus spies on the lifecycle and on the
  * `dispatch*` touch API the React Native component forwards gestures through.
+ * Touch dispatch uses the real core GestureProcessor, including callback and
+ * camera state, so transport assertions also exercise application callbacks.
  *
  * `render()` goes through `mount.present()` exactly like the real renderer, so
  * the component's picture pipeline (createPicture → <Picture>) is exercised
@@ -53,6 +57,7 @@ export function createFakeRenderer() {
 
     let mount: SkiaMount | undefined;
     let viewport: RendererDependencies<SkiaMount>["viewport"] | undefined;
+    let gestures: GestureProcessor | undefined;
 
     /** The frame painter handed to the host; identity is asserted in tests. */
     const paintFrame: Mock = vi.fn();
@@ -75,19 +80,39 @@ export function createFakeRenderer() {
     );
     const destroy: Mock = vi.fn();
 
-    const dispatchTap: Mock = vi.fn();
-    const dispatchPointerDown: Mock = vi.fn();
-    const dispatchPointerMove: Mock = vi.fn();
-    const dispatchPointerUp: Mock = vi.fn();
-    const dispatchPointerLeave: Mock = vi.fn();
-    const dispatchTouchStart: Mock = vi.fn();
-    const dispatchTouchMove: Mock = vi.fn();
-    const dispatchTouchEnd: Mock = vi.fn();
+    const dispatchTap: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handleClick(pointer));
+    const dispatchPointerDown: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handlePointerDown(pointer));
+    const dispatchPointerMove: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handlePointerMove(pointer));
+    const dispatchPointerUp: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handlePointerUp(pointer));
+    const dispatchPointerLeave: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handlePointerLeave(pointer));
+    const dispatchTouchStart: Mock = vi.fn((pointers: NormalizedPointer[]) => gestures?.handleTouchStart(pointers));
+    const dispatchTouchMove: Mock = vi.fn((pointers: NormalizedPointer[]) => gestures?.handleTouchMove(pointers));
+    const dispatchTouchEnd: Mock = vi.fn((remaining: NormalizedPointer[], changed?: NormalizedPointer) =>
+        gestures?.handleTouchEnd(remaining, changed),
+    );
 
     const renderer = {
         init: (deps: RendererDependencies<SkiaMount>) => {
             mount = deps.wrapper;
             viewport = deps.viewport;
+            gestures = new GestureProcessor(
+                deps.camera,
+                deps.config,
+                deps.transformer,
+                () => {
+                    const { width, height } = deps.wrapper.getSize();
+                    return { left: 0, top: 0, x: 0, y: 0, width, height, right: width, bottom: height };
+                },
+                () => renderer.onCameraChange?.(),
+            );
+            gestures.onClick = (...args) => renderer.onClick?.(...args);
+            gestures.onRightClick = (...args) => renderer.onRightClick?.(...args);
+            gestures.onHover = (...args) => renderer.onHover?.(...args);
+            gestures.onMouseDown = (...args) => renderer.onMouseDown?.(...args);
+            gestures.onMouseUp = (...args) => renderer.onMouseUp?.(...args);
+            gestures.onMouseLeave = (...args) => renderer.onMouseLeave?.(...args);
+            gestures.onZoom = (...args) => renderer.onZoom?.(...args);
+            gestures.onWheel = (...args) => renderer.onWheel?.(...args);
         },
         render,
         resize,

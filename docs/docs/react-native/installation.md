@@ -183,6 +183,7 @@ import { Skia } from "@canvas-tile-engine/react-native";
 - Use `engine.setEventHandlers`, `engine.setBounds`, `engine.setCenter`, `engine.goCenter`, `engine.setScale`, `engine.goScale`, `engine.setScaleLimits`, `zoomIn`, and `zoomOut` for runtime changes.
 - Static helpers record and replay Skia pictures keyed by `cacheKey`.
 - The React Native wrapper owns layout, touch handling (via react-native-gesture-handler), tap detection, and presentation.
+- A one-finger `onMouseDown` is paired with one `onMouseUp` when all fingers lift, even if multitouch suppresses the click. Cancellation or unmount instead sends `onMouseLeave` at the pressed finger's last known position. Drawing/selection tools should end their active press in either callback. A gesture that starts with multiple fingers does not emit a single-pointer down or release.
 - `engine.getConfig()` before the first layout returns the same pre-mount snapshot as the web hook: the engine's defaults for an unconfigured engine, not the `config` prop. See [the web notes](../react/installation.md#usecanvastileengine).
 
 :::info Maps inside a ScrollView
