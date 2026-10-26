@@ -85,6 +85,19 @@ browsers these fire for the **primary (left) button only** — right clicks go
 through `onRightClick`, and the middle button is left to the browser. Touch
 input also feeds them (touch start/end).
 
+For the Canvas2D and WebGL renderers, a primary-button press started on the
+canvas is tracked until release, even outside the canvas. Camera dragging
+continues outside and `onMouseUp` reports the release position in the same
+coordinate spaces (canvas-relative coordinates can be outside its bounds).
+Ordinary hover remains local to the canvas.
+
+Browser interruption (`touchcancel`, window blur, or a lost mouse release)
+and renderer teardown clear drag/pinch state without firing `onClick`.
+An active press is released once through `onMouseUp`, using the last known
+pointer position when no release position is available. For a cancelled
+multi-touch gesture, remaining contacts are ignored until a fresh gesture.
+Touches that started on other elements do not participate in the canvas gesture.
+
 ```ts
 let selecting = false;
 let selectionStart = { x: 0, y: 0 };
@@ -104,6 +117,9 @@ engine.onMouseUp = (coords) => {
 ### `onMouseLeave`
 
 Triggered when the pointer leaves the canvas. Use it to clear transient UI state.
+
+On the browser renderers, this notification does not end an active camera
+drag: dragging continues until release or cancellation, including after re-entry.
 
 ```ts
 engine.onMouseLeave = () => {

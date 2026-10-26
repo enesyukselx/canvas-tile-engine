@@ -54,6 +54,15 @@ underneath it unless camera bounds constrain the result. This translation
 still works at `minScale`/`maxScale`. Center zoom mode ignores midpoint
 movement and keeps the viewport center anchored.
 
+Browser Canvas2D/WebGL drags track mouse movement and release outside the
+canvas. `onMouseLeave` still fires immediately but does not stop the drag;
+ordinary hover remains local. Release coordinates can be outside the canvas.
+`touchcancel`, window blur, lost mouse buttons, and renderer teardown cancel
+the gesture without clicking, release an active press once via `onMouseUp`
+(last known position if needed), and clear drag/pinch state. Remaining fingers
+from a cancelled touch gesture are ignored until a fresh gesture. Only touches
+that started on the canvas participate; other elements' contacts are excluded.
+
 ## Camera callbacks
 
 ```ts

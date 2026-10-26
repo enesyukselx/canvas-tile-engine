@@ -83,6 +83,7 @@ export interface CanvasBounds {
 export class GestureProcessor {
     // Gesture state
     private isDragging = false;
+    private pointerDown = false;
     private shouldPreventClick = false;
     private lastPos = { x: 0, y: 0 };
 
@@ -195,17 +196,19 @@ export class GestureProcessor {
     };
 
     handlePointerDown = (pointer: NormalizedPointer): void => {
+        this.pointerDown = true;
+        this.shouldPreventClick = false;
         if (this.onMouseDown) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseDown(coords, mouse, client);
         }
 
-        if (!this.config.get().eventHandlers.drag) {
+        // A press callback can tear down its renderer and cancel this input.
+        if (!this.pointerDown || !this.config.get().eventHandlers.drag) {
             return;
         }
 
         this.isDragging = true;
-        this.shouldPreventClick = false;
         this.lastPos = { x: pointer.clientX, y: pointer.clientY };
     };
 
@@ -229,6 +232,7 @@ export class GestureProcessor {
     };
 
     handlePointerUp = (pointer: NormalizedPointer): void => {
+        this.pointerDown = false;
         if (this.onMouseUp) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseUp(coords, mouse, client);
@@ -237,13 +241,29 @@ export class GestureProcessor {
         this.isDragging = false;
     };
 
-    handlePointerLeave = (pointer: NormalizedPointer): void => {
+    handlePointerLeave = (pointer: NormalizedPointer, preserveDrag = false): void => {
         if (this.onMouseLeave) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseLeave(coords, mouse, client);
         }
 
+        if (!preserveDrag) {
+            this.isDragging = false;
+        }
+    };
+
+    /** End interrupted input without synthesizing a click or continuing a pinch. */
+    handleCancel = (pointer?: NormalizedPointer): void => {
+        const wasDown = this.pointerDown;
+        this.pointerDown = false;
         this.isDragging = false;
+        this.isPinching = false;
+        this.lastPinchDistance = 0;
+        this.shouldPreventClick = true;
+        if (wasDown && pointer && this.onMouseUp) {
+            const { coords, mouse, client } = this.processCoords(pointer);
+            this.onMouseUp(coords, mouse, client);
+        }
     };
 
     // ─── Touch Handlers ───────────────────────────────
@@ -266,6 +286,9 @@ export class GestureProcessor {
         }
         const pointer = pointers[0];
 
+        this.pointerDown = true;
+        this.shouldPreventClick = false;
+
         // Fire onMouseDown callback for touch
         if (this.onMouseDown) {
             const { coords, mouse, client } = this.processCoords(pointer);
@@ -273,12 +296,11 @@ export class GestureProcessor {
         }
 
         // Handle single finger drag
-        if (!eventHandlers.drag) {
+        if (!this.pointerDown || !eventHandlers.drag) {
             return;
         }
         this.isDragging = true;
         this.isPinching = false;
-        this.shouldPreventClick = false;
         this.lastPos = { x: pointer.clientX, y: pointer.clientY };
     };
 
@@ -380,6 +402,8 @@ export class GestureProcessor {
             }
             return;
         }
+
+        this.pointerDown = false;
 
         // Fire onMouseUp for touch end
         if (changedPointer && this.onMouseUp) {

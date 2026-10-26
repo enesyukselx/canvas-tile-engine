@@ -238,6 +238,66 @@ describe("GestureProcessor", () => {
             processor.handlePointerLeave(createPointer(100, 100));
             expect(processor.dragging).toBe(false);
         });
+
+        it("preserves captured drags without suppressing the leave callback", () => {
+            processor.onMouseLeave = vi.fn();
+            processor.handlePointerDown(createPointer(100, 100));
+            processor.handlePointerLeave(createPointer(120, 100), true);
+            processor.handlePointerMove(createPointer(150, 120));
+            expect(processor.onMouseLeave).toHaveBeenCalledTimes(1);
+            expect(processor.dragging).toBe(true);
+            expect(panMock).toHaveBeenCalledExactlyOnceWith(50, 20);
+        });
+    });
+
+    describe("handleCancel", () => {
+        it.each(["mouse", "touch"])("does not restart a %s drag cancelled by its press callback", (input) => {
+            processor.onMouseDown = () => processor.handleCancel(createPointer(100, 100));
+            if (input === "mouse") {
+                processor.handlePointerDown(createPointer(100, 100));
+            } else {
+                processor.handleTouchStart([createPointer(100, 100)]);
+            }
+            expect(processor.dragging).toBe(false);
+        });
+
+        it("releases interrupted mouse input without a click or further panning", () => {
+            processor.onMouseUp = vi.fn();
+            processor.onClick = vi.fn();
+            processor.handlePointerDown(createPointer(100, 100));
+            processor.handleCancel(createPointer(120, 110));
+            processor.handleCancel(createPointer(120, 110));
+            processor.handlePointerMove(createPointer(150, 150));
+            processor.handleClick(createPointer(120, 110));
+            expect(processor.dragging).toBe(false);
+            expect(processor.onMouseUp).toHaveBeenCalledTimes(1);
+            expect(processor.onClick).not.toHaveBeenCalled();
+            expect(panMock).not.toHaveBeenCalled();
+        });
+
+        it("clears pinch state and does not zoom from stale touch moves", () => {
+            processor.onMouseUp = vi.fn();
+            processor.handleTouchStart([createPointer(100, 100), createPointer(200, 100)]);
+            processor.handleCancel(createPointer(100, 100));
+            processor.handleTouchMove([createPointer(50, 100), createPointer(250, 100)]);
+            expect(processor.pinching).toBe(false);
+            expect(processor.dragging).toBe(false);
+            expect(zoomByFactorMock).not.toHaveBeenCalled();
+            expect(processor.onMouseUp).not.toHaveBeenCalled();
+        });
+
+        it("allows the next mouse click and touch tap when drag is disabled", () => {
+            config.updateEventHandlers({ drag: false });
+            processor.onClick = vi.fn();
+            processor.handleCancel();
+            processor.handlePointerDown(createPointer(100, 100));
+            processor.handlePointerUp(createPointer(100, 100));
+            processor.handleClick(createPointer(100, 100));
+            processor.handleCancel();
+            processor.handleTouchStart([createPointer(100, 100)]);
+            processor.handleTouchEnd([], createPointer(100, 100));
+            expect(processor.onClick).toHaveBeenCalledTimes(2);
+        });
     });
 
     describe("handleWheel", () => {
