@@ -111,6 +111,19 @@ engine.drawText({ x: 0, y: 0, text: "Hello", style: { fontFamily: "Inter" } }, 2
 
 ## Custom Drawing
 
+`Image`, `Canvas`, and `SKRSContext2D` are convenience **type-only** exports.
+Use `import type` for annotations. They are not runtime values or constructors
+from this package. Import native constructors directly from `@napi-rs/canvas`
+(add it as a direct dependency when importing it in your application):
+
+```ts
+import type { Image, Canvas } from "@canvas-tile-engine/renderer-server";
+import { Image as NativeImage, createCanvas } from "@napi-rs/canvas";
+
+const image: Image = new NativeImage();
+const canvas: Canvas = createCanvas(256, 256);
+```
+
 ```ts
 import type { SKRSContext2D } from "@canvas-tile-engine/renderer-server";
 
@@ -122,6 +135,13 @@ engine.addDrawFunction((ctx) => {
 ```
 
 ## Documentation
+
+For contributors, `pnpm test:package` from the repository root builds and packs
+core and renderer-server, then checks a temporary consumer against those tarballs.
+It verifies type-only/native type compatibility, rejected value usage, named
+runtime exports, and PNG rendering in NodeNext ESM/CommonJS and bundler mode.
+Third-party dependencies reuse the workspace lockfile installation; no registry
+download or package publication is performed by this check.
 
 - Core engine: [`@canvas-tile-engine/core`](../core)
 - Browser Canvas2D renderer: [`@canvas-tile-engine/renderer-canvas`](../renderer-canvas)

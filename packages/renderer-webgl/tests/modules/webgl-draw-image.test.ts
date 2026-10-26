@@ -81,4 +81,24 @@ describe("WebGLDraw image flip (texcoord swap)", () => {
         expect(drawn[0].w).toBe(20);
         expect(drawn[0].h).toBe(20);
     });
+
+    it("ignores sizePx for static images while preserving aspect, opacity, and flip", () => {
+        const { draw, render } = setup();
+        const { gl, drawn } = makeRecordingGL();
+        const item = Object.freeze({
+            x: 2,
+            y: 2,
+            size: 2,
+            sizePx: 60,
+            img: fakeImage,
+            sprite: { x: 0, y: 0, w: 10, h: 5 },
+            opacity: 0.5,
+            flipX: true,
+        });
+        draw.drawStaticImage([item], "image");
+        render(gl);
+
+        expect(drawn[0]).toMatchObject({ w: 20, h: 10, alpha: 0.5, u0: 1, u1: 0 });
+        expect(item.sizePx).toBe(60);
+    });
 });

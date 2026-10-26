@@ -14,6 +14,10 @@
         "test": {
             "dependsOn": ["^build"]
         },
+        "@canvas-tile-engine/renderer-server#test:package": {
+            "dependsOn": ["build"],
+            "cache": false
+        },
         "test:watch": {
             "dependsOn": ["^build"],
             "persistent": true,

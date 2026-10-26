@@ -552,7 +552,7 @@ describe("GestureProcessor", () => {
                 processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
 
                 // Pinch midpoint is (150, 150), canvas offset is (0, 0)
-                expect(zoomByFactorMock).toHaveBeenCalledWith(expect.any(Number), 150, 150);
+                expect(zoomByFactorMock).toHaveBeenCalledWith(expect.any(Number), 150, 150, 150, 150);
             });
 
             it("anchors pinch zoom at the canvas center in center mode", () => {
@@ -572,7 +572,8 @@ describe("GestureProcessor", () => {
                 // Both fingers shift +60 on x: midpoint moves (150, 150) -> (210, 150)
                 processor.handleTouchMove([createPointer(160, 100, 160, 100), createPointer(260, 200, 260, 200)]);
 
-                expect(panMock).toHaveBeenCalledWith(60, 0);
+                expect(zoomByFactorMock).toHaveBeenCalledWith(1, 150, 150, 210, 150);
+                expect(panMock).not.toHaveBeenCalled();
             });
 
             it("does not pan when the pinch midpoint moves in center mode", () => {
@@ -591,7 +592,7 @@ describe("GestureProcessor", () => {
                 processor.handleTouchStart([createPointer(100, 100, 100, 100), createPointer(100, 100, 100, 100)]);
                 processor.handleTouchMove([createPointer(50, 50, 50, 50), createPointer(250, 250, 250, 250)]);
 
-                expect(zoomByFactorMock).toHaveBeenCalledWith(1, expect.any(Number), expect.any(Number));
+                expect(zoomByFactorMock).toHaveBeenCalledWith(1, 100, 100, 150, 150);
             });
         });
 

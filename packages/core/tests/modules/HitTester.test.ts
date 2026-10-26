@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HitTester } from "../../src/modules/HitTester";
-import type { DrawHandle } from "../../src/types";
+import type { DrawHandle, PathItem } from "../../src/types";
 
 const handle = (layer: number): DrawHandle => ({ id: Symbol("h"), layer });
 
@@ -583,6 +583,92 @@ describe("HitTester sizePx items", () => {
 
 describe("HitTester command paths", () => {
     const scaled = () => new HitTester(() => 40);
+
+    it.each([40, 60])("refreshes in-place command edits when re-registered at scale %s", (nextScale) => {
+        let scale = 40;
+        const ht = new HitTester(() => scale);
+        const h = handle(1);
+        const from = { type: "moveTo" as const, x: 0, y: 0 };
+        const to = { type: "lineTo" as const, x: 2, y: 0 };
+        const item: PathItem = { commands: [from, to], style: { lineWidthPx: 8 } };
+        ht.register(h, "path", item, 1);
+        expect(ht.hitTestFirst({ x: 1, y: 0 })?.item).toBe(item);
+
+        // Keep both the PathItem and its commands array; the scale remains
+        // within the old cache bucket, so zoom cannot hide stale geometry.
+        from.y = 20;
+        to.y = 20;
+        scale = nextScale;
+        ht.register(h, "path", item, 1);
+
+        expect(ht.hitTest({ x: 1, y: 0 })).toHaveLength(0);
+        expect(ht.hitTestFirst({ x: 1, y: 20 })).toMatchObject({ item, handle: h });
+        expect(ht.hitTestRect({ minX: -1, minY: -1, maxX: 3, maxY: 1 })).toHaveLength(0);
+        const region = { minX: -1, minY: 19, maxX: 3, maxY: 21 };
+        expect(ht.hitTestRect(region)).toHaveLength(1);
+        expect(ht.hitTestRect(region, { mode: "contain" })).toHaveLength(1);
+
+        // Subsequent zooms still use the updated path and live pixel width.
+        scale = 10;
+        expect(ht.hitTestFirst({ x: 1, y: 20.3 })?.item).toBe(item);
+        scale = 160;
+        expect(ht.hitTestFirst({ x: 1, y: 20.3 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 1, y: 20 })?.item).toBe(item);
+    });
+
+    it("refreshes a shared item's geometry for every registration", () => {
+        const ht = scaled();
+        const low = handle(1);
+        const high = handle(2);
+        const item: PathItem = {
+            commands: [{ type: "arc", x: 0, y: 0, radius: 2, startAngle: 0, endAngle: 360 }],
+            style: { fillStyle: "red" },
+        };
+        ht.register(low, "path", item, 1);
+        ht.register(high, "path", [item], 2);
+        expect(ht.hitTestRect({ minX: -1, minY: -1, maxX: 1, maxY: 1 })).toHaveLength(2);
+
+        item.commands = [{ type: "arc", x: 20, y: 0, radius: 2, startAngle: 0, endAngle: 360 }];
+        ht.register(high, "path", [item], 2);
+
+        expect(ht.hitTest({ x: 0, y: 0 })).toHaveLength(0);
+        const hits = ht.hitTest({ x: 20, y: 0 });
+        expect(hits.map((hit) => hit.handle)).toEqual([high, low]);
+        expect(hits.every((hit) => hit.item === item)).toBe(true);
+        const region = { minX: 17, minY: -3, maxX: 23, maxY: 3 };
+        expect(ht.hitTestRect(region, { mode: "contain" }).map((hit) => hit.handle)).toEqual([high, low]);
+    });
+
+    it.each(["remove", "clearLayer", "clear"] as const)(
+        "refreshes a reused path after %s and registration with a new handle",
+        (cleanup) => {
+            const ht = scaled();
+            const first = handle(1);
+            const item: PathItem = {
+                commands: [
+                    { type: "moveTo", x: 0, y: 0 },
+                    { type: "lineTo", x: 2, y: 0 },
+                ],
+            };
+            ht.register(first, "path", item, 1);
+            expect(ht.hitTestFirst({ x: 1, y: 0 })?.item).toBe(item);
+            if (cleanup === "remove") {
+                ht.remove(first);
+            } else if (cleanup === "clearLayer") {
+                ht.clearLayer(1);
+            } else {
+                ht.clear();
+            }
+            item.commands = [
+                { type: "moveTo", x: 0, y: 20 },
+                { type: "lineTo", x: 2, y: 20 },
+            ];
+            const second = handle(1);
+            ht.register(second, "path", item, 1);
+            expect(ht.hitTest({ x: 1, y: 0 })).toHaveLength(0);
+            expect(ht.hitTestFirst({ x: 1, y: 20 })).toMatchObject({ item, handle: second });
+        },
+    );
 
     // Donut: outer CW square, inner CCW square (opposite winding -> nonzero hole)
     const donut = [
