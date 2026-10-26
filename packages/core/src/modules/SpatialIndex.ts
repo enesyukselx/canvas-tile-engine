@@ -23,18 +23,20 @@ interface RBushItem<T> {
     minY: number;
     maxX: number;
     maxY: number;
+    order: number;
     item: T;
 }
 
 export class SpatialIndex<T extends SpatialItem> {
     private tree: RBush<RBushItem<T>>;
+    private nextOrder = 0;
 
     constructor() {
         this.tree = new RBush();
     }
 
     /**
-     * Bulk load items into the R-Tree (much faster than individual inserts)
+     * Append items to the R-Tree in registration order (faster than individual inserts).
      */
     load(items: T[]): void {
         const rbushItems: RBushItem<T>[] = items.map((item) => {
@@ -47,6 +49,7 @@ export class SpatialIndex<T extends SpatialItem> {
                 minY: item.y - halfH,
                 maxX: item.x + halfW,
                 maxY: item.y + halfH,
+                order: this.nextOrder++,
                 item,
             };
         });
@@ -54,10 +57,13 @@ export class SpatialIndex<T extends SpatialItem> {
     }
 
     /**
-     * Query all items within a rectangular range
+     * Query all items within a rectangular range, in registration order.
      */
     query(minX: number, minY: number, maxX: number, maxY: number): T[] {
         const results = this.tree.search({ minX, minY, maxX, maxY });
+        // R-Tree traversal follows spatial partitions, not paint order. Sort only
+        // the matching entries so culling preserves the array's stacking order.
+        results.sort((a, b) => a.order - b.order);
         return results.map((r) => r.item);
     }
 
@@ -66,6 +72,7 @@ export class SpatialIndex<T extends SpatialItem> {
      */
     clear(): void {
         this.tree.clear();
+        this.nextOrder = 0;
     }
 
     /**
