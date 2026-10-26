@@ -1,4 +1,11 @@
-import { CanvasTileEngineConfig, CoordinateTransformer, Coords, DrawHandle, ICamera } from "@canvas-tile-engine/core";
+import {
+    Bounds,
+    CanvasTileEngineConfig,
+    CoordinateTransformer,
+    Coords,
+    DrawHandle,
+    ICamera,
+} from "@canvas-tile-engine/core";
 
 /** @internal */
 export type DrawContext<TContext> = {
@@ -28,6 +35,20 @@ export interface LayerContext {
 }
 
 /**
+ * Applies a registration's clip rectangle and, when the platform needs it,
+ * hands back a release function.
+ *
+ * The clip arrives in WORLD coordinates: this module stays free of any
+ * coordinate math, and each renderer needs a different space anyway — CSS
+ * pixels for a Canvas2D path clip, device pixels measured from the bottom for
+ * a GL scissor. Contexts that unwind their clip through `restore()` return
+ * nothing; state that lives outside the context stack (GL scissor) returns its
+ * own teardown.
+ * @internal
+ */
+export type ClipAdapter<TDrawContext> = (dc: TDrawContext, clip: Bounds) => (() => void) | void;
+
+/**
  * Manages ordered draw callbacks, generic over the full draw context handed to
  * callbacks. Plain Canvas2D renderers use {@link DrawContext}; renderers with
  * extra per-frame state (e.g. WebGL's batched GL renderer alongside its 2D
@@ -36,16 +57,23 @@ export interface LayerContext {
  * @internal
  */
 export class Layer<TDrawContext extends { ctx: LayerContext }> {
-    private layers = new Map<number, { id: symbol; fn: DrawCallback<TDrawContext> }[]>();
+    private layers = new Map<number, { id: symbol; fn: DrawCallback<TDrawContext>; clip?: Bounds }[]>();
+
+    /**
+     * @param applyClip Platform hook for `add`'s clip argument. A renderer
+     * that omits it simply draws unclipped.
+     */
+    constructor(private applyClip?: ClipAdapter<TDrawContext>) {}
 
     /**
      * Register a draw callback at a specific layer index.
      * @param layer Layer order; lower numbers draw first.
      * @param fn Callback receiving drawing context.
+     * @param clip Optional world rectangle to confine the callback to.
      */
-    add(layer: number, fn: DrawCallback<TDrawContext>): DrawHandle {
+    add(layer: number, fn: DrawCallback<TDrawContext>, clip?: Bounds): DrawHandle {
         const id = Symbol("layer-callback");
-        const entry = { id, fn };
+        const entry = { id, fn, clip };
         if (!this.layers.has(layer)) {
             this.layers.set(layer, []);
         }
@@ -91,9 +119,16 @@ export class Layer<TDrawContext extends { ctx: LayerContext }> {
             if (!fns) {
                 continue;
             }
-            for (const { fn } of fns) {
+            for (const { fn, clip } of fns) {
                 const count = dc.ctx.save();
+                // Applied inside the save/restore pair the callback already
+                // runs in, so a context-stack clip unwinds itself and only
+                // out-of-stack state needs the release below.
+                const release = clip && this.applyClip ? this.applyClip(dc, clip) : undefined;
                 fn(dc);
+                if (release) {
+                    release();
+                }
                 if (typeof count === "number" && dc.ctx.restoreToCount) {
                     dc.ctx.restoreToCount(count);
                 } else {

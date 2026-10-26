@@ -814,7 +814,9 @@ describe("CanvasTileEngine", () => {
                 // A rejected replacement leaves both the old handle and its id intact.
                 e.drawGridLines(0.5, 1, "black", 0, { id: "grid" });
                 expect(drawAPI.removeDrawHandle).toHaveBeenCalledExactlyOnceWith(grid);
-                expect(register).toHaveBeenCalledExactlyOnceWith(0.5, { lineWidth: 1, strokeStyle: "black" }, 0);
+                expect(register).toHaveBeenCalledExactlyOnceWith(0.5, { lineWidth: 1, strokeStyle: "black" }, 0, {
+                    clip: undefined,
+                });
             },
         );
     });

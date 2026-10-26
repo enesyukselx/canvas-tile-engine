@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { normalizeConfig } from "@canvas-tile-engine/core";
 import type {
+    DrawOptions,
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
     Coords,
@@ -176,6 +177,7 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     addDrawFunction(
         fn: (ctx: TCtx, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,
+        options?: DrawOptions,
     ): DrawHandle;
 
     /** Draw rectangles */
@@ -236,7 +238,13 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     ): DrawHandle;
 
     /** Draw grid lines */
-    drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number): DrawHandle;
+    drawGridLines(
+        cellSize: number,
+        lineWidth?: number,
+        strokeStyle?: string,
+        layer?: number,
+        options?: DrawOptions,
+    ): DrawHandle;
 
     /** Clear a specific layer */
     clearLayer(layer: number): void;
@@ -411,7 +419,7 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                 instanceRef.current?.setEventHandlers(handlers);
             },
 
-            addDrawFunction(fn, layer) {
+            addDrawFunction(fn, layer, options) {
                 // The core API is renderer-agnostic (`ctx: unknown`); each
                 // platform handle narrows the context type (TCtx), so widen it
                 // back here to keep the cast out of user code.
@@ -424,6 +432,7 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                             transform: DrawTransform,
                         ) => void,
                         layer,
+                        options,
                     ) ?? droppedDraw("addDrawFunction")
                 );
             },
@@ -473,9 +482,9 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
                 );
             },
 
-            drawGridLines(cellSize, lineWidth, strokeStyle, layer) {
+            drawGridLines(cellSize, lineWidth, strokeStyle, layer, options) {
                 return (
-                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer) ??
+                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer, options) ??
                     droppedDraw("drawGridLines")
                 );
             },

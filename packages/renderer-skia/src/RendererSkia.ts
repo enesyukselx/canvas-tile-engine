@@ -22,8 +22,8 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import { Skia, type SkCanvas, type SkImage, type SkPaint, type SkPicture } from "@shopify/react-native-skia";
-import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { ClipOp, Skia, type SkCanvas, type SkImage, type SkPaint, type SkPicture } from "@shopify/react-native-skia";
+import { type ClipAdapter, clipRectPx, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { SkiaDraw } from "./modules/SkiaDraw";
 import { SkiaImageLoader } from "./modules/SkiaImageLoader";
 import { SkiaCoordinateOverlayRenderer } from "./modules/SkiaCoordinateOverlayRenderer";
@@ -39,6 +39,16 @@ import { SkiaMount, SkiaDrawContext } from "./types";
  * and gestures; it forwards normalized pointer input via the `dispatch*` methods
  * and supplies the canvas via {@link SkiaMount.present}.
  */
+/**
+ * Clip adapter for Skia. Returns nothing: `clipRect` is canvas state, and
+ * {@link Layer} already runs each callback between `save()` and
+ * `restoreToCount()`, so it unwinds itself.
+ */
+const skiaClipAdapter: ClipAdapter<SkiaDrawContext> = ({ ctx: canvas, transformer }, clip) => {
+    const rect = clipRectPx(clip, (x, y) => transformer.worldToScreen(x, y));
+    canvas.clipRect(Skia.XYWHRect(rect.x, rect.y, rect.width, rect.height), ClipOp.Intersect, false);
+};
+
 export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     /** Transform helpers handed to the onDraw hook. */
     private drawTransform: DrawTransform = {
@@ -157,7 +167,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         this.viewport = deps.viewport;
         this.transformer = deps.transformer;
 
-        this.layers = new Layer();
+        this.layers = new Layer(skiaClipAdapter);
         this.drawAPI = new SkiaDraw(this.layers, deps.transformer, deps.camera);
 
         this.bgPaint = Skia.Paint();

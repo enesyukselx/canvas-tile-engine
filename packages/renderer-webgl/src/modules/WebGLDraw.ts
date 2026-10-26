@@ -29,6 +29,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    RendererClipOptions,
     LineStyle,
     LineDecorationStyle,
     PathDecorationStyle,
@@ -38,7 +39,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
-import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { type DrawCallback, DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import {
     PaintedCuller,
     boxPaintBounds,
@@ -91,6 +92,18 @@ export class WebGLDraw {
         private camera: ICamera,
     ) {}
 
+    /**
+     * Register a layer callback, forwarding the registration's clip. Every
+     * draw method funnels through here so a new draw kind cannot forget it.
+     */
+    private register(
+        layer: number,
+        options: RendererClipOptions | undefined,
+        fn: DrawCallback<WebGLDrawContext>,
+    ): DrawHandle {
+        return this.layers.add(layer, fn, options?.clip);
+    }
+
     addDrawFunction(
         fn: (
             ctx: CanvasRenderingContext2D,
@@ -99,8 +112,9 @@ export class WebGLDraw {
             transform: DrawTransform,
         ) => void,
         layer: number = 1,
+        options?: RendererClipOptions,
     ): DrawHandle {
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             fn(ctx, topLeft, config, this.drawTransform);
         });
     }
@@ -121,7 +135,7 @@ export class WebGLDraw {
             list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
         );
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -214,7 +228,7 @@ export class WebGLDraw {
             list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
         );
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -292,7 +306,7 @@ export class WebGLDraw {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const color = this.colorParser.parse(style?.strokeStyle ?? "#000");
             const lineWidth = resolveLineWidthPx(style, this.camera.scale);
@@ -346,7 +360,7 @@ export class WebGLDraw {
         let culler: PaintedCuller<Text> | undefined;
         let measuringContext: CanvasRenderingContext2D;
 
-        return this.layers.add(layer, ({ ctx, config, topLeft }) => {
+        return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             ctx.save();
             measuringContext = ctx;
@@ -433,7 +447,7 @@ export class WebGLDraw {
             return subpaths;
         };
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const viewport = getViewportBounds(topLeft, config);
             let lines: LineInstance[] = [];
 
@@ -533,7 +547,7 @@ export class WebGLDraw {
             list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
         );
 
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -616,11 +630,16 @@ export class WebGLDraw {
         });
     }
 
-    drawGridLines(cellSize: number, style: { strokeStyle: string; lineWidth: number }, layer: number = 0): DrawHandle {
+    drawGridLines(
+        cellSize: number,
+        style: { strokeStyle: string; lineWidth: number },
+        layer: number = 0,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         if (!Number.isFinite(cellSize) || cellSize <= 0) {
             throw new RangeError("[CanvasTileEngine] cellSize must be a positive finite number");
         }
-        return this.layers.add(layer, ({ gl, config, topLeft }) => {
+        return this.register(layer, options, ({ gl, config, topLeft }) => {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
@@ -654,30 +673,48 @@ export class WebGLDraw {
     // and blits it each frame. WebGL batches consecutive compatible paints, so
     // the static variants reuse the dynamic path.
 
-    drawStaticRect(items: Array<Rect>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticRect(
+        items: Array<Rect>,
+        _cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         // Pixel sizes are stripped for the same reason as drawStaticCircle's:
         // static draws must look the same on every renderer, and the cached
         // ones replay at a recorded scale where a screen size cannot hold.
         return this.drawRect(
             items.map(({ sizePx: _sizePx, widthPx: _widthPx, heightPx: _heightPx, ...rest }) => rest),
             layer,
+            options,
         );
     }
 
-    drawStaticCircle(items: Array<Circle>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticCircle(
+        items: Array<Circle>,
+        _cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         // sizePx is stripped even though WebGL redraws statics dynamically:
         // static draws must render identically across renderers (the cached
         // ones replay at a recorded scale), and hit boxes ignore it too.
         return this.drawCircle(
             items.map(({ sizePx: _sizePx, ...rest }) => rest),
             layer,
+            options,
         );
     }
 
-    drawStaticImage(items: Array<ImageItem>, _cacheKey: string, layer: number = 1): DrawHandle {
+    drawStaticImage(
+        items: Array<ImageItem>,
+        _cacheKey: string,
+        layer: number = 1,
+        options?: RendererClipOptions,
+    ): DrawHandle {
         return this.drawImage(
             items.map(({ sizePx: _sizePx, ...rest }) => rest),
             layer,
+            options,
         );
     }
 

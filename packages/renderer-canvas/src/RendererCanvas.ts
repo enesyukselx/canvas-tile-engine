@@ -22,7 +22,11 @@ import {
     ViewportState,
     DrawTransform,
 } from "@canvas-tile-engine/core";
-import { CoordinateOverlayRenderer, DebugOverlay } from "@canvas-tile-engine/renderer-shared/canvas2d";
+import {
+    canvas2dClipAdapter,
+    CoordinateOverlayRenderer,
+    DebugOverlay,
+} from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import {
     EventBinder,
@@ -204,7 +208,7 @@ export class RendererCanvas implements IRenderer {
         this.transformer = deps.transformer;
         this.viewport = deps.viewport;
         this.camera = deps.camera;
-        this.layers = new Layer();
+        this.layers = new Layer(canvas2dClipAdapter<BrowserContext2D>());
         this.drawAPI = createBrowserCanvasDraw(this.layers, deps.transformer, deps.camera);
 
         this.applyCanvasSize();
