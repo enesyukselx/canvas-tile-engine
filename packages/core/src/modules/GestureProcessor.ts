@@ -293,24 +293,21 @@ export class GestureProcessor {
             const scaleFactor =
                 this.lastPinchDistance >= MIN_PINCH_DISTANCE ? currentDistance / this.lastPinchDistance : 1;
 
-            // Zoom anchor relative to canvas: pinch midpoint, or canvas center in "center" mode
+            // Transform the previous pinch midpoint to the current one in a
+            // single camera update, including bounds constraints. Center mode
+            // deliberately ignores midpoint motion to keep its fixed anchor.
             const centerMode = this.config.get().eventHandlers.zoom === "center";
-            const centerX = centerMode ? bounds.width / 2 : currentCenter.x - bounds.left;
-            const centerY = centerMode ? bounds.height / 2 : currentCenter.y - bounds.top;
-
-            // Apply zoom
             const prevScale = this.camera.scale;
-            this.camera.zoomByFactor(scaleFactor, centerX, centerY);
-
-            // Also pan if pinch center moved. Skipped in "center" mode: fingers
-            // never move symmetrically, so following the midpoint would drift
-            // the camera away from the fixed anchor the mode promises.
-            if (!centerMode) {
-                const dx = currentCenter.x - this.lastPinchCenter.x;
-                const dy = currentCenter.y - this.lastPinchCenter.y;
-                if (dx !== 0 || dy !== 0) {
-                    this.camera.pan(dx, dy);
-                }
+            if (centerMode) {
+                this.camera.zoomByFactor(scaleFactor, bounds.width / 2, bounds.height / 2);
+            } else {
+                this.camera.zoomByFactor(
+                    scaleFactor,
+                    this.lastPinchCenter.x - bounds.left,
+                    this.lastPinchCenter.y - bounds.top,
+                    currentCenter.x - bounds.left,
+                    currentCenter.y - bounds.top,
+                );
             }
 
             this.lastPinchDistance = currentDistance;
