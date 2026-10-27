@@ -9,85 +9,110 @@ React Native the wrapper claims the gesture responder only while an
 interaction is enabled (or `onMouseDown`/`onMouseUp` is set), so parent
 scroll views keep working.
 
-```ts
-eventHandlers: {
-    click: true,        // tap/click -> onClick
-    rightClick: true,   // DOM context menu -> onRightClick (browser only;
-                        // the default browser menu is suppressed)
-    hover: true,        // pointer move (not dragging) -> onHover
-    drag: true,         // pointer/touch drag pans the camera
-    zoom: "pointer",    // wheel + pinch; true === "pointer"; "center" zooms
-                        // around the viewport center; false disables
-    resize: true,       // observe wrapper size when responsive === false
-}
-```
+Contents:
+
+- [Flags and the callbacks they gate](#flags-and-the-callbacks-they-gate)
+- [Pointer callback payload](#pointer-callback-payload)
+- [Camera callbacks](#camera-callbacks)
+- [Keyboard camera control](#keyboard-camera-control)
+- [Runtime mode switching](#runtime-mode-switching)
+- Patterns: [hitTest](#pattern-item-click--hover-via-hittest),
+  [cursor](#pattern-cursor-management), [hover](#pattern-hover-highlight),
+  [painting](#pattern-click-drag-painting),
+  [marquee](#pattern-drag-to-select-marquee),
+  [mode keys](#pattern-keyboard-driven-mode-switching-vanilla)
+- [Best practices](#best-practices)
+
+## Flags and the callbacks they gate
+
+| Flag | Enables | Gates |
+| :-- | :-- | :-- |
+| `click` | tap / click | `onClick`. Skipped after a press that panned; with `drag: false` it also fires after press-move-release. |
+| `rightClick` | DOM context menu capture (the browser menu is prevented only while on) | `onRightClick` |
+| `hover` | move reporting | `onHover`. Mouse: not while drag-panning. Touch (incl. RN): every one-finger move, also while panning. |
+| `drag` | drag / one-finger pan | nothing: `drag: false` keeps down/up firing and only skips panning |
+| `zoom` | wheel + pinch; `true`/`"pointer"` anchors at the cursor or pinch midpoint, `"center"` at the viewport center | `onWheel`, and `onZoom` from gestures (programmatic zooms fire `onZoom` regardless) |
+| `resize` | wrapper observation while `responsive` is `false` | `onResize` for observed sizes |
+| `keyboard` (core >= 0.12) | keyboard camera control, see [below](#keyboard-camera-control) | keyboard `onClick` |
+| no flag | - | `onMouseDown`, `onMouseUp`, `onMouseLeave`, `onCoordsChange`, `onDraw`, programmatic `onZoom`, `onResize` from `resize()` / responsive modes |
+
+`onMouseDown`/`onMouseUp` fire for the primary mouse button and touch
+start/end only (right -> `onRightClick`, middle -> browser).
 
 ## Pointer callback payload
 
 `onClick`, `onRightClick`, `onHover`, `onMouseDown`, `onMouseUp`,
-`onMouseLeave` all receive `(coords, mouse, client)`.
-`onMouseDown`/`onMouseUp` fire for the primary (left) mouse button only
-(right → `onRightClick`, middle → browser) and for touch start/end:
+`onMouseLeave` (and `onWheel`) receive `(coords, mouse, client)`:
 
-| Argument | Space       | `raw`                                     | `snapped`                                    |
-| :------- | :---------- | :---------------------------------------- | :------------------------------------------- |
-| `coords` | World       | Exact world coordinate under the pointer. | Floored world grid cell (integer).           |
-| `mouse`  | Canvas px   | Canvas-relative pixel position.           | Pixel position of the snapped cell's center. |
-| `client` | Viewport px | Browser viewport pixel position.          | Viewport pixel of the snapped cell's center. |
+| Argument | `raw` | `snapped` |
+| :-- | :-- | :-- |
+| `coords` | World point in RAW (corner) space: cell k spans `[k, k+1]`. | `Math.floor(raw)`: the cell's integer, i.e. the item `x`/`y` of that cell. |
+| `mouse` | Canvas-relative CSS px. | Canvas px of the snapped cell's CENTER. |
+| `client` | `clientX`/`clientY` (viewport px). | `mouse.snapped` + the canvas rect offset. |
 
-Usage rule of thumb: `coords.snapped` for game/grid logic, `mouse.raw` for
-custom canvas drawing, `client.raw` for positioning DOM popovers/tooltips.
+Why raw and item space differ by half a cell:
+[core-api.md](core-api.md#coordinate-spaces). Rule of thumb: `coords.raw`
+into `hitTest*`, `coords.snapped` for grid logic and `goCenter`, `mouse.raw`
+for custom canvas drawing, `client.raw` for DOM popovers/tooltips.
+
+`onClick` gets a 4th argument `info?: ClickInfo` (core >= 0.12):
+`info.source` is `"pointer"`, or `"keyboard"` for Enter/Space, where the
+coordinates describe the viewport center (skip pointer-only UI then).
 
 ```ts
-engine.onClick = (coords, mouse, client) => {
+engine.onClick = (coords, mouse, client, info) => {
     placeUnit(coords.snapped.x, coords.snapped.y);
-    showTooltipAt(client.raw.x, client.raw.y);
+    if (info?.source !== "keyboard") showTooltipAt(client.raw.x, client.raw.y);
 };
 ```
 
-Touch behavior: taps fire `onClick`; touch drags pan (when `drag` enabled);
-pinch zooms (when `zoom` enabled). A drag suppresses the click that would
-otherwise fire on release.
-
-In pointer zoom mode, a moving pinch midpoint keeps the same world point
-underneath it unless camera bounds constrain the result. This translation
-still works at `minScale`/`maxScale`. Center zoom mode ignores midpoint
-movement and keeps the viewport center anchored.
-
-Browser Canvas2D/WebGL drags track mouse movement and release outside the
-canvas. `onMouseLeave` still fires immediately but does not stop the drag;
-ordinary hover remains local. Release coordinates can be outside the canvas.
-`touchcancel`, window blur, lost mouse buttons, and renderer teardown cancel
-the gesture without clicking, release an active press once via `onMouseUp`
-(last known position if needed), and clear drag/pinch state. Remaining fingers
-from a cancelled touch gesture are ignored until a fresh gesture. Only touches
-that started on the canvas participate; other elements' contacts are excluded.
+Touch: a drag or pinch suppresses the click on release. A moving pinch
+midpoint keeps its world point underneath in pointer zoom mode (unless
+`bounds` constrain it); center mode ignores it. Browser drags track the
+mouse outside the canvas: `onMouseLeave` fires but does not stop the drag,
+and `onMouseUp` still fires once on release (possibly outside the canvas).
+`touchcancel`, window blur, a lost button and teardown cancel the gesture
+without a click, release an active press once via `onMouseUp` and clear
+drag/pinch state. Only touches that started on the canvas count.
 
 ## Camera callbacks
 
-```ts
-engine.onCoordsChange = (center: Coords) => {};
-// Fires on ANY camera movement: drag, wheel/pinch, setCenter, goCenter,
-// setBounds clamping, resize re-centering. The primary hook for syncing
-// minimaps, URL state, or coordinate readouts.
+| Callback | Fires on | Does NOT fire on |
+| :-- | :-- | :-- |
+| `onCoordsChange(center)` (item space) | Every camera notification: drag pan, wheel/pinch, keyboard pan and zoom, `setCenter`, `goCenter` (each frame), `setScale`/`goScale`/`zoomIn`/`zoomOut`, `setScaleLimits`, `setBounds`, `fitBounds`. Also zoom-only and no-op calls: it means "camera touched", not "center moved". | Any resize (responsive, `eventHandlers.resize`, `resize()`, RN layout) or pixel-ratio change - the center is kept, but the visible area changes, so minimaps and readouts also need `onResize`. |
+| `onZoom(scale)` | The scale actually changed: wheel, pinch, keyboard `+`/`-`, `setScale`, `goScale` (each frame), `zoomIn`/`zoomOut`, `fitBounds`, `setScaleLimits` clamping, `"preserve-viewport"` resizes. | A gesture clamped at a limit, unchanged values. |
+| `onWheel(coords, mouse, client, wheel)` | A wheel or pinch gesture (needs `zoom`), even when clamped at a limit. `wheel = { deltaY, direction: "in" \| "out", source: "wheel" \| "pinch" }`; `deltaY < 0` = zoom in; pinch reports the midpoint and a factor-equivalent delta. | Keyboard and programmatic zooms. |
+| `onResize()` | `resize()` completion, an observed wrapper resize (`eventHandlers.resize` or a responsive mode), a pixel-ratio change, RN layout. | Camera moves. |
 
-engine.onZoom = (scale: number) => {};
-// Fires on ANY scale CHANGE: wheel, pinch, setScale, goScale, zoomIn, zoomOut,
-// setScaleLimits clamping the current scale into a new range, and
-// preserve-viewport responsive resizes (the resize changes the scale).
-// Silent when the scale does not actually move (a wheel/pinch at minScale or
-// maxScale), so non-idempotent handlers are safe here.
+Timing of `onZoom`/`onCoordsChange`/`onComplete` per programmatic call
+(instant vs animated, interruption):
+[core-api.md](core-api.md#animation-and-interruption).
 
-engine.onWheel = (coords, mouse, client, wheel) => {};
-// Fires for wheel (desktop) and pinch (touch) zoom gestures — requires
-// eventHandlers.zoom, and fires even when the scale is clamped at a limit.
-// coords/mouse/client are the standard payload (pinch: the pinch midpoint);
-// wheel = { deltaY, direction: "in" | "out", source: "wheel" | "pinch" }
-// (deltaY < 0 = zoom in; for pinch it is the factor-equivalent wheel delta).
+## Keyboard camera control
 
-engine.onResize = () => {};
-// Fires after manual resize() or an observed wrapper resize.
-```
+(core >= 0.12.) DOM renderers only (RN's `View` has no key events, the
+server has no input). The handler sits on the WRAPPER and acts only on keys
+pressed while the wrapper ITSELF has focus, so inputs and buttons you place
+inside the wrapper keep all their keys. The wrapper is a tab stop when
+`accessibility.focusable` is true (derived by default - see
+[core-api.md](core-api.md#accessibility-and-reduced-motion)); a click on the
+canvas focuses it too.
+
+| Key | Action | Gate while `keyboard` is unset |
+| :-- | :-- | :-- |
+| Arrow keys | pan by `panPx` (default 80 screen px) or `pan` world units (`panPx` wins) | `drag` |
+| `+` / `=` | zoom in by `zoomFactor` (default 1.5) around the viewport center | `zoom` |
+| `-` / `_` | zoom out by `zoomFactor` | `zoom` |
+| `Enter` / `Space` | `onClick` at the viewport center, `info.source === "keyboard"` | `click` (and `onClick` assigned) |
+
+- `keyboard` unset (default) mirrors the pointer gates above; the object
+  form `{ pan?, panPx?, zoomFactor? }` sets step sizes and still mirrors;
+  `true` forces every key on; `false` turns them all off.
+- Never captured: `Tab`, `Escape`, `Home`, `End`, `PageUp`/`PageDown` and
+  any Ctrl/Meta/Alt chord; Shift only on the zoom keys. Only consumed keys
+  are `preventDefault`ed.
+- Keyboard pan/zoom fire `onCoordsChange` and (when the scale moves)
+  `onZoom`, never `onWheel`.
 
 ## Runtime mode switching
 
@@ -103,217 +128,198 @@ function enablePanMode() {
     engine.canvas.style.cursor = "grab";
 }
 function enableReadOnlyMode() {
-    engine.setEventHandlers({
-        click: false,
-        rightClick: false,
-        hover: false,
-        drag: false,
-        zoom: false,
-    });
+    engine.setEventHandlers({ click: false, rightClick: false, hover: false, drag: false, zoom: false });
 }
 ```
 
 CRITICAL for paint/marquee tools: disable `drag` while the tool is active,
 otherwise pointer movement pans the camera AND paints simultaneously.
+Toggling flags also moves the derived tab stop (`accessibility.focusable`).
 
 ## Pattern: item click / hover via hitTest
 
-For "which item did the user click/hover?" use the built-in hit testing -
-do NOT build coordinate lookup maps or hand-roll box math (the 0.5 cell
-offset is easy to get wrong):
-
-Attach app data to items with the `data` field (never read by the engine)
-and read it back from the hit - do not rely on `hit.index`, which goes stale
-when a filtered/re-ordered array is re-drawn:
+For "which item did the user click/hover?" use the built-in hit testing,
+NOT coordinate lookup maps or hand-rolled box math (the half-cell offset is
+easy to get wrong). Attach app data via the item `data` field and read it
+back from the hit (not `hit.index`, which goes stale after a re-draw):
 
 ```ts
-engine.drawCircle(stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })), 2);
+import type { Circle } from "@canvas-tile-engine/core";
+
+type Station = { id: string; name: string; x: number; y: number };
+const dots = stations.map((s: Station): Circle<Station> => ({ x: s.x, y: s.y, size: 1, data: s }));
+engine.drawCircle(dots, 2);
 engine.onClick = (coords) => {
-    const hit = engine.hitTestFirst<Station>(coords.raw); // raw, not snapped
+    // raw, not snapped; padding widens small markers (world units)
+    const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
     if (hit?.item.data) select(hit.item.data); // typed as Station
 };
 ```
 
-Small markers hard to click? Expand the hit area with `padding` (world
-units) or `paddingPx` (screen pixels, zoom-independent) instead of drawing
-invisible oversized halo items:
-
-```ts
-const hit = engine.hitTestFirst(coords.raw, { padding: 0.6 });
-```
-
-React / React Native: the hook handle exposes the same methods (empty
-result before mount, no null checks needed), and items drawn by the
-declarative components are included automatically:
-
-```tsx
-const engine = useCanvasTileEngine();
-
-<CanvasTileEngine
-    engine={engine}
-    onClick={(coords) => {
-        const hit = engine.hitTestFirst<Station>(coords.raw);
-        setSelected(hit?.item.data ?? null); // data attached to items below
-    }}
-    /* ... */
->
-    {/* stationDots items carry data: station */}
-    <CanvasTileEngine.Circle items={stationDots} layer={2} />
-</CanvasTileEngine>;
-```
-
-Full semantics: [core-api.md](core-api.md) hit testing section (kinds
-covered, ordering, staleness rule).
+`paddingPx` is the zoom-independent alternative to `padding`. React / React
+Native: the hook handle has the same methods (empty result before mount)
+and its hits include items drawn by the declarative components. Full
+semantics (kinds, ordering, what never hits):
+[core-api.md](core-api.md#hit-testing).
 
 ## Pattern: cursor management
 
 The engine never sets `canvas.style.cursor` - the app owns cursor policy
-entirely (there is no cursor config). Reset in BOTH `onMouseUp` and
-`onMouseLeave`: releasing the button outside the canvas never fires
-`onMouseUp`, so without the leave reset the cursor sticks on "grabbing".
+entirely. On the browser renderers `onMouseUp` fires once per press even
+when the button is released outside the canvas, so resetting there is
+enough; also reset in `onMouseLeave` when hover picks the cursor.
 
 ```ts
-engine.canvas.style.cursor = "grab"; // idle
+const idle = () => {
+    engine.canvas.style.cursor = "grab";
+};
+idle();
 engine.onMouseDown = () => {
     engine.canvas.style.cursor = "grabbing";
 };
-engine.onMouseUp = () => {
-    engine.canvas.style.cursor = "grab";
-};
-engine.onMouseLeave = () => {
-    engine.canvas.style.cursor = "grab";
-};
-// Optional item feedback; onHover never fires mid-drag, so no conflict:
+engine.onMouseUp = idle;
+engine.onMouseLeave = idle;
+// Optional item feedback; mouse onHover never fires mid-drag:
 engine.onHover = (c) => {
-    engine.canvas.style.cursor = items.has(`${c.snapped.x},${c.snapped.y}`)
-        ? "pointer"
-        : "grab";
+    engine.canvas.style.cursor = engine.hitTestFirst(c.raw) ? "pointer" : "grab";
 };
 ```
 
 ## Pattern: hover highlight
 
-A registration id replaces the previous draw call instead of accumulating -
-no handle bookkeeping (core >= 0.10; on older cores swap a `DrawHandle` via
-`removeDrawHandle` instead):
+A registration id replaces the previous draw call instead of accumulating
+(core >= 0.10). Re-register only when the hovered cell changes:
 
 ```ts
+let hovered = "";
 engine.onHover = (coords) => {
-    engine.drawRect(
-        {
-            x: coords.snapped.x,
-            y: coords.snapped.y,
-            size: 1,
-            style: { fillStyle: "rgba(56, 189, 248, 0.25)" },
-        },
-        10, // high layer -> on top
-        { id: "hover" }, // same id -> replaces the previous highlight
-    );
+    const key = `${coords.snapped.x},${coords.snapped.y}`;
+    if (key === hovered) return;
+    hovered = key;
+    const { x, y } = coords.snapped;
+    const fill = { fillStyle: "rgba(56, 189, 248, 0.25)" };
+    // high layer -> on top; same id replaces the previous highlight
+    engine.drawRect({ x, y, size: 1, style: fill }, 10, { id: "hover", hitTest: false });
     engine.render();
 };
 
 engine.onMouseLeave = () => {
+    hovered = "";
     engine.drawRect([], 10, { id: "hover" }); // replace with nothing
     engine.render();
 };
 ```
 
+To tint existing items instead, use `styleOf` reading the hovered id
+([drawing.md](drawing.md#styleof-visibleof-interactiveof)).
+
+`onHover` does not fire during wheel zoom or drag-panning, so a tooltip
+anchored to the pointer goes stale while the map moves under it: hide it in
+`onCoordsChange` (and `onMouseLeave`) and let the next `onHover` show it
+again.
+
 ## Pattern: click-drag painting
 
-```ts
-let painting = false;
-const painted = new Set<string>();
+Register the cells ONCE; painting only mutates a map and calls `render()`
+(`visibleOf`/`styleOf` read it live, nothing re-registers):
 
-function redrawPaintLayer() {
-    const rects = Array.from(painted).map((key) => {
-        const [x, y] = key.split(",").map(Number);
-        return { x, y, size: 1, style: { fillStyle: "#38bdf8" } };
-    });
-    engine.drawRect(rects, 2, { id: "paint" });
+```ts
+import type { Coords, Rect } from "@canvas-tile-engine/core";
+
+const W = 64;
+const H = 64;
+const painted = new Map<string, string>(); // "x,y" -> color
+const cells: Rect[] = [];
+for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) cells.push({ x, y, size: 1 });
+}
+engine.drawRect(cells, 2, {
+    hitTest: false,
+    visibleOf: (c) => painted.has(`${c.x},${c.y}`),
+    styleOf: (c) => ({ fillStyle: painted.get(`${c.x},${c.y}`) }),
+});
+
+let painting = false;
+let color = "#38bdf8";
+function paintAt(c: { snapped: Coords }) {
+    const { x, y } = c.snapped;
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    if (painted.get(`${x},${y}`) === color) return;
+    painted.set(`${x},${y}`, color);
     engine.render();
 }
 
+engine.setEventHandlers({ drag: false, hover: true }); // paint mode
 engine.onMouseDown = (coords) => {
     painting = true;
-    painted.add(`${coords.snapped.x},${coords.snapped.y}`);
-    redrawPaintLayer();
+    paintAt(coords);
 };
 engine.onHover = (coords) => {
-    if (!painting) return;
-    const key = `${coords.snapped.x},${coords.snapped.y}`;
-    if (!painted.has(key)) {
-        painted.add(key);
-        redrawPaintLayer();
-    }
+    if (painting) paintAt(coords);
 };
-engine.onMouseUp = () => {
+const stop = () => {
     painting = false;
 };
-engine.onMouseLeave = () => {
-    painting = false;
-};
+engine.onMouseUp = stop;
+engine.onMouseLeave = stop;
+// Back to pan mode: engine.setEventHandlers({ drag: true });
 ```
 
-Requires `eventHandlers: { hover: true, drag: false, ... }` while painting.
+Works on touch too: a finger move reports `onHover` while `hover` is on.
 
 ## Pattern: drag-to-select (marquee)
 
+With `drag: false` while the tool is active, collect the press and release
+points in RAW space and ask the engine which items fall inside:
+
 ```ts
-let selecting = false;
-let start = { x: 0, y: 0 };
+import type { Coords } from "@canvas-tile-engine/core";
+
+let start: Coords | null = null;
 
 engine.onMouseDown = (coords) => {
-    selecting = true;
-    start = coords.snapped;
+    start = coords.raw;
 };
 engine.onMouseUp = (coords) => {
-    if (!selecting) return;
-    selecting = false;
-    const minX = Math.min(start.x, coords.snapped.x);
-    const maxX = Math.max(start.x, coords.snapped.x);
-    const minY = Math.min(start.y, coords.snapped.y);
-    const maxY = Math.max(start.y, coords.snapped.y);
-    selectRegion({ minX, maxX, minY, maxY });
+    if (!start) return;
+    const hits = engine.hitTestRect(
+        { minX: start.x, minY: start.y, maxX: coords.raw.x, maxY: coords.raw.y },
+        { mode: "intersect" }, // or "contain"
+    );
+    start = null;
+    select(hits.map((h) => h.item.data));
 };
 ```
+
+For a cell range instead of items, use `coords.snapped` at both ends and
+take `Math.min`/`Math.max` per axis (inclusive cell indices).
 
 ## Pattern: keyboard-driven mode switching (vanilla)
 
+The engine's keys cover camera control only. Wire other shortcuts yourself
+(`Tab`, `Escape`, `Home`, `End`, `PageUp`/`PageDown` and modifier chords are
+never captured, so they stay yours) and translate them into camera calls or
+`setEventHandlers` flips:
+
 ```ts
+// Hold Shift to paint, release to pan
 window.addEventListener("keydown", (e) => {
-    if (e.key === "Shift") {
-        engine.setEventHandlers({ drag: false, hover: true });
-    }
-    if (e.code === "Space") {
-        engine.setEventHandlers({ drag: true, hover: false });
-    }
+    if (e.key === "Shift") engine.setEventHandlers({ drag: false, hover: true });
 });
 window.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") {
-        engine.setEventHandlers({ drag: true, hover: false });
-    }
+    if (e.key === "Shift") engine.setEventHandlers({ drag: true, hover: false });
 });
 ```
-
-The engine's own keyboard binding covers camera control only (arrows pan, `+`/
-`-` zoom, `Enter`/`Space` fire `onClick` at the viewport center - see
-`eventHandlers.keyboard`, DOM renderers only). For anything else - mode flips,
-shortcuts, tool switching - wire `keydown`/`keyup` yourself and translate them
-into camera calls (`goCenter`, `zoomIn`, ...) or `setEventHandlers` flips.
-`Tab`, `Escape`, `Home`, `End`, `PageUp`/`PageDown` and Ctrl/Meta/Alt chords are
-never captured by the engine, so they stay yours. The engine only handles keys
-pressed while the wrapper itself has focus, so inputs and buttons you place
-inside the wrapper keep all of their keys.
 
 ## Best practices
 
 - Enable only the events the UI needs; each enabled path costs listeners and
   per-move math.
-- Keep transient visuals (hover, selection) on their own high layer or a
-  single replaced `DrawHandle`.
+- Keep transient visuals (hover, selection) on their own high layer under a
+  registration id, or tint items with `styleOf`.
 - Clear tool state in `onMouseLeave` - pointers leave mid-gesture.
-- `onCoordsChange` + `onZoom` + `onResize` are the sync points for external
-  UI (minimaps, readouts, URL params).
-- Platform notes: `rightClick` and cursor styling are DOM-only; React Native has
-  taps, drags, and pinch but no hover or right-click (see
-  [react-native.md](react-native.md)).
+- Sync external UI (minimaps, readouts, URL params) from `onCoordsChange` +
+  `onZoom` + `onResize`.
+- Platform notes: `rightClick`, keyboard and cursor styling are DOM-only.
+  React Native has taps, drags, pinch and finger-move `onHover`, but no
+  pointer hover or right-click (see [react-native.md](react-native.md)).
