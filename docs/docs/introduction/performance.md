@@ -47,7 +47,7 @@ Renderer behavior differs:
 | Skia | Records a reusable `SkPicture`. |
 | Server | Uses an offscreen `@napi-rs/canvas` cache. |
 
-Clear caches when underlying static data changes:
+Caches render once, at the camera scale active when the static helper is called, and are scaled on zoom after that. When the underlying data changes, call the helper again with the same `cacheKey`: it replaces the registration and renders a fresh cache at the current scale (which also sharpens a Canvas2D or server bitmap after zooming in). `clearStaticCache` only releases cached content; it does not re-render a registered layer:
 
 ```ts
 engine.clearStaticCache("terrain");
