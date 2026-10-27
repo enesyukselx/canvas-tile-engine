@@ -75,8 +75,9 @@ rebuilds the cache (core >= 0.10). Zoom behavior differs: Canvas2D/server
 blit a bitmap captured at the registration scale and pixel ratio (softens
 when zoomed in past it), Skia replays a recorded picture, WebGL draws
 dynamically. Canvas2D/server bitmaps are capped at 16384 physical px per
-side; a larger world extent * scale * pixel ratio warns once and falls back
-to dynamic drawing. Details: [drawing.md](drawing.md).
+side and ~16.7M px in area: past that the pixel ratio is lowered (never
+below 1), and only a cache too large even at ratio 1 warns once and falls
+back to dynamic drawing. Details: [drawing.md](drawing.md).
 
 ## Practical budgets (rough, from the repo's own examples)
 

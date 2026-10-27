@@ -462,9 +462,10 @@ registration (`devicePixelRatio` in the browser, the renderer's `pixelRatio`
 on the server), so at the registration scale a static layer is as crisp as
 a dynamic draw, on HiDPI screens and in `pixelRatio: 2` images too
 (core >= 0.12; older releases render it at CSS-pixel resolution, slightly
-soft at ratios above 1). Like the scale, the ratio is captured once: after
-the window moves to a screen with a different `devicePixelRatio`,
-re-register to re-render at the new ratio.
+soft at ratios above 1). When `devicePixelRatio` changes (browser zoom,
+another monitor), the layer re-records itself once on the next frame. A
+bitmap that would exceed 16384 px a side or ~16.7M px in area at the device
+ratio is recorded at a lower ratio (never below 1) instead.
 
 To keep a Canvas2D static layer sharp on a zoomable map, re-register it
 (same `cacheKey`) once a zoom settles above the recorded scale, e.g. from a

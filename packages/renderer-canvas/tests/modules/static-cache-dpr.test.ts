@@ -135,18 +135,46 @@ describe("browser static cache pixel ratio", () => {
         expectNear(blit.args.slice(1), [91, 91, 111, 111, 0, 0, 55.5, 55.5]);
     });
 
-    it("records the ratio at registration", () => {
-        let dpr = 2;
+    it("re-records once on the next frame after the ratio changes", () => {
+        let dpr = 1;
         const { draw, render } = setup(() => dpr);
-        draw.drawStaticRect([rect], "first");
-        dpr = 1;
+        draw.drawStaticRect([{ ...rect, style: { fillStyle: "#00ff00" } }], "rect");
+        expectNear(render()[0].args.slice(1, 5), [1, 1, 100, 100]);
 
-        // The existing cache keeps its 2x bitmap and mapping...
-        expectNear(render()[0].args.slice(1, 5), [1, 1, 200, 200]);
+        // Browser zoom / another monitor: the next frame re-records at 2x...
+        dpr = 2;
+        const [blit] = render();
+        expect(FakeOffscreenCanvas.created.map((canvas) => canvas.width)).toEqual([102, 202]);
+        expect(blit.args[0]).toBe(FakeOffscreenCanvas.created[1]);
+        expectNear(blit.args.slice(1, 5), [1, 1, 200, 200]);
+        // ...on a fresh context, so the per-pass fill memo does not skip the color.
+        expect(FakeOffscreenCanvas.created[1].ctx.fillStyle).toBe("#00ff00");
 
-        // ...and only a new registration picks up the new ratio.
-        draw.drawStaticRect([rect], "second");
-        expect(FakeOffscreenCanvas.created.map((canvas) => canvas.width)).toEqual([202, 102]);
+        // ...and only once.
+        render();
+        expect(FakeOffscreenCanvas.created).toHaveLength(2);
+    });
+
+    it("lowers the ratio to fit the per-side cap instead of dropping the cache", () => {
+        const { draw } = setup(() => 2);
+        // A 1200 x 10 strip at scale 10: 12000 CSS px wide, 24000 px at 2x,
+        // and small enough in area that only the per-side cap binds.
+        draw.drawStaticRect([{ ...rect, width: 1200, height: 10 }], "strip");
+
+        expect(FakeOffscreenCanvas.created).toHaveLength(1);
+        const [offscreen] = FakeOffscreenCanvas.created;
+        expect(offscreen.width).toBeLessThanOrEqual(16384);
+        expect(offscreen.width).toBeGreaterThan(16000);
+    });
+
+    it("lowers the ratio to fit the area cap on high-DPR screens", () => {
+        const { draw } = setup(() => 3);
+        // 200 world units at scale 10: 2000x2000 CSS px, 36M px at 3x.
+        draw.drawStaticRect([{ ...rect, size: 200 }], "minimap");
+
+        const [offscreen] = FakeOffscreenCanvas.created;
+        expect(offscreen.width * offscreen.height).toBeLessThanOrEqual(16_777_216);
+        expect(offscreen.width).toBeGreaterThan(2002 * 2);
     });
 });
 

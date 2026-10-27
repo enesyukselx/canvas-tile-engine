@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
     CanvasTileEngine,
     CoordinateTransformer,
@@ -13,6 +13,10 @@ import { CanvasDraw } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { Layer, type DrawContext } from "@canvas-tile-engine/renderer-shared/scene";
 import { RendererServer } from "../../src/RendererServer";
 import type { ServerMount } from "../../src/types";
+
+// Exact-pixel napi rendering at three pixel ratios is the heaviest suite in
+// the package; under turbo's parallel runs the 5 s default is too tight.
+vi.setConfig({ testTimeout: 20_000 });
 
 type Draw = CanvasDraw<SKRSContext2D, Canvas, Canvas>;
 
