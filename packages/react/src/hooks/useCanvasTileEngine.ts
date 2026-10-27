@@ -27,13 +27,12 @@ export interface EngineHandle extends EngineHandleBase<HTMLDivElement, HTMLImage
  *   const mainMap = useCanvasTileEngine();
  *   const miniMap = useCanvasTileEngine();
  *
+ *   // It can run twice as the engines attach, so the draw must be idempotent: the id replaces.
  *   useEffect(() => {
- *     if (mainMap.isReady && miniMap.isReady) {
- *       // Both engines are ready, draw items
- *       mainMap.drawGridLines(50);
- *       mainMap.render();
- *     }
- *   }, [mainMap.isReady, miniMap.isReady]);
+ *     if (!mainMap.instance || !miniMap.instance) return;
+ *     mainMap.drawGridLines(50, 1, "#ccc", 0, { id: "grid" });
+ *     mainMap.render();
+ *   }, [mainMap, miniMap, mainMap.instance, miniMap.instance]);
  *
  *   return (
  *     <>

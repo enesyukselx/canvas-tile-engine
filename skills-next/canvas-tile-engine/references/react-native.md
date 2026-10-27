@@ -4,8 +4,8 @@ Package: `@canvas-tile-engine/react-native`, rendered through
 `@canvas-tile-engine/renderer-skia` on `@shopify/react-native-skia`. The API
 mirrors the React web package - same compound components, same
 `useCanvasTileEngine` handle, same rules ([react.md](react.md): mount-once
-props, effects keyed on `engine.instance`, stable `items`, `styleOf`) - with
-the platform differences below.
+props, effects keyed on `engine.instance` with an `id` or cleanup on every
+draw, stable `items`, `styleOf`) - with the platform differences below.
 
 Contents:
 

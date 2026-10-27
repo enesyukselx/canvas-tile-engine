@@ -143,16 +143,20 @@ Imperative:
 
 ```tsx
 useEffect(() => {
-    if (!engine.isReady) return;
+    if (!engine.instance) return;
 
-    engine.drawGridLines(1, 1, "#334155", 0);
-    engine.drawRect(rects, 1);
+    // Ids make the effect idempotent: drawing again with the same id replaces
+    // the previous registration instead of adding a second one.
+    engine.drawGridLines(1, 1, "#334155", 0, { id: "grid" });
+    engine.drawRect(rects, 1, { id: "rects" });
     engine.render();
-}, [engine, engine.isReady, rects]);
+}, [engine, engine.instance, rects]);
 ```
 
+Keep an imperative effect idempotent: pass an `id` to every draw call, or return a cleanup that calls `engine.removeDrawHandle(handle)` for each handle it registered. The effect can run twice as the engine attaches, and every change to another dependency (`rects` here) runs it again on the same engine; without an id or cleanup each run adds its registrations again, so items paint and hit-test more than once.
+
 :::note
-If you remount the component with a `key` (for example to swap `renderer` or `config`), depend on `engine.instance` instead of `engine.isReady`. During a remount `isReady` returns to `true` within the same effect flush, so effects keyed on it do not re-run, while `engine.instance` changes identity with every new engine. Draw calls made while no engine is mounted are dropped and log a dev-only console warning.
+Depend on `engine.instance`, not `engine.isReady`, so the effect also runs for a new engine when you remount the component with a `key` (for example to swap `renderer` or `config`). During a remount `isReady` returns to `true` within the same effect flush, so effects keyed on it do not re-run, while `engine.instance` changes identity with every new engine. Draw calls made while no engine is mounted are dropped and log a dev-only console warning.
 :::
 
 For declarative draw components, keep large `items` arrays stable with `useMemo` or state. A new array identity re-registers the draw callback and can rebuild spatial indexes.

@@ -105,12 +105,13 @@ const remainingPointers = (e: GestureTouchEvent): NormalizedPointer[] => {
  * ```tsx
  * function App() {
  *   const engine = useCanvasTileEngine();
+ *   // Keyed on engine.instance so it also re-runs on the new engine after a `key` remount.
+ *   // It can run twice as the engine attaches, so the draw must be idempotent: the id replaces.
  *   useEffect(() => {
- *     if (engine.isReady) {
- *       engine.drawGridLines(50);
- *       engine.render();
- *     }
- *   }, [engine.isReady]);
+ *     if (!engine.instance) return;
+ *     engine.drawGridLines(50, 1, "#ccc", 0, { id: "grid" });
+ *     engine.render();
+ *   }, [engine, engine.instance]);
  *   return <CanvasTileEngine engine={engine} config={config} renderer={new RendererSkia()} style={{ flex: 1 }} />;
  * }
  * ```

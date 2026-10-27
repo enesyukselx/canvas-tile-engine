@@ -44,11 +44,82 @@ function droppedDraw(method: string): DrawHandle {
     if (typeof process !== "undefined" && process.env.NODE_ENV !== "production") {
         console.warn(
             `Canvas Tile Engine: ${method}() was called before the engine mounted, so the call was dropped. ` +
-                `Gate imperative draw calls on engine.isReady and include engine.instance in your effect deps ` +
-                `so they re-run when the engine remounts.`,
+                `Make imperative draw calls from an effect that returns early while engine.instance is null ` +
+                `and lists engine.instance in its deps, so it re-runs when the engine remounts. ` +
+                `That effect can run twice as the engine attaches: pass an id (same id replaces) ` +
+                `or remove the returned handle in the effect's cleanup.`,
         );
     }
     return DUMMY_DRAW_HANDLE;
+}
+
+const isDev = () => typeof process !== "undefined" && process.env.NODE_ENV !== "production";
+
+/**
+ * Dev only: the live id-less registrations made through a handle, per engine,
+ * by what was drawn (the items, or a grid's arguments) and layer. The same key
+ * registered twice on one layer without an id, and without removing the first,
+ * is almost always an imperative effect that ran twice (it can as the engine
+ * attaches), so everything paints and hit-tests twice. Reported once per engine.
+ */
+type UnnamedDraws = {
+    byKey: Map<unknown, Map<number, symbol>>;
+    byHandle: Map<symbol, [unknown, number]>;
+    warned: boolean;
+};
+const unnamedDraws = new WeakMap<object, UnnamedDraws>();
+
+/** Forward a draw to the engine (or drop it before mount), tracking id-less registrations in dev. */
+function trackDraw<E extends object>(
+    engine: E | null,
+    method: string,
+    key: unknown,
+    options: { id?: string } | undefined,
+    draw: (engine: E) => DrawHandle,
+): DrawHandle {
+    if (!engine) {
+        return droppedDraw(method);
+    }
+    const handle = draw(engine);
+    if (options?.id !== undefined || !isDev()) {
+        return handle;
+    }
+    let draws = unnamedDraws.get(engine);
+    if (!draws) {
+        draws = { byKey: new Map(), byHandle: new Map(), warned: false };
+        unnamedDraws.set(engine, draws);
+    }
+    const layers = draws.byKey.get(key) ?? new Map<number, symbol>();
+    draws.byKey.set(key, layers);
+    if (layers.has(handle.layer) && !draws.warned) {
+        draws.warned = true;
+        console.warn(
+            `Canvas Tile Engine: ${method}() registered the same content on layer ${handle.layer} twice without an id, ` +
+                `so it now paints and hit-tests twice. An imperative effect can run twice as the engine attaches: ` +
+                `pass an id (same id replaces) or remove the returned handle in the effect's cleanup.`,
+        );
+    }
+    layers.set(handle.layer, handle.id);
+    draws.byHandle.set(handle.id, [key, handle.layer]);
+    return handle;
+}
+
+/** Forget tracked registrations removed through the handle: one handle, one layer, or all. */
+function untrackDraws(engine: object | null, which: { handle: DrawHandle } | { layer: number } | "all"): void {
+    const draws = engine && unnamedDraws.get(engine);
+    if (!draws) {
+        return;
+    }
+    for (const [id, [key, layer]] of draws.byHandle) {
+        const matches = which === "all" || ("handle" in which ? which.handle.id === id : which.layer === layer);
+        if (matches) {
+            draws.byHandle.delete(id);
+            const layers = draws.byKey.get(key);
+            if (layers?.get(layer) === id) {
+                layers.delete(layer);
+            }
+        }
+    }
 }
 
 /**
@@ -450,7 +521,9 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
             },
 
             drawRect(items, layer, options) {
-                return instanceRef.current?.drawRect(items, layer, options) ?? droppedDraw("drawRect");
+                return trackDraw(instanceRef.current, "drawRect", items, options, (e) =>
+                    e.drawRect(items, layer, options),
+                );
             },
 
             drawStaticRect(items, cacheKey, layer, options) {
@@ -461,7 +534,9 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
             },
 
             drawCircle(items, layer, options) {
-                return instanceRef.current?.drawCircle(items, layer, options) ?? droppedDraw("drawCircle");
+                return trackDraw(instanceRef.current, "drawCircle", items, options, (e) =>
+                    e.drawCircle(items, layer, options),
+                );
             },
 
             drawStaticCircle(items, cacheKey, layer, options) {
@@ -472,19 +547,27 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
             },
 
             drawLine(items, style, layer, options) {
-                return instanceRef.current?.drawLine(items, style, layer, options) ?? droppedDraw("drawLine");
+                return trackDraw(instanceRef.current, "drawLine", items, options, (e) =>
+                    e.drawLine(items, style, layer, options),
+                );
             },
 
             drawText(items, layer, options) {
-                return instanceRef.current?.drawText(items, layer, options) ?? droppedDraw("drawText");
+                return trackDraw(instanceRef.current, "drawText", items, options, (e) =>
+                    e.drawText(items, layer, options),
+                );
             },
 
             drawPath(items, layer, options) {
-                return instanceRef.current?.drawPath(items, layer, options) ?? droppedDraw("drawPath");
+                return trackDraw(instanceRef.current, "drawPath", items, options, (e) =>
+                    e.drawPath(items, layer, options),
+                );
             },
 
             drawImage(items, layer, options) {
-                return instanceRef.current?.drawImage(items, layer, options) ?? droppedDraw("drawImage");
+                return trackDraw(instanceRef.current, "drawImage", items, options, (e) =>
+                    e.drawImage(items, layer, options),
+                );
             },
 
             drawStaticImage(items, cacheKey, layer, options) {
@@ -495,17 +578,22 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
             },
 
             drawGridLines(cellSize, lineWidth, strokeStyle, layer, options) {
-                return (
-                    instanceRef.current?.drawGridLines(cellSize, lineWidth, strokeStyle, layer, options) ??
-                    droppedDraw("drawGridLines")
+                return trackDraw(
+                    instanceRef.current,
+                    "drawGridLines",
+                    `grid:${cellSize}|${lineWidth}|${strokeStyle}`,
+                    options,
+                    (e) => e.drawGridLines(cellSize, lineWidth, strokeStyle, layer, options),
                 );
             },
 
             clearLayer(layer) {
+                untrackDraws(instanceRef.current, { layer });
                 instanceRef.current?.clearLayer(layer);
             },
 
             clearAll() {
+                untrackDraws(instanceRef.current, "all");
                 instanceRef.current?.clearAll();
             },
 
@@ -514,6 +602,7 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
             },
 
             removeDrawHandle(handle) {
+                untrackDraws(instanceRef.current, { handle });
                 instanceRef.current?.removeDrawHandle(handle);
             },
 
