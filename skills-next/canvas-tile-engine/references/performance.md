@@ -56,7 +56,8 @@ identical.
 - Images become GPU textures cached by source. If you mutate an image/canvas
   source in place at the same size (e.g. redraw an offscreen canvas), call
   `renderer.invalidateTexture(source)` to force a re-upload. Not needed when
-  drawing different image objects.
+  drawing different image objects, nor to free memory: the cache holds sources
+  weakly, so a dropped image's texture is deleted once it is garbage-collected.
 - Spritesheet edges can bleed when zooming; author sheets with `spacing`
   (see [sprites.md](sprites.md)).
 - WebGL context loss is handled automatically (resources rebuild on
