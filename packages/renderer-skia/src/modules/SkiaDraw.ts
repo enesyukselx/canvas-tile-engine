@@ -65,6 +65,7 @@ import {
     boxPaintBounds,
     boxPixelPadding,
     getViewportBounds,
+    gridLineStep,
     intersectsBounds,
     linePaintBounds,
     pathPaintBounds,
@@ -714,21 +715,25 @@ export class SkiaDraw {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
-            const startX = Math.floor(topLeft.x / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endX = Math.ceil((topLeft.x + viewW) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const startY = Math.floor(topLeft.y / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endY = Math.ceil((topLeft.y + viewH) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            // Zoomed far out, keep only every 2nd/4th/... line so the number of
+            // drawLine calls (each a JSI hop) stays bounded by the viewport size.
+            const step = gridLineStep(cellSize, config.scale);
+
+            const startX = Math.floor(topLeft.x / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endX = Math.ceil((topLeft.x + viewW) / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startY = Math.floor(topLeft.y / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endY = Math.ceil((topLeft.y + viewH) / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
 
             this.strokePaint.setColor(this.color(style.strokeStyle));
             this.strokePaint.setStrokeWidth(style.lineWidth);
 
-            for (let x = startX; x <= endX; x += cellSize) {
+            for (let x = startX; x <= endX; x += step) {
                 const p1 = this.transformer.worldToScreen(x, startY);
                 const p2 = this.transformer.worldToScreen(x, endY);
                 canvas.drawLine(p1.x, p1.y, p2.x, p2.y, this.strokePaint);
             }
 
-            for (let y = startY; y <= endY; y += cellSize) {
+            for (let y = startY; y <= endY; y += step) {
                 const p1 = this.transformer.worldToScreen(startX, y);
                 const p2 = this.transformer.worldToScreen(endX, y);
                 canvas.drawLine(p1.x, p1.y, p2.x, p2.y, this.strokePaint);

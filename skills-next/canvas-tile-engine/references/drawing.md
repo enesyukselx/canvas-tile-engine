@@ -430,7 +430,10 @@ engine.drawGridLines(1, 1, "#1e293b", 0);
 // (cellSize world units, lineWidth px = 1, strokeStyle = "black", layer = 0)
 ```
 
-Grid lines are infinite - they cover whatever the camera shows.
+Grid lines are infinite - they cover whatever the camera shows. When zoomed
+out so far that lines would be under 2px apart, the grid draws only every
+2nd/4th/8th/... line (still on multiples of `cellSize`), so the line count
+stays bounded.
 
 `cellSize` must be a positive finite number; fractional intervals are valid.
 Zero, negative values, `NaN`, and infinities throw `RangeError` synchronously,

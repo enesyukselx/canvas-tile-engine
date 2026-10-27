@@ -286,6 +286,8 @@ Draw grid lines at specified intervals.
 
 `cellSize` must be a positive finite number; fractional intervals are supported. Invalid values throw a `RangeError` when the grid draw is registered. This also applies to React Native.
 
+When you zoom out far enough that lines would be less than 2px apart on screen, the grid draws only every 2nd, 4th, 8th, ... line, so the line count stays bounded and the remaining lines still sit on multiples of `cellSize`.
+
 | Prop          | Type     | Default      | Description                            |
 | :------------ | :------- | :----------- | :------------------------------------- |
 | `cellSize`    | `number` | **Required** | Size of each grid cell in world units. |
