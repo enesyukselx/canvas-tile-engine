@@ -1053,7 +1053,7 @@ export class CanvasDraw<
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
                 // Cache renders at the current camera scale, so world-unit radii
-                // resolve against it (the cache rebuilds when the scale changes).
+                // resolve against it (the bitmap then scales with the camera).
                 const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
                 const fill =
