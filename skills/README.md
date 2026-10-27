@@ -35,8 +35,7 @@ Just describe what you want - the skill activates automatically:
 > Add an OG-image endpoint that renders a map snapshot with
 > @canvas-tile-engine/renderer-server.
 
-Or invoke it explicitly: `/canvas-tile-engine` (plugin installs are
-namespaced: `/canvas-tile-engine:canvas-tile-engine`).
+Or invoke it explicitly: `/canvas-tile-engine`.
 
 ## Contents
 
@@ -53,14 +52,12 @@ namespaced: `/canvas-tile-engine:canvas-tile-engine`).
 | `canvas-tile-engine/references/performance.md`  | Culling, spatial index, renderer choice, WebGL notes.                |
 | `canvas-tile-engine/references/recipes.md`      | End-to-end build patterns to adapt.                                  |
 
-The `.claude-plugin/plugin.json` manifest makes this directory installable as
-a Claude Code plugin; the top-level `.claude-plugin/marketplace.json` in the
-repository root lists it as a marketplace entry.
-
 ## Versioning
 
 Written against `@canvas-tile-engine/core@0.11.x` and the renderer/binding
-packages published alongside it. The plugin manifest omits a `version` field,
-so every commit to this repository is picked up as a new version. If a future
-major release changes the API, update the reference files from the docs at
-[canvastileengine.dev](https://canvastileengine.dev).
+packages published alongside it. This directory always describes what is on
+npm: the upcoming copy lives in `skills-next/`, and the release ("Version
+Packages") PR copies it here and updates the version above, so the skill
+changes in the same commit that publishes the packages. Features marked
+`core >= x.y` need at least that version; check the project's installed
+version if it is older.

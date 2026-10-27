@@ -27,7 +27,7 @@
         "test:watch": "turbo run test:watch",
         "test:coverage": "turbo run test:coverage",
         "changeset": "changeset",
-        "changeset:version": "changeset version && pnpm install --lockfile-only",
+        "changeset:version": "changeset version && node scripts/sync-skill.mjs && pnpm install --lockfile-only",
         "release": "pnpm build && changeset publish"
     },
     "keywords": [],
