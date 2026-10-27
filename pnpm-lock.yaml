@@ -439,11 +439,10 @@ importers:
         version: 4.0.0
 
   packages/react:
-    dependencies:
+    devDependencies:
       '@canvas-tile-engine/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       '@canvas-tile-engine/react-shared':
         specifier: workspace:^
         version: link:../react-shared
@@ -468,9 +467,6 @@ importers:
 
   packages/react-native:
     dependencies:
-      '@canvas-tile-engine/core':
-        specifier: workspace:^
-        version: link:../core
       '@canvas-tile-engine/renderer-skia':
         specifier: workspace:^
         version: link:../renderer-skia
@@ -478,6 +474,9 @@ importers:
         specifier: '>=2.0.0-next.0'
         version: 2.6.9(react-native@0.87.1(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0))(react@19.0.0)
     devDependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:^
+        version: link:../core
       '@canvas-tile-engine/react-shared':
         specifier: workspace:^
         version: link:../react-shared
@@ -531,24 +530,23 @@ importers:
         version: 18.3.1(react@18.3.1)
 
   packages/renderer-canvas:
-    dependencies:
+    devDependencies:
       '@canvas-tile-engine/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       '@canvas-tile-engine/renderer-shared':
         specifier: workspace:^
         version: link:../renderer-shared
 
   packages/renderer-server:
     dependencies:
-      '@canvas-tile-engine/core':
-        specifier: workspace:^
-        version: link:../core
       '@napi-rs/canvas':
         specifier: ^0.1.60
         version: 0.1.100
     devDependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:^
+        version: link:../core
       '@canvas-tile-engine/renderer-shared':
         specifier: workspace:^
         version: link:../renderer-shared
@@ -578,11 +576,10 @@ importers:
         version: 26.1.0
 
   packages/renderer-skia:
-    dependencies:
+    devDependencies:
       '@canvas-tile-engine/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       '@canvas-tile-engine/renderer-shared':
         specifier: workspace:^
         version: link:../renderer-shared
@@ -597,11 +594,10 @@ importers:
         version: 0.87.1(@babel/core@7.28.5)(@types/react@19.2.17)(react@19.0.0)
 
   packages/renderer-webgl:
-    dependencies:
+    devDependencies:
       '@canvas-tile-engine/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       '@canvas-tile-engine/renderer-shared':
         specifier: workspace:^
         version: link:../renderer-shared
