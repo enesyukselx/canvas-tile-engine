@@ -48,6 +48,19 @@ describe("ConfigValidationError", () => {
         expect(error.name).toBe("ConfigValidationError");
         expect(error.message).toBe("boom");
         expect(String(error)).toBe("ConfigValidationError: boom");
+        expect(error.stack?.split("\n")[0]).toBe("ConfigValidationError: boom");
+    });
+
+    it("keeps name on the prototype, non-enumerable like the built-in errors", () => {
+        const error = new ConfigValidationError("boom");
+        expect(Object.keys(error)).toEqual([]);
+        expect(Object.hasOwn(error, "name")).toBe(false);
+        expect(Object.getOwnPropertyDescriptor(ConfigValidationError.prototype, "name")).toEqual({
+            value: "ConfigValidationError",
+            writable: true,
+            enumerable: false,
+            configurable: true,
+        });
     });
 
     // Every message is the exact text these sites threw as a plain Error.

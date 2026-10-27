@@ -24,14 +24,15 @@ import { AccessibilityConfig, CanvasTileEngineConfig } from "../types";
  * }
  * ```
  */
-export class ConfigValidationError extends Error {
-    constructor(message: string) {
-        super(message);
-        // Set explicitly: the published build is minified, so the class's
-        // own name would not survive.
-        this.name = "ConfigValidationError";
-    }
-}
+export class ConfigValidationError extends Error {}
+// On the prototype and non-enumerable, like the built-in errors' `name`, so
+// it stays out of `Object.keys(error)`. A string literal because the
+// published build is minified: the class's own name would not survive.
+Object.defineProperty(ConfigValidationError.prototype, "name", {
+    value: "ConfigValidationError",
+    writable: true,
+    configurable: true,
+});
 
 /**
  * Creates a validation error with descriptive message.

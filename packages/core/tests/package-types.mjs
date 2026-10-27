@@ -115,6 +115,7 @@ async function main() {
     assert.ok(rejected instanceof ConfigValidationError);
     assert.ok(rejected instanceof Error);
     assert.equal(rejected.name, "ConfigValidationError");
+    assert.deepEqual(Object.keys(rejected), []);
     assert.equal(rejected.message, "[CanvasTileEngine] Invalid config: scale must be positive, got 0");
 }
 void main().catch((error) => { console.error(error); process.exitCode = 1; });
