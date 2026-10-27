@@ -3,6 +3,48 @@
 Package: `@canvas-tile-engine/core`. Everything here is renderer-agnostic and
 applies to all platforms unless noted.
 
+Contents:
+
+- [Coordinate spaces](#coordinate-spaces)
+- [Construction](#construction-vanilla--server-react-packages-construct-for-you)
+- [Full config reference](#full-config-reference) (responsive, accessibility)
+- [Engine methods](#engine-methods) (camera, bounds, animation, draw, hits)
+- [Image loading](#image-loading) (CORS)
+- [Utilities](#utilities) (`gridToSize`, `fitScale`, `itemsBounds`)
+- [Exported types and classes](#exported-types-and-classes-import-from-canvas-tile-enginecore)
+- [Validation errors](#validation-errors)
+
+## Coordinate spaces
+
+Two world spaces, half a cell apart. Mixing them up is the most common bug.
+
+- **Item space** - where items live. An integer `x`/`y` is a cell CENTER;
+  cell `k` spans `[k - 0.5, k + 0.5]`, so cells `0..N-1` taken as an AREA
+  are `-0.5..N-0.5`.
+- **Raw (corner) space** - what pointer events report as `coords.raw`. Cell
+  `k` spans `[k, k + 1]`, so `coords.snapped = Math.floor(raw)` is the
+  clicked cell's integer, i.e. the value you put in an item's `x`.
+
+| API | Space |
+| :-- | :-- |
+| item `x`/`y`, `setCenter`, `goCenter`, `getCenter`, `onCoordsChange(center)` | item |
+| `fitBounds(bounds)`, draw `clip`, `itemsBounds()` result | item, as an area |
+| `getVisibleBounds()` | item, floored/ceiled (may include one extra cell per side) |
+| `hitTest`, `hitTestFirst`, `hitTestRect` | raw - pass `coords.raw` straight in (they subtract 0.5) |
+| `config.bounds`, `setBounds` | corner: `{ minX: 0, maxX: 10 }` = cells 0..9 |
+| draw callback `topLeft` arg, `transform.screenToWorld()` result | raw |
+| `transform.worldToScreen(x, y)` input | item |
+| event `mouse` / `client` | canvas CSS px / viewport px ([events.md](events.md#pointer-callback-payload)) |
+
+Two traps:
+
+- `goCenter(coords.raw.x, coords.raw.y)` lands half a cell off. Use
+  `coords.snapped` to center on the clicked cell, or `raw - 0.5` for the
+  exact point.
+- `bounds` is corner space, unlike `fitBounds`/`clip`: a board of cells
+  `0..N-1` is `bounds: { minX: 0, maxX: N, ... }` but
+  `fitBounds({ minX: -0.5, maxX: N - 0.5, ... })`.
+
 ## Construction (vanilla / server; React packages construct for you)
 
 ```ts
@@ -10,82 +52,74 @@ new CanvasTileEngine<TMount, TImage>(
     canvasWrapper: TMount,               // DOM: a div that CONTAINS a <canvas> child
     config: CanvasTileEngineConfig,
     renderer: IRenderer<TMount, TImage>, // e.g. new RendererCanvas()
-    center?: Coords,                     // initial world center, default { x: 0, y: 0 }
+    center?: Coords,                     // initial center (item space), default { x: 0, y: 0 }
 )
 ```
 
-- DOM renderers (`RendererCanvas`, `RendererWebGL`): `canvasWrapper` is an
-  `HTMLDivElement` that must already contain `<canvas></canvas>`.
-- Server renderer: pass the exported `SERVER_MOUNT` constant as the wrapper.
-- `engine.canvas` is the `HTMLCanvasElement` on DOM mounts (useful for
-  `engine.canvas.style.cursor = "crosshair"`), `undefined` on non-DOM mounts.
-- `engine.canvasWrapper` is the wrapper you passed in.
+DOM renderers (`RendererCanvas`, `RendererWebGL`) take an `HTMLDivElement`
+that already contains `<canvas></canvas>`; the server takes the exported
+`SERVER_MOUNT`. `engine.canvas` is the `HTMLCanvasElement` on DOM mounts (for
+`engine.canvas.style.cursor`), `undefined` elsewhere; `engine.canvasWrapper`
+is the wrapper you passed in.
 
 ## Full config reference
 
 ```ts
 type CanvasTileEngineConfig = {
-    scale: number;                     // REQUIRED. Initial pixels per world unit.
+    scale: number;                     // REQUIRED. Initial px per world unit.
     size: {                            // REQUIRED. Logical canvas size in px.
         width: number;
         height: number;
-        minWidth?: number;             // default 100  (resize/responsive clamp)
-        minHeight?: number;            // default 100
-        maxWidth?: number;             // default Infinity
-        maxHeight?: number;            // default Infinity
+        minWidth?: number;             // default 100. min/max clamp resize() and
+        minHeight?: number;            // default 100   eventHandlers.resize only;
+        maxWidth?: number;             // default Infinity   responsive modes
+        maxHeight?: number;            // default Infinity   ignore them
     };
     minScale?: number;                 // default scale * 0.5
     maxScale?: number;                 // default scale * 2
     backgroundColor?: string;          // default "#ffffff", any CSS color
-    gridAligned?: boolean;             // default false. Snaps the initial center to
-                                       // the nearest grid-aligned value: half-integers
-                                       // for even tile counts, integers for odd
-                                       // (pixel-perfect grids). Integer ties snap
-                                       // down, so N/2 lands on a 0-based board's
-                                       // true center (N-1)/2.
+    gridAligned?: boolean;             // default false. Construction only: snaps the
+                                       // initial center per axis by tile count =
+                                       // size/scale (even -> x.5, odd -> integer,
+                                       // fractional -> as is). Trap: a fractional
+                                       // gutter (8 cells in 9 units) snaps off-center
+                                       // - pass `center` and leave this off.
     responsive?: "preserve-scale" | "preserve-viewport" | "fill" | false; // default false
-    eventHandlers?: {                  // ALL default false
+    eventHandlers?: {                  // ALL default false. Gates: events.md
         click?: boolean;
         rightClick?: boolean;          // DOM renderers only
         hover?: boolean;
-        drag?: boolean;
-        zoom?: boolean | "pointer" | "center"; // true === "pointer"
-        resize?: boolean;              // observe wrapper size when responsive=false
+        drag?: boolean;                // pan by drag
+        zoom?: boolean | "pointer" | "center"; // wheel + pinch; true === "pointer"
+                                       // (anchor: cursor / pinch midpoint; "center"
+                                       // anchors at the viewport center)
+        resize?: boolean;              // responsive=false only: wrapper gets CSS
+                                       // `resize: both` and the canvas follows it
         keyboard?: boolean | { pan?: number; panPx?: number; zoomFactor?: number };
-                                       // DOM-only camera control. Unset = MIRROR the
-                                       // pointer gates: arrows pan iff drag, +/- zoom
-                                       // iff zoom, Enter/Space fire onClick at the
-                                       // viewport center iff click. true forces all
-                                       // on, false all off. panPx default 80 (wins
-                                       // over pan), zoomFactor default 1.5
+                                       // (core >= 0.12) DOM only. Unset mirrors the
+                                       // pointer gates; events.md#keyboard-camera-control
     };
     bounds?: { minX: number; maxX: number; minY: number; maxY: number };
-                                       // camera limits; use +/-Infinity per axis
-    accessibility?: {
-        label?: string;                // accessible name; NO default. Without it
-                                       // neither aria-label nor role is written
-        description?: string;          // aria-describedby node / RN accessibilityHint
-        role?: "region" | "image" | "application";  // default "region" IF label set
-        focusable?: boolean;           // tab stop. Default DERIVED: a boolean
-                                       // eventHandlers.keyboard decides outright,
-                                       // else true iff any pointer handler is on
-        reducedMotion?: boolean | "auto"; // default "auto" = follow the platform
-    };                                 // OVERRIDES an explicit durationMs; escape is false
-    coordinates?: {                    // coordinate labels around the viewport edge
-                                       // (thin to every 2nd/5th/10th/... coordinate
-                                       // when zoomed out so they stay legible)
+                                       // camera limits, CORNER space; see Camera bounds
+    accessibility?: {                  // (core >= 0.12); see Accessibility below
+        label?: string;
+        description?: string;
+        role?: "region" | "image" | "application";
+        focusable?: boolean;
+        reducedMotion?: boolean | "auto";
+    };
+    coordinates?: {                    // edge labels: integer item-space values (Y
+                                       // left, X bottom), thinned 1-2-5 when crowded.
+                                       // Format is fixed: draw Text items for a-h.
         enabled?: boolean;             // default false
         shownScaleRange?: { min: number; max: number }; // default {0, Infinity}
     };
     debug?: {
         enabled?: boolean;             // master switch, default false
-        hud?: {                        // on-canvas HUD panel
-            enabled?: boolean;
-            topLeftCoordinates?: boolean;
-            coordinates?: boolean;     // center coords
-            scale?: boolean;
-            tilesInView?: boolean;
-            fps?: boolean;             // browser renderers only
+        hud?: {                        // on-canvas HUD panel, all default false;
+            enabled?: boolean;         // coordinates = center coords, fps = browser
+            topLeftCoordinates?: boolean; coordinates?: boolean; scale?: boolean;
+            tilesInView?: boolean; fps?: boolean;
         };
         eventHandlers?: {              // console logging per event type, default true each
             click?: boolean; hover?: boolean; drag?: boolean;
@@ -99,34 +133,48 @@ type CanvasTileEngineConfig = {
 
 | Mode | Behavior |
 | :-- | :-- |
-| `"preserve-scale"` | Scale stays fixed; visible world area grows/shrinks with the wrapper. Width-responsive only: the wrapper is set to `width: 100%` and its height is PINNED to `config.size.height` via inline style (CSS heights are overridden). |
-| `"preserve-viewport"` | Configured tile count stays visible; scale changes with wrapper width. |
-| `"fill"` | Scale stays fixed and BOTH axes follow the container (`width: 100%; height: 100%`) - the panel/grid-cell/split-pane mode; `config.size` only seeds the first frame. The container must have a definite height (a flex/grid child also needs `min-height: 0`); the wrapper cannot supply one because the canvas is absolutely positioned. A zero-height first measurement warns once. |
+| `"preserve-scale"` | Scale fixed; the visible area grows/shrinks with the wrapper WIDTH. The wrapper gets `width: 100%` and its height is PINNED to `config.size.height` by inline style (CSS heights are overridden). |
+| `"preserve-viewport"` | The configured tile count stays visible; scale follows the wrapper width, height follows the configured aspect ratio. |
+| `"fill"` (core >= 0.12) | Scale fixed; BOTH axes follow the PARENT: the wrapper gets `width: 100%; height: 100%`, so the parent needs a definite height (a flex/grid child also `min-height: 0`). A zero-height parent warns once and the canvas stays blank. In React the wrapper is the component's own div - size its parent. `config.size` only seeds the first camera, the `gridAligned` tile count and the min-scale baseline. |
 | `false` | Fixed `config.size` until `engine.resize()` or `eventHandlers.resize`. |
 
-When `responsive` is enabled, `engine.resize()` and `eventHandlers.resize`
-are ignored (the wrapper element controls size - style the wrapper with CSS).
-The server renderer ignores `responsive`; React Native measures its `View`
-via `onLayout` instead.
+Every mode uses the renderer's own `ResizeObserver` on the wrapper plus a
+devicePixelRatio watcher - add no window `resize` listener. While a mode is
+on, `engine.resize()` warns and no-ops and `eventHandlers.resize` is ignored.
+The server renderer ignores `responsive`; React Native uses `onLayout`.
 
-Scale limits adapt to the container in responsive modes: `"preserve-viewport"`
-scales `minScale` with the base scale (a zoom-out factor of the configured
-`scale`), and `"preserve-scale"` / `"fill"` lower the minimum limit to the scale at
-which finite `bounds` fit the viewport (never raising it above the current
-scale). `maxScale` stays absolute in both modes - a px-per-tile quality cap,
-lifted only when a preserve-viewport base scale or adapted runtime minimum exceeds it. The camera
-therefore never lands outside the gesture-reachable zoom range after a resize.
+Scale limits adapt on resize so the camera never lands outside the
+gesture-reachable range: `"preserve-viewport"` scales `minScale` with the
+base scale (and fires `onZoom` when the scale changes); `"preserve-scale"`/
+`"fill"` (finite `bounds` only) rescale `minScale` with the scale at which
+the bounds fit, so "minScale shows the whole board" survives resizes (capped
+at the current scale). `maxScale` is an absolute quality cap, lifted only
+when an adapted value exceeds it. `setScaleLimits` values adapt the same way.
+The first responsive sizing runs during construction, before callbacks
+attach - read the starting scale with `engine.getScale()` after mount.
 
-When a `"preserve-viewport"` resize changes the scale, `onZoom` fires with the
-new value (like wheel/pinch and programmatic zooms), so scale-threshold logic
-keeps working. The initial responsive sizing runs during engine construction
-before callbacks attach - read the starting value with `engine.getScale()`
-after mount.
+### Accessibility and reduced motion
 
-### Zoom anchor
+(core >= 0.12.) The wrapper carries the accessible identity; canvases get
+`aria-hidden`. Attributes you set yourself are never overwritten.
 
-`zoom: "pointer"` (or `true`) zooms toward the cursor / pinch midpoint.
-`zoom: "center"` zooms toward the viewport center. `false` disables zoom.
+| Field | Default | Meaning |
+| :-- | :-- | :-- |
+| `label` | none | Accessible name (`aria-label`; RN `accessibilityLabel`). Without it neither `aria-label` nor `role` is written. |
+| `description` | none | Usage text, e.g. which keys do what (hidden `aria-describedby` node; RN `accessibilityHint`). |
+| `role` | `"region"` if `label` set | `"region"`: interactive maps/boards, screen-reader browse keys keep working. `"application"`: ONLY when the surface handles every key itself - it disables screen-reader browse/quick-nav keys. `"image"`: non-interactive pictures (minimap, thumbnail). RN maps only `"image"`. |
+| `focusable` | derived | Tab stop (`tabindex="0"`). A boolean `eventHandlers.keyboard` decides; otherwise `true` iff any pointer flag is on. `setEventHandlers` moves it. Set `false` on hover-only surfaces. |
+| `reducedMotion` | `"auto"` | `"auto"` follows `prefers-reduced-motion` / RN `AccessibilityInfo`. When in effect, `goCenter`/`goScale`/`fitBounds`/`resize` land instantly, OVERRIDING an explicit `durationMs` - no per-call escape; `false` is the escape. `SpriteAnimator` and your own drawing are not covered (`animator.stop()` yourself). |
+
+| Method | Notes |
+| :-- | :-- |
+| `setAccessibility(patch): void` | Merge into `config.accessibility` at runtime; DOM renderers re-apply attributes. Needed because React reads `config` once on mount. |
+| `onAccessibilityChange(listener): () => void` | Fires on `setAccessibility` and when `setEventHandlers` flips the derived `focusable`. Only hosts that render their own accessible surface need it (DOM renderers and the RN binding subscribe internally). |
+| `setReducedMotion(value: boolean \| "auto"): void` | Replace the preference. Fires no change event. |
+| `getReducedMotion(): boolean` | The RESOLVED value. Poll-only: there is no change event for it or for OS changes. `getConfig().accessibility.reducedMotion` is the preference (may be `"auto"`). Handle: `false` before mount. |
+
+Keys, focus rules and what the keyboard may do:
+[events.md](events.md#keyboard-camera-control).
 
 ## Engine methods
 
@@ -134,87 +182,61 @@ after mount.
 
 | Signature | Notes |
 | :-- | :-- |
-| `render(): void` | Paint one frame. Needed after initial draw registration and after data mutation. Camera changes (drag/zoom/goCenter/...) render automatically. |
+| `render(): void` | Paint one frame. Needed after draw registration and after data mutation. Camera changes (drag/zoom/goCenter/...) render automatically. |
 | `destroy(): void` | Cancel animations, remove listeners/observers. Call on teardown (React does this on unmount). |
 
 ### Camera and viewport
 
-Interruption policy: `setCenter`/`goCenter` cancel the previous move;
-`setScale`/`zoomIn`/`zoomOut`/`goScale` cancel the previous zoom. The other
-channel continues, so concurrent move+zoom still works. `fitBounds` replaces
-both. This includes instant/reduced-motion commands and unchanged-value
-setters. Invalid `setCenter`/`setScale` calls throw without cancellation.
-Interrupted `goCenter`/`goScale` runs do not fire `onComplete`, including cancellation from
-`onCoordsChange`/`onZoom`; old callbacks cannot resume an interrupted run.
-
 | Signature | Notes |
 | :-- | :-- |
-| `getCenter(): Coords` | Current world center. |
-| `setCenter(center: Coords): void` | Jump to a new center instantly. Throws on non-finite values. |
-| `goCenter(x, y, durationMs = 500, onComplete?): void` | Animated smooth move. `durationMs: 0` = instant. |
+| `getCenter(): Coords` | Current center (item space). |
+| `setCenter(center: Coords): void` | Jump instantly. Throws on non-finite values. |
+| `goCenter(x, y, durationMs = 500, onComplete?): void` | Animated move. `0` = instant. |
 | `getScale(): number` | Current scale (px per world unit). |
-| `setScale(n): void` | Set scale directly, clamped to min/max. Anchored at the viewport center. |
-| `goScale(n, durationMs = 500, onComplete?): void` | Animated smooth zoom to a target scale, clamped to min/max. Anchored at the viewport center. `durationMs: 0` = instant. |
-| `zoomIn(factor = 1.5): void` / `zoomOut(factor = 1.5): void` | Zoom around viewport center. |
-| `setScaleLimits(minScale, maxScale): void` | Replace min/max scale limits at runtime; clamps the current scale into the new range immediately (fires `onZoom` if it changes). Future responsive resizes adapt these replacement limits against the original configured scale/size. Throws on non-positive/non-finite values or `minScale > maxScale`. |
-| `getSize(): { width, height }` | Current logical canvas size in px. |
-| `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the view centered. Warns and no-ops when `responsive` is enabled. |
-| `getVisibleBounds(): { minX, maxX, minY, maxY }` | Which world cells are visible (floored/ceiled). |
-| `setBounds(bounds): void` | Restrict camera movement; clamps current position immediately. Infinity removes a limit. |
-| `fitBounds(bounds, opts?): { scale, fitted }` | Fit a finite world rectangle into the viewport: centers on it and picks the largest scale showing the whole area, clamped to scale limits. `opts: { padding?: number (world units, scales with content), paddingPx?: number (screen px kept free on every side, content-size-independent; wins over padding - PREFER for fit-to-selection UI), durationMs?: number (default 500, 0 = instant), onComplete? }`. Animated by default. NOT related to setBounds. `bounds` is an AREA, not cell indices: cell k spans [k-0.5, k+0.5], so a board of cells 0..31 is `{ minX: -0.5, maxX: 31.5, ... }` and centers on 15.5 - passing 0..32 fits the same width but centers half a cell off. Returns the targeted scale and `fitted` - `false` ONLY when `minScale` floors the fit, so the whole rectangle is NOT visible; `maxScale` clamping keeps `fitted: true`. The React/RN handle returns `undefined` before mount. |
-| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized config snapshot with live scale, minScale, maxScale and size, including responsive adjustments. Use the live limits for zoom controls; re-read after resizing or runtime updates. Treat snapshots as read-only. The React/RN handle answers it before mount with the frozen, shared `normalizeConfig({ scale: 1, size: { width: 0, height: 0 } })`; those placeholder values describe an unconfigured engine, not the `config` prop. Read configured/live values after `isReady`. |
-| `setAccessibility(patch): void` | Merge a patch into `config.accessibility` at runtime (label/description/role/focusable/reducedMotion). The DOM renderers re-apply their attributes. Needed because React reads config once on mount. |
-| `onAccessibilityChange(listener): () => void` | Subscribe to `setAccessibility` updates. Only needed by a host that renders the accessible surface itself — the DOM renderers and the React Native binding subscribe internally. |
-| `setReducedMotion(value): void` | `value: boolean \| "auto"` (default `"auto"` = follow platform). Collapses engine-driven camera animation to instant. OVERRIDES an explicitly passed `durationMs` - there is NO per-call escape, the escape is `false`. Covers goCenter/goScale/fitBounds/resize ONLY; `SpriteAnimator` and app drawing are OUT of scope (call `animator.stop()` yourself for SC 2.2.2). |
-| `getReducedMotion(): boolean` | The RESOLVED value in effect. `getConfig().accessibility.reducedMotion` reports the PREFERENCE instead, which may be `"auto"`. Handle returns `false` before mount. |
-| `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }`. |
+| `setScale(n): void` | Instant, clamped to min/max, anchored at the viewport center. |
+| `goScale(n, durationMs = 500, onComplete?): void` | Animated zoom to `n` clamped to min/max, anchored at the viewport center. `0` = instant. |
+| `zoomIn(factor = 1.5)` / `zoomOut(factor = 1.5)` | Instant zoom around the viewport center. |
+| `setScaleLimits(minScale, maxScale): void` | Replace the limits at runtime; clamps the current scale now (fires `onZoom` if it moves). Throws on non-positive/non-finite values or `minScale > maxScale`. |
+| `fitBounds(bounds, opts?): FitBoundsResult` | Center on an item-space AREA and pick the largest scale showing all of it, clamped to the limits. `opts: { padding? (world units), paddingPx? (screen px kept free on every side, wins over padding - PREFER for fit-to-selection), durationMs? (default 500), onComplete? }`. Returns `{ scale, fitted }` (core >= 0.12): `fitted: false` ONLY when `minScale` floors the fit, so part of the area stays hidden; a `maxScale` clamp keeps `true`. Unrelated to `setBounds`. React/RN handle: `undefined` before mount. |
+| `getSize(): { width, height }` | Logical canvas size in px. |
+| `resize(w, h, durationMs = 500, onComplete?): void` | Animated resize keeping the center. Warns and no-ops while `responsive` is on. |
+| `getVisibleBounds(): Bounds` | Visible cells, item space, floored/ceiled - coarse. Exact extent: `getCenter().x +/- getSize().width / (2 * getScale())`. |
+| `setBounds(bounds): void` | Replace the camera bounds and clamp now; see below. |
+| `getConfig(): Required<CanvasTileEngineConfig>` | Normalized snapshot with LIVE `scale`, `minScale`, `maxScale` and `size` (responsive adjustments included). Read zoom-UI limits here and re-read after resizes. Read-only. React/RN handle before mount: a frozen placeholder (`normalizeConfig({ scale: 1, size: { width: 0, height: 0 } })`), NOT your `config` prop - read after `isReady`. |
+| `setEventHandlers(partial): void` | Toggle interactions at runtime, e.g. `{ drag: false, hover: true }` ([events.md](events.md)). |
+
+### Camera bounds
+
+`config.bounds` / `setBounds` clamp the VIEWPORT EDGES in corner space:
+`{ minX: 0, maxX: 10 }` keeps the left edge >= 0 and the right edge <= 10,
+which is cells 0..9. The clamp is re-applied on every pan, zoom, `setScale`,
+`setCenter`, resize and animation frame (`goCenter`, `goScale`,
+`fitBounds`), so animated moves never overshoot. When the viewport is as large as the bounds or
+larger on an axis, that axis locks with the bounds centered. `-Infinity` /
+`Infinity` leave an axis free. Bounds never limit zoom: pair them with
+`minScale` (or [`fitScale`](#fitscale---content-driven-scale-limits)).
+
+### Animation and interruption
+
+`setCenter`/`goCenter` cancel the running move; `setScale`/`zoomIn`/
+`zoomOut`/`goScale` cancel the running zoom; the other channel continues, so
+a concurrent move + zoom works. `fitBounds` cancels both. Instant,
+reduced-motion and unchanged-value calls cancel too; invalid calls throw
+without cancelling. An interrupted run never fires its `onComplete`, also
+when the new call comes from inside `onCoordsChange`/`onZoom`. Reduced
+motion and no `requestAnimationFrame` (server) make every call instant:
+
+| Call | `onZoom` | `onCoordsChange` | `onComplete` |
+| :-- | :-- | :-- | :-- |
+| `goCenter(x, y, 0)` | never | once | synchronously |
+| `goScale(s, 0)`, `setScale`, `zoomIn`/`zoomOut` | once, if the scale changed | once | synchronously (`goScale`) |
+| `fitBounds(b, { durationMs: 0 })` | once, if the scale changed | once | synchronously |
+| animated `goCenter` / `goScale` / `fitBounds` | per frame while the scale changes | per frame | after the last frame |
 
 ### Draw methods
 
-All return a `DrawHandle` (`{ id: symbol, layer: number }`) and accept an
-optional `options?` last parameter (core >= 0.10) with these fields:
-
-- `id?: string` - re-registering with the same `id` atomically replaces the
-  previous registration (draw callback + hit-test entries) instead of
-  accumulating. Ids share one namespace across draw kinds and layers; a
-  replaced registration re-enters at the end of its layer's draw order.
-  Static draws take no `id` - their `cacheKey` is the id.
-- `styleOf?: (item) => partialStyle | undefined` (dynamic `drawRect`,
-  `drawCircle`, `drawText`, `drawLine`, `drawPath` only) - paint-time
-  decoration: runs per item every frame; returned fields overlay the item's
-  own `style` for that frame. Reads external state live (mutate a selection
-  set + `render()`, nothing re-registers). Line/path decorations exclude
-  `lineWidth`/`lineWidthPx` (and `cornerRadius*` for paths) - hit-test
-  geometry is registration-time. Not available on statics or `drawImage`.
-- `visibleOf?: (item) => boolean | undefined` (the five `styleOf` methods
-  plus `drawImage`) - per-item show/hide: `false` skips the item for the
-  frame (neither painted nor hit-testable; queries fall through to items
-  below). Reads external state live like `styleOf` - mutate a filter set +
-  `render()`, nothing re-registers. PREFER this over deriving a filtered
-  items array (which re-registers and rebuilds the spatial index). Not
-  available on statics.
-- `interactiveOf?: (item) => boolean | undefined` (dynamic `drawRect`,
-  `drawCircle`, `drawImage`, `drawLine`, `drawPath` - not `drawText`, text
-  never hit-tests) - per-item hit-test opt-out: `false` keeps the item painted but
-  transparent to `hitTest`/`hitTestFirst`/`hitTestRect`; queries fall
-  through to items below. The item-level counterpart of `hitTest: false`,
-  for decorative items mixed into an interactive set or disabled entries.
-  Items hidden by `visibleOf` never hit-test regardless of this callback.
-- `clip?: Bounds` - confine the registration to a world rectangle: nothing it
-  draws paints outside, and nothing outside hit-tests (point queries reject,
-  marquee queries narrow to the overlap; `padding` does not widen it).
-  Available on every draw kind including `drawGridLines`, `drawStatic*` and
-  `addDrawFunction`. World space, so it pans and zooms with the scene -
-  a chart plot area, a minimap frame. Axis-aligned rectangles only.
-- `hitTest?: boolean` - `false` keeps the registration out of hit testing
-  (the `pointer-events: none` of the draw API). Declare decorative content
-  (floor tiles, background images, zone overlays) once at registration and
-  every `hitTest`/`hitTestFirst`/`hitTestRect` query stays clean - PREFER
-  this over filtering results or passing `layer` at every query site. Also
-  skips hit-registry bookkeeping (spatial index) for large decorative sets.
-  Statics accept it too (as their `options?` last parameter). Default `true`.
-
-Full item shapes and semantics: [drawing.md](drawing.md).
+All return a `DrawHandle` (`{ id: symbol, layer: number }`). Item shapes and
+semantics: [drawing.md](drawing.md).
 
 | Signature | Default layer |
 | :-- | :-- |
@@ -225,83 +247,90 @@ Full item shapes and semantics: [drawing.md](drawing.md).
 | `drawLine(items: Line \| Line[], style?: LineStyle, layer?, options?)` | 1 |
 | `drawPath(items: PathItem \| PathItem[], layer?, options?)` | 1 |
 | `drawGridLines(cellSize: number, lineWidth = 1, strokeStyle = "black", layer = 0, options?)` | 0 |
-| `drawStaticRect(items: Rect[], cacheKey: string, layer?)` | 1 |
-| `drawStaticCircle(items: Circle[], cacheKey: string, layer?)` | 1 |
-| `drawStaticImage(items: ImageItem[], cacheKey: string, layer?)` | 1 |
-| `addDrawFunction(fn: (ctx, topLeft: Coords, config) => void, layer?, options?)` | 1 |
+| `drawStaticRect(items: Rect[], cacheKey: string, layer?, options?)` | 1 |
+| `drawStaticCircle(items: Circle[], cacheKey: string, layer?, options?)` | 1 |
+| `drawStaticImage(items: ImageItem[], cacheKey: string, layer?, options?)` | 1 |
+| `addDrawFunction(fn: (ctx, topLeft, config, transform) => void, layer?, options?)` | 1 |
+
+The six dynamic draws infer `TData` from the items, so `styleOf(item)` sees
+a typed `item.data` (optional: `item.data?.id`); statics are not generic.
+`options?` (core >= 0.10; `hitTest`/`visibleOf`/`interactiveOf` >= 0.11;
+`clip` >= 0.12):
+
+| Option | Accepted by | Does |
+| :-- | :-- | :-- |
+| `id: string` | every non-static draw (a static's `cacheKey` is its id) | Same id atomically replaces the previous registration (callback + hit entries). One namespace across kinds and layers; the replacement re-enters at the end of its layer. |
+| `hitTest: boolean` | every hit-testable kind incl. statics; default `true` | `false` keeps the registration out of every hit query and skips its spatial index - declare decorative layers this way once. |
+| `clip: Bounds` | every kind incl. statics, grid lines, `addDrawFunction` | Item-space rect: nothing paints or hit-tests outside it. |
+| `styleOf: (item) => style \| undefined` | dynamic rect, circle, text, line, path | Per-item paint-time style overlay. |
+| `visibleOf: (item) => boolean \| undefined` | the `styleOf` five + `drawImage` | `false` hides the item (paint and hits) for the frame. |
+| `interactiveOf: (item) => boolean \| undefined` | dynamic rect, circle, image, line, path | `false` keeps the item painted but out of hit queries. |
+
+The `*Of` callbacks read your state live: mutate it and call `render()`,
+nothing re-registers. What each may change, including the Line/Path width
+limit: [drawing.md](drawing.md#styleof-visibleof-interactiveof).
+
+`addDrawFunction` and `onDraw` callbacks get the same four arguments:
+`ctx` (typed `unknown`: the 2D context on Canvas2D, the WebGL overlay and
+the server; `SkCanvas` on Skia; logical px, pixel ratio applied), `topLeft`
+(viewport top-left, raw space), `config` (live: current `scale`, `size`)
+and `transform` (`worldToScreen(x, y)`: item space -> canvas px, `(k, k)` =
+center of cell k; `screenToWorld(px, py)` -> raw). Use cases and
+screen-fixed overlays: [drawing.md](drawing.md#custom-draw-functions).
 
 ### Draw management
 
 | Signature | Notes |
 | :-- | :-- |
-| `removeDrawHandle(handle: DrawHandle): void` | Remove one registered draw callback (a tracked static registration's cache is dropped too). |
-| `clearLayer(layer: number): void` | Remove every callback on a layer (drops static caches registered on it). |
-| `clearAll(): void` | Remove all callbacks on all layers and drop all static caches. |
-| `clearStaticCache(cacheKey?: string): void` | Drop one or all stored static caches. Does NOT re-render: a registered static layer keeps drawing what it captured at registration (scaled on zoom); re-register with the same key to re-render. Rarely needed since core 0.10 - same-key re-register invalidates automatically. |
+| `removeDrawHandle(handle: DrawHandle): void` | Remove one registration (a static's cache is dropped too). |
+| `clearLayer(layer: number): void` | Remove every registration on a layer (drops its static caches). |
+| `clearAll(): void` | Remove everything and drop all static caches. |
+| `clearStaticCache(cacheKey?: string): void` | Drop one or all static caches. Does NOT re-render: a registered static keeps drawing what it captured. Re-registering with the same key already invalidates, so this is rarely needed. |
 
 ### Hit testing
 
 | Signature | Notes |
 | :-- | :-- |
-| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | All rect/circle/image/path/line items under a world point, highest visual priority first (higher layer, later registration, later item). |
-| `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Topmost item only. |
-| `hitTestRect<TData>(rect: Bounds, opts?: { layer?: number; mode?: "intersect" \| "contain" }): HitResult<TImage, TData>[]` | Marquee/box selection: every item intersecting (default) or fully inside (`"contain"`) a world rectangle. Corners in any order, built from `coords.raw` drag points. Geometry-exact (circles as discs, rotated boxes as quads, filled paths count interior with holes excluded); stroke widths NOT expanded, `padding` not applied — grow the rect instead. |
+| `hitTest<TData>(point: Coords, opts?: { layer?: number; padding?: number; paddingPx?: number }): HitResult<TImage, TData>[]` | Every rect/circle/image/line/path under a RAW point (pass `coords.raw`), top-most first: higher layer, later registration, later item. |
+| `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Top-most item only. |
+| `hitTestRect<TData>(rect: Bounds, opts?: { layer?: number; mode?: "intersect" \| "contain" }): HitResult<TImage, TData>[]` | Marquee: items intersecting (default) or fully inside a raw-space rect, corners in any order (build it from `coords.raw` drag points). Exact geometry: discs, rotated quads, path interiors minus holes. Stroke widths and `padding` are NOT applied - grow the rect instead. |
 
-`HitResult` = `{ item, kind: "rect"|"circle"|"image"|"path"|"line", layer, handle, index }`;
-`item` is the exact object passed to the draw call. Every drawable item
-accepts an optional `data?: TData` field the engine never reads - attach app
-data there and read it back as `hit.item.data`. The `TData` type parameter
-types that field (assertion only, no runtime check). Prefer `data` over
-`index` for identity: `index` is the position in the array at draw time and
-goes stale when a filtered/re-ordered array is re-drawn. Pass `coords.raw`
-from event callbacks; origin anchoring, non-square Rect `width`/`height`,
-image aspect fit, and rotation are handled internally - the hit box is always
-the drawn box. Covers `drawStatic*` variants too. Paths and lines: filled
-paths hit on their interior (item `fillRule`); unfilled paths and lines hit
-within half the stroke width (resolved against the live scale, min 8px tap
-width so hairlines stay tappable). Text is NOT hit-testable. Position
-mutations require re-registration to be reflected
-(same rule as rendering). 500+ item draw calls are queried via a spatial
-index - hover-frequency use is fine at scale.
-
-The hit area is exactly the drawn geometry by default; expand it for generous
-touch targets with `padding` (world units) and/or `paddingPx` (screen pixels,
-zoom-independent, converted with the current scale per query). Both expand
-every tested item outward and combine additively; negative values are 0. Use
-these instead of registering invisible oversized "halo" items.
-
-Decorative registrations opt out with `hitTest: false` at draw time (see
-Draw methods above) - e.g. `engine.drawRect(floorTiles, 0, { hitTest: false })`
-keeps a marquee from selecting the floor along with the units.
-
-```ts
-engine.drawRect(stations.map((s) => ({ x: s.x, y: s.y, size: 1, data: s })), 2);
-engine.onClick = (coords) => {
-    // Small station dots stay clickable up to 0.6 units around each center
-    const hit = engine.hitTestFirst<Station>(coords.raw, { padding: 0.6 });
-    if (hit?.item.data) openPanel(hit.item.data);
-};
-```
+`HitResult` = `{ item, kind, layer, handle, index }`; `item` is the exact
+object you drew. Identify items by their `data?: TData` field (never read by
+the engine), not `index` (array position at draw time, stale after a
+re-draw). `TData` is an explicit, UNCHECKED type argument - results are not
+linked to the draw call that typed the items. The hit box is the drawn box
+(origin, Rect `width`/`height`, image fit, rotation, `drawStatic*`
+included); filled paths hit on the interior, lines and unfilled paths within
+half the stroke width (min 8px). Text never hit-tests; neither do
+`hitTest: false` registrations, items hidden by `visibleOf` or opted out by
+`interactiveOf`, nor points outside the registration's `clip`. Hit tests
+follow mutated item positions while a registration holds <= 500 items; above
+that the index is built once, so re-register moved items
+([500-item note](drawing.md#the-retained-draw-model)). `padding` (world
+units) and `paddingPx` (screen px) grow every tested item, additively - use
+them instead of invisible halo items. 500+ item draw calls use a spatial
+index, so hover-rate queries are fine. Usage pattern:
+[events.md](events.md#pattern-item-click--hover-via-hittest).
 
 ### Event callbacks (assign as properties)
 
 ```ts
-engine.onClick      = (coords, mouse, client) => {};
+engine.onClick = (coords, mouse, client, info) => {}; // info?.source (core >= 0.12)
 engine.onRightClick = (coords, mouse, client) => {};  // DOM only
-engine.onHover      = (coords, mouse, client) => {};
-engine.onMouseDown  = (coords, mouse, client) => {};
-engine.onMouseUp    = (coords, mouse, client) => {};
+engine.onHover = (coords, mouse, client) => {};
+engine.onMouseDown = (coords, mouse, client) => {};
+engine.onMouseUp = (coords, mouse, client) => {};
 engine.onMouseLeave = (coords, mouse, client) => {};
-engine.onCoordsChange = (center: Coords) => {};       // any camera movement
-engine.onZoom       = (scale: number) => {};          // any scale change
-engine.onWheel      = (coords, mouse, client, wheel) => {}; // wheel/pinch zoom
-                                       // gesture; wheel = { deltaY, direction, source }
-engine.onResize     = () => {};
-engine.onDraw       = (ctx, coords, config, transform) => {}; // after each frame,
-                                       // same signature as addDrawFunction (drawing.md)
+engine.onWheel = (coords, mouse, client, wheel) => {}; // wheel/pinch gesture
+engine.onZoom = (scale) => {};                        // the scale changed
+engine.onCoordsChange = (center) => {};               // camera notification
+engine.onResize = () => {};
+engine.onDraw = (ctx, topLeft, config, transform) => {}; // after each frame
 ```
 
-Payload details and patterns: [events.md](events.md).
+Payload, which flag gates which callback, and when each fires:
+[events.md](events.md).
 
 ## Image loading
 
@@ -329,31 +358,29 @@ engine.render();
 
 ### CORS on the browser renderers
 
-`RendererCanvas` and `RendererWebGL` request images with
-`crossOrigin="anonymous"` by default, which makes every image request a CORS
-request. Images served WITHOUT an `Access-Control-Allow-Origin` header then fail
-to load entirely (the error names the URL, not the missing header). Opt out per
-renderer:
+(core >= 0.12.) `RendererCanvas` and `RendererWebGL` load images with
+`crossOrigin="anonymous"` by default, so images served WITHOUT an
+`Access-Control-Allow-Origin` header fail to load entirely (the error names
+the URL, not the header). Opt out per renderer:
 
 ```ts
 new RendererCanvas({ crossOrigin: null });          // plain request, no CORS
 new RendererCanvas({ crossOrigin: "use-credentials" }); // CORS with cookies
 ```
 
-Reach for `crossOrigin: null` when tiles/sprites come from a bucket, a CDN, or a
-third-party tile server that sends no CORS headers. It is safe on Canvas2D (the
-renderer never reads pixels back; the canvas is merely tainted), but on WebGL a
-tainted image cannot be uploaded as a texture and is skipped at draw time - so
-only opt out there if every image is same-origin.
+Use `null` for a bucket, CDN or tile server that sends no CORS headers. Safe
+on Canvas2D (the canvas is merely tainted; nothing reads it back). On WebGL a
+tainted image cannot become a texture and is skipped - opt out there only if
+every image is same-origin.
 
 ## Utilities
 
 ### `gridToSize` - think in cells instead of pixels
 
-Returns `{ size, scale, center }` where `center = ((columns-1)/2, (rows-1)/2)`
-is the exact center of a board of cells `0..N-1` (integers are cell centers -
-see [drawing.md](drawing.md)). ALWAYS pass this center to the engine;
-without it the board renders mostly off-screen.
+For fixed boards (chess, match-3, minesweeper). Returns `{ size, scale,
+center }` where `center = ((columns-1)/2, (rows-1)/2)` is the exact center of
+cells `0..N-1`. ALWAYS pass this center to the engine (without it the board
+renders mostly off-screen); `gridAligned` is then unnecessary.
 
 ```ts
 import { gridToSize } from "@canvas-tile-engine/core";
@@ -363,26 +390,19 @@ const { center, ...board } = gridToSize({ columns: 8, rows: 8, cellSize: 60 });
 
 const engine = new CanvasTileEngine(wrapper, {
     ...board,
-    gridAligned: true,
     eventHandlers: { click: true, hover: true, drag: false, zoom: false },
 }, new RendererCanvas(), center);
 ```
 
-Perfect for fixed boards (chess, match-3, minesweeper): a known number of
-cells fully visible, often with `drag`/`zoom` disabled. On core versions
-before 0.5 `gridToSize` has no `center` field - compute
-`{ x: (columns-1)/2, y: (rows-1)/2 }` manually.
-
 ### `fitScale` - content-driven scale limits
 
-`fitScale(bounds, size, opts?)` returns the scale (px per world unit) at
-which `bounds` exactly fits a `size`-px viewport - the SAME math `fitBounds`
-uses (shared implementation, no drift), as a pure config-time function. The
-`gridToSize` of free-form content: derive `scale`/`minScale` from the content
-instead of hand-tuning constants that need recalibration whenever the
-content size changes. `opts: { padding? (world), paddingPx? (screen px, wins) }`.
-Result is unclamped - apply your own policy. Throws on invalid bounds/
-paddings/size.
+`fitScale(bounds: Bounds, size: { width, height }, options?: { padding?,
+paddingPx? }): number` returns the scale at which `bounds` exactly fits a
+`size`-px viewport - the SAME math `fitBounds` uses, as a pure config-time
+function. `paddingPx` (screen px) wins over `padding` (world units). The
+result is unclamped - apply your own policy. Throws on invalid bounds,
+paddings or size. Derive `scale`/`minScale` from the content instead of
+hand-tuned constants:
 
 ```ts
 import { fitScale } from "@canvas-tile-engine/core";
@@ -397,26 +417,17 @@ const config = {
 // Runtime content change: setScaleLimits(fit * 0.8, 64) + fitBounds(bounds)
 ```
 
-Only `maxScale` stays manual by design: it is a content-resolution quality
-cap (asset px density, label readability), which no bounds can imply.
-
 ### `itemsBounds` - the rectangle `fitBounds`/`fitScale` ask for
 
-`itemsBounds(items)` returns `{ minX, maxX, minY, maxY }` enclosing a list of
-items, or `null` when nothing in the list has bounds. Use it instead of
-hand-rolling a min/max reduce before `fitBounds`/`fitScale`.
-
-EVERY item kind fits in one list, mixed freely - no filtering needed, so
-`hitTest`/`hitTestRect` results go straight in:
+(core >= 0.12.) `itemsBounds(items)` returns the item-space `Bounds`
+enclosing a list of items of any kinds (hit results go straight in), or
+`null` when nothing in it has bounds:
 
 | Kind                              | Box |
 | --------------------------------- | --- |
 | `Rect`, `Circle`, `Text`, `Image` | `width ?? size` x `height ?? size` world units (default 1), centered on the anchor |
 | `Line`                            | its two endpoints |
 | `PathItem`                        | vertex box for `points`, control-point hull for `commands` |
-
-Returns `Bounds | null`, and `fitBounds`/`fitScale` take a non-null `Bounds`, so
-the guard is part of the call - it is NOT a one-liner:
 
 ```ts
 import { itemsBounds } from "@canvas-tile-engine/core";
@@ -429,44 +440,42 @@ if (bounds) {
 }
 ```
 
-Skipping the guard (`itemsBounds(tiles)!`) is only safe for a set you know is
-non-empty; anything from a selection or a hit test can be empty.
-
-Items that draw nothing are skipped, not counted: a path with fewer than two
-points, an empty command list, an object with no geometry.
-
-Deliberately camera-independent, so it leaves out `origin` offsets and `rotate`
-(both stay within half an item of the box - add `padding` for slack),
-`sizePx`/`fontPx` (no world extent without a scale), and measured text: a
-`Text` item contributes its `size` box, NOT its glyph extents - core has no
-font metrics, so a long label reaches past this box. Null is a real case:
-guard it, do not pass it straight through.
-
-`pathItemBounds(item)` is the single-path building block, exported for the same
-job on one `PathItem` (null when it draws nothing).
+Keep the guard: a selection or hit result can be empty (`!` only for sets
+known to be non-empty). Items that draw nothing are skipped. Camera-
+independent, so it ignores `origin` offsets and `rotate` (add `padding` for
+slack), `sizePx`/`fontPx`, and glyph extents (a `Text` counts its `size`
+box). `pathItemBounds(item)` is the single-path building block.
 
 ## Exported types and classes (import from `@canvas-tile-engine/core`)
 
-Values: `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`,
-`itemsBounds`, `pathItemBounds`, `normalizeConfig`, `SpatialIndex`, `Config`, `ViewportState`,
-`CoordinateTransformer`, `GestureProcessor`, `AnimationController`.
+| Group | Exports |
+| :-- | :-- |
+| Values | `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`, `itemsBounds`, `pathItemBounds`, `normalizeConfig` (plus `Config`, `GestureProcessor`, ... for renderer authors) |
+| Config | `CanvasTileEngineConfig`, `EventHandlers`, `ZoomMode`, `KeyboardConfig`, `AccessibilityConfig`, `AccessibilityRole`, `ReducedMotionSetting` |
+| Geometry | `Coords`, `Bounds`, `BoundedItem`, `FitBoundsOptions`, `FitBoundsResult`, `FitScaleOptions`, `DrawTransform` |
+| Items, paint | `DrawObject`, `Rect`, `Circle`, `Text`, `Line`, `PathItem`, `PathCommand`, `PathStyle`, `ImageItem`, `SpriteRect`, `LineStyle`, `TextAlign`, `TextBaseline`, `FontWeight`, `LinearGradient`, `Paint` (`string \| LinearGradient`), `ColorStop` |
+| Draw options | `DrawHandle`, `DrawOptions`, `StaticDrawOptions`, `RectDrawOptions` (and `Circle`/`Text`/`Line`/`Path`/`Image` variants), `StyleOf`, `VisibleOf`, `InteractiveOf` |
+| Hit testing | `HitResult`, `HitKind`, `HitTestOptions`, `HitTestRectOptions` |
+| Callbacks | `onClickCallback`, `onRightClickCallback`, `onHoverCallback`, `onMouseDownCallback`, `onMouseUpCallback`, `onMouseLeaveCallback`, `onWheelCallback`, `onZoomCallback`, `onDrawCallback`, `ClickInfo`, `WheelInfo` (no named type for `onCoordsChange`/`onResize`) |
+| Sprites | `SpriteSheetOptions`, `SpriteAnimation` |
+| Renderer authors | `IRenderer`, `IDrawAPI`, `IImageLoader`, `ICamera`, `RendererDependencies` |
 
-Types: `CanvasTileEngineConfig`, `Coords`, `Bounds`, `BoundedItem`, `DrawObject`, `Rect`,
-`Circle`, `Text`, `Line`, `PathItem`, `PathStyle`, `ImageItem<TImage>`, `SpriteRect`,
-`SpriteSheetOptions`, `SpriteAnimation`, `EventHandlers`, `ZoomMode`,
-`DrawHandle`, `LineStyle`, `TextAlign`, `TextBaseline`, `IRenderer`,
-`IDrawAPI`, `IImageLoader`, `ICamera`, `RendererDependencies`, plus all
-callback types (`onClickCallback`, `onHoverCallback`, ...).
-
-The module classes (`Config`, `GestureProcessor`, ...) are exported for
-renderer authors; app code normally only needs `CanvasTileEngine`,
-`SpriteSheet`, `SpriteAnimator`, `gridToSize`, and the types.
+Generics: `Rect`, `Circle`, `Text`, `Line`, `PathItem` are `<TData =
+unknown>`, `ImageItem` is `<TImage, TData>`; type a dataset as
+`Rect<{ id: string }>[]` for a typed `item.data` in `styleOf` and hits. The
+React/RN packages re-export only some of these: [react.md](react.md).
 
 ## Validation errors
 
-`scale` must be a positive finite number and coordinates finite numbers;
-`setScale`, `goScale`, `setCenter`, and `goCenter` throw
-`ConfigValidationError` otherwise. Config normalization fills every optional field with the defaults
-listed above. `normalizeConfig(config)` runs that same normalization without an engine and returns
-the deeply frozen snapshot (`normalizeConfig({ scale: 32, size }).minScale === 16`); it does NOT
-validate, so values the constructor rejects come back normalized instead of throwing.
+Invalid input throws a plain `Error` whose message starts with
+`[CanvasTileEngine] Invalid config:` (there is no exported error class). The
+constructor rejects non-positive/non-finite `scale`, `size` or limits,
+`minScale > maxScale`, `scale` outside explicit limits, an unknown `zoom`
+mode, bad `accessibility` fields and `bounds` with `min >= max`. At runtime
+`setScale`/`goScale`, `setCenter`/`goCenter` (non-finite), `setScaleLimits`,
+`setBounds`, `setAccessibility`, `setReducedMotion`, `fitBounds`/`fitScale`
+(non-finite edge, `min >= max`, negative padding) throw the same way;
+`drawGridLines` throws a `RangeError` for a non-positive `cellSize`.
+`normalizeConfig(config)` (core >= 0.12) fills every default above without
+an engine and returns a frozen snapshot (`normalizeConfig({ scale: 32, size
+}).minScale === 16`); it does NOT validate.
