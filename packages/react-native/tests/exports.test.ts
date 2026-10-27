@@ -1,11 +1,14 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type * as Core from "@canvas-tile-engine/core";
-import type * as Binding from "../src";
+// The PUBLISHED declarations, not ../src: a tsup dts-bundling regression
+// (the react-shared flat-dts setup) would drop names from dist only.
+import type * as Binding from "../dist/index";
 
 // Type-level contract for the core types the binding re-exports, so app code
 // never needs a second import from core just to name one. `tsc --noEmit`
-// (the package's `typecheck`, which includes `tests/`) is what enforces it: a
-// type missing from the binding's root index fails to resolve, and a
+// (the package's `typecheck`, which includes `tests/` and runs after the
+// package's own build) is what enforces it: a type missing from the built
+// `dist/index.d.ts` fails to resolve, and a
 // re-export of the wrong type fails `toEqualTypeOf`. Under `vitest run` the
 // assertions are no-ops. Same list as @canvas-tile-engine/react.
 
