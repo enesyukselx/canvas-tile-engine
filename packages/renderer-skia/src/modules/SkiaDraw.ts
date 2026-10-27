@@ -806,8 +806,16 @@ export class SkiaDraw {
     }
 
     /**
-     * Register a layer callback that replays a cached picture of `items` under
-     * the current camera transform, recording it first if `cacheKey` is new.
+     * Record `items` into a new picture for a `drawStatic*` registration,
+     * store it under `cacheKey` (replacing any earlier entry), and register a
+     * layer callback that replays it.
+     *
+     * Contract: every call records afresh, at the camera scale active at
+     * registration. The layer captures the picture and replays it every frame
+     * under the camera transform; nothing re-records it later. To show new
+     * items or styles, register again (through the engine, reusing the
+     * `cacheKey` replaces the old registration). `clearStaticCache` only drops
+     * the stored reference.
      */
     private addStaticPictureLayer<T extends AnchoredItem>(
         cacheKey: string,
@@ -821,11 +829,8 @@ export class SkiaDraw {
             return this.register(layer, options, () => {});
         }
 
-        let entry = this.staticPictureCache.get(cacheKey);
-        if (!entry) {
-            entry = this.recordStaticPicture(items, boundsOf, paintItem);
-            this.staticPictureCache.set(cacheKey, entry);
-        }
+        const entry = this.recordStaticPicture(items, boundsOf, paintItem);
+        this.staticPictureCache.set(cacheKey, entry);
         const { picture, recordScale } = entry;
 
         return this.register(layer, options, ({ ctx: canvas, topLeft }) => {
