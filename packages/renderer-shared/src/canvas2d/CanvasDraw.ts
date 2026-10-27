@@ -82,15 +82,37 @@ function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coor
     return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
 }
 
-// Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
+// Conservative max dimension, in physical (backing-store) pixels, for an
+// offscreen static cache (browser limits often 16384 or 32767).
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
-// A static layer's pre-rendered offscreen canvas, plus the world bounds and
-// camera scale it was rendered at, which the blit needs to map it to screen.
+// Physical pixel budget for a HiDPI cache (iOS Safari's canvas area limit,
+// 4096^2). Only lowers the ratio, never below 1, so 1x caches are unaffected.
+const MAX_STATIC_CANVAS_AREA = 16_777_216;
+
+// A static layer's pre-rendered offscreen canvas, plus the world bounds,
+// camera scale, and pixel ratio it was rendered at, which the blit needs to
+// map it to screen. The bitmap holds `scale * pixelRatio` pixels per world unit.
+// `requestedRatio` is the renderer's ratio at recording time (`pixelRatio` may
+// be lower when the caps forced it down); `rerecord` renders the same items
+// again, without storing the result under the cache key.
 interface StaticCache<TCanvas> {
     canvas: TCanvas;
     worldBounds: { minX: number; minY: number; maxX: number; maxY: number };
     scale: number;
+    pixelRatio: number;
+    requestedRatio: number;
+    rerecord: () => StaticCache<TCanvas> | null;
+}
+
+/** Grow `bounds` outwards to whole pixels of a `raster` (pixels per world unit) grid. */
+function snapOutward(bounds: Bounds, raster: number): Bounds {
+    return {
+        minX: Math.floor(bounds.minX * raster) / raster,
+        minY: Math.floor(bounds.minY * raster) / raster,
+        maxX: Math.ceil(bounds.maxX * raster) / raster,
+        maxY: Math.ceil(bounds.maxY * raster) / raster,
+    };
 }
 
 /**
@@ -118,12 +140,18 @@ export class CanvasDraw<
      * @param createOffscreen Offscreen canvas factory for static caching, or
      * `null` when the platform has no offscreen surface (static draws then
      * fall back to dynamic drawing).
+     * @param pixelRatio Physical pixels per CSS pixel of the visible canvas
+     * (the browser's devicePixelRatio, the server's `pixelRatio`). Static
+     * caches read it at registration and render at that resolution, so the
+     * blit copies 1:1 instead of upscaling a CSS-resolution bitmap. Defaults
+     * to 1.
      */
     constructor(
         private layers: Layer<DrawContext<TContext>>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
         private createOffscreen: OffscreenCanvasFactory<TContext, TCanvas> | null,
+        private pixelRatio: () => number = () => 1,
     ) {}
 
     /**
@@ -836,11 +864,16 @@ export class CanvasDraw<
      * Render `items` into a new offscreen canvas for a `drawStatic*`
      * registration and store it under `cacheKey`, replacing any earlier entry.
      *
-     * Contract: every call renders afresh, at the camera scale active at
-     * registration. The layer captures the returned cache and blits it every
-     * frame, scaling the bitmap on zoom; nothing re-renders it later. To show
-     * new items or styles, or a sharp bitmap at a new zoom, register again
-     * (through the engine, reusing the `cacheKey` replaces the old
+     * Contract: every call renders afresh, at the camera scale and pixel
+     * ratio active at registration: the bitmap holds `scale * pixelRatio`
+     * physical pixels per world unit, so at the recorded zoom it lands 1:1 on
+     * the visible canvas's backing store. The ratio is lowered (never below
+     * 1) when the bitmap would exceed the per-side or area cap. The layer
+     * captures the returned cache and blits it every frame, scaling the
+     * bitmap on zoom; it re-records only when the renderer's pixel ratio
+     * changes (browser zoom, another monitor), at the then-current scale. To
+     * show new items or styles, or a sharp bitmap at a new zoom, register
+     * again (through the engine, reusing the `cacheKey` replaces the old
      * registration). `clearStaticCache` only drops the stored reference.
      */
     private createStaticCache<
@@ -862,6 +895,9 @@ export class CanvasDraw<
             /** World -> cache pixels, the cache-space counterpart of `worldToScreen`. */
             toCacheSpace: (wx: number, wy: number) => Coords,
         ) => void,
+        /** Resets `renderFn`'s per-pass memo; every recording starts on a fresh context. */
+        resetPass?: () => void,
+        store = true,
     ): StaticCache<TCanvas> | null {
         if (!this.createOffscreen) {
             if (!this.warnedStaticCacheDisabled) {
@@ -872,9 +908,27 @@ export class CanvasDraw<
         }
 
         const renderScale = this.camera.scale;
-        const box = staticCacheBounds(items, renderScale, boundsOf);
+        const requestedRatio = this.currentPixelRatio();
+        let box = staticCacheBounds(items, renderScale, boundsOf, requestedRatio);
         if (!box) {
             return null;
+        }
+
+        // Lower the ratio (never below 1) until the bitmap fits the per-side
+        // and area caps, so a cache that fits at 1x stays a cache on HiDPI
+        // instead of dropping to per-frame dynamic drawing. The 2 px margin
+        // and the 1% area headroom absorb the outward re-snap below (the area
+        // cap only binds for caches over a thousand px a side).
+        const cssWidth = (box.maxX - box.minX) * renderScale;
+        const cssHeight = (box.maxY - box.minY) * renderScale;
+        const fit = Math.min(
+            (MAX_STATIC_CANVAS_DIMENSION - 2) / cssWidth,
+            (MAX_STATIC_CANVAS_DIMENSION - 2) / cssHeight,
+            Math.sqrt((MAX_STATIC_CANVAS_AREA * 0.99) / (cssWidth * cssHeight)),
+        );
+        const pixelRatio = Math.min(requestedRatio, Math.max(1, fit));
+        if (pixelRatio !== requestedRatio) {
+            box = snapOutward(box, renderScale * pixelRatio);
         }
 
         const { minX, minY, maxX, maxY } = box;
@@ -882,13 +936,17 @@ export class CanvasDraw<
         const worldWidth = maxX - minX;
         const worldHeight = maxY - minY;
 
-        // Bounds already snap outwards to integer raster coordinates.
-        const canvasWidth = Math.round(worldWidth * renderScale);
-        const canvasHeight = Math.round(worldHeight * renderScale);
+        // Physical (backing-store) size. Bounds already snap outwards to
+        // integer physical pixels, so rounding only drops float noise.
+        const canvasWidth = Math.round(worldWidth * renderScale * pixelRatio);
+        const canvasHeight = Math.round(worldHeight * renderScale * pixelRatio);
 
+        // Still too large at ratio 1: draw dynamically, as before HiDPI support.
         if (canvasWidth > MAX_STATIC_CANVAS_DIMENSION || canvasHeight > MAX_STATIC_CANVAS_DIMENSION) {
             if (!this.warnedStaticCacheDisabled) {
-                console.warn(`Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight}).`);
+                console.warn(
+                    `Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight} physical px at pixel ratio ${pixelRatio}).`,
+                );
                 this.warnedStaticCacheDisabled = true;
             }
             return null;
@@ -904,7 +962,13 @@ export class CanvasDraw<
             return null;
         }
 
-        // Cache pixel 0 is world minX/minY at renderScale — the same
+        // Items below paint in CSS px, as on the visible canvas under its
+        // pixel-ratio transform; this maps them onto the physical bitmap.
+        if (pixelRatio !== 1) {
+            offscreen.ctx.scale(pixelRatio, pixelRatio);
+        }
+
+        // Cache CSS pixel 0 is world minX/minY at renderScale — the same
         // mapping the per-item `pos` below uses, exposed so callbacks can
         // place world-space geometry (a world-unit gradient axis) inside
         // the cache.
@@ -914,6 +978,7 @@ export class CanvasDraw<
         });
 
         // Render all items using the provided render function
+        resetPass?.();
         for (const item of items) {
             // World units only: the cache is rendered once at renderScale
             // and blitted afterwards, so a screen-pixel size could not hold
@@ -937,9 +1002,20 @@ export class CanvasDraw<
             canvas: offscreen.canvas,
             worldBounds: { minX, minY, maxX, maxY },
             scale: renderScale,
+            pixelRatio,
+            requestedRatio,
+            rerecord: () => this.createStaticCache(items, cacheKey, boundsOf, renderFn, resetPass, false),
         };
-        this.staticCaches.set(cacheKey, cache);
+        if (store) {
+            this.staticCaches.set(cacheKey, cache);
+        }
         return cache;
+    }
+
+    /** The renderer's current pixel ratio; non-finite or non-positive reads as 1. */
+    private currentPixelRatio(): number {
+        const ratio = this.pixelRatio();
+        return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
     }
 
     /**
@@ -948,16 +1024,38 @@ export class CanvasDraw<
     private addStaticCacheLayer(
         cache: StaticCache<TCanvas> | null,
         layer: number,
-        options?: RendererClipOptions,
+        options: RendererClipOptions | undefined,
+        cacheKey: string,
     ): DrawHandle | null {
         if (!cache) {
             return null;
         }
-        const cachedCanvas = cache.canvas;
-        const cachedBounds = cache.worldBounds;
-        const cachedScale = cache.scale;
+        let current = cache;
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
+            // A pixel-ratio change (browser zoom, another monitor) re-backs the
+            // visible canvas, so re-record once at the new ratio (and the
+            // current scale) to stay 1:1 with it. A failed re-record keeps the
+            // old bitmap and is not retried until the ratio changes again.
+            const ratio = this.currentPixelRatio();
+            if (ratio !== current.requestedRatio) {
+                const next = current.rerecord();
+                if (next) {
+                    if (this.staticCaches.get(cacheKey) === current) {
+                        this.staticCaches.set(cacheKey, next);
+                    }
+                    current = next;
+                } else {
+                    current.requestedRatio = ratio;
+                }
+            }
+            const cachedCanvas = current.canvas;
+            const cachedBounds = current.worldBounds;
+            // Physical cache pixels per world unit. Source rects are in the
+            // cache's physical pixels; destination rects stay in CSS px, since
+            // the visible context already carries the pixel-ratio transform.
+            const cachedScale = current.scale * current.pixelRatio;
+
             const viewportWidth = config.size.width / config.scale;
             const viewportHeight = config.size.height / config.scale;
 
@@ -1048,6 +1146,13 @@ export class CanvasDraw<
         let lastStrokeStyle: string | undefined;
         // The cache is built in one pass, so this memo spans that whole pass.
         const gradients = new Map<string, CanvasGradientLike>();
+        // Reset before every recording: a pixel-ratio change re-records into a
+        // fresh context whose fill and stroke start at the defaults.
+        const resetPass = () => {
+            lastFillStyle = undefined;
+            lastStrokeStyle = undefined;
+            gradients.clear();
+        };
 
         const cache = this.createStaticCache(
             items,
@@ -1108,6 +1213,7 @@ export class CanvasDraw<
                     this.fillStrokePath(ctx, style, this.camera.scale);
                 }
             },
+            resetPass,
         );
 
         if (!cache) {
@@ -1120,7 +1226,7 @@ export class CanvasDraw<
             );
         }
 
-        return this.addStaticCacheLayer(cache, layer, options)!;
+        return this.addStaticCacheLayer(cache, layer, options, cacheKey)!;
     }
 
     /**
@@ -1194,7 +1300,7 @@ export class CanvasDraw<
             );
         }
 
-        return this.addStaticCacheLayer(cache, layer, options)!;
+        return this.addStaticCacheLayer(cache, layer, options, cacheKey)!;
     }
 
     /**
@@ -1214,6 +1320,13 @@ export class CanvasDraw<
         let lastFillStyle: string | CanvasGradientLike | undefined;
         let lastStrokeStyle: string | undefined;
         const gradients = new Map<string, CanvasGradientLike>();
+        // Reset before every recording: a pixel-ratio change re-records into a
+        // fresh context whose fill and stroke start at the defaults.
+        const resetPass = () => {
+            lastFillStyle = undefined;
+            lastStrokeStyle = undefined;
+            gradients.clear();
+        };
 
         const cache = this.createStaticCache(
             items,
@@ -1246,6 +1359,7 @@ export class CanvasDraw<
                 ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
                 this.fillStrokePath(ctx, style, this.camera.scale);
             },
+            resetPass,
         );
 
         if (!cache) {
@@ -1256,7 +1370,7 @@ export class CanvasDraw<
             );
         }
 
-        return this.addStaticCacheLayer(cache, layer, options)!;
+        return this.addStaticCacheLayer(cache, layer, options, cacheKey)!;
     }
 
     /**

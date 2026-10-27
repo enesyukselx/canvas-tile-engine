@@ -35,7 +35,7 @@ function setup() {
     const camera = { x: 0, y: 0, scale: 10 } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
     const layers = new Layer<DrawContext<BrowserContext2D>>();
-    const draw = createBrowserCanvasDraw(layers, transformer, camera);
+    const draw = createBrowserCanvasDraw(layers, transformer, camera, () => 1);
     const config = { size: { width: 100, height: 100 }, scale: 10 } as never;
     const render = (ctx: CanvasRenderingContext2D) =>
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
@@ -461,7 +461,7 @@ function setupAtScale(scale: number) {
     const camera = { x: 0, y: 0, scale } as unknown as ICamera;
     const transformer = new CoordinateTransformer(camera);
     const layers = new Layer<DrawContext<BrowserContext2D>>();
-    const draw = createBrowserCanvasDraw(layers, transformer, camera);
+    const draw = createBrowserCanvasDraw(layers, transformer, camera, () => 1);
     const config = { size: { width: 100, height: 100 }, scale } as never;
     const render = (ctx: CanvasRenderingContext2D) =>
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });

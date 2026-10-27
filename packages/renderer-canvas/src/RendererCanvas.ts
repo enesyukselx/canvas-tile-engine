@@ -213,7 +213,8 @@ export class RendererCanvas implements IRenderer {
         this.viewport = deps.viewport;
         this.camera = deps.camera;
         this.layers = new Layer(canvas2dClipAdapter<BrowserContext2D>());
-        this.drawAPI = createBrowserCanvasDraw(this.layers, deps.transformer, deps.camera);
+        // Static caches render at the same DPR the visible canvas is backed at.
+        this.drawAPI = createBrowserCanvasDraw(this.layers, deps.transformer, deps.camera, () => this.viewport.dpr);
 
         this.applyCanvasSize();
 

@@ -72,14 +72,17 @@ export function staticImagePaintBounds(
 
 /**
  * Enclose the painted content, with a one-raster-pixel antialiasing guard.
- * Snap outwards at the recording scale so caching preserves pixel phase and
- * does not resample a fractional cache origin when blitted at that scale.
+ * Snap outwards at the recording raster's resolution (`scale * pixelRatio`
+ * pixels per world unit) so caching preserves pixel phase and does not
+ * resample a fractional cache origin when blitted at that scale. `boundsOf`
+ * still receives the CSS-px `scale` its pixel-unit styles resolve against.
  * These are camera/corner-space coordinates, not item-center coordinates.
  */
 export function staticCacheBounds<T>(
     items: T[],
     scale: number,
     boundsOf: (item: T, scale: number) => Bounds | null,
+    pixelRatio = 1,
 ): Bounds | null {
     if (items.length === 0) {
         return null;
@@ -101,10 +104,11 @@ export function staticCacheBounds<T>(
     if (minX === Infinity) {
         return null;
     }
+    const raster = scale * pixelRatio;
     return {
-        minX: (Math.floor(minX * scale) - 1) / scale,
-        minY: (Math.floor(minY * scale) - 1) / scale,
-        maxX: (Math.ceil(maxX * scale) + 1) / scale,
-        maxY: (Math.ceil(maxY * scale) + 1) / scale,
+        minX: (Math.floor(minX * raster) - 1) / raster,
+        minY: (Math.floor(minY * raster) - 1) / raster,
+        maxX: (Math.ceil(maxX * raster) + 1) / raster,
+        maxY: (Math.ceil(maxY * raster) + 1) / raster,
     };
 }

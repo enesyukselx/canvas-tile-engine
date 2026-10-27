@@ -14,13 +14,15 @@ const createOffscreen: OffscreenCanvasFactory<SKRSContext2D, Canvas> = (width, h
 
 /**
  * Wire the shared Canvas2D pipeline for the headless server: static caches
- * render to an in-memory @napi-rs/canvas surface.
+ * render to an in-memory @napi-rs/canvas surface, at the output's
+ * `pixelRatio` so they match the main canvas's resolution.
  * @internal
  */
 export function createServerCanvasDraw(
     layers: Layer<DrawContext<SKRSContext2D>>,
     transformer: CoordinateTransformer,
     camera: ICamera,
+    pixelRatio: number,
 ): ServerCanvasDraw {
-    return new CanvasDraw(layers, transformer, camera, createOffscreen);
+    return new CanvasDraw(layers, transformer, camera, createOffscreen, () => pixelRatio);
 }
