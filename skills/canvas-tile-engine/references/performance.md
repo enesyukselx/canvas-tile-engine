@@ -1,5 +1,7 @@
 # Performance Reference
 
+Renderer choice, what the engine already optimizes, and rough budgets.
+
 ## What the engine already does (do not reimplement)
 
 - **Viewport culling**: every draw callback skips items outside the camera
@@ -7,9 +9,10 @@
   visible ones are painted.
 - **Spatial indexing**: above 500 items per draw call, an R-tree
   (`SpatialIndex`, RBush-backed) is built once at registration and queried
-  per frame instead of linear scanning.
+  per frame instead of linear scanning. Paint order stays array order.
 - **Style batching** (Canvas2D): consecutive items with the same
-  fill/stroke style avoid redundant context state changes.
+  fill/stroke style avoid redundant context state changes. Batching never
+  reorders.
 - **High-DPI**: browser renderers scale the backing store by
   `devicePixelRatio` automatically.
 - **Render-on-demand**: frames render on camera changes and explicit
@@ -20,14 +23,13 @@ Consequences for generated code:
 
 - Prefer ONE `drawRect(bigArray)` over many `drawRect(singleItem)` calls -
   the spatial index and style batching work per call.
-- The index is built from item positions at registration time. If item
-  positions change, re-register (new handle / layer swap). If only styles
-  change, use `styleOf` (paint-time overlay, zero rebuild; core >= 0.10) or
-  mutation + `render()`; sprite frame changes are mutation + `render()`.
-  Show/hide is `visibleOf` + `render()` - never a filtered array copy.
+- The index is built from item positions at registration time: moved items
+  need re-registration (same `id`). Style, show/hide and hit opt-out changes
+  need none - `styleOf`/`visibleOf`/`interactiveOf` + `render()`, never a
+  filtered array copy ([drawing.md](drawing.md#styleof-visibleof-interactiveof)).
+  Sprite frame changes are mutation + `render()`.
 - Keep item arrays referentially stable in React - a new array identity
-  rebuilds the index. The `styleOf`/`visibleOf`/`interactiveOf` props are
-  exempt (read through refs).
+  re-registers and rebuilds the index ([react.md](react.md)).
 
 ## Choosing a renderer
 
@@ -56,24 +58,26 @@ identical.
 - Images become GPU textures cached by source. If you mutate an image/canvas
   source in place at the same size (e.g. redraw an offscreen canvas), call
   `renderer.invalidateTexture(source)` to force a re-upload. Not needed when
-  drawing different image objects.
+  drawing different image objects, nor to free memory: the cache holds sources
+  weakly, so a dropped image's texture is deleted once it is garbage-collected.
 - Spritesheet edges can bleed when zooming; author sheets with `spacing`
   (see [sprites.md](sprites.md)).
 - WebGL context loss is handled automatically (resources rebuild on
   restore).
 
-## Static caches (Canvas2D / Skia / server)
+## Static caches
 
-`drawStaticRect/Circle/Image(items, cacheKey, layer)` pre-render all items to
-an offscreen canvas once, then blit the visible region per frame.
-
-- Use when the item set is static AND mostly visible (minimaps, fixed-zoom
-  overviews). Do not use for content that changes.
-- Invalidation (core >= 0.10): re-register with the same `cacheKey` - it
-  replaces the old registration and rebuilds the cache. On older cores it is
-  manual: `clearStaticCache(cacheKey)` after data changes, then re-register.
-- Offscreen dimension cap: 16384px. World extent * scale beyond that falls
-  back safely.
+`drawStaticRect/Circle/Image(items, cacheKey, layer?, options?)` render the
+items once and replay them per frame - the cheapest way to show a large,
+unchanging, mostly visible set (minimaps, fixed-zoom overviews); do not use
+them for content that changes. Re-registering with the same `cacheKey`
+rebuilds the cache (core >= 0.10). Zoom behavior differs: Canvas2D/server
+blit a bitmap captured at the registration scale and pixel ratio (softens
+when zoomed in past it), Skia replays a recorded picture, WebGL draws
+dynamically. Canvas2D/server bitmaps are capped at 16384 physical px per
+side and ~16.7M px in area: past that the pixel ratio is lowered (never
+below 1), and only a cache too large even at ratio 1 warns once and falls
+back to dynamic drawing. Details: [drawing.md](drawing.md).
 
 ## Practical budgets (rough, from the repo's own examples)
 
@@ -88,15 +92,13 @@ an offscreen canvas once, then blit the visible region per frame.
 2. Stable arrays (React: `useMemo`/state; vanilla: keep the same array and
    mutate for animation).
 3. Static caches for minimap/overview layers; `cacheKey` per dataset.
-4. Selection/hover tint on registered items via `styleOf` (mutate the
-   selection set + `render()`; zero re-registration, core >= 0.10). Overlay
-   visuals (a hover cursor cell) on their own layer with a registration id
-   (`drawRect(item, layer, { id: "hover" })`) or a single swapped
-   `DrawHandle` - never accumulate handles per mouse move.
+4. Selection/hover tint via `styleOf` + `render()` (zero re-registration);
+   overlay visuals (a hover cursor cell) on their own layer under a
+   registration id - never accumulate handles per mouse move.
 5. `SpriteAnimator` for frame animation (fps-gated repaints) instead of a
    60fps `requestAnimationFrame` loop.
 6. Enable only needed `eventHandlers`; `hover` fires on every pointer move.
 7. Text is the most expensive primitive everywhere - avoid thousands of
-   visible labels; gate them by zoom via the `coordinates.shownScaleRange`
-   pattern (draw labels only when `engine.getScale()` is high enough, and
-   redraw on `onZoom`).
+   visible labels; gate them by zoom (draw labels only when
+   `engine.getScale()` is high enough, and redraw on `onZoom`), as the
+   built-in `coordinates.shownScaleRange` does.

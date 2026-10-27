@@ -1,5 +1,86 @@
 # @canvas-tile-engine/renderer-skia
 
+## 0.7.0
+
+### Minor Changes
+
+- bcea4b7: feat: `clip` — confine a draw registration to a world rectangle
+
+  - Every draw method takes `clip` in its options, and every React/React Native draw component takes it as a prop: a world rectangle the registration is confined to. Nothing it draws paints outside, and nothing outside it hit-tests. That covers a chart's plot area, a minimap frame, or any "this layer belongs inside that box" region — none of which could be expressed before without dropping into `addDrawFunction` and calling `ctx.clip` by hand, which only clips one of the four renderers (on WebGL that context is the text overlay, so the GPU primitives ignored it entirely).
+  - **World (item) space**, the same coordinates `fitBounds` and `hitTestRect` take, so a clip pans and zooms with the scene. For a chart plot area that is the behavior you want: the axes drawn outside the clip keep their position relative to the data, and panning cannot smear the series across them.
+  - Applies to every draw kind, `drawGridLines`, the `drawStatic*` variants and `addDrawFunction` included.
+  - **Hit testing follows the clip**, or clipped-away items would stay clickable. Point queries reject before any geometry work; marquee queries are narrowed to the overlap rather than skipped when they miss, so a selection half inside the clip cannot reach what is cut away. `padding`/`paddingPx` deliberately do not widen a clip: they grow an item's own tap target, and a target that is not drawn has nothing to grow.
+  - Axis-aligned rectangles only. An arbitrary shape would need the stencil buffer on WebGL, where path fills already live, so the scope stops at what all four renderers can do identically.
+  - The React `clip` prop is compared **by value**, unlike `items`, so an inline object literal does not re-register the draw call on every render.
+
+  Purely additive: a registration without a `clip` behaves exactly as before.
+
+  Internally each renderer supplies a clip adapter to the shared layer manager, which applies it inside the `save()`/`restore()` pair every draw callback already runs in. The layer manager stays free of coordinate math because the renderers genuinely need different spaces — CSS pixels for a Canvas2D or Skia path clip, device pixels measured from the bottom for a WebGL scissor. WebGL cuts on both of its surfaces: the scissor for batched primitives, an ordinary path clip for the 2D overlay that carries text and custom drawing.
+
+- 164e37d: feat: gradient fills — `fillStyle` takes a `Paint`, not just a color string
+
+  - `fillStyle` on shapes (`Rect`, `Circle`) and on `PathStyle` now accepts a linear gradient as well as a CSS color string. This is what an area chart, a fading bar, or a shaded zone needed, and what previously had to be faked by drawing the ramp out of many shapes.
+  - `strokeStyle` and text fills stay color strings, deliberately. A stroke has no box to normalize a gradient axis against, and "along the stroke" and "across the stroke" are equally fair readings of the same axis, so the ambiguity stays out of the API rather than being answered differently by each renderer.
+  - **Box units are the default and make a gradient object reusable.** `{ from: { x: 0, y: 0 }, to: { x: 0, y: 1 } }` means "top to bottom" for every item that uses it, whatever its size, position, or rotation — a rotated shape's ramp turns with the shape. `units: "world"` places the axis in world coordinates instead, so neighbouring items each show their own slice of one scene-spanning ramp and it moves with the camera.
+  - Stops are normalized before painting: offsets clamped to `0..1` and sorted ascending, with stops sharing an offset keeping their authored order so a hard color break stays hard. An empty list paints nothing; a single stop paints flat. Both properties are load-bearing rather than defensive — Canvas2D's `addColorStop` throws on an out-of-range offset and Skia's `MakeLinearGradient` expects ascending positions.
+  - Identical output on all four renderers, arbitrary stop counts and any axis angle included, so swapping `RendererCanvas` for `RendererWebGL` stays the one-line change it is documented to be. WebGL gets there with a ramp texture plus a per-vertex gradient parameter: the parameter is affine in position, so interpolating it is exact however many stops the ramp has, and the stop count never touches the vertex count.
+  - `drawStatic*` accepts gradients too, with the caveat their cache already carries: it is recorded at one scale, so a `"world"` axis is baked at the scale the cache was built with.
+  - Core exports the shared resolution helpers the renderers agree through: `isGradient`, `normalizeStops`, `gradientAxisPx`, `gradientT`, and `paintKey`. Keys are structural, so a gradient spec rebuilt inline inside a `styleOf` callback still hits each renderer's cache.
+
+  Purely additive: every existing `fillStyle` string renders exactly as before.
+
+- e0c6ed3: feat: pixel sizing for `Rect` and `fontWeight` for text
+
+  Two gaps in the same corner of the item API, both about a value that should not scale with zoom.
+
+  - **`Rect.sizePx` / `widthPx` / `heightPx`.** Rect was the only anchored primitive without a pixel size — `Circle` has `sizePx`, `ImageItem` has `sizePx`, `Text` has `fontPx` — so a marker that must stay a fixed size on screen could not be a rectangle. Because Rect already carries `width`/`height`, the per-axis fields come along too: a shared-only `sizePx` would just move the asymmetry. Resolution order per axis is pixels before world units and specific before shared: `widthPx` → `sizePx` → `width` → `size`. Hit testing follows the drawn box on both axes, and culling re-evaluates it per frame because a pixel-sized box grows in world units as the camera zooms out.
+  - **`Text.style.fontWeight`.** Accepts `"normal"`, `"bold"`, and the numeric `100`–`900`. Canvas2D's font shorthand also takes the relative `bolder`/`lighter`, but Skia has no equivalent, so they are excluded rather than silently ignored on native. An unset weight is omitted from the font shorthand entirely rather than emitted as `"normal"` — the CSS shorthand resets every property it does not list, so an unconditional weight would change what existing callers get.
+
+  Both are additive; existing items render exactly as before.
+
+  The `drawStatic*` variants ignore the pixel sizes, matching how `drawStaticCircle` already ignores a circle's `sizePx`: a cache is recorded at one scale and blitted afterwards, so a screen size cannot hold across zooms. On WebGL, where statics are aliases of the dynamic path, `drawStaticRect` strips the fields itself so the four renderers stay identical and the hit box (registered with `ignoreSizePx`) keeps matching what is drawn.
+
+  New core helpers `resolveBoxPx`, `resolveBoxWorld` and `maxPxExtent` are exported alongside the existing `resolveSizePx`/`resolveSizeWorld` pair.
+
+### Patch Changes
+
+- a4d056a: Bound the number of grid lines drawn when zoomed out. When lines would be less than 2px apart on screen, every renderer now draws only every 2nd, 4th, 8th, ... line, keeping the count proportional to the viewport size instead of growing with 1 / scale (previously 10,000 lines per axis per frame at scale 0.1 with `cellSize` 1 on a 1000px canvas). The remaining lines stay on multiples of `cellSize`, so they do not shift while panning, and grids at least 2px apart draw exactly as before.
+- 1b68c1d: Fix: the renderers' color caches no longer grow without bound, so `styleOf` can compute a color string per frame the way it is documented to.
+
+  Both renderers memoize parsed colors keyed on the raw CSS string, and both only dropped that map on destroy. That is right for a fixed palette, but the natural way to write a pulse, a heat map, or a fade is a computed string — a `styleOf` returning `fillStyle: "hsl(" + item.data.load * 120 + ", 70%, 50%)"` — and every distinct value it ever produced stayed resident for the renderer's lifetime. A 60fps animation over a large item set added tens of thousands of entries per minute.
+
+  - Both caches are now a fixed-capacity LRU. The bound is sized per renderer — 4096 entries in `renderer-webgl`, 8192 in `renderer-skia`, where a miss is a native call rather than an inline parse — so it clears the working set even when `styleOf` gives every cell on screen its own color. A palette that is touched every frame stays resident; computed one-off colors cost a fixed amount of memory instead of one permanent entry each.
+  - `renderer-webgl` additionally parses the `#rgb`/`#rgba`/`#rrggbb`/`#rrggbbaa`, `rgb()`/`rgba()`, and `hsl()`/`hsla()` forms inline, in both the legacy comma and the modern space/slash syntaxes. Those were previously normalized by painting onto a 1x1 canvas and reading the pixel back — a GPU-to-CPU sync per new color, per frame, which the bound alone would have made more frequent. Everything else (named colors, `color-mix()`, `oklch()`, ...) still goes through the canvas, unchanged.
+
+  Colors render the same. The inline path keeps full float precision where the pixel readback quantized to 8 bits per channel, so an `hsl()` or fractional-alpha value can differ from the old result by less than 1/255.
+
+- b7c1115: Keep partially visible dynamic shapes and labels on screen by culling against conservative painted bounds, including origins, rotation, stroke width, and measured text. Use the same bounds above and below the spatial-index threshold, update pixel-sized bounds when zoom changes, and respect live style decorations.
+- 9d10090: Declare `@canvas-tile-engine/core` only as a peer dependency (`>=0.12.0`) instead of also listing it under `dependencies`. The renderers and bindings now always use the app's own copy of core, so a core release outside the old caret range can no longer install a second copy that the renderer is wired to instead of the app's engine. Apps must install `@canvas-tile-engine/core` themselves, which the installation docs already require. The minimum is 0.12.0 because these releases import core APIs added in that version.
+- e69c0dc: Keep large rotated, anchored, and thick-stroked static shapes fully inside their caches. Compute painted bounds for rectangles, circles, and aspect-fitted images, including sprite frames, and align the cache to the recording pixel grid with an antialiasing guard.
+- 91b4014: Internal: the renderer's animation controller now receives the engine's config as its motion policy, so `resizeWithAnimation` honors the reduced-motion preference like every other engine animation. No API change; the React Native binding supplies the platform signal.
+- 3ca8eee: Internal refactor: the world-space geometry every renderer's draw pipeline duplicated now comes from one place.
+
+  - Per-item path culling bounds (control-point hull for command paths, vertex box for polylines) was a byte-identical block in all three draw pipelines. They now call core's `pathItemBounds`.
+  - `getViewportBounds` / `isVisible` were identical private methods in each pipeline; they move to a new `geometry` entry point in the private `@canvas-tile-engine/renderer-shared` package, so the viewport-plus-tile-buffer formula is stated once instead of six times. Renderer-only helpers stay out of core's public API.
+  - `renderer-skia` now consumes `renderer-shared` like the other three renderers (bundled source, nothing new on npm).
+
+  No behavior change.
+
+- 868229a: Internal refactor: the FPS loop, the debug HUD and the coordinate overlay are computed in one place instead of two.
+
+  - The rAF sampler behind `FPS: n`, the block that assembles the HUD strings from camera/viewport state, and the overlay's border geometry, font-size clamp and label loop were duplicated line for line between `renderer-shared` and `renderer-skia`. They move to a new `scene` entry point in the private `@canvas-tile-engine/renderer-shared` package; each renderer keeps only its paint calls (`fillRect`/`fillText` vs `drawRect`/`drawText`).
+  - Skia's HUD offset — the panel sits 50px lower so the status bar / notch does not hide it — is now the shared layout's `topOffset` argument rather than an undocumented divergence.
+  - `renderer-skia`'s `Layer` was a byte-for-byte reimplementation of the shared one; it now uses the shared manager, which restores Skia canvases to their save depth exactly as before. `DrawHandle` is re-exported from core (same shape) instead of from the deleted module.
+  - The sampler's stop path is fixed on the way: stopping now cancels the frame the last tick queued and starting clears the sample window. Stopping and restarting within the same frame previously left two chained loops running, which roughly doubled the reported `FPS: n` for the rest of the session; the HUD never reached that path, so no released renderer showed it.
+
+  No other behavior change.
+
+- c26fc3f: Paint each frame straight onto the canvas the host presents instead of first recording the scene into a separate picture and replaying it. Normal frames no longer pay for an extra picture recording and replay. The scene is still cached as a picture only while the debug HUD's FPS counter runs, so its ticks repaint the readout without redrawing the map.
+- 576f4b7: Fix: `drawStaticRect` sized its picture cull rect from `size` alone, so a rect with per-axis `width`/`height` recorded outside its own bounds — `drawStaticRect([{ x: 0, y: 0, width: 8, height: 2 }])` painted 25px past the left edge at scale 10. Skia may quick-reject or clip against that rect, and the Canvas2D static cache already accounted for `width`/`height`, so the two renderers disagreed on the same input. Both now derive the box from the shared `itemsBounds` helper.
+- c428a05: Render a fresh static cache on every `drawStaticRect`, `drawStaticCircle`, and `drawStaticImage` call. When a `cacheKey` was registered again through the draw API without a `clearStaticCache` in between, the Canvas2D and server renderers reused the previous bitmap if the bounds and scale matched, and the Skia renderer always reused the previous picture, so the new items never appeared. Engine users were not affected, because the engine clears the cache before re-registering a key. The cache is still rendered once at the camera scale active at registration and scaled on zoom; register again to re-render it.
+- 5b8e9fe: Thin out coordinate overlay labels when zoomed out instead of drawing one per cell. Once neighboring labels would crowd each other, each axis labels only every 2nd, 5th, 10th, 20th, ... coordinate, so the labels stay legible and the per-frame text count is bounded by the viewport size rather than growing with the visible world span (previously about 14,000 labels per frame at scale 0.1 on an 800x600 canvas). Labels stay on their coordinates while panning, and views where every label already fits are unchanged.
+- 94ab3ac: Reject invalid grid intervals synchronously with a `RangeError` in the engine and every renderer's draw API. `cellSize` must be a positive finite number, preventing negative intervals from hanging grid rendering. A rejected same-id registration leaves the previous draw intact; positive fractional intervals remain supported.
+
 ## 0.6.0
 
 ### Minor Changes
