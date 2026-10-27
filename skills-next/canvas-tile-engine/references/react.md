@@ -209,7 +209,8 @@ in `useCallback` to skip those repaints. Arguments and rules:
 
 ## Types: binding or core
 
-Import from `@canvas-tile-engine/react` (re-exported):
+Import from `@canvas-tile-engine/react` (re-exported); app code needs no
+type import from core:
 
 - Components and hooks: `CanvasTileEngine`, `useCanvasTileEngine`,
   `useEngineContext`; types `EngineHandle`, `EngineContextValue`,
@@ -227,10 +228,17 @@ Import from `@canvas-tile-engine/react` (re-exported):
   `FitBoundsResult` (core >= 0.12), `FitScaleOptions`, `BoundedItem`,
   `SpriteSheetOptions`, `SpriteAnimation`.
 
-Import from `@canvas-tile-engine/core` (NOT re-exported): `Bounds`,
-`LinearGradient`, `Paint`, `ColorStop`, `HitResult`, `HitTestOptions`,
-`ClickInfo`, `FitBoundsOptions`, `AccessibilityConfig`, `StyleOf`, and the
+Also re-exported for the draw features (core >= 0.12): `Bounds`,
+`FitBoundsOptions`, `DrawTransform`, `LinearGradient`, `Paint`, `ColorStop`,
+`TextAlign`, `TextBaseline`, `FontWeight`, `HitResult`, `HitKind`,
+`HitTestOptions`, `HitTestRectOptions`, `ClickInfo`, `ZoomMode`,
+`KeyboardConfig`, `AccessibilityConfig`, `AccessibilityRole`,
+`ReducedMotionSetting`, `StyleOf`, `VisibleOf`, `InteractiveOf`, and the
 `*DrawOptions` / `*DecorationStyle` types.
+
+An older binding lacks the draw-feature group: import those from
+`@canvas-tile-engine/core` there. Only `normalizeConfig` and the
+renderer-author APIs (`IRenderer`, `IDrawAPI`, ...) stay core-only.
 
 Generics: item types take a `data` type (`Rect<TData>`). The handle's
 `engine.drawRect(items, ...)` infers it from the items, so its `styleOf`

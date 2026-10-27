@@ -11,6 +11,12 @@
         "typecheck": {
             "dependsOn": ["^build"]
         },
+        "@canvas-tile-engine/react#typecheck": {
+            "dependsOn": ["^build", "build"]
+        },
+        "@canvas-tile-engine/react-native#typecheck": {
+            "dependsOn": ["^build", "build"]
+        },
         "test": {
             "dependsOn": ["^build"]
         },
