@@ -84,10 +84,10 @@ function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coor
 // Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
-// Cache for static layers (pre-rendered offscreen canvases)
-interface StaticCache<TContext, TCanvas> {
+// A static layer's pre-rendered offscreen canvas, plus the world bounds and
+// camera scale it was rendered at, which the blit needs to map it to screen.
+interface StaticCache<TCanvas> {
     canvas: TCanvas;
-    ctx: TContext;
     worldBounds: { minX: number; minY: number; maxX: number; maxY: number };
     scale: number;
 }
@@ -109,7 +109,7 @@ export class CanvasDraw<
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
         screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
     };
-    private staticCaches = new Map<string, StaticCache<TContext, TCanvas>>();
+    private staticCaches = new Map<string, StaticCache<TCanvas>>();
     private warnedStaticCacheDisabled = false;
     private textBounds = new CanvasTextBounds();
 
@@ -828,10 +828,17 @@ export class CanvasDraw<
     }
 
     /**
-     * Helper to create or get a static cache for pre-rendered content.
-     * Handles bounds calculation, canvas creation, and rebuild logic.
+     * Render `items` into a new offscreen canvas for a `drawStatic*`
+     * registration and store it under `cacheKey`, replacing any earlier entry.
+     *
+     * Contract: every call renders afresh, at the camera scale active at
+     * registration. The layer captures the returned cache and blits it every
+     * frame, scaling the bitmap on zoom; nothing re-renders it later. To show
+     * new items or styles, or a sharp bitmap at a new zoom, register again
+     * (through the engine, reusing the `cacheKey` replaces the old
+     * registration). `clearStaticCache` only drops the stored reference.
      */
-    private getOrCreateStaticCache<
+    private createStaticCache<
         T extends AnchoredItem & {
             radius?: number | number[];
             origin?: { mode?: "cell" | "self"; x?: number; y?: number };
@@ -850,7 +857,7 @@ export class CanvasDraw<
             /** World -> cache pixels, the cache-space counterpart of `worldToScreen`. */
             toCacheSpace: (wx: number, wy: number) => Coords,
         ) => void,
-    ): StaticCache<TContext, TCanvas> | null {
+    ): StaticCache<TCanvas> | null {
         if (!this.createOffscreen) {
             if (!this.warnedStaticCacheDisabled) {
                 console.warn("[CanvasDraw] Static cache disabled: OffscreenCanvas not available.");
@@ -882,74 +889,59 @@ export class CanvasDraw<
             return null;
         }
 
-        // Check if we need to create or update cache
-        let cache = this.staticCaches.get(cacheKey);
-        const needsRebuild =
-            !cache ||
-            cache.scale !== renderScale ||
-            cache.worldBounds.minX !== minX ||
-            cache.worldBounds.maxX !== maxX ||
-            cache.worldBounds.minY !== minY ||
-            cache.worldBounds.maxY !== maxY;
+        const offscreen = this.createOffscreen(canvasWidth, canvasHeight);
 
-        if (needsRebuild) {
-            const offscreen = this.createOffscreen(canvasWidth, canvasHeight);
-
-            if (!offscreen) {
-                if (!this.warnedStaticCacheDisabled) {
-                    console.warn("[CanvasDraw] Static cache disabled: 2D context unavailable.");
-                    this.warnedStaticCacheDisabled = true;
-                }
-                return null;
+        if (!offscreen) {
+            if (!this.warnedStaticCacheDisabled) {
+                console.warn("[CanvasDraw] Static cache disabled: 2D context unavailable.");
+                this.warnedStaticCacheDisabled = true;
             }
-
-            // Cache pixel 0 is world minX/minY at renderScale — the same
-            // mapping the per-item `pos` below uses, exposed so callbacks can
-            // place world-space geometry (a world-unit gradient axis) inside
-            // the cache.
-            const toCacheSpace = (wx: number, wy: number) => ({
-                x: (wx + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
-                y: (wy + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
-            });
-
-            // Render all items using the provided render function
-            for (const item of items) {
-                // World units only: the cache is rendered once at renderScale
-                // and blitted afterwards, so a screen-pixel size could not hold
-                // its size across zooms. `ignoreSizePx` keeps hit testing in
-                // step with what is drawn here.
-                const size = item.size ?? 1;
-                const pxW = (item.width ?? size) * renderScale;
-                const pxH = (item.height ?? size) * renderScale;
-                const origin = resolveOrigin(item.origin);
-                // Cache-space equivalent of worldToScreen: cache pixel 0 is world minX.
-                const pos = {
-                    x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
-                    y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
-                };
-                const { x, y } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
-
-                renderFn(offscreen.ctx, item, x, y, pxW, pxH, toCacheSpace);
-            }
-
-            cache = {
-                canvas: offscreen.canvas,
-                ctx: offscreen.ctx,
-                worldBounds: { minX, minY, maxX, maxY },
-                scale: renderScale,
-            };
-
-            this.staticCaches.set(cacheKey, cache);
+            return null;
         }
 
-        return cache ?? null;
+        // Cache pixel 0 is world minX/minY at renderScale — the same
+        // mapping the per-item `pos` below uses, exposed so callbacks can
+        // place world-space geometry (a world-unit gradient axis) inside
+        // the cache.
+        const toCacheSpace = (wx: number, wy: number) => ({
+            x: (wx + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
+            y: (wy + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
+        });
+
+        // Render all items using the provided render function
+        for (const item of items) {
+            // World units only: the cache is rendered once at renderScale
+            // and blitted afterwards, so a screen-pixel size could not hold
+            // its size across zooms. `ignoreSizePx` keeps hit testing in
+            // step with what is drawn here.
+            const size = item.size ?? 1;
+            const pxW = (item.width ?? size) * renderScale;
+            const pxH = (item.height ?? size) * renderScale;
+            const origin = resolveOrigin(item.origin);
+            // Cache-space equivalent of worldToScreen: cache pixel 0 is world minX.
+            const pos = {
+                x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET - minX) * renderScale,
+                y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET - minY) * renderScale,
+            };
+            const { x, y } = computeOriginOffset(pos, pxW, pxH, origin, this.camera.scale);
+
+            renderFn(offscreen.ctx, item, x, y, pxW, pxH, toCacheSpace);
+        }
+
+        const cache: StaticCache<TCanvas> = {
+            canvas: offscreen.canvas,
+            worldBounds: { minX, minY, maxX, maxY },
+            scale: renderScale,
+        };
+        this.staticCaches.set(cacheKey, cache);
+        return cache;
     }
 
     /**
      * Helper to add a layer callback that blits from a static cache.
      */
     private addStaticCacheLayer(
-        cache: StaticCache<TContext, TCanvas> | null,
+        cache: StaticCache<TCanvas> | null,
         layer: number,
         options?: RendererClipOptions,
     ): DrawHandle | null {
@@ -1052,7 +1044,7 @@ export class CanvasDraw<
         // The cache is built in one pass, so this memo spans that whole pass.
         const gradients = new Map<string, CanvasGradientLike>();
 
-        const cache = this.getOrCreateStaticCache(
+        const cache = this.createStaticCache(
             items,
             cacheKey,
             staticRectPaintBounds,
@@ -1061,7 +1053,7 @@ export class CanvasDraw<
                 const rotationDeg = item.rotate ?? 0;
                 const rotation = rotationDeg * (Math.PI / 180);
                 // Cache renders at the current camera scale, so world-unit radii
-                // resolve against it (the cache rebuilds when the scale changes).
+                // resolve against it (the bitmap then scales with the camera).
                 const radius = resolveRadiusPx(item.radius, this.camera.scale);
 
                 const fill =
@@ -1140,7 +1132,7 @@ export class CanvasDraw<
         layer: number = 1,
         options?: RendererClipOptions,
     ): DrawHandle {
-        const cache = this.getOrCreateStaticCache(
+        const cache = this.createStaticCache(
             items,
             cacheKey,
             (item) => staticImagePaintBounds(item, item.img.width, item.img.height),
@@ -1218,7 +1210,7 @@ export class CanvasDraw<
         let lastStrokeStyle: string | undefined;
         const gradients = new Map<string, CanvasGradientLike>();
 
-        const cache = this.getOrCreateStaticCache(
+        const cache = this.createStaticCache(
             items,
             cacheKey,
             staticCirclePaintBounds,
@@ -1265,11 +1257,10 @@ export class CanvasDraw<
     /**
      * Clear a static cache
      *
-     * Note: the pre-rendered bitmap is reused as long as the item bounds and the
-     * scale at registration time are unchanged — edits that only change item
-     * colors/styles are not detected automatically. To refresh content, remove
-     * the old draw handle, call this method, and register the `drawStatic*`
-     * call again (already-registered layers keep blitting their old bitmap).
+     * Drops the stored reference to the pre-rendered bitmap. It does not
+     * re-render anything: an already-registered layer keeps blitting the bitmap
+     * it captured. Every `drawStatic*` call renders a fresh cache, so to refresh
+     * content, remove the old draw handle and register the call again.
      * @param cacheKey The cache key to clear, or undefined to clear all
      */
     clearStaticCache(cacheKey?: string) {

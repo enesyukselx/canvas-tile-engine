@@ -849,9 +849,10 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
         this.drawIdByHandle.delete(handle.id);
         const entry = this.drawIds.get(id);
         this.drawIds.delete(id);
-        // A removed static registration leaves its offscreen cache orphaned —
-        // and silently stale if the same cacheKey is later re-registered with
-        // different items — so drop the cache with the registration.
+        // A removed static registration leaves its offscreen cache (or Skia
+        // picture) orphaned in the renderer, so drop it with the registration
+        // to release its memory. Renderers render a fresh cache on every
+        // registration, so this is not needed to avoid stale content.
         if (entry?.cacheKey !== undefined) {
             this.renderer.getDrawAPI().clearStaticCache(entry.cacheKey);
         }
@@ -1282,8 +1283,8 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      */
     clearAll() {
         this.renderer.getDrawAPI().clearAll();
-        // Every static cache is orphaned once all callbacks are gone; dropping
-        // them prevents stale reuse when the same cacheKey is registered again.
+        // Every static cache (or Skia picture) is orphaned once all callbacks
+        // are gone; dropping them releases their memory.
         this.renderer.getDrawAPI().clearStaticCache();
         this.hitTester.clear();
         this.drawIds.clear();

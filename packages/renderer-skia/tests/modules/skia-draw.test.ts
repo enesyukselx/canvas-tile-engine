@@ -460,7 +460,7 @@ describe("static picture cache", () => {
         expect(scaleOps[1]).toMatchObject({ sx: 2, sy: 2 });
     });
 
-    it("re-records after clearStaticCache, reuses otherwise", () => {
+    it("records a fresh picture on every registration, cleared or not", () => {
         const { draw, render } = setup();
         const { canvas, ops } = makeCanvas();
 
@@ -468,20 +468,36 @@ describe("static picture cache", () => {
         render(canvas);
         draw.removeDrawHandle(first);
 
-        // Same cacheKey without clearing → same picture instance.
+        // Same cacheKey without clearing.
         const second = draw.drawStaticRect(items, "cache-d", 1);
         render(canvas);
         draw.removeDrawHandle(second);
 
-        // After clearing → a fresh recording.
+        // Same cacheKey after clearing.
         draw.clearStaticCache("cache-d");
         draw.drawStaticRect(items, "cache-d", 1);
         render(canvas);
 
         const pictures = ops.filter((o) => o.op === "picture").map((o) => o.picture);
         expect(pictures).toHaveLength(3);
-        expect(pictures[1]).toBe(pictures[0]);
-        expect(pictures[2]).not.toBe(pictures[0]);
+        expect(new Set(pictures).size).toBe(3);
+    });
+
+    it("draws the new items when a cacheKey is reused without clearing", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        const first = draw.drawStaticRect([{ x: 1, y: 1, size: 1, style: { fillStyle: "#f00" } }], "cache-reuse", 1);
+        draw.removeDrawHandle(first);
+        // Same footprint and camera scale, different content, called on the
+        // draw API directly (the engine clears the key before re-registering).
+        draw.drawStaticRect([{ x: 1, y: 1, size: 1, style: { fillStyle: "#00f" } }], "cache-reuse", 1);
+        render(canvas);
+
+        const pictures = ops.filter((o) => o.op === "picture").map((o) => o.picture as MockPicture);
+        expect(pictures).toHaveLength(1);
+        const rects = pictures[0].ops.filter((o) => o.op === "rect") as Op[];
+        expect(rects.map((o) => o.color)).toEqual([{ parsed: "#00f" }]);
     });
 
     it("covers per-axis width/height in the cull rect", () => {

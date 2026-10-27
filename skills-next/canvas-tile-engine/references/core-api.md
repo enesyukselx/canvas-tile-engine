@@ -219,7 +219,7 @@ Full item shapes and semantics: [drawing.md](drawing.md).
 | `removeDrawHandle(handle: DrawHandle): void` | Remove one registered draw callback (a tracked static registration's cache is dropped too). |
 | `clearLayer(layer: number): void` | Remove every callback on a layer (drops static caches registered on it). |
 | `clearAll(): void` | Remove all callbacks on all layers and drop all static caches. |
-| `clearStaticCache(cacheKey?: string): void` | Drop one or all pre-rendered static caches (forces rebuild next frame). Rarely needed since core 0.10 - same-key re-register invalidates automatically. |
+| `clearStaticCache(cacheKey?: string): void` | Drop one or all stored static caches. Does NOT re-render: a registered static layer keeps drawing what it captured at registration (scaled on zoom); re-register with the same key to re-render. Rarely needed since core 0.10 - same-key re-register invalidates automatically. |
 
 ### Hit testing
 

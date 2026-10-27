@@ -699,7 +699,7 @@ engine.drawStaticImage(terrainTiles, "terrain-cache", 0);
 
 ### `clearStaticCache`
 
-Clears pre-rendered caches when content changes.
+Releases pre-rendered caches. It does not re-render anything: a registered static layer keeps drawing the bitmap it was given. To show changed content, call the static draw method again with the same key (see [Cache Keys](#cache-keys)).
 
 ```typescript
 // Clear a specific cache
@@ -730,9 +730,9 @@ Each static cache creates an offscreen canvas sized to fit all items. For 100k i
 
 ### How It Works
 
-1. **First render**: All items are drawn to an offscreen canvas (OffscreenCanvas or HTMLCanvasElement)
-2. **Subsequent renders**: Only the visible portion is copied (blitted) to the main canvas
-3. **Zoom changes**: Cache is automatically rebuilt when scale changes
+1. **Registration**: When the static draw method is called, all items are drawn to an offscreen canvas (OffscreenCanvas or HTMLCanvasElement) at the current camera scale
+2. **Every render**: Only the visible portion is copied (blitted) to the main canvas
+3. **Zoom changes**: The cache is not re-rendered. The bitmap from registration is scaled with the camera, so it softens when you zoom in past the registration scale. Call the static draw method again with the same key to re-render it at the current scale
 
 ### When to Use
 
