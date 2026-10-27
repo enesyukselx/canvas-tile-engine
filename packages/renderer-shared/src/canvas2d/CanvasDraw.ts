@@ -82,15 +82,18 @@ function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coor
     return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
 }
 
-// Conservative max dimension for offscreen static cache (browser limits often 16384 or 32767)
+// Conservative max dimension, in physical (backing-store) pixels, for an
+// offscreen static cache (browser limits often 16384 or 32767).
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
 
-// A static layer's pre-rendered offscreen canvas, plus the world bounds and
-// camera scale it was rendered at, which the blit needs to map it to screen.
+// A static layer's pre-rendered offscreen canvas, plus the world bounds,
+// camera scale, and pixel ratio it was rendered at, which the blit needs to
+// map it to screen. The bitmap holds `scale * pixelRatio` pixels per world unit.
 interface StaticCache<TCanvas> {
     canvas: TCanvas;
     worldBounds: { minX: number; minY: number; maxX: number; maxY: number };
     scale: number;
+    pixelRatio: number;
 }
 
 /**
@@ -118,12 +121,18 @@ export class CanvasDraw<
      * @param createOffscreen Offscreen canvas factory for static caching, or
      * `null` when the platform has no offscreen surface (static draws then
      * fall back to dynamic drawing).
+     * @param pixelRatio Physical pixels per CSS pixel of the visible canvas
+     * (the browser's devicePixelRatio, the server's `pixelRatio`). Static
+     * caches read it at registration and render at that resolution, so the
+     * blit copies 1:1 instead of upscaling a CSS-resolution bitmap. Defaults
+     * to 1.
      */
     constructor(
         private layers: Layer<DrawContext<TContext>>,
         private transformer: CoordinateTransformer,
         private camera: ICamera,
         private createOffscreen: OffscreenCanvasFactory<TContext, TCanvas> | null,
+        private pixelRatio: () => number = () => 1,
     ) {}
 
     /**
@@ -836,12 +845,16 @@ export class CanvasDraw<
      * Render `items` into a new offscreen canvas for a `drawStatic*`
      * registration and store it under `cacheKey`, replacing any earlier entry.
      *
-     * Contract: every call renders afresh, at the camera scale active at
-     * registration. The layer captures the returned cache and blits it every
-     * frame, scaling the bitmap on zoom; nothing re-renders it later. To show
-     * new items or styles, or a sharp bitmap at a new zoom, register again
-     * (through the engine, reusing the `cacheKey` replaces the old
-     * registration). `clearStaticCache` only drops the stored reference.
+     * Contract: every call renders afresh, at the camera scale and pixel
+     * ratio active at registration: the bitmap holds `scale * pixelRatio`
+     * physical pixels per world unit, so at the recorded zoom it lands 1:1 on
+     * the visible canvas's backing store. The layer captures the returned
+     * cache and blits it every frame, scaling the bitmap on zoom; nothing
+     * re-renders it later, including when the pixel ratio changes afterwards
+     * (a window moved to another monitor). To show new items or styles, or a
+     * sharp bitmap at a new zoom or pixel ratio, register again (through the
+     * engine, reusing the `cacheKey` replaces the old registration).
+     * `clearStaticCache` only drops the stored reference.
      */
     private createStaticCache<
         T extends AnchoredItem & {
@@ -872,7 +885,9 @@ export class CanvasDraw<
         }
 
         const renderScale = this.camera.scale;
-        const box = staticCacheBounds(items, renderScale, boundsOf);
+        const ratio = this.pixelRatio();
+        const pixelRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+        const box = staticCacheBounds(items, renderScale, boundsOf, pixelRatio);
         if (!box) {
             return null;
         }
@@ -882,13 +897,19 @@ export class CanvasDraw<
         const worldWidth = maxX - minX;
         const worldHeight = maxY - minY;
 
-        // Bounds already snap outwards to integer raster coordinates.
-        const canvasWidth = Math.round(worldWidth * renderScale);
-        const canvasHeight = Math.round(worldHeight * renderScale);
+        // Physical (backing-store) size. Bounds already snap outwards to
+        // integer physical pixels, so rounding only drops float noise.
+        const canvasWidth = Math.round(worldWidth * renderScale * pixelRatio);
+        const canvasHeight = Math.round(worldHeight * renderScale * pixelRatio);
 
+        // The cap applies to the physical size, since that is what gets
+        // allocated. Past it, draw dynamically (crisp at any ratio) rather
+        // than quietly caching at a lower, blurry ratio.
         if (canvasWidth > MAX_STATIC_CANVAS_DIMENSION || canvasHeight > MAX_STATIC_CANVAS_DIMENSION) {
             if (!this.warnedStaticCacheDisabled) {
-                console.warn(`Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight}).`);
+                console.warn(
+                    `Static cache disabled: offscreen canvas too large (${canvasWidth}x${canvasHeight} physical px at pixel ratio ${pixelRatio}).`,
+                );
                 this.warnedStaticCacheDisabled = true;
             }
             return null;
@@ -904,7 +925,13 @@ export class CanvasDraw<
             return null;
         }
 
-        // Cache pixel 0 is world minX/minY at renderScale — the same
+        // Items below paint in CSS px, as on the visible canvas under its
+        // pixel-ratio transform; this maps them onto the physical bitmap.
+        if (pixelRatio !== 1) {
+            offscreen.ctx.scale(pixelRatio, pixelRatio);
+        }
+
+        // Cache CSS pixel 0 is world minX/minY at renderScale — the same
         // mapping the per-item `pos` below uses, exposed so callbacks can
         // place world-space geometry (a world-unit gradient axis) inside
         // the cache.
@@ -937,6 +964,7 @@ export class CanvasDraw<
             canvas: offscreen.canvas,
             worldBounds: { minX, minY, maxX, maxY },
             scale: renderScale,
+            pixelRatio,
         };
         this.staticCaches.set(cacheKey, cache);
         return cache;
@@ -955,7 +983,10 @@ export class CanvasDraw<
         }
         const cachedCanvas = cache.canvas;
         const cachedBounds = cache.worldBounds;
-        const cachedScale = cache.scale;
+        // Physical cache pixels per world unit. Source rects are in the
+        // cache's physical pixels; destination rects stay in CSS px, since
+        // the visible context already carries the pixel-ratio transform.
+        const cachedScale = cache.scale * cache.pixelRatio;
 
         return this.register(layer, options, ({ ctx, config, topLeft }) => {
             const viewportWidth = config.size.width / config.scale;

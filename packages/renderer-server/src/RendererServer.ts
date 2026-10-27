@@ -97,7 +97,7 @@ export class RendererServer implements IRenderer<ServerMount, Image> {
         this.ctx = ctx;
 
         this.layers = new Layer(canvas2dClipAdapter<SKRSContext2D>());
-        this.drawAPI = createServerCanvasDraw(this.layers, this.transformer, this.camera);
+        this.drawAPI = createServerCanvasDraw(this.layers, this.transformer, this.camera, this.pixelRatio);
         this.coordinateOverlay = new CoordinateOverlayRenderer(this.ctx, this.camera, this.config, this.viewport);
 
         this.applyTransform();

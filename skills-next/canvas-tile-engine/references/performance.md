@@ -72,11 +72,11 @@ items once and replay them per frame - the cheapest way to show a large,
 unchanging, mostly visible set (minimaps, fixed-zoom overviews); do not use
 them for content that changes. Re-registering with the same `cacheKey`
 rebuilds the cache (core >= 0.10). Zoom behavior differs: Canvas2D/server
-blit a bitmap captured at the registration scale (softens when zoomed in
-past it), Skia replays a recorded picture, WebGL draws dynamically.
-Canvas2D/server bitmaps are capped at 16384px per side; a larger world
-extent * scale warns once and falls back to dynamic drawing. Details:
-[drawing.md](drawing.md).
+blit a bitmap captured at the registration scale and pixel ratio (softens
+when zoomed in past it), Skia replays a recorded picture, WebGL draws
+dynamically. Canvas2D/server bitmaps are capped at 16384 physical px per
+side; a larger world extent * scale * pixel ratio warns once and falls back
+to dynamic drawing. Details: [drawing.md](drawing.md).
 
 ## Practical budgets (rough, from the repo's own examples)
 

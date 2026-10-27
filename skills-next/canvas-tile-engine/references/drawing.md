@@ -457,11 +457,14 @@ engine.drawStaticRect(minimapItems, "minimap-items", 1, { hitTest: false });
 | Skia | SkPicture recorded at the registration scale, replayed scaled | stays sharp (vector); px values baked in at that scale |
 | WebGL | none - statics are aliases of the dynamic path | n/a; `*Px` sizes still stripped, `clearStaticCache` is a no-op |
 
-The Canvas2D/server bitmap is rendered at CSS-pixel resolution, not
-multiplied by `devicePixelRatio` (or the server's `pixelRatio`), so on HiDPI
-screens and in `pixelRatio: 2` images a static layer looks slightly softer
-than dynamic draws even at the registration scale. Prefer dynamic draws
-where crispness matters more than pan speed.
+The Canvas2D/server bitmap is rendered at the pixel ratio active at
+registration (`devicePixelRatio` in the browser, the renderer's `pixelRatio`
+on the server), so at the registration scale a static layer is as crisp as
+a dynamic draw, on HiDPI screens and in `pixelRatio: 2` images too
+(core >= 0.12; older releases render it at CSS-pixel resolution, slightly
+soft at ratios above 1). Like the scale, the ratio is captured once: after
+the window moves to a screen with a different `devicePixelRatio`,
+re-register to re-render at the new ratio.
 
 To keep a Canvas2D static layer sharp on a zoomable map, re-register it
 (same `cacheKey`) once a zoom settles above the recorded scale, e.g. from a
@@ -482,9 +485,10 @@ debounced `onZoom`.
   layer keeps drawing what it captured).
 - Pixel sizes (`sizePx`, `widthPx`, `heightPx`) are ignored by drawing and
   hit testing alike; `sprite` frames are frozen at build time.
-- Canvas2D/server caches are capped at 16384 px per side. A larger cache
-  (huge world extent at a high scale), or a platform without offscreen
-  canvases, falls back to dynamic drawing with a console warning.
+- Canvas2D/server caches are capped at 16384 physical px per side (world
+  extent * scale * pixel ratio). A larger cache (huge world extent at a high
+  scale or ratio), or a platform without offscreen canvases, falls back to
+  dynamic drawing with a console warning.
 
 ## Custom draw functions
 

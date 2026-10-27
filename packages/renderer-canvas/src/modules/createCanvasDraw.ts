@@ -28,13 +28,16 @@ const createOffscreen: OffscreenCanvasFactory<BrowserContext2D, BrowserOffscreen
  * Wire the shared Canvas2D pipeline for the browser: static caches render to
  * an OffscreenCanvas when available, falling back to a detached DOM canvas,
  * and are disabled entirely when neither exists.
+ * @param pixelRatio The device pixel ratio the visible canvas is backed at
+ * (`ViewportState.dpr`); static caches render at it so they stay crisp on HiDPI.
  * @internal
  */
 export function createBrowserCanvasDraw(
     layers: Layer<DrawContext<BrowserContext2D>>,
     transformer: CoordinateTransformer,
     camera: ICamera,
+    pixelRatio: () => number,
 ): BrowserCanvasDraw {
     const staticCacheSupported = typeof OffscreenCanvas !== "undefined" || typeof document !== "undefined";
-    return new CanvasDraw(layers, transformer, camera, staticCacheSupported ? createOffscreen : null);
+    return new CanvasDraw(layers, transformer, camera, staticCacheSupported ? createOffscreen : null, pixelRatio);
 }
