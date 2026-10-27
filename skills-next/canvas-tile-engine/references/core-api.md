@@ -58,6 +58,8 @@ type CanvasTileEngineConfig = {
         reducedMotion?: boolean | "auto"; // default "auto" = follow the platform
     };                                 // OVERRIDES an explicit durationMs; escape is false
     coordinates?: {                    // coordinate labels around the viewport edge
+                                       // (thin to every 2nd/5th/10th/... coordinate
+                                       // when zoomed out so they stay legible)
         enabled?: boolean;             // default false
         shownScaleRange?: { min: number; max: number }; // default {0, Infinity}
     };

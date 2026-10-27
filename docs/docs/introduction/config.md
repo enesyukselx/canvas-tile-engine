@@ -168,6 +168,8 @@ coordinates: {
 | `enabled` | `boolean` | `false` | Draws coordinate labels around the viewport. |
 | `shownScaleRange` | `{ min: number; max: number }` | `{ min: 0, max: Infinity }` | Only shows labels while the current scale is inside the range. |
 
+When zoomed out far enough that a label per coordinate would overlap, the labels thin out to every 2nd, 5th, 10th, 20th, ... coordinate so they stay legible.
+
 ## Debug
 
 ```ts
