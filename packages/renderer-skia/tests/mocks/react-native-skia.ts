@@ -150,6 +150,9 @@ export function makeRecordingCanvas() {
 
 export const TileMode = { Clamp: 0, Repeat: 1, Mirror: 2, Decal: 3 };
 
+/** Every picture recorder created, for asserting when a scene is (re-)recorded. */
+export const pictureRecorders: unknown[] = [];
+
 export const Skia = {
     Paint: makePaint,
     Shader: {
@@ -189,7 +192,7 @@ export const Skia = {
     PictureRecorder: () => {
         let recording: { canvas: unknown; ops: MockOp[] } | null = null;
         let bounds: unknown;
-        return {
+        const recorder = {
             beginRecording(cullRect?: unknown) {
                 recording = makeRecordingCanvas();
                 bounds = cullRect;
@@ -199,6 +202,8 @@ export const Skia = {
                 return { __picture: true, bounds, ops: recording?.ops ?? [] };
             },
         };
+        pictureRecorders.push(recorder);
+        return recorder;
     },
 };
 

@@ -72,8 +72,18 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     private imageLoader = new SkiaImageLoader();
 
     /**
+     * Whether the debug HUD's FPS loop runs (set once in {@link init}; debug
+     * config is fixed for the renderer's lifetime). Its ticks are the only
+     * presents without a scene change, so only then is the scene worth caching
+     * as a picture — otherwise {@link render} paints it straight onto the
+     * host's frame canvas.
+     */
+    private fpsLoopRunning = false;
+
+    /**
      * Scene (background + layers + overlays) recorded once per {@link render}
-     * and replayed on overlay-only presents — see {@link paintFrame}.
+     * and replayed on FPS ticks — see {@link paintCachedFrame}. Only used
+     * while {@link fpsLoopRunning}; stays null otherwise.
      */
     private scenePicture: SkPicture | null = null;
 
@@ -184,6 +194,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
             if (this.config.get().debug?.hud?.fps) {
                 this.debugOverlay.setFpsUpdateCallback(() => this.presentCached());
                 this.debugOverlay.startFpsLoop();
+                this.fpsLoopRunning = true;
             }
         }
 
@@ -225,35 +236,63 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
     }
 
     render(): void {
-        this.scenePicture = null;
-        this.mount.present((canvas) => this.paintFrame(canvas));
+        if (this.fpsLoopRunning) {
+            this.scenePicture = null;
+            this.presentCached();
+            return;
+        }
+
+        // The host already records the painter into its frame picture, so
+        // paint the scene straight onto that canvas. The save/restore keeps
+        // any state `onDraw` leaves behind off the HUD, as picture playback
+        // did.
+        this.mount.present((canvas) => {
+            const saveCount = canvas.save();
+            this.paintScene(canvas);
+            canvas.restoreToCount(saveCount);
+            this.paintHud(canvas);
+        });
     }
 
-    /** Re-present without invalidating the scene — only the debug HUD is redrawn fresh. */
+    /**
+     * Present the cached scene picture (recording it first if {@link render}
+     * invalidated it) under a fresh HUD. FPS ticks land here, so they repaint
+     * the readout without re-recording the scene.
+     */
     private presentCached(): void {
-        this.mount.present((canvas) => this.paintFrame(canvas));
+        this.mount.present((canvas) => this.paintCachedFrame(canvas));
     }
 
-    private paintFrame(canvas: SkCanvas): void {
+    private paintCachedFrame(canvas: SkCanvas): void {
         if (!this.scenePicture) {
             this.scenePicture = this.recordScene();
         }
         canvas.drawPicture(this.scenePicture);
+        this.paintHud(canvas);
+    }
 
-        // Debug overlay is drawn outside the scene picture so HUD updates
-        // (FPS ticks) can re-present without re-recording the scene.
+    /**
+     * Debug overlay. Painted outside the scene in both paths so FPS ticks can
+     * re-present the cached scene without re-recording it.
+     */
+    private paintHud(canvas: SkCanvas): void {
         if (this.config.get().debug?.enabled && this.debugOverlay) {
             this.debugOverlay.draw(canvas);
         }
     }
 
     private recordScene(): SkPicture {
+        const { width, height } = this.viewport.getSize();
+        const recorder = Skia.PictureRecorder();
+        this.paintScene(recorder.beginRecording(Skia.XYWHRect(0, 0, width, height)));
+        return recorder.finishRecordingAsPicture();
+    }
+
+    /** Paint background, engine layers, `onDraw` and the coordinate overlay onto `canvas`. */
+    private paintScene(canvas: SkCanvas): void {
         const size = this.viewport.getSize();
         const config = { ...this.config.get(), size: { ...size }, scale: this.camera.scale };
         const topLeft: Coords = { x: this.camera.x, y: this.camera.y };
-
-        const recorder = Skia.PictureRecorder();
-        const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, size.width, size.height));
 
         // Background
         this.bgPaint.setColor(Skia.Color(config.backgroundColor));
@@ -275,8 +314,6 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         if (this.coordinateOverlayRenderer.shouldDraw(this.camera.scale)) {
             this.coordinateOverlayRenderer.draw(canvas);
         }
-
-        return recorder.finishRecordingAsPicture();
     }
 
     resize(width: number, height: number): void {
@@ -308,6 +345,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
         this.debugOverlay?.destroy();
         this.imageLoader.clear();
         this.scenePicture = null;
+        this.fpsLoopRunning = false;
     }
 
     // ─── Host → renderer gesture forwarding ───
