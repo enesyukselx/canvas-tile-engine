@@ -116,7 +116,8 @@ useEffect(() => {
   again on the re-render that follows - StrictMode adds a second engine,
   and any other dep re-runs it on the same engine. Without cleanup or id,
   the first mount alone registers everything twice (painted and hit-tested
-  twice).
+  twice); in development the handle warns once when the same items land on
+  the same layer twice without an `id`.
 
 Mount-time reads (the responsive start scale, live zoom limits for a
 slider) belong in such an effect too: before mount `getConfig()` answers

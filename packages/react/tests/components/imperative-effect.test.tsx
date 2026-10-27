@@ -13,6 +13,8 @@ const ON_TILE = { x: 0, y: 0 };
 
 type Form = "id" | "cleanup";
 
+const DUPLICATE_WARNING = /twice without an id/;
+
 /**
  * The documented imperative pattern (see the CanvasTileEngine JSDoc): key the
  * effect on engine.instance and keep its body idempotent, either with ids or
@@ -65,11 +67,13 @@ describe.each<Form>(["id", "cleanup"])("documented imperative effect (%s form)",
     });
 
     it("leaves exactly one live registration after the first mount", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const fake = createFakeRenderer();
         let captured: EngineHandle | null = null;
         render(<DocumentedHarness renderer={fake.renderer} form={form} onHandle={(e) => (captured = e)} />);
 
         expectOneLiveRegistration(fake, captured!);
+        expect(warn.mock.calls.some(([message]) => DUPLICATE_WARNING.test(String(message)))).toBe(false);
     });
 
     it("leaves exactly one live registration on the surviving engine under StrictMode", () => {
@@ -140,9 +144,40 @@ describe("imperative effect without an id or cleanup", () => {
             return <CanvasTileEngine engine={engine} config={CONFIG} renderer={fake.renderer} />;
         }
 
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         render(<RawHarness />);
 
         expect(fake.liveCount("rect")).toBe(2);
         expect(captured!.hitTest(ON_TILE)).toHaveLength(2);
+        // ...which the handle reports once in dev, so old code is not silent.
+        const duplicates = warn.mock.calls.filter(([message]) => DUPLICATE_WARNING.test(String(message)));
+        expect(duplicates).toHaveLength(1);
+        expect(String(duplicates[0][0])).toContain("drawRect() registered the same content on layer 1");
+    });
+
+    it("does not warn when the same items are drawn on two layers", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const fake = createFakeRenderer();
+
+        function TwoLayers() {
+            const engine = useCanvasTileEngine();
+            useEffect(() => {
+                if (!engine.instance) {
+                    return;
+                }
+                const fill = engine.drawRect(TILES, 1);
+                const outline = engine.drawRect(TILES, 2);
+                return () => {
+                    engine.removeDrawHandle(fill);
+                    engine.removeDrawHandle(outline);
+                };
+            }, [engine, engine.instance]);
+            return <CanvasTileEngine engine={engine} config={CONFIG} renderer={fake.renderer} />;
+        }
+
+        render(<TwoLayers />);
+
+        expect(fake.liveCount("rect")).toBe(2);
+        expect(warn.mock.calls.some(([message]) => DUPLICATE_WARNING.test(String(message)))).toBe(false);
     });
 });
