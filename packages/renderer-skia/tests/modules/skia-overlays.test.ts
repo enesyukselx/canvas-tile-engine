@@ -15,14 +15,14 @@ function makeCanvas() {
     return { canvas: canvas as unknown as SkCanvas, ops: ops as Op[] };
 }
 
-function setup(overrides: Partial<CanvasTileEngineConfig>, size = { width: 400, height: 300 }) {
+function setup(overrides: Partial<CanvasTileEngineConfig>, size = { width: 400, height: 300 }, scale = 10) {
     const camera = {
         x: 0,
         y: 0,
-        scale: 10,
+        scale,
         getCenter: () => ({ x: 20, y: 15 }),
     } as unknown as ICamera;
-    const config = new Config({ scale: 10, size, ...overrides });
+    const config = new Config({ scale, size, ...overrides });
     const viewport = new ViewportState(size.width, size.height);
     return { camera, config, viewport };
 }
@@ -98,7 +98,7 @@ describe("SkiaCoordinateOverlayRenderer", () => {
     });
 
     it("draws both gutters and one label per visible row and column", () => {
-        const { camera, config, viewport } = setup(coordsConfig, { width: 100, height: 100 });
+        const { camera, config, viewport } = setup(coordsConfig, { width: 100, height: 100 }, 20);
         const { canvas, ops } = makeCanvas();
 
         new SkiaCoordinateOverlayRenderer(camera, config, viewport).draw(canvas);
@@ -106,9 +106,10 @@ describe("SkiaCoordinateOverlayRenderer", () => {
         expect(ops[0]).toMatchObject({ op: "rect", rect: { x: 0, y: 0, width: 20, height: 100 } });
         expect(ops[1]).toMatchObject({ op: "rect", rect: { x: 20, y: 80, width: 100, height: 20 } });
 
-        // 100px at scale 10 is 10 cells per axis, labelled one past the edge.
+        // 100px at scale 20 is 5 cells per axis, labelled one past the edge.
+        // (At scale 10 the 8px labels would crowd, so every 2nd one is drawn.)
         const labels = ops.slice(2);
-        expect(labels).toHaveLength(24);
+        expect(labels).toHaveLength(14);
         expect(labels.every((op) => op.op === "text")).toBe(true);
     });
 
