@@ -11,12 +11,18 @@ type HandlerMap = {
     touchmove?: (e: TouchEvent) => void;
     touchend?: (e: TouchEvent) => void;
     cancel?: (pointer?: MouseEvent | Touch) => void;
+    keydown?: (e: KeyboardEvent) => void;
 };
 
 /**
  * DOM input lifetime shared by the browser renderers. Mouse drags are tracked
  * on the owning document until release; touch events already target the element
  * where the contact started. Cancellation never goes through the tap path.
+ *
+ * Pointer events bind to the canvas, because the coordinate math is relative
+ * to its bounding rect. `keydown` binds to the KEY TARGET instead — the
+ * wrapper — because a key event only fires on the focused element, and the
+ * wrapper is what carries `tabindex`.
  * @internal
  */
 export class EventBinder {
@@ -32,6 +38,7 @@ export class EventBinder {
     constructor(
         private canvas: HTMLCanvasElement,
         private handlers: HandlerMap,
+        private keyTarget?: HTMLElement,
     ) {}
 
     attach() {
@@ -79,6 +86,11 @@ export class EventBinder {
         if (this.handlers.touchend) {
             this.canvas.addEventListener("touchend", this.handleTouchEnd, { passive: false });
         }
+
+        if (this.handlers.keydown && this.keyTarget) {
+            this.keyTarget.addEventListener("keydown", this.handlers.keydown);
+        }
+
         this.canvas.addEventListener("touchcancel", this.handleTouchCancel);
         this.canvas.ownerDocument.defaultView?.addEventListener("blur", this.handleBlur);
     }
@@ -128,6 +140,11 @@ export class EventBinder {
         if (this.handlers.touchend) {
             this.canvas.removeEventListener("touchend", this.handleTouchEnd);
         }
+
+        if (this.handlers.keydown && this.keyTarget) {
+            this.keyTarget.removeEventListener("keydown", this.handlers.keydown);
+        }
+
         this.canvas.removeEventListener("touchcancel", this.handleTouchCancel);
         this.canvas.ownerDocument.defaultView?.removeEventListener("blur", this.handleBlur);
         this.cancel();

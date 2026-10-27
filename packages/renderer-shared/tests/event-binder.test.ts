@@ -97,6 +97,49 @@ describe("EventBinder", () => {
         expect(handlers.mouseup).toHaveBeenCalledTimes(1);
     });
 
+    // keydown belongs on the wrapper, not the canvas: the wrapper is what
+    // carries tabindex, and a canvas is never focusable on its own.
+    it("binds keydown to the key target and everything else to the canvas", () => {
+        const keyTarget = document.createElement("div");
+        const keyHandlers = { click: vi.fn(), keydown: vi.fn() };
+        const canvasAdd = vi.spyOn(canvas, "addEventListener");
+        const keyAdd = vi.spyOn(keyTarget, "addEventListener");
+
+        const keyBinder = new EventBinder(canvas, keyHandlers, keyTarget);
+        keyBinder.attach();
+
+        expect(canvasAdd).toHaveBeenCalledWith("click", keyHandlers.click);
+        expect(canvasAdd).not.toHaveBeenCalledWith("keydown", expect.anything());
+        expect(keyAdd).toHaveBeenCalledTimes(1);
+        expect(keyAdd).toHaveBeenCalledWith("keydown", keyHandlers.keydown);
+        keyBinder.detach();
+    });
+
+    it("drops keydown entirely when there is no key target", () => {
+        const canvasAdd = vi.spyOn(canvas, "addEventListener");
+        const keyBinder = new EventBinder(canvas, { keydown: vi.fn() });
+        keyBinder.attach();
+
+        expect(canvasAdd).not.toHaveBeenCalledWith("keydown", expect.anything());
+        keyBinder.detach();
+    });
+
+    it("detaches keydown from the key target, not the canvas, and keeps it across blur cancellation", () => {
+        const keyTarget = document.createElement("div");
+        const keyHandlers = { keydown: vi.fn() };
+        const canvasRemove = vi.spyOn(canvas, "removeEventListener");
+        const keyRemove = vi.spyOn(keyTarget, "removeEventListener");
+        const keyBinder = new EventBinder(canvas, keyHandlers, keyTarget);
+
+        keyBinder.attach();
+        window.dispatchEvent(new Event("blur"));
+        expect(keyRemove).not.toHaveBeenCalled();
+
+        keyBinder.detach();
+        expect(keyRemove).toHaveBeenCalledWith("keydown", keyHandlers.keydown);
+        expect(canvasRemove).not.toHaveBeenCalledWith("keydown", expect.anything());
+    });
+
     it.each(["open", "closed"] as const)("avoids duplicate delivery in a %s shadow root", (mode) => {
         const host = document.createElement("div");
         document.body.append(host);

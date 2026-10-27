@@ -144,6 +144,9 @@ function CanvasTileEngineBase({
     // Local state starts false on every mount, so children always mount
     // after their own engine is attached.
     const [ready, setReady] = useState(false);
+    // Bumped by the accessibility subscription below; its only job is to
+    // re-render so the View re-reads the engine's resolved snapshot.
+    const [, setA11yVersion] = useState(0);
     const [configClaimsTouches, setConfigClaimsTouches] = useState(false);
 
     const instanceRef = useRef<CanvasTileEngineCore<SkiaMount, SkImage> | null>(null);
@@ -319,6 +322,24 @@ function CanvasTileEngineBase({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [engine, mount, renderer, wireCallbacks],
     );
+
+    // Re-render when `engine.setAccessibility()` changes the name/description/
+    // role, so the measured View below picks it up. Runs once the engine
+    // exists (`ready`), which is also when its snapshot becomes readable.
+    useEffect(() => {
+        const instance = instanceRef.current;
+        if (!instance) {
+            return;
+        }
+        let prev = instance.getConfig().accessibility;
+        return instance.onAccessibilityChange(() => {
+            const next = instance.getConfig().accessibility;
+            if (next.label !== prev.label || next.description !== prev.description || next.role !== prev.role) {
+                prev = next;
+                setA11yVersion((v) => v + 1);
+            }
+        });
+    }, [ready]);
 
     // ─── Touch → renderer gesture forwarding (react-native-gesture-handler) ───
     //
@@ -599,10 +620,28 @@ function CanvasTileEngineBase({
         return Gesture.Simultaneous(transport, blocker);
     }, [interactionsClaimed, onTouchesDown, onTouchesMove, onTouchesUp, onTouchesCancelled]);
 
+    // Prefer the engine's resolved snapshot so `engine.setAccessibility()`
+    // reaches this View, and fall back to the prop for the window before the
+    // first layout creates the engine — an unnamed surface there would be
+    // announced as nothing. The subscription above is what re-renders us on a
+    // change; without it a name update would wait for the next painted frame.
+    const a11y = instanceRef.current?.getConfig().accessibility ?? config.accessibility;
+    const accessibilityRole = a11y?.role === "image" ? ("image" as const) : undefined;
+
     return (
         <EngineContext.Provider value={contextValue}>
             <GestureDetector gesture={gesture}>
-                <View style={[styles.fill, style]} onLayout={handleLayout}>
+                <View
+                    style={[styles.fill, style]}
+                    onLayout={handleLayout}
+                    // The measured View carries the identity, never the Skia
+                    // Canvas — the canvas is purely visual and marked
+                    // pointerEvents="none" below.
+                    accessible={a11y?.label !== undefined || undefined}
+                    accessibilityRole={accessibilityRole}
+                    accessibilityLabel={a11y?.label}
+                    accessibilityHint={a11y?.description}
+                >
                     {size.width > 0 && size.height > 0 && (
                         // pointerEvents="none": the canvas is purely visual — all
                         // gestures are handled by the wrapper's GestureDetector, so

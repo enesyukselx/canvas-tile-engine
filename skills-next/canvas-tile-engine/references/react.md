@@ -56,7 +56,10 @@ function Map() {
 - For dynamic changes use runtime APIs instead: `engine.setBounds`,
   `engine.setEventHandlers`, `engine.setCenter`, `engine.goCenter`,
   `engine.setScale`, `engine.goScale`, `engine.setScaleLimits` `engine.resize`,
-  `engine.setReducedMotion`.
+  `engine.setReducedMotion`, `engine.setAccessibility`.
+- `engine.setAccessibility(patch)`: merge label / description / role /
+  focusable / reducedMotion at runtime. Needed because config is read ONCE on
+  mount - an accessible name set only in config can never change afterwards.
 - `engine.setReducedMotion(value)` / `engine.getReducedMotion()`: `"auto"`
   (default) follows the platform. When in effect, goCenter/goScale/fitBounds/
   resize land instantly, OVERRIDING any durationMs. `SpriteAnimator` and app

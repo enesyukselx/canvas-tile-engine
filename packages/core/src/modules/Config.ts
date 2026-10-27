@@ -1,6 +1,19 @@
-import { CanvasTileEngineConfig, EventHandlers, MotionPolicy, ReducedMotionSetting, ZoomMode } from "../types";
+import {
+    AccessibilityConfig,
+    CanvasTileEngineConfig,
+    EventHandlers,
+    MotionPolicy,
+    ReducedMotionSetting,
+    ZoomMode,
+} from "../types";
 import { SCALE_LIMITS, SIZE_LIMITS, RENDER_DEFAULTS } from "../constants";
-import { validateConfig, validateBounds, validateScaleLimits, validateReducedMotion } from "../utils/validateConfig";
+import {
+    validateConfig,
+    validateBounds,
+    validateScaleLimits,
+    validateReducedMotion,
+    validateAccessibility,
+} from "../utils/validateConfig";
 
 /** Normalize the zoom setting so consumers only see a mode or `false` (`true` means `"pointer"`). */
 function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
@@ -8,6 +21,49 @@ function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
         return "pointer";
     }
     return zoom || false;
+}
+
+type NormalizedEventHandlers = Required<CanvasTileEngineConfig>["eventHandlers"];
+
+/**
+ * Whether the surface offers any pointer interaction. Drives the derived
+ * `accessibility.focusable` default: a surface nobody can click, drag or zoom
+ * has nothing for a keyboard user to reach, so it should not take a tab stop.
+ */
+function wantsFocus(handlers: NormalizedEventHandlers): boolean {
+    if (typeof handlers.keyboard === "boolean") {
+        // Explicitly on: a keyboard user has something to reach. Explicitly
+        // off: no key does anything here, so a tab stop would be a dead one —
+        // `accessibility.focusable: true` still forces it back for an app that
+        // handles keys itself on the container.
+        return handlers.keyboard;
+    }
+    return handlers.click || handlers.rightClick || handlers.hover || handlers.drag || handlers.zoom !== false;
+}
+
+/**
+ * Resolve the accessibility snapshot from what the app supplied plus the
+ * normalized event handlers. Kept a pure function so it can run during
+ * construction, before the config field exists.
+ */
+function resolveAccessibility(input: AccessibilityConfig, handlers: NormalizedEventHandlers): AccessibilityConfig {
+    const resolved: AccessibilityConfig = {
+        focusable: input.focusable ?? wantsFocus(handlers),
+        reducedMotion: input.reducedMotion ?? "auto",
+    };
+    if (input.label !== undefined) {
+        resolved.label = input.label;
+    }
+    if (input.description !== undefined) {
+        resolved.description = input.description;
+    }
+    // A role without a name announces as a bare landmark, so it is only
+    // defaulted alongside a label. An explicit role is honored either way.
+    const role = input.role ?? (input.label !== undefined ? "region" : undefined);
+    if (role !== undefined) {
+        resolved.role = role;
+    }
+    return resolved;
 }
 
 /**
@@ -26,6 +82,21 @@ function normalizeZoom(zoom: boolean | ZoomMode | undefined): ZoomMode | false {
  * @returns Deeply frozen snapshot with every optional field resolved e.g. `{ scale: 1, minScale: 0.5, ... }`.
  */
 export function normalizeConfig(config: CanvasTileEngineConfig): Readonly<Required<CanvasTileEngineConfig>> {
+    const eventHandlers: NormalizedEventHandlers = Object.freeze({
+        click: config.eventHandlers?.click ?? false,
+        rightClick: config.eventHandlers?.rightClick ?? false,
+        hover: config.eventHandlers?.hover ?? false,
+        drag: config.eventHandlers?.drag ?? false,
+        zoom: normalizeZoom(config.eventHandlers?.zoom),
+        resize: config.eventHandlers?.resize ?? false,
+        // Kept as supplied: `undefined` means "mirror the gates above",
+        // which only the gesture layer can resolve.
+        keyboard:
+            typeof config.eventHandlers?.keyboard === "object"
+                ? Object.freeze({ ...config.eventHandlers.keyboard })
+                : config.eventHandlers?.keyboard,
+    });
+
     return Object.freeze({
         scale: config.scale,
         minScale: config.minScale ?? config.scale * SCALE_LIMITS.MIN_SCALE_MULTIPLIER,
@@ -45,14 +116,7 @@ export function normalizeConfig(config: CanvasTileEngineConfig): Readonly<Requir
 
         backgroundColor: config.backgroundColor ?? RENDER_DEFAULTS.BACKGROUND_COLOR,
 
-        eventHandlers: Object.freeze({
-            click: config.eventHandlers?.click ?? false,
-            rightClick: config.eventHandlers?.rightClick ?? false,
-            hover: config.eventHandlers?.hover ?? false,
-            drag: config.eventHandlers?.drag ?? false,
-            zoom: normalizeZoom(config.eventHandlers?.zoom),
-            resize: config.eventHandlers?.resize ?? false,
-        }),
+        eventHandlers,
 
         // Nested objects are copied before freezing, never adopted: freezing
         // what the caller passed in would silently make their own config
@@ -71,7 +135,7 @@ export function normalizeConfig(config: CanvasTileEngineConfig): Readonly<Requir
             shownScaleRange: Object.freeze({ ...(config.coordinates?.shownScaleRange ?? { min: 0, max: Infinity }) }),
         }),
 
-        accessibility: Object.freeze({ reducedMotion: config.accessibility?.reducedMotion ?? "auto" }),
+        accessibility: Object.freeze(resolveAccessibility(config.accessibility ?? {}, eventHandlers)),
 
         debug: Object.freeze({
             enabled: config.debug?.enabled ?? false,
@@ -114,6 +178,15 @@ export class Config implements MotionPolicy {
     private platformReducedMotion = false;
 
     /**
+     * What the app supplied for `accessibility`, kept separate from the
+     * resolved snapshot because `focusable` and `role` are derived — from the
+     * event handlers and from `label` respectively — and both inputs can
+     * change at runtime.
+     */
+    private accessibilityInput: AccessibilityConfig = {};
+    private accessibilityListeners = new Set<() => void>();
+
+    /**
      * Create a config store with defaults merged from the provided partial config.
      * @param config Incoming configuration values.
      * @throws {ConfigValidationError} If any config value is invalid.
@@ -121,6 +194,7 @@ export class Config implements MotionPolicy {
     constructor(config: CanvasTileEngineConfig) {
         validateConfig(config);
 
+        this.accessibilityInput = { ...config.accessibility };
         this.config = normalizeConfig(config);
         // Read back off the snapshot so the default lives in one place. The
         // `?? "auto"` is a type-level formality: `Required<>` is shallow, so
@@ -159,10 +233,21 @@ export class Config implements MotionPolicy {
         if ("zoom" in handlers) {
             merged.zoom = normalizeZoom(handlers.zoom);
         }
+        if (typeof merged.keyboard === "object") {
+            merged.keyboard = Object.freeze({ ...merged.keyboard });
+        }
+        const prevFocusable = this.config.accessibility.focusable;
+        const accessibility = Object.freeze(resolveAccessibility(this.accessibilityInput, merged));
         this.config = Object.freeze({
             ...this.config,
             eventHandlers: Object.freeze(merged),
+            // `focusable` is derived from these, so toggling interaction at
+            // runtime moves the tab stop with it.
+            accessibility,
         });
+        if (accessibility.focusable !== prevFocusable) {
+            this.notifyAccessibilityChange();
+        }
     }
 
     /**
@@ -225,10 +310,53 @@ export class Config implements MotionPolicy {
         validateReducedMotion(value);
 
         this.motionPreference = value;
+        this.accessibilityInput = { ...this.accessibilityInput, reducedMotion: value };
         this.config = Object.freeze({
             ...this.config,
             accessibility: Object.freeze({ ...this.config.accessibility, reducedMotion: value }),
         });
+    }
+
+    /**
+     * Merge a patch into the accessibility preferences at runtime and
+     * re-resolve the derived fields. Mirrors `updateEventHandlers`: the patch
+     * is merged, not replaced wholesale, so setting only `label` leaves an
+     * explicit `focusable` alone.
+     * @throws {ConfigValidationError} If any supplied value is invalid.
+     */
+    updateAccessibility(patch: Partial<AccessibilityConfig>) {
+        validateAccessibility(patch);
+
+        this.accessibilityInput = { ...this.accessibilityInput, ...patch };
+        if (patch.reducedMotion !== undefined) {
+            this.motionPreference = patch.reducedMotion;
+        }
+        this.config = Object.freeze({
+            ...this.config,
+            accessibility: Object.freeze(resolveAccessibility(this.accessibilityInput, this.config.eventHandlers)),
+        });
+        this.notifyAccessibilityChange();
+    }
+
+    /**
+     * Subscribe to accessibility changes so the DOM layer can re-apply its
+     * attributes. Returns an unsubscribe function.
+     *
+     * Needed because the attributes are written once at mount, unlike config
+     * the renderers re-read every frame — an accessible name that could never
+     * change after mount would be the wrong thing to freeze into 1.0.
+     */
+    onAccessibilityChange(listener: () => void): () => void {
+        this.accessibilityListeners.add(listener);
+        return () => {
+            this.accessibilityListeners.delete(listener);
+        };
+    }
+
+    private notifyAccessibilityChange() {
+        for (const listener of this.accessibilityListeners) {
+            listener();
+        }
     }
 
     /**
