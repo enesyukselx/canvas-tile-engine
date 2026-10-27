@@ -6,6 +6,7 @@ export * from "./constants";
 // Utilities
 export { gridToSize } from "./utils/gridToSize";
 export { fitScale, type FitScaleOptions } from "./utils/fitScale";
+export { ConfigValidationError } from "./utils/validateConfig";
 export {
     resolveLineWidthPx,
     resolveLineDashPx,

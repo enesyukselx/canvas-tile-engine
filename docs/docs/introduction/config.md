@@ -254,6 +254,25 @@ resolved.eventHandlers.drag; // false
 
 The result is deeply frozen, like every `getConfig()` snapshot. It fills in defaults only and does **not** validate: values the engine constructor would reject come back normalized instead of throwing.
 
+## Validation Errors
+
+The engine constructor and the runtime setters that take config-like input (`setScale`, `goScale`, `setScaleLimits`, `setBounds`, `setCenter`, `goCenter`, `fitBounds`, `setAccessibility`, `setReducedMotion`) and the `fitScale` helper throw a `ConfigValidationError` for an invalid value. Its message starts with `[CanvasTileEngine] Invalid config:` and names the offending value. `drawGridLines` is the exception: an invalid `cellSize` throws a `RangeError`.
+
+`ConfigValidationError` is exported by `@canvas-tile-engine/core` and re-exported by `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native`:
+
+```ts
+import { ConfigValidationError } from "@canvas-tile-engine/core";
+
+try {
+    engine.setScaleLimits(minScale, maxScale);
+} catch (error) {
+    if (!(error instanceof ConfigValidationError)) throw error;
+    console.warn(error.message); // "[CanvasTileEngine] Invalid config: minScale (4) cannot be greater than maxScale (2)"
+}
+```
+
+`instanceof` holds when the app resolves a single copy of `@canvas-tile-engine/core`. Checking `error.name === "ConfigValidationError"` also works across copies.
+
 ## Full Type
 
 ```ts

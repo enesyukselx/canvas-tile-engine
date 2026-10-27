@@ -56,6 +56,7 @@ export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 // Re-export core class and utilities
 export {
     CanvasTileEngine as CanvasTileEngineCore,
+    ConfigValidationError,
     gridToSize,
     fitScale,
     itemsBounds,
