@@ -54,12 +54,10 @@
         "format:check": "oxfmt --check"
     },
     "peerDependencies": {
-        "@canvas-tile-engine/core": ">=0.11.0"
-    },
-    "dependencies": {
-        "@canvas-tile-engine/core": "workspace:^"
+        "@canvas-tile-engine/core": ">=0.12.0"
     },
     "devDependencies": {
+        "@canvas-tile-engine/core": "workspace:^",
         "@canvas-tile-engine/renderer-shared": "workspace:^"
     }
 }
