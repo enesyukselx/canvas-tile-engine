@@ -161,9 +161,9 @@ import type {
     EngineHandle, SkiaEngine, CanvasTileEngineConfig, Coords, Rect, Circle,
     Text as TextItem, // RN's own <Text> component has the same name
     Line, PathItem, PathStyle, ImageItem, SpriteRect, onClickCallback,
+    Bounds, LinearGradient, HitResult, // core >= 0.12
     SkCanvas, SkImage, SkPaint, SkFont, SkPath, SkRect, SkPoint, SkRRect, SkiaImageItem,
 } from "@canvas-tile-engine/react-native";
-import type { Bounds, LinearGradient, HitResult } from "@canvas-tile-engine/core"; // not re-exported
 ```
 
 The binding/core split is the same as on the web

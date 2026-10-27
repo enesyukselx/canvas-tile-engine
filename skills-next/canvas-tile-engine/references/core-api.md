@@ -463,7 +463,9 @@ box). `pathItemBounds(item)` is the single-path building block.
 Generics: `Rect`, `Circle`, `Text`, `Line`, `PathItem` are `<TData =
 unknown>`, `ImageItem` is `<TImage, TData>`; type a dataset as
 `Rect<{ id: string }>[]` for a typed `item.data` in `styleOf` and hits. The
-React/RN packages re-export only some of these: [react.md](react.md).
+React/RN packages re-export all of these except `normalizeConfig` and the
+renderer-author exports (core >= 0.12; the engine class as
+`CanvasTileEngineCore`): [react.md](react.md#types-binding-or-core).
 
 ## Validation errors
 

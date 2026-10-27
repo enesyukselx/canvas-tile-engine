@@ -225,8 +225,8 @@ pin whose tip sits on the point: `{ mode: "self", x: 0.5, y: 1 }`.
   break. An empty list paints nothing, a single stop paints flat.
 - Identical on all four renderers. `drawStatic*` bakes a `"world"` axis at
   the scale its cache was recorded at.
-- `LinearGradient`, `Paint` and `ColorStop` are core types; the React/RN
-  bindings do not re-export them.
+- `LinearGradient`, `Paint` and `ColorStop` are core types, also
+  re-exported by the React/RN bindings (core >= 0.12).
 
 ```ts
 import type { LinearGradient } from "@canvas-tile-engine/core";

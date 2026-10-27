@@ -87,3 +87,51 @@ export type {
     SpriteSheetOptions,
     SpriteAnimation,
 } from "@canvas-tile-engine/core";
+
+// Re-export the rest of core's app-facing types (everything but the
+// renderer-author contracts), so a binding user never needs a second import
+// from core just to name a type. Type-only: no runtime cost. Same list as
+// @canvas-tile-engine/react. `KeyboardConfig` is inert here (React Native's
+// View has no key events) but stays for parity with `EventHandlers`.
+export type {
+    // Config
+    ZoomMode,
+    KeyboardConfig,
+    AccessibilityConfig,
+    AccessibilityRole,
+    ReducedMotionSetting,
+    // Geometry and camera
+    Bounds,
+    FitBoundsOptions,
+    DrawTransform,
+    // Paint and text style
+    Paint,
+    LinearGradient,
+    ColorStop,
+    TextAlign,
+    TextBaseline,
+    FontWeight,
+    // Draw options and paint-time callbacks
+    DrawOptions,
+    StaticDrawOptions,
+    RectDrawOptions,
+    CircleDrawOptions,
+    TextDrawOptions,
+    LineDrawOptions,
+    PathDrawOptions,
+    ImageDrawOptions,
+    StyleOf,
+    VisibleOf,
+    InteractiveOf,
+    ShapeDecorationStyle,
+    TextDecorationStyle,
+    LineDecorationStyle,
+    PathDecorationStyle,
+    // Hit testing
+    HitResult,
+    HitKind,
+    HitTestOptions,
+    HitTestRectOptions,
+    // Callbacks
+    ClickInfo,
+} from "@canvas-tile-engine/core";
