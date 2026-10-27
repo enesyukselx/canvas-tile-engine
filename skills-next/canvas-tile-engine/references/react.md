@@ -109,12 +109,14 @@ useEffect(() => {
   identity with every engine; `isReady` flips true -> false -> true inside
   one flush on a `key` remount, so an `[engine.isReady]` effect never
   re-fires and the new canvas stays blank.
-- Make the body idempotent: return a cleanup that removes what it
-  registered, or register with an `id` (same id replaces). The effect runs
-  more than once per engine - on first mount it fires in the commit that
-  attaches the engine AND again on the re-render that follows, and
-  StrictMode adds a second engine. Without cleanup or id, the first mount
-  alone registers everything twice.
+- Always make the body idempotent: return a cleanup that removes what it
+  registered, or register with an `id` (same id replaces). An effect keyed
+  on `engine.instance` or `engine.isReady` can run twice as the engine
+  attaches - on the web it fires in the commit that attaches the engine AND
+  again on the re-render that follows - StrictMode adds a second engine,
+  and any other dep re-runs it on the same engine. Without cleanup or id,
+  the first mount alone registers everything twice (painted and hit-tested
+  twice).
 
 Mount-time reads (the responsive start scale, live zoom limits for a
 slider) belong in such an effect too: before mount `getConfig()` answers
@@ -379,8 +381,8 @@ Cross-origin images: `new RendererCanvas({ crossOrigin: "anonymous" })`
 - Expecting `config`/`center`/`renderer` prop changes to apply: remount with
   `key` or use runtime APIs.
 - Imperative effects keyed on `[engine.isReady]` (blank after a `key`
-  remount) or without cleanup/id (duplicate registrations). Key on
-  `[engine, engine.instance]` and clean up.
+  remount) or without cleanup/id (duplicate registrations from the first
+  mount on). Key on `[engine, engine.instance]` and clean up or pass an `id`.
 - One handle for two `<CanvasTileEngine>` mounts: each needs its own
   `useCanvasTileEngine()`.
 - Forgetting `eventHandlers` in config: canvas renders, nothing responds.

@@ -44,8 +44,10 @@ function droppedDraw(method: string): DrawHandle {
     if (typeof process !== "undefined" && process.env.NODE_ENV !== "production") {
         console.warn(
             `Canvas Tile Engine: ${method}() was called before the engine mounted, so the call was dropped. ` +
-                `Gate imperative draw calls on engine.isReady and include engine.instance in your effect deps ` +
-                `so they re-run when the engine remounts.`,
+                `Make imperative draw calls from an effect that returns early while engine.instance is null ` +
+                `and lists engine.instance in its deps, so it re-runs when the engine remounts. ` +
+                `That effect can run twice as the engine attaches: pass an id (same id replaces) ` +
+                `or remove the returned handle in the effect's cleanup.`,
         );
     }
     return DUMMY_DRAW_HANDLE;
