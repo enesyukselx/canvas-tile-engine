@@ -157,6 +157,7 @@ Key public contracts:
 - Overlay draws text, coordinate overlay, debug HUD, `addDrawFunction`, and `onDraw`.
 - Static draw helpers delegate to dynamic drawing because WebGL already batches layer geometry.
 - `invalidateTexture(source)` exists for advanced same-size image/canvas content mutation cases.
+- `GLRenderer`'s texture cache is a `WeakMap` keyed by source, with a `FinalizationRegistry` that deletes a texture once its source is garbage-collected; a `Set` of live entries (never the sources) lets `dispose()` free the rest. Do not reintroduce a strong `Map` or an LRU: the first leaks every image ever drawn, the second evicts textures still in use.
 
 `renderer-skia`:
 

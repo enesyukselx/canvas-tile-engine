@@ -129,6 +129,17 @@ interface TextureProgram {
 }
 
 /**
+ * One cached upload: the GL handle and the size it was uploaded at. It must
+ * never reference its source, because the FinalizationRegistry holds it
+ * strongly and would keep that source alive forever.
+ */
+interface TextureEntry {
+    texture: WebGLTexture;
+    width: number;
+    height: number;
+}
+
+/**
  * Thin batched drawing layer over a raw WebGL context.
  *
  * Each `draw*` call uploads a freshly built vertex array and issues a single
@@ -154,7 +165,29 @@ export class GLRenderer {
     private rampPixels = new Uint8Array(RAMP_WIDTH * 4);
     private rampDirty = false;
 
-    private textures = new Map<TexImageSource, { texture: WebGLTexture; width: number; height: number }>();
+    /**
+     * Uploaded textures, keyed weakly so the cache never keeps alive an image
+     * the app has dropped. Once a source is collected, {@link textureRegistry}
+     * deletes its texture, so GPU memory follows the app's image set instead
+     * of growing for the renderer's whole lifetime.
+     */
+    private textures = new WeakMap<TexImageSource, TextureEntry>();
+    /** Entries whose texture is still allocated, for {@link dispose}: a WeakMap cannot be iterated. */
+    private liveTextures = new Set<TextureEntry>();
+    /**
+     * Deletes a collected source's texture; each entry is its own unregister
+     * token. This can never pull a texture out from under a batch: a source
+     * stays reachable while a draw registration's items reference it, image
+     * batches are drawn synchronously within the frame, and cleanup callbacks
+     * only run as separate tasks.
+     */
+    private textureRegistry = new FinalizationRegistry<TextureEntry>((entry) => {
+        // An entry already released (invalidated, replaced, or disposed) is
+        // no longer live, and its texture is already gone.
+        if (this.liveTextures.delete(entry)) {
+            this.gl.deleteTexture(entry.texture);
+        }
+    });
     /** Sources that threw on upload (not CORS-clean); retried only after {@link invalidateTexture}. */
     private taintedSources = new WeakSet<TexImageSource>();
 
@@ -871,10 +904,11 @@ export class GLRenderer {
             if (existing.width === width && existing.height === height) {
                 return existing.texture;
             }
+            // Re-upload into the same texture, so the entry and its single
+            // registration stay as they are.
             gl.bindTexture(gl.TEXTURE_2D, existing.texture);
             if (!this.uploadTexture(source)) {
-                gl.deleteTexture(existing.texture);
-                this.textures.delete(source);
+                this.releaseTexture(source, existing);
                 return null;
             }
             existing.width = width;
@@ -897,7 +931,10 @@ export class GLRenderer {
             return null;
         }
 
-        this.textures.set(source, { texture, width, height });
+        const entry: TextureEntry = { texture, width, height };
+        this.textures.set(source, entry);
+        this.liveTextures.add(entry);
+        this.textureRegistry.register(source, entry, entry);
         return texture;
     }
 
@@ -911,17 +948,29 @@ export class GLRenderer {
         if (!entry) {
             return;
         }
+        this.releaseTexture(source, entry);
+    }
+
+    /**
+     * Delete a cached texture now and forget its entry everywhere, so a
+     * later cleanup for the same source cannot delete it a second time.
+     */
+    private releaseTexture(source: TexImageSource, entry: TextureEntry) {
         this.gl.deleteTexture(entry.texture);
         this.textures.delete(source);
+        this.liveTextures.delete(entry);
+        this.textureRegistry.unregister(entry);
     }
 
     /** Release all GPU resources. */
     dispose() {
         const gl = this.gl;
-        for (const { texture } of this.textures.values()) {
-            gl.deleteTexture(texture);
+        for (const entry of this.liveTextures) {
+            gl.deleteTexture(entry.texture);
+            this.textureRegistry.unregister(entry);
         }
-        this.textures.clear();
+        this.liveTextures.clear();
+        this.textures = new WeakMap();
         gl.deleteBuffer(this.shapeBuffer);
         gl.deleteBuffer(this.lineBuffer);
         gl.deleteBuffer(this.textureBuffer);

@@ -527,6 +527,9 @@ export class RendererWebGL implements IRenderer {
      * are detected automatically, but mutating a source's pixels at the same
      * size (e.g. redrawing an offscreen canvas) requires this call. The
      * Canvas2D renderer has no such cache and always paints current pixels.
+     *
+     * Freeing memory does not need this call: the cache holds sources weakly,
+     * and a source's texture is deleted once the source is garbage-collected.
      */
     invalidateTexture(source: TexImageSource): void {
         this.glRenderer.invalidateTexture(source);

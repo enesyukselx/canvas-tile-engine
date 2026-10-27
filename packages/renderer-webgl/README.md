@@ -83,6 +83,7 @@ Geometry is drawn in layer order, batching consecutive compatible paints within 
 - Text and user custom draw functions live on the upper 2D overlay, so they composite above every WebGL primitive even if their layer number is lower. Ordering within each surface is preserved.
 - `drawStaticRect`, `drawStaticCircle`, and `drawStaticImage` delegate to dynamic drawing and use the same order-preserving GPU batches instead of the Canvas2D offscreen static cache.
 - Image sources are uploaded to the GPU and cached. Dimension changes are detected automatically, but if you mutate pixels at the same size, call `renderer.invalidateTexture(source)`.
+- The texture cache holds sources weakly: once your app drops an image or canvas and it is garbage-collected, its GPU texture is deleted too. You do not need `invalidateTexture` to free memory.
 - The renderer prefers WebGL 2 and falls back to WebGL 1. If neither is available, `init()` throws.
 
 ## Canvas Fallback
