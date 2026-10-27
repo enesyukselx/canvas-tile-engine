@@ -44,7 +44,10 @@ function unpackPackage(name) {
     run("tar", ["-xzf", join(output, tarballs[0]), "--strip-components=1", "-C", target], consumer);
     const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
     assert.equal(manifest.name, `@canvas-tile-engine/${name}`);
-    assert.ok(!JSON.stringify(manifest.dependencies).includes("workspace:"));
+    // Peer-only packages publish without a `dependencies` field at all.
+    for (const field of ["dependencies", "peerDependencies"]) {
+        assert.ok(!JSON.stringify(manifest[field] ?? {}).includes("workspace:"));
+    }
     assert.ok(!readdirSync(target).includes("src"));
 }
 
