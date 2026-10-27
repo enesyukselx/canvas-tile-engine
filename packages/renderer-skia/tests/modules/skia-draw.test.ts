@@ -78,6 +78,44 @@ describe("SkiaDraw grid intervals", () => {
     });
 });
 
+// Grid density contract shared by all renderers (mirrored in the server and
+// webgl suites): lines never get closer than 2px, so the drawLine (JSI) call
+// count is bounded by the 100x100px viewport rather than by 1 / scale.
+describe("SkiaDraw grid line density", () => {
+    function renderGridLines(cellSize: number, scale: number) {
+        const { draw, render } = setup(scale);
+        const { canvas, ops } = makeCanvas();
+        draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" });
+        render(canvas);
+        return ops.filter((op) => op.op === "line") as Array<Op & { x1: number; x2: number }>;
+    }
+    const verticalXs = (lines: Array<{ x1: number; x2: number }>) =>
+        lines.filter((l) => l.x1 === l.x2).map((l) => l.x1);
+
+    it("bounds the line count when zoomed far out", () => {
+        // 100px at scale 0.1 spans 1000 cells: 1001 lines per axis, 0.1px apart.
+        const lines = renderGridLines(1, 0.1);
+
+        expect(lines.length).toBeLessThanOrEqual(2 * (100 / 2 + 2));
+        const xs = verticalXs(lines);
+        for (let i = 1; i < xs.length; i++) {
+            expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(2);
+        }
+    });
+
+    it.each([
+        [0.5, 10],
+        [1, 2], // exactly 2px apart: still every line
+    ])("keeps every line and its position for cellSize %s at scale %s", (cellSize, scale) => {
+        const spacing = cellSize * scale;
+        const perAxis = 100 / spacing + 1;
+        const lines = renderGridLines(cellSize, scale);
+
+        expect(lines).toHaveLength(2 * perAxis);
+        expect(verticalXs(lines)).toEqual(Array.from({ length: perAxis }, (_, i) => i * spacing));
+    });
+});
+
 describe("resolveRadius roundRect semantics", () => {
     const rectWithRadius = (radius: number | number[]) => ({
         x: 1,

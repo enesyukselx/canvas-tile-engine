@@ -4,6 +4,7 @@
 // Item-bounds helpers live in core instead (`itemsBounds`, `pathItemBounds`):
 // app code needs those, so they are part of the public API.
 export { getViewportBounds, isVisible } from "./culling";
+export { gridLineStep, MIN_GRID_LINE_SPACING_PX } from "./gridStep";
 export {
     staticCacheBounds,
     staticRectPaintBounds,

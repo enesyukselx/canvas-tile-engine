@@ -387,6 +387,8 @@ Draw grid lines at specified intervals. This is useful for creating grid overlay
 
 `cellSize` must be a positive finite number; fractional intervals are supported. Zero, negative values, `NaN`, and infinities throw a `RangeError` immediately, before registering a draw or replacing an existing `id`. Direct renderer `IDrawAPI.drawGridLines` calls enforce the same requirement.
 
+When you zoom out far enough that lines would be less than 2px apart on screen, the grid draws only every 2nd, 4th, 8th, ... line, so the line count stays bounded and the remaining lines still sit on multiples of `cellSize`.
+
 ```typescript
 drawGridLines(cellSize: number, lineWidth?: number, strokeStyle?: string, layer?: number, options?: DrawOptions): DrawHandle
 ```

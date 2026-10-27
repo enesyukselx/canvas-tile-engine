@@ -51,6 +51,7 @@ import {
     boxPaintBounds,
     boxPixelPadding,
     getViewportBounds,
+    gridLineStep,
     intersectsBounds,
     linePaintBounds,
     pathPaintBounds,
@@ -727,21 +728,25 @@ export class WebGLDraw {
             const viewW = config.size.width / config.scale;
             const viewH = config.size.height / config.scale;
 
-            const startX = Math.floor(topLeft.x / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endX = Math.ceil((topLeft.x + viewW) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const startY = Math.floor(topLeft.y / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
-            const endY = Math.ceil((topLeft.y + viewH) / cellSize) * cellSize - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            // Zoomed far out, keep only every 2nd/4th/... line so the vertex
+            // count stays bounded by the viewport size instead of growing with 1/scale.
+            const step = gridLineStep(cellSize, config.scale);
+
+            const startX = Math.floor(topLeft.x / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endX = Math.ceil((topLeft.x + viewW) / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const startY = Math.floor(topLeft.y / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
+            const endY = Math.ceil((topLeft.y + viewH) / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
 
             const color = this.colorParser.parse(style.strokeStyle);
             const lines: LineInstance[] = [];
 
-            for (let x = startX; x <= endX; x += cellSize) {
+            for (let x = startX; x <= endX; x += step) {
                 const p1 = this.transformer.worldToScreen(x, startY);
                 const p2 = this.transformer.worldToScreen(x, endY);
                 this.pushLine(lines, p1, p2, color, style.lineWidth);
             }
 
-            for (let y = startY; y <= endY; y += cellSize) {
+            for (let y = startY; y <= endY; y += step) {
                 const p1 = this.transformer.worldToScreen(startX, y);
                 const p2 = this.transformer.worldToScreen(endX, y);
                 this.pushLine(lines, p1, p2, color, style.lineWidth);

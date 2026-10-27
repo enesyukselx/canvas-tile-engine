@@ -159,6 +159,51 @@ describe("Server CanvasDraw grid intervals", () => {
     });
 });
 
+// Grid density contract shared by all renderers (mirrored in the webgl and
+// skia suites): lines never get closer than 2px, so the count is bounded by
+// the 100x100px viewport rather than by 1 / scale.
+describe("Server CanvasDraw grid line density", () => {
+    function renderGridSegments(cellSize: number, scale: number) {
+        const { draw, render } = setupAtScale(scale);
+        const { ctx } = makeLineStyleRecordingCtx();
+        const moveTo = vi.spyOn(ctx, "moveTo");
+        const lineTo = vi.spyOn(ctx, "lineTo");
+
+        draw.drawGridLines(cellSize, { lineWidth: 1, strokeStyle: "#000" });
+        render(ctx);
+
+        return moveTo.mock.calls.map(([x1, y1], i) => {
+            const [x2, y2] = lineTo.mock.calls[i];
+            return { x1, y1, x2, y2 };
+        });
+    }
+    const verticalXs = (segments: Array<{ x1: number; x2: number }>) =>
+        segments.filter((s) => s.x1 === s.x2).map((s) => s.x1);
+
+    it("bounds the line count when zoomed far out", () => {
+        // 100px at scale 0.1 spans 1000 cells: 1001 lines per axis, 0.1px apart.
+        const segments = renderGridSegments(1, 0.1);
+
+        expect(segments.length).toBeLessThanOrEqual(2 * (100 / 2 + 2));
+        const xs = verticalXs(segments);
+        for (let i = 1; i < xs.length; i++) {
+            expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(2);
+        }
+    });
+
+    it.each([
+        [0.5, 10],
+        [1, 2], // exactly 2px apart: still every line
+    ])("keeps every line and its position for cellSize %s at scale %s", (cellSize, scale) => {
+        const spacing = cellSize * scale;
+        const perAxis = 100 / spacing + 1;
+        const segments = renderGridSegments(cellSize, scale);
+
+        expect(segments).toHaveLength(2 * perAxis);
+        expect(verticalXs(segments)).toEqual(Array.from({ length: perAxis }, (_, i) => i * spacing));
+    });
+});
+
 // Per-item line style contract shared by all renderers (mirrors the canvas
 // suite): item.style overlays the call-level style field by field.
 describe("CanvasDraw per-item line style", () => {
