@@ -71,6 +71,7 @@ export type {
 // Re-export core class and utilities
 export {
     CanvasTileEngine as CanvasTileEngineCore,
+    ConfigValidationError,
     gridToSize,
     fitScale,
     itemsBounds,

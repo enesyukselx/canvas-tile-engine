@@ -450,7 +450,7 @@ box). `pathItemBounds(item)` is the single-path building block.
 
 | Group | Exports |
 | :-- | :-- |
-| Values | `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`, `itemsBounds`, `pathItemBounds`, `normalizeConfig` (plus `Config`, `GestureProcessor`, ... for renderer authors) |
+| Values | `CanvasTileEngine`, `SpriteSheet`, `SpriteAnimator`, `gridToSize`, `fitScale`, `itemsBounds`, `pathItemBounds`, `normalizeConfig`, `ConfigValidationError` (core >= 0.12, see [Validation errors](#validation-errors)) (plus `Config`, `GestureProcessor`, ... for renderer authors) |
 | Config | `CanvasTileEngineConfig`, `EventHandlers`, `ZoomMode`, `KeyboardConfig`, `AccessibilityConfig`, `AccessibilityRole`, `ReducedMotionSetting` |
 | Geometry | `Coords`, `Bounds`, `BoundedItem`, `FitBoundsOptions`, `FitBoundsResult`, `FitScaleOptions`, `DrawTransform` |
 | Items, paint | `DrawObject`, `Rect`, `Circle`, `Text`, `Line`, `PathItem`, `PathCommand`, `PathStyle`, `ImageItem`, `SpriteRect`, `LineStyle`, `TextAlign`, `TextBaseline`, `FontWeight`, `LinearGradient`, `Paint` (`string \| LinearGradient`), `ColorStop` |
@@ -467,15 +467,30 @@ React/RN packages re-export only some of these: [react.md](react.md).
 
 ## Validation errors
 
-Invalid input throws a plain `Error` whose message starts with
-`[CanvasTileEngine] Invalid config:` (there is no exported error class). The
-constructor rejects non-positive/non-finite `scale`, `size` or limits,
-`minScale > maxScale`, `scale` outside explicit limits, an unknown `zoom`
-mode, bad `accessibility` fields and `bounds` with `min >= max`. At runtime
-`setScale`/`goScale`, `setCenter`/`goCenter` (non-finite), `setScaleLimits`,
-`setBounds`, `setAccessibility`, `setReducedMotion`, `fitBounds`/`fitScale`
-(non-finite edge, `min >= max`, negative padding) throw the same way;
-`drawGridLines` throws a `RangeError` for a non-positive `cellSize`.
+Invalid input throws a `ConfigValidationError` (core >= 0.12; a plain
+`Error` before) whose message starts with `[CanvasTileEngine] Invalid
+config:`. The constructor rejects non-positive/non-finite `scale`, `size` or
+limits, `minScale > maxScale`, `scale` outside explicit limits, an unknown
+`zoom` mode, bad `accessibility` fields and `bounds` with `min >= max`. At
+runtime `setScale`/`goScale`, `setCenter`/`goCenter` (non-finite),
+`setScaleLimits`, `setBounds`, `setAccessibility`, `setReducedMotion`,
+`fitBounds`/`fitScale` (non-finite edge, `min >= max`, negative padding)
+throw the same way; `drawGridLines` throws a `RangeError` for a
+non-positive `cellSize`.
+
+```ts
+import { ConfigValidationError } from "@canvas-tile-engine/core"; // also re-exported by react / react-native
+
+try {
+    engine.setScaleLimits(minScale, maxScale);
+} catch (error) {
+    if (!(error instanceof ConfigValidationError)) throw error;
+    console.warn(error.message); // "[CanvasTileEngine] Invalid config: ..."
+}
+```
+
+`instanceof` needs one copy of core in the app; `error.name ===
+"ConfigValidationError"` also works across copies.
 `normalizeConfig(config)` (core >= 0.12) fills every default above without
 an engine and returns a frozen snapshot (`normalizeConfig({ scale: 32, size
 }).minScale === 16`); it does NOT validate.

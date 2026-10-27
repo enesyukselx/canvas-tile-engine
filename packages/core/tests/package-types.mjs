@@ -58,7 +58,7 @@ type Assert<T extends true> = T;
 
 const nodeConsumer = `
 import assert from "node:assert/strict";
-import { CanvasTileEngine, SpriteSheet, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type RendererDependencies } from "@canvas-tile-engine/core";
+import { CanvasTileEngine, ConfigValidationError, SpriteSheet, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type RendererDependencies } from "@canvas-tile-engine/core";
 import { RendererServer, SERVER_MOUNT, renderToBuffer, type ServerMount } from "@canvas-tile-engine/renderer-server";
 import { Image } from "@napi-rs/canvas";
 ${assertions}
@@ -105,6 +105,17 @@ async function main() {
     assert.ok(Buffer.isBuffer(png));
     assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
     assert.equal(new SpriteSheet({ frameWidth: 4, frameHeight: 4 }).frame(1, 0).x, 4);
+    // The minified ESM and CJS builds both keep the class and its name.
+    let rejected: unknown;
+    try {
+        new CanvasTileEngine(SERVER_MOUNT, { ...config, scale: 0 }, new RendererServer());
+    } catch (error) {
+        rejected = error;
+    }
+    assert.ok(rejected instanceof ConfigValidationError);
+    assert.ok(rejected instanceof Error);
+    assert.equal(rejected.name, "ConfigValidationError");
+    assert.equal(rejected.message, "[CanvasTileEngine] Invalid config: scale must be positive, got 0");
 }
 void main().catch((error) => { console.error(error); process.exitCode = 1; });
 `;

@@ -1,11 +1,44 @@
 import { AccessibilityConfig, CanvasTileEngineConfig } from "../types";
 
 /**
+ * Thrown when a config value or a runtime camera/config argument is invalid:
+ * the constructor's config, `setScale`/`goScale`, `setScaleLimits`,
+ * `setBounds`, `setCenter`/`goCenter`, `fitBounds`, `fitScale`,
+ * `setAccessibility` and `setReducedMotion`. The message starts with
+ * `[CanvasTileEngine] Invalid config:`. `drawGridLines` throws a
+ * `RangeError` instead.
+ *
+ * `instanceof` holds as long as the app resolves a single copy of
+ * `@canvas-tile-engine/core`; `error.name === "ConfigValidationError"`
+ * works across copies.
+ * @example
+ * ```ts
+ * try {
+ *     engine.setScaleLimits(minScale, maxScale);
+ * } catch (error) {
+ *     if (error instanceof ConfigValidationError) {
+ *         showFormError(error.message);
+ *     } else {
+ *         throw error;
+ *     }
+ * }
+ * ```
+ */
+export class ConfigValidationError extends Error {
+    constructor(message: string) {
+        super(message);
+        // Set explicitly: the published build is minified, so the class's
+        // own name would not survive.
+        this.name = "ConfigValidationError";
+    }
+}
+
+/**
  * Creates a validation error with descriptive message.
  * @internal Shared by the validators here and sibling utils (fitScale).
  */
-export function configError(message: string): Error {
-    return new Error(`[CanvasTileEngine] Invalid config: ${message}`);
+export function configError(message: string): ConfigValidationError {
+    return new ConfigValidationError(`[CanvasTileEngine] Invalid config: ${message}`);
 }
 
 /**

@@ -325,6 +325,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * @param config Initial engine configuration.
      * @param renderer The renderer implementation to use (e.g., RendererCanvas).
      * @param center Initial center in world space.
+     * @throws {ConfigValidationError} If any config value is invalid.
      */
     constructor(
         canvasWrapper: TMount,
@@ -820,6 +821,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
     /**
      * Set or update map boundaries to restrict camera movement.
      * @param bounds Boundary limits. Use Infinity/-Infinity to remove limits.
+     * @throws {ConfigValidationError} If an edge is not a number or min >= max on an axis.
      * @example
      * ```ts
      * // Restrict map to -100 to 100 on both axes

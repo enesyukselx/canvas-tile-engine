@@ -219,9 +219,10 @@ Import from `@canvas-tile-engine/react` (re-exported):
   `onWheelCallback`, `onZoomCallback`, `onDrawCallback`, `WheelInfo`.
 - Helpers: `gridToSize`, `fitScale`, `itemsBounds` and `pathItemBounds`
   (core >= 0.12), `pathCommandsBounds`, `SpriteSheet`, `SpriteAnimator`,
-  `CanvasTileEngineCore` (the engine class); types `FitBoundsResult`
-  (core >= 0.12), `FitScaleOptions`, `BoundedItem`, `SpriteSheetOptions`,
-  `SpriteAnimation`.
+  `CanvasTileEngineCore` (the engine class), `ConfigValidationError`
+  (core >= 0.12; [core-api.md](core-api.md#validation-errors)); types
+  `FitBoundsResult` (core >= 0.12), `FitScaleOptions`, `BoundedItem`,
+  `SpriteSheetOptions`, `SpriteAnimation`.
 
 Import from `@canvas-tile-engine/core` (NOT re-exported): `Bounds`,
 `LinearGradient`, `Paint`, `ColorStop`, `HitResult`, `HitTestOptions`,

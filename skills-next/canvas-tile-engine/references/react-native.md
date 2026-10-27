@@ -154,6 +154,7 @@ import {
     CanvasTileEngine, useCanvasTileEngine, useEngineContext,
     // core re-exports
     CanvasTileEngineCore, gridToSize, fitScale, itemsBounds, SpriteSheet, SpriteAnimator,
+    ConfigValidationError, // core >= 0.12
     // Skia surface
     Skia,
 } from "@canvas-tile-engine/react-native";
