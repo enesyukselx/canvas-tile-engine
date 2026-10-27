@@ -350,7 +350,9 @@ export interface DrawOptions {
      * outside, and nothing outside hit-tests either.
      *
      * The rectangle is world (item) space, so it pans and zooms with the rest
-     * of the scene — the same coordinates `fitBounds` and `hitTestRect` take.
+     * of the scene — the same coordinates `fitBounds` and `itemsBounds` use
+     * (cells 0..N-1 are `-0.5..N-0.5`). Not the raw pointer space that
+     * `hitTest` and `hitTestRect` take, which is offset by half a cell.
      * That is the plot-area of a chart, the frame of a minimap inset, or any
      * "this layer belongs inside that box" region.
      *
