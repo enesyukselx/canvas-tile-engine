@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.10.0
+
+### Minor Changes
+
+- 60f732a: The engine handle gains `setAccessibility(patch)` for updating the accessible name, description, role and tab-stop behavior at runtime — needed because both bindings read `config` once on mount — plus `onAccessibilityChange(listener)` for subscribing to those updates.
+
+  React Native applies `accessible`, `accessibilityLabel`, `accessibilityHint` and `accessibilityRole` to the measured `View`, never to the Skia `Canvas`. The `View` reads the engine's resolved snapshot and subscribes to `onAccessibilityChange`, so `setAccessibility` reaches it too; the `config` prop is the fallback for the window before the first layout creates the engine. Only `role: "image"` has a React Native equivalent; `"region"` and `"application"` are dropped and the label still announces.
+
+  Known limitation, documented rather than implied: on React Native this makes the surface **announced** but not **operable**. Keyboard camera control is DOM-only because React Native's core `View` has no key events, and `accessibilityActions` is not wired yet.
+
+  On the web, behavior change: interactive surfaces become keyboard tab stops by default and arrow keys pan them. Opt out with `accessibility: { focusable: false }`.
+
+- bcea4b7: feat: `clip` — confine a draw registration to a world rectangle
+
+  - Every draw method takes `clip` in its options, and every React/React Native draw component takes it as a prop: a world rectangle the registration is confined to. Nothing it draws paints outside, and nothing outside it hit-tests. That covers a chart's plot area, a minimap frame, or any "this layer belongs inside that box" region — none of which could be expressed before without dropping into `addDrawFunction` and calling `ctx.clip` by hand, which only clips one of the four renderers (on WebGL that context is the text overlay, so the GPU primitives ignored it entirely).
+  - **World (item) space**, the same coordinates `fitBounds` and `hitTestRect` take, so a clip pans and zooms with the scene. For a chart plot area that is the behavior you want: the axes drawn outside the clip keep their position relative to the data, and panning cannot smear the series across them.
+  - Applies to every draw kind, `drawGridLines`, the `drawStatic*` variants and `addDrawFunction` included.
+  - **Hit testing follows the clip**, or clipped-away items would stay clickable. Point queries reject before any geometry work; marquee queries are narrowed to the overlap rather than skipped when they miss, so a selection half inside the clip cannot reach what is cut away. `padding`/`paddingPx` deliberately do not widen a clip: they grow an item's own tap target, and a target that is not drawn has nothing to grow.
+  - Axis-aligned rectangles only. An arbitrary shape would need the stencil buffer on WebGL, where path fills already live, so the scope stops at what all four renderers can do identically.
+  - The React `clip` prop is compared **by value**, unlike `items`, so an inline object literal does not re-register the draw call on every render.
+
+  Purely additive: a registration without a `clip` behaves exactly as before.
+
+  Internally each renderer supplies a clip adapter to the shared layer manager, which applies it inside the `save()`/`restore()` pair every draw callback already runs in. The layer manager stays free of coordinate math because the renderers genuinely need different spaces — CSS pixels for a Canvas2D or Skia path clip, device pixels measured from the bottom for a WebGL scissor. WebGL cuts on both of its surfaces: the scissor for batched primitives, an ordinary path clip for the 2D overlay that carries text and custom drawing.
+
+- 819dd99: `fitBounds` now reports what it did instead of failing silently. It returns `{ scale, fitted }`: the scale the fit targets after clamping, and whether the whole rectangle actually ends up visible. `fitted` is `false` only when `minScale` floors the fit — the area needs a smaller scale than the configured minimum, so the view shows less than was asked for and nothing previously signalled that. Clamping at `maxScale` still leaves the rectangle fully visible, so it stays `true`.
+
+  The new `FitBoundsResult` type is exported from all three packages. On the React and React Native handles `fitBounds` returns `undefined` before mount, where there is no engine to fit. Existing callers that ignore the return value are unaffected.
+
+- 576f4b7: feat: itemsBounds — the rectangle `fitBounds`/`fitScale` ask for
+
+  - New pure helper `itemsBounds(items)`: the world rectangle enclosing a list of items, or `null` when nothing in the list has bounds. Replaces the hand-rolled min/max reduce every "fit to selection" flow needed. Returns `Bounds | null`, so the call is guarded: `const b = itemsBounds(selected); if (b) engine.fitBounds(b, { paddingPx: 24 });` — an empty selection should not move the camera.
+  - Every item kind fits in one list, mixed freely, so `hitTest`/`hitTestRect` results go straight in with no filtering: `Rect`/`Circle`/`Text`/`ImageItem` contribute `width ?? size` by `height ?? size` world units (default 1) centered on the anchor, `Line` its two endpoints, `PathItem` its vertex box (`points`) or control-point hull (`commands`). Items that draw nothing — a path with fewer than two points, an empty command list — are skipped rather than counted.
+  - `pathItemBounds(item)` is exported as the single-path building block.
+  - Deliberately camera-independent, so it leaves out `origin` offsets and `rotate` (both stay within half an item of the box — add `padding` for slack), `sizePx`/`fontPx` (pixel sizes have no world extent without a camera scale), and measured text: a `Text` item contributes its `size` box, not its glyph extents, because core carries no font metrics.
+  - Re-exported from `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native` alongside `gridToSize`/`fitScale` (with the `BoundedItem` type).
+
+- c3a6381: Fix: the config snapshot the React and React Native handles return before the engine mounts no longer contradicts the engine's own defaults.
+
+  `engine.getConfig()` answers with a default snapshot until the engine attaches, and that snapshot was a hand-written copy of the defaults that had drifted from what `Config` actually resolves: it reported `eventHandlers.drag: true` and `zoom: "pointer"` where the engine defaults both to off, and `debug.eventHandlers.*: false` where the engine defaults them to on. Code that read the handle before `isReady` — to decide whether panning is enabled, or to initialise a zoom control — got values that flipped the moment the engine mounted. The snapshot was also returned by reference and unfrozen, unlike `Config.get()`'s deeply frozen one, so a consumer mutating it corrupted every later pre-mount call.
+
+  The pre-mount snapshot is now produced by the engine's own normalization and is deeply frozen, so no field can disagree with a mounted engine. It still describes an _unconfigured_ engine (`scale: 1`, zero size, matching the pre-mount `getSize()`) because the handle cannot see the `config` you pass to the component — so `minScale`/`maxScale` are `0.5`/`2` rather than your scale's limits. Read config-derived values after `isReady`.
+
+  `@canvas-tile-engine/core` exports the normalization behind this as `normalizeConfig(config)`: it fills every optional field with its default and returns the deeply frozen snapshot, without validating (`new CanvasTileEngine(...)` still validates what it is given). `normalizeConfig({ scale: 32, size }).minScale` is `16`. It also no longer freezes the `bounds` and `coordinates.shownScaleRange` objects you pass in — those are copied into the snapshot now, matching what `updateBounds` already did.
+
+- 91b4014: The engine handle gains `setReducedMotion(value)` and `getReducedMotion()`. `getReducedMotion()` returns `false` before mount, matching the handle's neutral-default convention.
+
+  Behavior change: engine-driven camera animation now follows the platform reduced-motion setting by default. On the web that signal comes from the renderer's `prefers-reduced-motion` watcher; on React Native the binding subscribes to `AccessibilityInfo` itself, so apps wire nothing. When in effect it overrides an explicitly passed `durationMs`; the opt-out is `accessibility: { reducedMotion: false }` or `engine.setReducedMotion(false)`.
+
+### Patch Changes
+
+- 4e5bbac: Re-export the rest of core's app-facing types, so binding code no longer needs a second import from `@canvas-tile-engine/core` to name them: `Bounds`, `FitBoundsOptions`, `DrawTransform`, `LinearGradient`, `Paint`, `ColorStop`, `TextAlign`, `TextBaseline`, `FontWeight`, `HitResult`, `HitKind`, `HitTestOptions`, `HitTestRectOptions`, `ClickInfo`, `ZoomMode`, `KeyboardConfig`, `AccessibilityConfig`, `AccessibilityRole`, `ReducedMotionSetting`, `StyleOf`, `VisibleOf`, `InteractiveOf`, the `*DrawOptions` types (`DrawOptions`, `StaticDrawOptions`, `RectDrawOptions`, `CircleDrawOptions`, `TextDrawOptions`, `LineDrawOptions`, `PathDrawOptions`, `ImageDrawOptions`) and the `*DecorationStyle` types. The re-exports are type-only, so bundles do not change. Only `normalizeConfig` and the renderer-author APIs (`IRenderer`, `IDrawAPI`, ...) remain core-only.
+- ffb207a: Throw the documented `ConfigValidationError` for invalid config and runtime arguments. The constructor, `setScale`, `goScale`, `setScaleLimits`, `setBounds`, `setCenter`, `goCenter`, `fitBounds`, `fitScale`, `setAccessibility` and `setReducedMotion` already promised it in their JSDoc but threw a plain `Error`. The class is a new export of core, re-exported by the React and React Native bindings, so `error instanceof ConfigValidationError` now works. Messages are unchanged and keep the `[CanvasTileEngine] Invalid config:` prefix, but `error.name` changes from `"Error"` to `"ConfigValidationError"`. `drawGridLines` still throws a `RangeError` for an invalid `cellSize`.
+- 9d10090: Declare `@canvas-tile-engine/core` only as a peer dependency (`>=0.12.0`) instead of also listing it under `dependencies`. The renderers and bindings now always use the app's own copy of core, so a core release outside the old caret range can no longer install a second copy that the renderer is wired to instead of the app's engine. Apps must install `@canvas-tile-engine/core` themselves, which the installation docs already require. The minimum is 0.12.0 because these releases import core APIs added in that version.
+- bcb23c3: Fix the imperative examples and the dropped-draw warning, which led to duplicate registrations, and warn in development when it happens.
+
+  The `@example Imperative API` on `<CanvasTileEngine>` (web and React Native) and the `useCanvasTileEngine` example drew in an effect keyed on `engine.isReady` without an `id`. Such an effect can run twice as the engine attaches: on the web it runs in the commit that attaches the engine and again on the re-render that follows, so the grid was registered, painted and hit-tested twice from the first frame. The examples now key the effect on `engine.instance` (so it also runs for a new engine after a `key` remount) and draw with an `id`, so a second run replaces the first registration. The dev warning logged when a draw call is dropped before mount now gives the same advice: return early while `engine.instance` is null, list it in the deps, and pass an `id` or remove the returned handle in the effect's cleanup.
+
+  In development, the engine handle now also warns once per engine when the same items (or the same grid) are registered on the same layer twice without an `id` and without removing the first registration, which is what an effect written in the old style does as the engine attaches. Production behavior is unchanged.
+
+- 467b077: Fix: `Text` and `ImageItem` inherited `origin` and `radius` from `DrawObject` without any renderer reading them, so both fields typechecked and silently did nothing — `{ x, y, text: "A", origin: { mode: "self", x: 0, y: 0 } }` and `{ x, y, img, radius: 8 }` looked like they should work but were dropped on every renderer. `Text` now omits `origin` and `ImageItem` now omits `radius`, matching the pattern `Circle` already used for `rotate`/`radius`. Type-only change; if either is meant to be supported later, that's a separate feature.
+
 ## 0.9.0
 
 ### Minor Changes
