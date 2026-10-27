@@ -8,7 +8,11 @@ function createFakeProcessor(consumed: boolean) {
 }
 
 function createKeyEvent(init: Partial<KeyboardEvent> & { key: string }) {
+    // Pressed on the surface itself unless a test says otherwise.
+    const surface = {};
     return {
+        target: init.target ?? surface,
+        currentTarget: surface,
         key: init.key,
         shiftKey: init.shiftKey ?? false,
         ctrlKey: init.ctrlKey ?? false,
@@ -50,6 +54,16 @@ describe("createKeyDownHandler", () => {
 
         createKeyDownHandler(processor)(event);
 
+        expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("ignores a key that bubbled up from another element inside the surface", () => {
+        const { processor, handleKeyDown } = createFakeProcessor(true);
+        const event = createKeyEvent({ key: " ", target: {} as EventTarget });
+
+        createKeyDownHandler(processor)(event);
+
+        expect(handleKeyDown).not.toHaveBeenCalled();
         expect(event.preventDefault).not.toHaveBeenCalled();
     });
 });

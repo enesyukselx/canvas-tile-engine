@@ -301,7 +301,9 @@ The engine's own keyboard binding covers camera control only (arrows pan, `+`/
 shortcuts, tool switching - wire `keydown`/`keyup` yourself and translate them
 into camera calls (`goCenter`, `zoomIn`, ...) or `setEventHandlers` flips.
 `Tab`, `Escape`, `Home`, `End`, `PageUp`/`PageDown` and Ctrl/Meta/Alt chords are
-never captured by the engine, so they stay yours.
+never captured by the engine, so they stay yours. The engine only handles keys
+pressed while the wrapper itself has focus, so inputs and buttons you place
+inside the wrapper keep all of their keys.
 
 ## Best practices
 

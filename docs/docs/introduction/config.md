@@ -166,6 +166,8 @@ engine.onClick = (coords, mouse, client, info) => {
 
 `preventDefault` runs only for a key the engine consumed. `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are never captured, so the surface can never become a keyboard trap, and Ctrl/Meta/Alt combinations are ignored so browser and screen-reader shortcuts keep working (Shift is honored only on the zoom keys, since `+` and `_` *are* Shift+`=` and Shift+`-`).
 
+Only keys pressed while the wrapper itself has focus are handled. Inputs, buttons and other elements you place inside the wrapper, such as a popup over the map, keep all of their keys.
+
 Step sizes come from the object form: `panPx` (screen pixels, default `80`) wins over `pan` (world units), and `zoomFactor` defaults to `1.5`, matching `zoomIn`/`zoomOut`.
 
 ```ts

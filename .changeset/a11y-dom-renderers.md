@@ -9,4 +9,4 @@ The wrapper, not a canvas, because `initStyles` gives the wrapper `overflow: hid
 
 An attribute you set yourself on the wrapper is **never** overwritten, and teardown removes only what the renderer wrote. A canvas with fallback child content keeps it — that content is your own accessible alternative. A `:focus-visible` outline ships scoped to a `data-cte-a11y-surface` attribute the renderer sets, so a global `outline: none` reset cannot produce an invisible tab stop. It is an attribute rather than a class because React owns `className` on the wrapper it renders and would wipe a class on the next prop change.
 
-Keyboard events bind to the wrapper (it carries the tab stop) while pointer events stay on the canvas (the coordinate math needs its bounding rect). Attributes re-apply when `engine.setAccessibility` runs.
+Keyboard events bind to the wrapper (it carries the tab stop) while pointer events stay on the canvas (the coordinate math needs its bounding rect). Only keys pressed while the wrapper itself has focus are handled, so inputs and buttons placed inside the wrapper keep their own keys. Attributes re-apply when `engine.setAccessibility` runs.
