@@ -151,6 +151,10 @@ All render `null` and register through the engine in context:
 - `items` is compared BY REFERENCE: a new array identity re-registers (and
   rebuilds the spatial index for 500+ items). Keep items in `useMemo` or
   state, never inline literals.
+- For frequent per-item edits, use a stable [`ItemCollection`](item-collections.md)
+  (core >= 0.12). Dynamic Rect/Circle/Image/Text/Line/Path accept it. Keyed
+  updates maintain geometry and request a frame without React rerendering;
+  unmount removes the subscription. Both bindings re-export the class/types.
 - `styleOf`/`visibleOf`/`interactiveOf` are read through refs: identity may
   change every render (inline arrows are fine) and a change only repaints.
 - `clip={{ minX, maxX, minY, maxY }}` (core >= 0.12, every component) is

@@ -1,14 +1,16 @@
 import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
-import type { Bounds, ImageItem, VisibleOf, InteractiveOf } from "@canvas-tile-engine/core";
+import type { Bounds, DrawItems, ImageItem, VisibleOf, InteractiveOf } from "@canvas-tile-engine/core";
 
 export interface ImageProps<TImage = unknown> {
     /**
      * Items to draw. Compared by reference: a new array identity re-registers
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
+     * A stable ItemCollection updates and repaints imperatively without a
+     * parent render or re-registration.
      */
-    items: ImageItem<TImage> | ImageItem<TImage>[];
+    items: DrawItems<ImageItem<TImage>>;
     layer?: number;
     /**
      * Per-item visibility: return `false` to skip an item for the frame — it

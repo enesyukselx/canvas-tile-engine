@@ -32,6 +32,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    ItemCollectionChange,
     AnchoredItem,
     Bounds,
     Paint,
@@ -46,6 +47,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { DrawCallback, DrawContext, Layer } from "../scene/Layer";
+import { DrawChanges } from "../scene/DrawChanges";
 import { getViewportBounds } from "../geometry/culling";
 import { gridLineStep } from "../geometry/gridStep";
 import {
@@ -127,6 +129,8 @@ export class CanvasDraw<
     TImage extends CanvasImageSourceLike,
     TCanvas extends CanvasImageSourceLike,
 > implements IDrawAPI<TImage> {
+    private drawChanges = new DrawChanges();
+
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
@@ -171,6 +175,11 @@ export class CanvasDraw<
         return this.layers.add(layer, fn, options?.clip);
     }
 
+    /** Update the caches belonging to an existing collection registration. */
+    applyDrawChanges(handle: DrawHandle, changes: readonly ItemCollectionChange<unknown>[]): void {
+        this.drawChanges.apply(handle, changes);
+    }
+
     addDrawFunction(
         fn: (ctx: TContext, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer: number = 1,
@@ -194,10 +203,10 @@ export class CanvasDraw<
             list,
             (item, scale) => boxPaintBounds(item, scale, item.style),
             !!styleOf,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+            (item) => boxPixelPadding(item, item.style),
         );
 
-        return this.register(layer, options, ({ ctx, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -280,6 +289,8 @@ export class CanvasDraw<
             }
             ctx.restore();
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     drawLine(
@@ -385,10 +396,10 @@ export class CanvasDraw<
             list,
             (item, scale) => boxPaintBounds(item, scale, item.style, false),
             !!styleOf,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+            (item) => boxPixelPadding(item, item.style),
         );
 
-        return this.register(layer, options, ({ ctx, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -441,6 +452,8 @@ export class CanvasDraw<
             }
             ctx.restore();
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     drawText(
@@ -455,10 +468,10 @@ export class CanvasDraw<
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
 
-        let culler: PaintedCuller<Text>;
+        let culler: PaintedCuller<Text> | undefined;
         let measuringContext: TContext;
 
-        return this.register(layer, options, ({ ctx, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             measuringContext = ctx;
             culler ??= new PaintedCuller(
@@ -524,6 +537,8 @@ export class CanvasDraw<
             }
             ctx.restore();
         });
+        this.drawChanges.add(handle, (changes: readonly ItemCollectionChange<Text>[]) => culler?.applyChanges(changes));
+        return handle;
     }
 
     drawPath(
@@ -533,15 +548,19 @@ export class CanvasDraw<
     ): DrawHandle {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
-        // Conservative world bounds per item for culling, computed once.
-        const itemBounds = items.map((item) => pathItemBounds(item));
+        // Identity-keyed bounds survive insertion/removal; immutable collection
+        // updates invalidate only the replaced item.
+        const itemBounds = new WeakMap(items.map((item) => [item, pathItemBounds(item)] as const));
 
-        return this.register(layer, options, ({ ctx, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx, config, topLeft }) => {
             const viewport = getViewportBounds(topLeft, config);
             const gradients = new Map<string, CanvasGradientLike>();
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
-                const bounds = itemBounds[n];
+                if (!itemBounds.has(item)) {
+                    itemBounds.set(item, pathItemBounds(item));
+                }
+                const bounds = itemBounds.get(item);
                 if (!bounds || visibleOf?.(item) === false) {
                     continue;
                 }
@@ -618,6 +637,15 @@ export class CanvasDraw<
                 ctx.restore();
             }
         });
+        this.drawChanges.add(handle, (changes: readonly ItemCollectionChange<PathItem>[]) => {
+            for (const change of changes) {
+                itemBounds.delete(change.item);
+                if (change.type === "update") {
+                    itemBounds.delete(change.previous);
+                }
+            }
+        });
+        return handle;
     }
 
     /**
@@ -658,10 +686,10 @@ export class CanvasDraw<
             list,
             (item, scale) => boxPaintBounds(item, scale),
             false,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
+            (item) => boxPixelPadding(item),
         );
 
-        return this.register(layer, options, ({ ctx, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -727,6 +755,8 @@ export class CanvasDraw<
                 }
             }
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     drawGridLines(
@@ -1398,6 +1428,7 @@ export class CanvasDraw<
      * Does not clear other callbacks on the same layer.
      */
     removeDrawHandle(handle: DrawHandle) {
+        this.drawChanges.remove(handle);
         this.layers.remove(handle);
     }
 
@@ -1413,6 +1444,7 @@ export class CanvasDraw<
      * ```
      */
     clearLayer(layer: number) {
+        this.drawChanges.clear(layer);
         this.layers.clear(layer);
     }
 
@@ -1426,6 +1458,7 @@ export class CanvasDraw<
      * ```
      */
     clearAll() {
+        this.drawChanges.clear();
         this.layers.clear();
     }
 
@@ -1433,6 +1466,7 @@ export class CanvasDraw<
      * Release cached canvases and layer callbacks.
      */
     destroy() {
+        this.drawChanges.clear();
         this.textBounds.clear();
         this.staticCaches.clear();
         this.layers.clear();

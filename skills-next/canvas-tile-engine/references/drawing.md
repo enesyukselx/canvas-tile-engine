@@ -7,6 +7,7 @@ the camera scale.
 Contents:
 
 - [The retained draw model](#the-retained-draw-model)
+- [Live keyed collections](item-collections.md)
 - [styleOf, visibleOf, interactiveOf](#styleof-visibleof-interactiveof)
 - [Layers and paint order](#layers-and-paint-order)
 - [Coordinate convention: integers are cell centers](#coordinate-convention-integers-are-cell-centers)
@@ -30,8 +31,9 @@ registration unless you pass the same `id` (core >= 0.10).
 | :-- | :-- |
 | Appearance by state (selection, hover, highlight) | `styleOf` ([next section](#styleof-visibleof-interactiveof)) |
 | Show/hide by state (filters, toggles) | `visibleOf` - never a filtered copy of the array |
-| Positions or sprite frames of the same items | mutate the item objects (see the 500-item note) |
-| The item set or its geometry | draw again with the same `id` |
+| Positions or membership in a live collection (core >= 0.12) | `collection.update` / `insert` / `remove` / `batch`; repaint is automatic |
+| Positions or sprite frames in ordinary arrays | mutate the item objects (see the 500-item note) |
+| An ordinary array's item set or geometry | draw again with the same `id` |
 | Everything on one layer / one registration | `clearLayer(n)` and redraw / `removeDrawHandle(handle)` |
 
 ```ts
@@ -50,7 +52,9 @@ engine.render(); // repaint shows the new position
 500-item note: paint and hit testing reliably follow MOVED items only while
 a registration holds <= 500 items. Above that a spatial index built from the
 first positions can cull and hit-test moved items at their old place -
-re-register with the same `id` instead.
+re-register with the same `id` instead, or use an
+[`ItemCollection`](item-collections.md) (core >= 0.12). Collection updates
+refresh spatial caches and hit testing synchronously without a new handle.
 
 Ids share one namespace across draw kinds and layers (a `drawCircle` with a
 rect's id replaces the rect; a reused id on another layer moves the

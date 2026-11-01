@@ -3,6 +3,7 @@
 // touches a drawing context — renderers paint what these modules compute.
 export { Layer, type ClipAdapter, type DrawContext, type DrawCallback, type LayerContext } from "./Layer";
 export { FpsSampler } from "./FpsSampler";
+export { DrawChanges } from "./DrawChanges";
 export { computeHudLayout, HUD_STYLE, type HudCamera, type HudLayout, type HudTextLine } from "./hudLayout";
 export {
     coordinateOverlayBorders,

@@ -58,9 +58,9 @@ type Assert<T extends true> = T;
 
 const nodeConsumer = `
 import assert from "node:assert/strict";
-import { CanvasTileEngine, ConfigValidationError, SpriteSheet, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type RendererDependencies } from "@canvas-tile-engine/core";
+import { CanvasTileEngine, ConfigValidationError, ItemCollection, SpriteSheet, type DrawItems, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type Rect, type RendererDependencies } from "@canvas-tile-engine/core";
 import { RendererServer, SERVER_MOUNT, renderToBuffer, type ServerMount } from "@canvas-tile-engine/renderer-server";
-import { Image } from "@napi-rs/canvas";
+import { Image, createCanvas, loadImage } from "@napi-rs/canvas";
 ${assertions}
 type Defaults = [
     Assert<Equal<ImageItem["img"], unknown>>,
@@ -90,10 +90,39 @@ async function main() {
     const inference: Inference = [true, true, true];
     assert.equal(inference.length, 3);
     assert.equal(engine.canvas, undefined);
-    const image: ImageItem<Image, { id: number }> = { x: 0, y: 0, img: new Image(), data: { id: 1 } };
+    const image: ImageItem<Image, { id: number }> = {
+        x: 0, y: 0, data: { id: 1 },
+        img: await loadImage(createCanvas(1, 1).toBuffer("image/png")),
+    };
     engine.drawImage(image);
     engine.clearAll();
+
+    // A packed Node consumer can use live sources without ambient DOM types.
+    const rectangles = new ItemCollection<Rect<{ id: string }>>(
+        [{ x: 2, y: 0, style: { fillStyle: "#f00" }, data: { id: "seat" } }],
+        { keyOf: (item) => item.data!.id },
+    );
+    const rectangleInput: DrawItems<Rect> = rectangles;
+    const images = new ItemCollection([image], { keyOf: (item) => item.data!.id });
+    engine.drawRect(rectangleInput, 1);
+    engine.drawImage(images, 2);
+    let frames = 0;
+    engine.onDraw = () => { frames++; };
+    rectangles.update("seat", { x: 1, y: 2 });
+    images.update(1, { x: -2 });
+    assert.equal(engine.hitTestFirst({ x: 2.5, y: 0.5 }, { layer: 1 }), undefined);
+    assert.equal(engine.hitTestFirst({ x: 1.5, y: 2.5 }, { layer: 1 })?.key, "seat");
+    assert.equal(engine.hitTestFirst({ x: -1.5, y: 0.5 }, { layer: 2 })?.key, 1);
+    engine.requestRender();
+    engine.requestRender();
+    assert.equal(frames, 0);
+    await Promise.resolve(); // Node's scheduler uses one microtask instead of rAF.
+    assert.equal(frames, 1);
+    assert.equal(renderer.toBuffer().subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
     engine.destroy();
+    rectangles.update("seat", { x: 3 });
+    await Promise.resolve();
+    assert.equal(frames, 1);
     const png = await renderToBuffer({
         config,
         draw: (engine) => {
@@ -122,7 +151,7 @@ void main().catch((error) => { console.error(error); process.exitCode = 1; });
 `;
 
 const browserConsumer = `
-import { CanvasTileEngine, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type RendererDependencies } from "@canvas-tile-engine/core";
+import { CanvasTileEngine, ItemCollection, type DrawItems, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type RendererDependencies } from "@canvas-tile-engine/core";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
 import { RendererWebGL } from "@canvas-tile-engine/renderer-webgl";
 ${assertions}
@@ -152,6 +181,16 @@ void inference;
 defaultEngine.canvas.getContext("2d");
 canvasEngine.drawImage({ x: 0, y: 0, img: new Image() });
 webglEngine.drawImage({ x: 0, y: 0, img: new Image() });
+const images = new ItemCollection<ImageItem<HTMLImageElement, { id: string }>>(
+    [{ x: 0, y: 0, img: new Image(), data: { id: "marker" } }],
+    { keyOf: (item) => item.data!.id },
+);
+const liveInput: DrawItems<ImageItem> = images;
+canvasEngine.drawImage(liveInput);
+webglEngine.drawImage(liveInput);
+images.update("marker", { x: 1 });
+canvasEngine.requestRender();
+webglEngine.requestRender();
 function zoom(camera: ICamera) { camera.zoom(10, 10, -1, wrapper.getBoundingClientRect()); }
 void zoom;
 `;

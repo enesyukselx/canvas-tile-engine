@@ -59,11 +59,16 @@ scenes (one layering caveat in [performance](references/performance.md)).
    layer, { id: "units" })` replaces the previous registration with that id
    (draw + hit-test entries). Without an id, every call adds another copy.
    Static draws use their `cacheKey` as the id.
+   For frequent per-item geometry edits, use a stable `ItemCollection`
+   (core >= 0.12): `insert` / `update` / `remove` / `batch` maintain caches
+   and hit testing, then automatically request a frame. Read
+   [live collections](references/item-collections.md) before implementing them.
 4. **Decoration is not geometry.** Selection, hover, highlight and filters go
    through `styleOf` / `visibleOf` / `interactiveOf` in the draw options:
    they read your state live on every frame, so you mutate state and call
    `render()` - no new arrays, no re-registration. Geometry changes
-   (position, size, line width) re-register with the same id. Rules per
+   (position, size, line width) use collection updates, or re-register an
+   ordinary array with the same id. Rules per
    primitive: [drawing](references/drawing.md#styleof-visibleof-interactiveof).
 5. **Layers are z-order.** Lower numbers paint first (defaults: grid 0,
    shapes/images 1, text 2). Inside one draw call, array order is paint order.

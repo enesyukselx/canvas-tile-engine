@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { normalizeConfig } from "@canvas-tile-engine/core";
 import type {
     DrawOptions,
+    DrawItems,
     CanvasTileEngine as CanvasTileEngineCore,
     CanvasTileEngineConfig,
     Coords,
@@ -163,6 +164,9 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
     /** Render a frame */
     render(): void;
 
+    /** Request a frame, coalescing repeated requests before the next frame. No-op before mount. */
+    requestRender(): void;
+
     /** Get the current view center in world coordinates */
     getCenter(): Coords;
 
@@ -261,7 +265,7 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
 
     /** Draw rectangles */
     drawRect<TData = unknown>(
-        items: Rect<TData> | Rect<TData>[],
+        items: DrawItems<Rect<TData>>,
         layer?: number,
         options?: RectDrawOptions<TData>,
     ): DrawHandle;
@@ -271,7 +275,7 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
 
     /** Draw circles */
     drawCircle<TData = unknown>(
-        items: Circle<TData> | Circle<TData>[],
+        items: DrawItems<Circle<TData>>,
         layer?: number,
         options?: CircleDrawOptions<TData>,
     ): DrawHandle;
@@ -281,7 +285,7 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
 
     /** Draw lines */
     drawLine<TData = unknown>(
-        items: Line<TData> | Line<TData>[],
+        items: DrawItems<Line<TData>>,
         style?: LineStyle,
         layer?: number,
         options?: LineDrawOptions<TData>,
@@ -289,21 +293,21 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
 
     /** Draw text */
     drawText<TData = unknown>(
-        items: Text<TData> | Text<TData>[],
+        items: DrawItems<Text<TData>>,
         layer?: number,
         options?: TextDrawOptions<TData>,
     ): DrawHandle;
 
     /** Draw free-form paths: open/closed polylines, filled shapes, per-item styling */
     drawPath<TData = unknown>(
-        items: PathItem<TData> | PathItem<TData>[],
+        items: DrawItems<PathItem<TData>>,
         layer?: number,
         options?: PathDrawOptions<TData>,
     ): DrawHandle;
 
     /** Draw images */
     drawImage<TData = unknown>(
-        items: ImageItem<TImage, TData> | ImageItem<TImage, TData>[],
+        items: DrawItems<ImageItem<TImage, TData>>,
         layer?: number,
         options?: ImageDrawOptions<TImage, TData>,
     ): DrawHandle;
@@ -421,6 +425,10 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
 
             render() {
                 instanceRef.current?.render();
+            },
+
+            requestRender() {
+                instanceRef.current?.requestRender();
             },
 
             getCenter() {

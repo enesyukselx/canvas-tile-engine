@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CoordinateTransformer, type ICamera, type Rect, type Text } from "@canvas-tile-engine/core";
+import {
+    CoordinateTransformer,
+    ItemCollection,
+    type ICamera,
+    type PathItem,
+    type Rect,
+    type Text,
+} from "@canvas-tile-engine/core";
 import * as nativeSkia from "@shopify/react-native-skia";
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { SkiaDraw } from "../../src/modules/SkiaDraw";
@@ -49,7 +56,7 @@ function setup() {
             topLeft: { x: 0, y: 0 },
         });
     };
-    return { draw, render, camera: camera as { scale: number }, ops };
+    return { draw, render, layers, camera: camera as { scale: number }, ops };
 }
 
 function batch<T extends { x: number; y: number }>(item: T, count: number): T[] {
@@ -165,5 +172,86 @@ describe("Skia stroke and text edge cases", () => {
         render();
         render();
         expect(measureText).toHaveBeenCalledTimes(7);
+    });
+});
+
+describe("Skia live collection registrations", () => {
+    it("remeasures bounds when a removed path is edited and inserted again", () => {
+        const { draw, render, ops } = setup();
+        const path: PathItem & { id: string } = {
+            id: "a",
+            points: [
+                { x: 1, y: 1 },
+                { x: 3, y: 3 },
+            ],
+        };
+        const items = [path];
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const handle = draw.drawPath(source.items as typeof items);
+        source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+        render();
+        expect(ops.map(({ op }) => op)).toEqual(["path"]);
+
+        source.remove("a");
+        path.points = [
+            { x: 100, y: 1 },
+            { x: 102, y: 3 },
+        ];
+        source.insert(path);
+        render();
+        expect(ops).toHaveLength(0);
+    });
+
+    it.each(["drawRect", "drawCircle", "drawImage"] as const)(
+        "%s updates indexed items without adding registrations",
+        (method) => {
+            const { draw, render, layers, ops } = setup();
+            const add = vi.spyOn(layers, "add");
+            const img = { width: () => 10, height: () => 10 } as nativeSkia.SkImage;
+            const items = Array.from({ length: 600 }, (_, id) => ({
+                id,
+                x: 1000 + id,
+                y: 1000,
+                size: 1,
+                style: { fillStyle: "#f00" },
+                img,
+            }));
+            const source = new ItemCollection(items, { keyOf: (item) => item.id });
+            const handle = draw[method](source.items as typeof items);
+            source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+            render();
+            expect(ops).toHaveLength(0);
+            source.update(0, { x: 2, y: 2 });
+            render();
+            expect(ops).toHaveLength(1);
+            source.batch(() => {
+                source.insert({ ...items[0], id: 700, x: 3, y: 3 });
+                source.remove(0);
+                source.update(700, { x: 4 });
+            });
+            render();
+            expect(ops).toHaveLength(1);
+            expect(add).toHaveBeenCalledTimes(1);
+            draw.clearLayer(handle.layer);
+            source.update(700, { x: 5 });
+            render();
+            expect(ops).toHaveLength(0);
+        },
+    );
+
+    it("updates measured text after the first frame", () => {
+        const { draw, render, ops } = setup();
+        const items = Array.from({ length: 600 }, (_, id) => ({ id, x: 1000 + id, y: 1000, text: "old", fontPx: 10 }));
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const handle = draw.drawText(source.items as typeof items);
+        source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+        render();
+        expect(ops).toHaveLength(0);
+        source.update(0, { x: 2, y: 2, text: "updated" });
+        render();
+        expect(ops.filter(({ op }) => op === "text").map(({ text }) => text)).toEqual(["updated"]);
+        source.remove(0);
+        render();
+        expect(ops).toHaveLength(0);
     });
 });

@@ -30,6 +30,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    ItemCollectionChange,
     FontWeight,
     Paint,
     PaintBox,
@@ -78,7 +79,7 @@ import {
 
 /** matchFont's weight argument; its input type is not exported by the package. */
 type SkiaFontWeight = NonNullable<NonNullable<Parameters<typeof matchFont>[0]>["fontWeight"]>;
-import { type DrawCallback, Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { type DrawCallback, DrawChanges, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { LruCache } from "@canvas-tile-engine/renderer-shared/cache";
 import type { SkiaDrawContext } from "../types";
 import { DEFAULT_SANS_SERIF } from "../utils/fonts";
@@ -120,6 +121,8 @@ export const COLOR_CACHE_LIMIT = 8192;
  * @internal
  */
 export class SkiaDraw {
+    private drawChanges = new DrawChanges();
+
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
@@ -164,6 +167,11 @@ export class SkiaDraw {
         return this.layers.add(layer, fn, options?.clip);
     }
 
+    /** Update the caches belonging to an existing collection registration. */
+    applyDrawChanges(handle: DrawHandle, changes: readonly ItemCollectionChange<unknown>[]): void {
+        this.drawChanges.apply(handle, changes);
+    }
+
     addDrawFunction(
         fn: (
             canvas: SkCanvas,
@@ -192,10 +200,10 @@ export class SkiaDraw {
             list,
             (item, scale) => boxPaintBounds(item, scale, item.style),
             !!styleOf,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+            (item) => boxPixelPadding(item, item.style),
         );
 
-        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -213,6 +221,8 @@ export class SkiaDraw {
                 this.paintRect(canvas, item, pos, this.camera.scale, true, deco);
             }
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     /** Paint a single rect at a resolved position; `cellSize` is the pixel
@@ -290,10 +300,10 @@ export class SkiaDraw {
             list,
             (item, scale) => boxPaintBounds(item, scale, item.style, false),
             !!styleOf,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+            (item) => boxPixelPadding(item, item.style),
         );
 
-        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -311,6 +321,8 @@ export class SkiaDraw {
                 this.paintCircle(canvas, item, pos, this.camera.scale, true, deco);
             }
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     /** Paint a single circle at a resolved position; `cellSize` is the pixel
@@ -438,7 +450,7 @@ export class SkiaDraw {
             !!styleOf,
         );
 
-        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -471,6 +483,8 @@ export class SkiaDraw {
                 }
             }
         });
+        this.drawChanges.add(handle, (changes: readonly ItemCollectionChange<Text>[]) => culler?.applyChanges(changes));
+        return handle;
     }
 
     /**
@@ -517,14 +531,18 @@ export class SkiaDraw {
     ): DrawHandle {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
-        // Conservative world bounds per item for culling, computed once.
-        const itemBounds = items.map((item) => pathItemBounds(item));
+        // Identity-keyed bounds survive insertion/removal; immutable collection
+        // updates invalidate only the replaced item.
+        const itemBounds = new WeakMap(items.map((item) => [item, pathItemBounds(item)] as const));
 
-        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const viewport = getViewportBounds(topLeft, config);
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
-                const bounds = itemBounds[n];
+                if (!itemBounds.has(item)) {
+                    itemBounds.set(item, pathItemBounds(item));
+                }
+                const bounds = itemBounds.get(item);
                 if (!bounds || visibleOf?.(item) === false) {
                     continue;
                 }
@@ -595,6 +613,15 @@ export class SkiaDraw {
                 }
             }
         });
+        this.drawChanges.add(handle, (changes: readonly ItemCollectionChange<PathItem>[]) => {
+            for (const change of changes) {
+                itemBounds.delete(change.item);
+                if (change.type === "update") {
+                    itemBounds.delete(change.previous);
+                }
+            }
+        });
+        return handle;
     }
 
     drawImage(
@@ -609,10 +636,10 @@ export class SkiaDraw {
             list,
             (item, scale) => boxPaintBounds(item, scale),
             false,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
+            (item) => boxPixelPadding(item),
         );
 
-        return this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx: canvas, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -628,6 +655,8 @@ export class SkiaDraw {
                 this.paintImage(canvas, item, pos, this.camera.scale, true);
             }
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     /** Paint a single image at a resolved position; `cellSize` is the pixel
@@ -894,18 +923,22 @@ export class SkiaDraw {
     // ─── Layer management ───
 
     removeDrawHandle(handle: DrawHandle) {
+        this.drawChanges.remove(handle);
         this.layers.remove(handle);
     }
 
     clearLayer(layer: number) {
+        this.drawChanges.clear(layer);
         this.layers.clear(layer);
     }
 
     clearAll() {
+        this.drawChanges.clear();
         this.layers.clear();
     }
 
     destroy() {
+        this.drawChanges.clear();
         this.layers.clear();
         this.fontCache.clear();
         this.textLayoutCache.clear();

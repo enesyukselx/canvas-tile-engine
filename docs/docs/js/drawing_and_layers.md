@@ -6,6 +6,8 @@ sidebar_position: 2
 
 The engine provides a layered rendering system where you can draw shapes, text, images, and custom content. All drawing operations use **world coordinates**, and the engine handles the scaling and positioning automatically.
 
+The six dynamic primitives also accept an `ItemCollection` for keyed insertions, updates, and removals with automatic repaint and current hit testing. See [Live Item Collections](./item_collections.md). `DrawItems<T>` means a single `T`, a `T[]`, or a read-only collection source.
+
 :::tip Type Safety
 All drawing types are exported from the package. See [Types Reference](/docs/introduction/types) for complete type definitions.
 
@@ -44,8 +46,8 @@ You can use any number for a layer. They are sorted automatically at render time
 Draw basic geometric shapes. You can pass a single object or an array of objects for batch rendering.
 
 ```typescript
-drawRect(items: Rect | Rect[], layer?: number, options?: DrawOptions): DrawHandle
-drawCircle(items: Circle | Circle[], layer?: number, options?: DrawOptions): DrawHandle
+drawRect(items: DrawItems<Rect>, layer?: number, options?: DrawOptions): DrawHandle
+drawCircle(items: DrawItems<Circle>, layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 Every draw method accepts an optional `options` object as its last parameter. Its single field, `id`, gives the registration a stable identity: calling a draw method again with the same `id` **replaces** the previous registration instead of accumulating alongside it. See [Replacing with a registration id](#replacing-with-a-registration-id-optionsid).
@@ -212,7 +214,7 @@ The `drawStatic*` variants accept gradients too, but their cache is recorded at 
 Draw a straight line between two points. Supports single object or array of objects.
 
 ```typescript
-drawLine(items: Line | Line[], style?: LineStyle, layer?: number, options?: DrawOptions): DrawHandle
+drawLine(items: DrawItems<Line>, style?: LineStyle, layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **Line Properties:**
@@ -275,7 +277,7 @@ Lines participate in hit testing: a click/tap within half the stroke width of a 
 Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `PathItem` owns its geometry and style.
 
 ```typescript
-drawPath(items: PathItem | PathItem[], layer?: number, options?: DrawOptions): DrawHandle
+drawPath(items: DrawItems<PathItem>, layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **`PathItem` properties:**
@@ -421,7 +423,7 @@ engine.drawGridLines(50, 2, "rgba(0, 0, 0, 0.5)", 0); // Coarse grid
 Render text at world coordinates. Supports single object or array of objects. Text size scales with zoom.
 
 ```typescript
-drawText(items: Text | Text[], layer?: number, options?: DrawOptions): DrawHandle
+drawText(items: DrawItems<Text>, layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **Text Properties:**
@@ -501,7 +503,7 @@ engine.drawText(
 Draw an image scaled to world units. Supports single object or array of objects.
 
 ```typescript
-drawImage(items: ImageItem | ImageItem[], layer?: number, options?: DrawOptions): DrawHandle
+drawImage(items: DrawItems<ImageItem>, layer?: number, options?: DrawOptions): DrawHandle
 ```
 
 **ImageItem Properties:**

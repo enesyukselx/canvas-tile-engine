@@ -8,8 +8,9 @@ Renderer choice, what the engine already optimizes, and rough budgets.
   view (plus a small buffer). Passing 100k items to `drawRect` is fine; only
   visible ones are painted.
 - **Spatial indexing**: above 500 items per draw call, an R-tree
-  (`SpatialIndex`, RBush-backed) is built once at registration and queried
-  per frame instead of linear scanning. Paint order stays array order.
+  (`SpatialIndex`, RBush-backed) is built lazily and queried per frame instead
+  of linear scanning. Live collection changes update affected entries;
+  zoom/font-metric invalidation may rebuild caches. Paint order stays array order.
 - **Style batching** (Canvas2D): consecutive items with the same
   fill/stroke style avoid redundant context state changes. Batching never
   reorders.
@@ -23,8 +24,11 @@ Consequences for generated code:
 
 - Prefer ONE `drawRect(bigArray)` over many `drawRect(singleItem)` calls -
   the spatial index and style batching work per call.
-- The index is built from item positions at registration time: moved items
-  need re-registration (same `id`). Style, show/hide and hit opt-out changes
+- For frequent geometry or membership changes use a stable
+  [`ItemCollection`](item-collections.md) (core >= 0.12), with keyed updates
+  and `batch` for grouped notifications/repaint. Removals still shift dense
+  array positions. Ordinary array geometry changes need re-registration
+  (same `id`). Style, show/hide and hit opt-out changes
   need none - `styleOf`/`visibleOf`/`interactiveOf` + `render()`, never a
   filtered array copy ([drawing.md](drawing.md#styleof-visibleof-interactiveof)).
   Sprite frame changes are mutation + `render()`.

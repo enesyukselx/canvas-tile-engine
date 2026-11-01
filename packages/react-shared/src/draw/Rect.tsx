@@ -2,6 +2,7 @@ import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
 import type {
     Bounds,
+    DrawItems,
     Rect as RectType,
     ShapeDecorationStyle,
     StyleOf,
@@ -14,8 +15,10 @@ export interface RectProps {
      * Items to draw. Compared by reference: a new array identity re-registers
      * the draw callback (and rebuilds the spatial index for 500+ items), so
      * keep it stable with useMemo/useState instead of an inline literal.
+     * A stable ItemCollection updates and repaints imperatively without a
+     * parent render or re-registration.
      */
-    items: RectType | RectType[];
+    items: DrawItems<RectType>;
     layer?: number;
     /**
      * Paint-time decoration: the returned fields overlay the item's own

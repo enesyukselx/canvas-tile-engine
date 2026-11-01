@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
+import { CoordinateTransformer, ICamera, ItemCollection, type PathItem } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
 
@@ -41,6 +41,124 @@ function setup() {
         layers.drawAll({ ctx, camera, transformer, config, topLeft: { x: 0, y: 0 } });
     return { draw, render };
 }
+
+describe("CanvasDraw collection updates", () => {
+    it.each(["drawRect", "drawCircle"] as const)("%s refreshes a warmed index without re-registering", (method) => {
+        const { draw, render } = setup();
+        const { ctx, fills } = makeRecordingCtx();
+        const items = Array.from({ length: 600 }, (_, id) => ({
+            id,
+            x: 1000 + id,
+            y: 1000,
+            size: 1,
+            style: { fillStyle: "#f00" },
+        }));
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const handle = draw[method](source.items as typeof items);
+        source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+        render(ctx);
+        expect(fills).toHaveLength(0);
+        source.update(0, { x: 2, y: 2 });
+        render(ctx);
+        expect(fills).toHaveLength(1);
+        source.batch(() => {
+            source.insert({ ...items[0], id: 700, x: 3, y: 3 });
+            source.remove(0);
+        });
+        fills.length = 0;
+        render(ctx);
+        expect(fills).toHaveLength(1);
+        draw.removeDrawHandle(handle);
+        source.update(700, { x: 5 });
+        fills.length = 0;
+        render(ctx);
+        expect(fills).toHaveLength(0);
+    });
+
+    it("updates image and text candidates after their first frame", () => {
+        const { draw, render } = setup();
+        const { ctx } = makeRecordingCtx();
+        ctx.drawImage = vi.fn();
+        ctx.fillText = vi.fn();
+        ctx.measureText = vi.fn(
+            () =>
+                ({
+                    actualBoundingBoxLeft: 5,
+                    actualBoundingBoxRight: 5,
+                    actualBoundingBoxAscent: 5,
+                    actualBoundingBoxDescent: 5,
+                }) as TextMetrics,
+        );
+        const img = { width: 10, height: 10 } as HTMLImageElement;
+        const items = Array.from({ length: 600 }, (_, id) => ({
+            id,
+            x: 1000 + id,
+            y: 1000,
+            img,
+            text: "old",
+            fontPx: 10,
+        }));
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const imageHandle = draw.drawImage(source.items as typeof items);
+        const textHandle = draw.drawText(source.items as typeof items);
+        source.subscribe((changes) => {
+            draw.applyDrawChanges(imageHandle, changes);
+            draw.applyDrawChanges(textHandle, changes);
+        });
+        render(ctx);
+        expect(ctx.drawImage).not.toHaveBeenCalled();
+        expect(ctx.fillText).not.toHaveBeenCalled();
+        source.update(0, { x: 2, y: 2, text: "updated" });
+        render(ctx);
+        expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+        expect(ctx.fillText).toHaveBeenCalledWith("updated", 25, 25);
+        draw.clearAll();
+        source.remove(0);
+        render(ctx);
+        expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+        expect(ctx.fillText).toHaveBeenCalledTimes(1);
+    });
+
+    it("retains each path's bounds through removal, replacement and insertion", () => {
+        const { draw, render } = setup();
+        const { ctx, strokes } = makeRecordingCtx();
+        const path = (id: string, x: number): PathItem & { id: string } => ({
+            id,
+            points: [
+                { x, y: 1 },
+                { x: x + 2, y: 1 },
+            ],
+            style: { strokeStyle: "#f00" },
+        });
+        const items = [path("a", 0), path("b", 3)];
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const handle = draw.drawPath(source.items as typeof items);
+        source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+        render(ctx);
+        expect(strokes).toHaveLength(2);
+        source.batch(() => {
+            source.remove("a");
+            source.update("b", path("b", 100));
+        });
+        strokes.length = 0;
+        render(ctx);
+        expect(strokes).toHaveLength(0);
+        source.insert(path("c", 2));
+        render(ctx);
+        expect(strokes).toHaveLength(1);
+
+        const removed = source.get("c")!;
+        source.remove("c");
+        removed.points = [
+            { x: 200, y: 1 },
+            { x: 202, y: 1 },
+        ];
+        source.insert(removed);
+        strokes.length = 0;
+        render(ctx);
+        expect(strokes).toHaveLength(0);
+    });
+});
 
 describe("CanvasDraw grid intervals", () => {
     it.each([-1, -0.25, 0, -0, NaN, Infinity, -Infinity, "1", null, undefined])(

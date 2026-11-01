@@ -183,6 +183,7 @@ Keys, focus rules and what the keyboard may do:
 | Signature | Notes |
 | :-- | :-- |
 | `render(): void` | Paint one frame. Needed after draw registration and after data mutation. Camera changes (drag/zoom/goCenter/...) render automatically. |
+| `requestRender(): void` | Coalesce a repaint into one animation frame (microtask without rAF). Collection updates call it automatically; synchronous `render()` consumes it and destroy cancels it. Core >= 0.12. |
 | `destroy(): void` | Cancel animations, remove listeners/observers. Call on teardown (React does this on unmount). |
 
 ### Camera and viewport
@@ -295,19 +296,22 @@ screen-fixed overlays: [drawing.md](drawing.md#custom-draw-functions).
 | `hitTestFirst<TData>(point: Coords, opts?): HitResult<TImage, TData> \| undefined` | Top-most item only. |
 | `hitTestRect<TData>(rect: Bounds, opts?: { layer?: number; mode?: "intersect" \| "contain" }): HitResult<TImage, TData>[]` | Marquee: items intersecting (default) or fully inside a raw-space rect, corners in any order (build it from `coords.raw` drag points). Exact geometry: discs, rotated quads, path interiors minus holes. Stroke widths and `padding` are NOT applied - grow the rect instead. |
 
-`HitResult` = `{ item, kind, layer, handle, index }`; `item` is the exact
-object you drew. Identify items by their `data?: TData` field (never read by
-the engine), not `index` (array position at draw time, stale after a
-re-draw). `TData` is an explicit, UNCHECKED type argument - results are not
+`HitResult` = `{ item, kind, layer, handle, index, key? }`; `item` is the current
+drawn object. Collection hits include a stable `key` (core >= 0.12); `index`
+is the current dense position and shifts after removals. For ordinary items,
+use their `data?: TData` field (never read by the engine) for identity.
+`TData` is an explicit, UNCHECKED type argument - results are not
 linked to the draw call that typed the items. The hit box is the drawn box
 (origin, Rect `width`/`height`, image fit, rotation, `drawStatic*`
 included); filled paths hit on the interior, lines and unfilled paths within
 half the stroke width (min 8px). Text never hit-tests; neither do
 `hitTest: false` registrations, items hidden by `visibleOf` or opted out by
 `interactiveOf`, nor points outside the registration's `clip`. Hit tests
-follow mutated item positions while a registration holds <= 500 items; above
+follow ordinary in-place mutations while a registration holds <= 500 items; above
 that the index is built once, so re-register moved items
-([500-item note](drawing.md#the-retained-draw-model)). `padding` (world
+([500-item note](drawing.md#the-retained-draw-model)). Live
+[`ItemCollection`](item-collections.md) updates refresh hits at any collection
+size before the mutation returns. `padding` (world
 units) and `paddingPx` (screen px) grow every tested item, additively - use
 them instead of invisible halo items. 500+ item draw calls use a spatial
 index, so hover-rate queries are fine. Usage pattern:
