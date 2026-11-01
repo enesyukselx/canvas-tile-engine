@@ -7,6 +7,8 @@ export * from "./constants";
 export { gridToSize } from "./utils/gridToSize";
 export { fitScale, type FitScaleOptions } from "./utils/fitScale";
 export { ConfigValidationError } from "./utils/validateConfig";
+// Portable scene documents and prepared live collections.
+export * from "./modules/scene";
 export {
     resolveLineWidthPx,
     resolveLineDashPx,

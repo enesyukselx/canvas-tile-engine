@@ -59,6 +59,7 @@ type Assert<T extends true> = T;
 const nodeConsumer = `
 import assert from "node:assert/strict";
 import { CanvasTileEngine, ConfigValidationError, ItemCollection, SpriteSheet, type DrawItems, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type Rect, type RendererDependencies } from "@canvas-tile-engine/core";
+import { createSceneDocument, prepareScene, stringifySceneDocument, parseSceneDocument, type PreparedScene, type SceneRuntimeItemMap } from "@canvas-tile-engine/core";
 import { RendererServer, SERVER_MOUNT, renderToBuffer, type ServerMount } from "@canvas-tile-engine/renderer-server";
 import { Image, createCanvas, loadImage } from "@napi-rs/canvas";
 ${assertions}
@@ -71,6 +72,19 @@ type Defaults = [
 ];
 const defaults: Defaults = [true, true, true, true, true];
 assert.equal(defaults.length, 5);
+// Scene declarations and image resolvers remain usable without the DOM lib.
+const sceneImage: Assert<Equal<SceneRuntimeItemMap<Image>["image"]["img"], Image>> = true;
+void sceneImage;
+async function sceneDocumentTypes() {
+    const document = createSceneDocument({ assets: [{ id: "tile", src: "tile.png" }], layers: [] });
+    const scene: PreparedScene<Image> = await prepareScene(parseSceneDocument(stringifySceneDocument(document)), {
+        resolveImage: () => loadImage(createCanvas(1, 1).toBuffer("image/png")),
+    });
+    const native: Image = scene.getImage("tile");
+    void native;
+    assert.equal(scene.capture().schemaVersion, 1);
+}
+void sceneDocumentTypes;
 function zoom(camera: ICamera) {
     camera.zoom(10, 10, -1, { left: 0, top: 0, width: 8, height: 8 });
 }

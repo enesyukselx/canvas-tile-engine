@@ -27,6 +27,10 @@ package's `.d.ts` files before using it.
 
 ## Package selection (decide first)
 
+For JSON save/reopen workflows (core >= 0.12), read
+[scene documents](references/scene-documents.md). Preserve ordered typed
+batches and resolve asset references before attaching the prepared scene.
+
 | You are building | Install | Read |
 | :-- | :-- | :-- |
 | Vanilla JS/TS web app | `@canvas-tile-engine/core` + `@canvas-tile-engine/renderer-canvas` | [core-api](references/core-api.md), [drawing](references/drawing.md), [events](references/events.md) |
