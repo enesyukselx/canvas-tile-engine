@@ -6,6 +6,9 @@ import { registerFont, renderToBuffer } from "../../src";
 import { FIXTURES_DIR, expectSamePixels } from "./helpers";
 
 registerFont(join(FIXTURES_DIR, "Roboto-Regular.ttf"), "TextColorTest");
+// The undefined-style case resolves sans-serif. Pin that family before any
+// canvas measures text so its glyphs do not depend on the host's default font.
+registerFont(join(FIXTURES_DIR, "Roboto-Regular.ttf"), "sans-serif");
 
 const config = { scale: 30, size: { width: 240, height: 240 }, backgroundColor: "#ffffff" };
 const fontFamily = "TextColorTest";
