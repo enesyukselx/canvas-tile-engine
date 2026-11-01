@@ -46,6 +46,22 @@ export {
     type ItemKey,
     type DrawItems,
 } from "./modules/ItemCollection";
+export {
+    History,
+    HistoryCommittedError,
+    HistoryReplayError,
+    type HistoryAdapter,
+    type HistoryDirection,
+    type HistoryOptions,
+    type HistoryState,
+} from "./modules/History";
+export {
+    createItemCollectionHistory,
+    attachItemCollectionHistory,
+    itemCollectionHistoryAdapter,
+    type ItemCollectionHistoryCommand,
+    type ItemCollectionHistoryOptions,
+} from "./modules/ItemCollectionHistory";
 export type { HitResult, HitTestOptions, HitTestRectOptions, HitKind } from "./modules/HitTester";
 export { GestureProcessor } from "./modules/GestureProcessor";
 export type {

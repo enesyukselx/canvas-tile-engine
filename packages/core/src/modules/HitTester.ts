@@ -272,7 +272,7 @@ export class HitTester {
         if (!entry?.collection) {
             return;
         }
-        let removed = false;
+        let positionsChanged = false;
         for (const change of changes) {
             const previous =
                 change.type === "update" ? change.previous : change.type === "remove" ? change.item : undefined;
@@ -293,6 +293,9 @@ export class HitTester {
                     this.flattenCache.delete(next as PathItem);
                 }
             }
+            positionsChanged ||=
+                change.type === "remove" ||
+                (change.type === "insert" && entry.indexMap !== undefined && change.index < entry.indexMap.size);
             if (entry.index && entry.indexTokens) {
                 if (change.type === "insert") {
                     entry.indexTokens.set(change.item, entry.index.insert(change.item as BoxedItem));
@@ -315,11 +318,10 @@ export class HitTester {
                     entry.indexMap!.set(next, change.index);
                 }
             }
-            removed ||= change.type === "remove";
         }
-        // Dense array positions shift after removal, while the R-Tree's stable
-        // paint order needs no rebuild. Do this once per notification batch.
-        if (removed && entry.indexMap) {
+        // Dense positions shift after middle insertion/removal. Appends and updates
+        // retain the map; the R-Tree never needs rebuilding for these edits.
+        if (positionsChanged && entry.indexMap) {
             entry.indexMap = new Map(entry.items.map((item, index) => [item, index]));
         }
         if (entry.worldExtents && entry.pixelExtents) {

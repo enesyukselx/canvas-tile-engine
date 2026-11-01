@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CanvasTileEngine } from "../../src/CanvasTileEngine";
 import { ItemCollection } from "../../src/modules/ItemCollection";
 import { SpatialIndex } from "../../src/modules/SpatialIndex";
+import { createItemCollectionHistory } from "../../src/modules/ItemCollectionHistory";
 import type { DrawHandle, IDrawAPI, IRenderer, PathItem, Rect } from "../../src/types";
 
 type Seat = Rect & { id: string };
@@ -127,6 +128,42 @@ describe("ItemCollection engine integration", () => {
             ["1", 0],
         ]);
         expect(applyDrawChanges).toHaveBeenCalledTimes(1);
+        expect(load).not.toHaveBeenCalled();
+    });
+
+    it("keeps appends incremental and restores dense hit order for positional insertion and undo", () => {
+        frames();
+        const { engine, registered } = createEngine();
+        const source = seats(502);
+        const history = createItemCollectionHistory(source);
+        engine.drawRect(source);
+        engine.hitTest(at(0));
+        const view = registered[0].items as Seat[];
+        const map = vi.spyOn(view, "map");
+        const load = vi.spyOn(SpatialIndex.prototype, "load");
+        source.batch(() => {
+            source.insert({ id: "appended-a", x: 0, y: 0 });
+            source.insert({ id: "appended-b", x: 0, y: 0 });
+        });
+        expect(map).not.toHaveBeenCalled();
+        expect(engine.hitTest(at(0)).map(({ key, index }) => [key, index])).toEqual([
+            ["appended-b", 503],
+            ["appended-a", 502],
+            ["0", 0],
+        ]);
+        source.insertAt(0, { id: "behind", x: 0, y: 0 });
+        expect(map).toHaveBeenCalledTimes(1);
+        expect(engine.hitTest(at(0)).map(({ key, index }) => [key, index])).toEqual([
+            ["appended-b", 504],
+            ["appended-a", 503],
+            ["0", 1],
+            ["behind", 0],
+        ]);
+        history.undo();
+        expect(engine.hitTestFirst(at(0))).toMatchObject({ key: "appended-b", index: 503 });
+        history.redo();
+        expect(view[0].id).toBe("behind");
+        expect(engine.hitTest(at(0)).at(-1)).toMatchObject({ key: "behind", index: 0 });
         expect(load).not.toHaveBeenCalled();
     });
 

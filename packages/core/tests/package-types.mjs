@@ -61,6 +61,7 @@ import assert from "node:assert/strict";
 import { CanvasTileEngine, ConfigValidationError, ItemCollection, SpriteSheet, type DrawItems, type ICamera, type IRenderer, type IImageLoader, type IDrawAPI, type ImageItem, type Rect, type RendererDependencies } from "@canvas-tile-engine/core";
 import { RendererServer, SERVER_MOUNT, renderToBuffer, type ServerMount } from "@canvas-tile-engine/renderer-server";
 import { Image, createCanvas, loadImage } from "@napi-rs/canvas";
+import { History, attachItemCollectionHistory, itemCollectionHistoryAdapter } from "@canvas-tile-engine/core";
 ${assertions}
 type Defaults = [
     Assert<Equal<ImageItem["img"], unknown>>,
@@ -104,12 +105,21 @@ async function main() {
     );
     const rectangleInput: DrawItems<Rect> = rectangles;
     const images = new ItemCollection([image], { keyOf: (item) => item.data!.id });
+    const history = new History({ adapter: itemCollectionHistoryAdapter });
+    attachItemCollectionHistory(history, "rectangles", rectangles);
+    attachItemCollectionHistory(history, "images", images);
     engine.drawRect(rectangleInput, 1);
     engine.drawImage(images, 2);
     let frames = 0;
     engine.onDraw = () => { frames++; };
+    history.beginTransaction("Move two collections");
     rectangles.update("seat", { x: 1, y: 2 });
     images.update(1, { x: -2 });
+    history.commit();
+    history.undo();
+    assert.equal(engine.hitTestFirst({ x: 2.5, y: 0.5 }, { layer: 1 })?.key, "seat");
+    assert.equal(engine.hitTestFirst({ x: 1.5, y: 2.5 }, { layer: 1 }), undefined);
+    history.redo();
     assert.equal(engine.hitTestFirst({ x: 2.5, y: 0.5 }, { layer: 1 }), undefined);
     assert.equal(engine.hitTestFirst({ x: 1.5, y: 2.5 }, { layer: 1 })?.key, "seat");
     assert.equal(engine.hitTestFirst({ x: -1.5, y: 0.5 }, { layer: 2 })?.key, 1);
@@ -120,6 +130,7 @@ async function main() {
     assert.equal(frames, 1);
     assert.equal(renderer.toBuffer().subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
     engine.destroy();
+    history.dispose();
     rectangles.update("seat", { x: 3 });
     await Promise.resolve();
     assert.equal(frames, 1);

@@ -924,8 +924,8 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
             }
             for (const change of changes) {
                 if (change.type === "insert") {
-                    values.push(change.item);
-                    keys.push(change.key);
+                    values.splice(change.index, 0, change.item);
+                    keys.splice(change.index, 0, change.key);
                 } else if (change.type === "update") {
                     values[change.index] = change.item;
                 } else {

@@ -253,3 +253,12 @@ For a full app: read this file, then [core-api](references/core-api.md) +
 [drawing](references/drawing.md) + [events](references/events.md) (the
 sections you need), then the platform file, then copy the nearest recipe
 from [recipes](references/recipes.md) and adapt it.
+
+## Undoable editor operations (core >= 0.12)
+
+Read [history](references/history.md) when adding undo/redo, cancelable drags,
+or brush transactions. Use `createItemCollectionHistory` for one source or
+`History` + `itemCollectionHistoryAdapter` + `attachItemCollectionHistory` for
+several typed collections. Group gestures with `beginTransaction` / `commit` /
+`cancel`; keep scene data in the collections and identify sources/items by
+stable IDs/keys. Generic `History` adapters also support application stores.

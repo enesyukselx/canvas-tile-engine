@@ -129,6 +129,41 @@ describe("ItemCollection", () => {
         ]);
     });
 
+    it("inserts at a dense position, preserving identity and shifted update indices", () => {
+        const middle = { id: "middle", x: 1 };
+        const source = collection([{ id: "last", x: 2 }]);
+        const backing = source.items;
+        const changes: ItemCollectionChange<Item>[] = [];
+        source.subscribe((next) => changes.push(...next));
+        source.insertAt(0, middle);
+        source.insertAt(0, { id: "first", x: 0 });
+        source.insertAt(source.size, { id: "append", x: 3 });
+        source.update("last", { x: 4 });
+        expect(source.items).toBe(backing);
+        expect(source.items[1]).toBe(middle);
+        expect(source.items.map((item) => item.id)).toEqual(["first", "middle", "last", "append"]);
+        expect(changes.map(({ type, index }) => [type, index])).toEqual([
+            ["insert", 0],
+            ["insert", 0],
+            ["insert", 3],
+            ["update", 2],
+        ]);
+    });
+
+    it("rejects invalid positional inserts without changing items or notifying", () => {
+        const source = collection([{ id: "a", x: 0 }]);
+        const original = source.get("a");
+        const listener = vi.fn();
+        source.subscribe(listener);
+        for (const index of [-1, 2, 0.5, NaN, Infinity]) {
+            expect(() => source.insertAt(index, { id: "b", x: 1 })).toThrow("insertion index");
+        }
+        expect(() => source.insertAt(0, { id: "a", x: 1 })).toThrow("duplicate key");
+        expect(source.items).toEqual([original]);
+        expect(source.items[0]).toBe(original);
+        expect(listener).not.toHaveBeenCalled();
+    });
+
     it("groups nested batches in mutation order and returns the callback result", () => {
         const source = collection([{ id: "a", x: 0 }]);
         const listener = vi.fn();
