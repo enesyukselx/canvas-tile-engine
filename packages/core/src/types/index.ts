@@ -16,6 +16,7 @@ import { Circle, DrawObject, ImageItem, Line, PathItem, PathStyle, Rect, Text } 
 import { CanvasTileEngineConfig } from "./config";
 import type { DefaultImage, DefaultMount } from "./platform";
 import type { ItemCollectionChange } from "../modules/ItemCollection";
+import type { EngineInput } from "../modules/InputRouter";
 
 export type Coords = {
     x: number;
@@ -132,6 +133,8 @@ export interface RendererDependencies<TMount = DefaultMount> {
     viewport: ViewportState;
     config: Config;
     transformer: CoordinateTransformer;
+    /** Optional for custom renderers; pass to GestureProcessor to enable tools. */
+    input?: EngineInput;
 }
 
 export interface IRenderer<TMount = DefaultMount, TImage = DefaultImage> {

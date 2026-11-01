@@ -13,6 +13,7 @@ import { DEFAULT_VALUES } from "../constants";
 import { ICamera } from "./Camera";
 import { Config } from "./Config";
 import { CoordinateTransformer } from "./CoordinateTransformer";
+import type { EngineInput, EnginePointerEvent } from "./InputRouter";
 
 // Below this pinch distance (px) the scale factor is degenerate: two fingers
 // nearly on the same point would divide by ~0 and snap the zoom to its limit.
@@ -31,6 +32,15 @@ export interface NormalizedPointer {
     clientX: number;
     /** Y position relative to viewport (for callbacks) */
     clientY: number;
+    /** Stable contact identity when supplied by the platform. */
+    pointerId?: number;
+    pointerType?: "mouse" | "touch" | "pen";
+    button?: number;
+    buttons?: number;
+    shiftKey?: boolean;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    altKey?: boolean;
 }
 
 /**
@@ -141,7 +151,22 @@ export class GestureProcessor {
         private transformer: CoordinateTransformer,
         private canvasBoundsGetter: () => CanvasBounds,
         private onCameraChange: () => void,
+        private input?: EngineInput,
     ) {}
+
+    private notifyPointer(type: EnginePointerEvent["type"], pointer: NormalizedPointer): boolean {
+        return this.input?.dispatch({ type, pointer, ...this.processCoords(pointer) }) ?? false;
+    }
+
+    /** Includes a tool-owned press, so renderers keep forwarding outside moves. */
+    get trackingPointer(): boolean {
+        return this.isDragging || this.input?.captured === true;
+    }
+
+    /** Tools opt into touch ownership independently from the camera event gates. */
+    get toolsEnabled(): boolean {
+        return this.input?.hasTool === true || this.input?.captured === true;
+    }
 
     /**
      * Process pointer coordinates into world/screen coords for callbacks.
@@ -252,6 +277,9 @@ export class GestureProcessor {
      * bail would make the documented `+` binding unreachable.
      */
     handleKeyDown = (event: NormalizedKey): boolean => {
+        if (this.input?.dispatch({ type: "keydown", key: event })) {
+            return true;
+        }
         if (event.ctrlKey || event.metaKey || event.altKey) {
             return false;
         }
@@ -335,7 +363,7 @@ export class GestureProcessor {
     // ─── Single Pointer Handlers ───────────────────────────────
 
     handleClick = (pointer: NormalizedPointer): void => {
-        if (this.shouldPreventClick) {
+        if (this.shouldPreventClick || this.input?.suppressClick) {
             this.shouldPreventClick = false;
             return;
         }
@@ -356,14 +384,17 @@ export class GestureProcessor {
 
     handlePointerDown = (pointer: NormalizedPointer): void => {
         this.pointerDown = true;
+        this.isDragging = false;
         this.shouldPreventClick = false;
+        this.lastPos = { x: pointer.clientX, y: pointer.clientY };
+        const handled = this.notifyPointer("pointerdown", pointer);
         if (this.onMouseDown) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseDown(coords, mouse, client);
         }
 
         // A press callback can tear down its renderer and cancel this input.
-        if (!this.pointerDown || !this.config.get().eventHandlers.drag) {
+        if (!this.pointerDown || handled || !this.config.get().eventHandlers.drag) {
             return;
         }
 
@@ -372,7 +403,14 @@ export class GestureProcessor {
     };
 
     handlePointerMove = (pointer: NormalizedPointer): void => {
-        if (!this.isDragging) {
+        const handled = this.notifyPointer("pointermove", pointer);
+        if (handled) {
+            if (this.input?.captured && (pointer.clientX !== this.lastPos.x || pointer.clientY !== this.lastPos.y)) {
+                this.shouldPreventClick = true;
+            }
+            this.lastPos = { x: pointer.clientX, y: pointer.clientY };
+        }
+        if (handled || !this.isDragging) {
             if (this.onHover && this.config.get().eventHandlers.hover) {
                 const { coords, mouse, client } = this.processCoords(pointer);
                 this.onHover(coords, mouse, client);
@@ -392,6 +430,8 @@ export class GestureProcessor {
 
     handlePointerUp = (pointer: NormalizedPointer): void => {
         this.pointerDown = false;
+        this.isDragging = false;
+        this.notifyPointer("pointerup", pointer);
         if (this.onMouseUp) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseUp(coords, mouse, client);
@@ -401,6 +441,7 @@ export class GestureProcessor {
     };
 
     handlePointerLeave = (pointer: NormalizedPointer, preserveDrag = false): void => {
+        this.notifyPointer("pointerleave", pointer);
         if (this.onMouseLeave) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseLeave(coords, mouse, client);
@@ -408,6 +449,10 @@ export class GestureProcessor {
 
         if (!preserveDrag) {
             this.isDragging = false;
+            if (this.input?.captured) {
+                this.input.dispatch({ type: "pointercancel", reason: "cancel", pointer });
+                this.shouldPreventClick = true;
+            }
         }
     };
 
@@ -419,6 +464,7 @@ export class GestureProcessor {
         this.isPinching = false;
         this.lastPinchDistance = 0;
         this.shouldPreventClick = true;
+        this.input?.dispatch({ type: "pointercancel", reason: "cancel", pointer });
         if (wasDown && pointer && this.onMouseUp) {
             const { coords, mouse, client } = this.processCoords(pointer);
             this.onMouseUp(coords, mouse, client);
@@ -429,6 +475,14 @@ export class GestureProcessor {
 
     handleTouchStart = (pointers: NormalizedPointer[]): void => {
         const eventHandlers = this.config.get().eventHandlers;
+
+        // A second contact transfers the gesture to the camera. Roll back an
+        // object preview before pinch math starts, even when zoom is disabled.
+        if (pointers.length > 1) {
+            this.input?.dispatch({ type: "pointercancel", reason: "multitouch", pointer: pointers[0] });
+            this.isDragging = false;
+            this.shouldPreventClick = true;
+        }
 
         // Handle pinch-to-zoom (2 fingers)
         if (pointers.length === 2 && eventHandlers.zoom) {
@@ -445,22 +499,8 @@ export class GestureProcessor {
         }
         const pointer = pointers[0];
 
-        this.pointerDown = true;
-        this.shouldPreventClick = false;
-
-        // Fire onMouseDown callback for touch
-        if (this.onMouseDown) {
-            const { coords, mouse, client } = this.processCoords(pointer);
-            this.onMouseDown(coords, mouse, client);
-        }
-
-        // Handle single finger drag
-        if (!this.pointerDown || !eventHandlers.drag) {
-            return;
-        }
-        this.isDragging = true;
         this.isPinching = false;
-        this.lastPos = { x: pointer.clientX, y: pointer.clientY };
+        this.handlePointerDown(pointer);
     };
 
     handleTouchMove = (pointers: NormalizedPointer[]): void => {
@@ -523,6 +563,14 @@ export class GestureProcessor {
 
         const pointer = pointers[0];
 
+        const handled = this.notifyPointer("pointermove", pointer);
+        if (handled && this.input?.captured) {
+            if (pointer.clientX !== this.lastPos.x || pointer.clientY !== this.lastPos.y) {
+                this.shouldPreventClick = true;
+            }
+            this.lastPos = { x: pointer.clientX, y: pointer.clientY };
+        }
+
         // Fire onHover callback for touch move
         if (this.onHover && this.config.get().eventHandlers.hover) {
             const { coords, mouse, client } = this.processCoords(pointer);
@@ -530,7 +578,7 @@ export class GestureProcessor {
         }
 
         // Handle single finger drag
-        if (!this.isDragging) {
+        if (handled || !this.isDragging) {
             return;
         }
         const dx = pointer.clientX - this.lastPos.x;
@@ -564,6 +612,10 @@ export class GestureProcessor {
 
         this.pointerDown = false;
 
+        if (changedPointer) {
+            this.notifyPointer("pointerup", changedPointer);
+        }
+
         // Fire onMouseUp for touch end
         if (changedPointer && this.onMouseUp) {
             const { coords, mouse, client } = this.processCoords(changedPointer);
@@ -571,7 +623,13 @@ export class GestureProcessor {
         }
 
         // Fire onClick for tap gesture (touch end without drag)
-        if (changedPointer && !this.shouldPreventClick && this.config.get().eventHandlers.click && this.onClick) {
+        if (
+            changedPointer &&
+            !this.shouldPreventClick &&
+            !this.input?.suppressClick &&
+            this.config.get().eventHandlers.click &&
+            this.onClick
+        ) {
             const { coords, mouse, client } = this.processCoords(changedPointer);
             this.onClick(coords, mouse, client, { source: "pointer" });
         }
@@ -579,7 +637,11 @@ export class GestureProcessor {
         // All fingers lifted
         this.isDragging = false;
         this.isPinching = false;
-        this.shouldPreventClick = false;
+        // Native supplies the final pointer-up and tap separately. Keep a
+        // captured drag's click suppression until that tap path has run.
+        if (changedPointer || !this.input?.captured) {
+            this.shouldPreventClick = false;
+        }
     };
 
     // ─── Wheel Zoom Handler ───────────────────────────────

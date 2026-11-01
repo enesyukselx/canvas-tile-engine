@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Selection tools | Canvas Tile Engine</title>
+    </head>
+    <body>
+        <main>
+            <header>
+                <p class="eyebrow">Canvas Tile Engine / Interactive example</p>
+                <div class="heading">
+                    <div>
+                        <h1>Selection tools</h1>
+                        <p class="intro">Pick a tile, select a group, and move it together.</p>
+                    </div>
+                    <a href="https://github.com/enesyukselx/canvas-tile-engine">View source</a>
+                </div>
+            </header>
+            <section class="editor" aria-label="Selection example">
+                <div class="toolbar">
+                    <div class="tools" role="group" aria-label="Active tool">
+                        <button id="select-tool" type="button" aria-pressed="true">Select &amp; move</button>
+                        <button id="pan-tool" type="button" aria-pressed="false">Pan</button>
+                    </div>
+                    <span class="snap">Grid snap: 1 unit</span>
+                    <button id="clear-selection" type="button">Clear selection</button>
+                </div>
+                <div class="workspace">
+                    <div id="canvas-wrapper"><canvas></canvas></div>
+                    <aside>
+                        <p class="eyebrow">Inspector</p>
+                        <h2 id="selection-count" aria-live="polite">0 selected</h2>
+                        <p id="tool-status">Select &amp; move active</p>
+                        <ul id="selected-items" aria-label="Selected tiles"></ul>
+                        <div class="legend">
+                            <p><span class="swatch movable"></span>Movable tile</p>
+                            <p><span class="swatch locked"></span>Locked: selectable, stays in place</p>
+                            <p><span class="swatch decoration"></span>Decoration: cannot be selected</p>
+                        </div>
+                        <div class="shortcuts">
+                            <h3>Try it</h3>
+                            <p><kbd>Shift</kbd> + click adds to the selection.</p>
+                            <p><kbd>Ctrl</kbd> / <kbd>Cmd</kbd> + click toggles an item.</p>
+                            <p>Drag empty space to draw a selection rectangle.</p>
+                            <p>Drag a selected tile to move the group.</p>
+                            <p><kbd>Esc</kbd> cancels the current gesture.</p>
+                            <p>Switch to Pan to move the camera. Scroll to zoom.</p>
+                        </div>
+                    </aside>
+                </div>
+                <footer>
+                    <span id="operation-status" aria-live="polite">Ready</span
+                    ><span>Stable IDs. Batched group updates.</span>
+                </footer>
+            </section>
+        </main>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

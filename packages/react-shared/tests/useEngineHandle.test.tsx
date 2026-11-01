@@ -14,6 +14,10 @@ function createFakeEngine() {
     return {
         render: vi.fn(),
         requestRender: vi.fn(),
+        setTool: vi.fn(),
+        getTool: vi.fn(() => null),
+        subscribeInput: vi.fn(() => vi.fn()),
+        subscribeToolChange: vi.fn(() => vi.fn()),
         drawRect: vi.fn(() => handle),
         getCenter: vi.fn(() => ({ x: 7, y: 8 })),
         getConfig: vi.fn(() => ({ scale: 3 })),
@@ -42,6 +46,10 @@ describe("useEngineHandle", () => {
         expect(handle.getCenter()).toEqual({ x: 0, y: 0 });
         expect(handle.getScale()).toBe(1);
         expect(() => handle.requestRender()).not.toThrow();
+        expect(handle.getTool()).toBeNull();
+        expect(() => handle.setTool(null)).not.toThrow();
+        expect(() => handle.subscribeInput(() => {})()).not.toThrow();
+        expect(() => handle.subscribeToolChange(() => {})()).not.toThrow();
 
         // The unified pre-mount behavior: a default snapshot, never undefined.
         const config = handle.getConfig();
@@ -98,6 +106,18 @@ describe("useEngineHandle", () => {
         expect(fake.render).toHaveBeenCalledTimes(1);
         result.current.requestRender();
         expect(fake.requestRender).toHaveBeenCalledTimes(1);
+        const tool = { handleInput: () => true };
+        result.current.setTool(tool);
+        expect(fake.setTool).toHaveBeenCalledWith(tool);
+        result.current.getTool();
+        expect(fake.getTool).toHaveBeenCalledTimes(1);
+        const observer = vi.fn();
+        const offInput = result.current.subscribeInput(observer);
+        expect(fake.subscribeInput).toHaveBeenCalledWith(observer);
+        offInput();
+        expect(fake.subscribeInput.mock.results[0].value).toHaveBeenCalledTimes(1);
+        result.current.subscribeToolChange(observer)();
+        expect(fake.subscribeToolChange).toHaveBeenCalledWith(observer);
 
         result.current.drawRect(TILE, 2);
         expect(fake.drawRect).toHaveBeenCalledWith(TILE, 2, undefined);

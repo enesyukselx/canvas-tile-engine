@@ -5,9 +5,11 @@ import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
 import { HitTester, HitResult, HitTestOptions, HitTestRectOptions, HitItem } from "./modules/HitTester";
 import { isItemCollection, type DrawItems, type ItemCollectionChange } from "./modules/ItemCollection";
+import { InputRouter, type EngineInputEvent, type EngineTool } from "./modules/InputRouter";
 import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateScale } from "./utils/validateConfig";
 import { fitScale } from "./utils/fitScale";
+import { runAll } from "./utils/runAll";
 import { snapCenterToGrid } from "./utils/viewport";
 import type { BrowserCanvas, BrowserElement, DefaultImage, DefaultMount } from "./types/platform";
 import {
@@ -70,6 +72,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
     private drawIds = new Map<string, { handle: DrawHandle; cacheKey?: string }>();
     private drawIdByHandle = new Map<symbol, string>();
     private eventHandlersListeners = new Set<(handlers: Readonly<EventHandlers>) => void>();
+    private inputRouter = new InputRouter();
     private collectionBindings = new Map<symbol, { handle: DrawHandle; unsubscribe: () => void }>();
     private pendingFrame: number | undefined;
     private renderRequested = false;
@@ -386,6 +389,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
             viewport: this.viewport,
             config: this.config,
             transformer: this.coordinateTransformer,
+            input: this.inputRouter,
         });
 
         // Connect camera change callback from renderer to engine
@@ -402,17 +406,42 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
 
     // ─── PUBLIC API ──────────────────────────────
 
+    /** Observe normalized input without replacing legacy callback properties. */
+    subscribeInput(listener: (event: EngineInputEvent, handled: boolean) => void): () => void {
+        return this.inputRouter.subscribe(listener);
+    }
+
+    /** Activate one tool before camera gestures. Replacing it cancels its preview. */
+    setTool(tool: EngineTool | null): void {
+        this.inputRouter.setTool(tool);
+    }
+
+    getTool(): EngineTool | null {
+        return this.inputRouter.getTool();
+    }
+
+    /** Observe tool ownership changes, including native touch-claim updates. */
+    subscribeToolChange(listener: (tool: EngineTool | null) => void): () => void {
+        return this.inputRouter.subscribeToolChange(listener);
+    }
+
     /** Tear down listeners and observers. */
     destroy() {
+        if (this.destroyed) {
+            return;
+        }
         this.destroyed = true;
         this.cancelRequestedRender();
-        this.clearCollectionBindings();
-        this.eventHandlersListeners.clear();
-        this.animationController.cancelAll();
-        this.renderer.destroy();
-        this.hitTester.clear();
-        this.drawIds.clear();
-        this.drawIdByHandle.clear();
+        runAll([
+            () => this.inputRouter.destroy(),
+            () => this.clearCollectionBindings(),
+            () => this.eventHandlersListeners.clear(),
+            () => this.animationController.cancelAll(),
+            () => this.renderer.destroy(),
+            () => this.hitTester.clear(),
+            () => this.drawIds.clear(),
+            () => this.drawIdByHandle.clear(),
+        ]);
     }
 
     /** Render a frame using the active renderer. */

@@ -77,6 +77,11 @@ scenes (one layering caveat in [performance](references/performance.md)).
    `eventHandlers: { drag: true, zoom: true, click: true }`. An interactive
    web surface also becomes a keyboard tab stop (core >= 0.12): give it an
    `accessibility.label`.
+   For ready-made selection and moving (core >= 0.12), activate a
+   `SelectionController` with `engine.setTool(controller)`. It captures its
+   own input without replacing application callbacks. Read
+   [selection tools](references/selection-tools.md) for modifiers, marquee,
+   group translation, snapping, lifecycle and native touch ownership.
 7. **Culling is automatic.** Off-screen items are skipped and an R-tree kicks
    in above 500 items. Pass 100k items straight to a draw call.
 

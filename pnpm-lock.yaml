@@ -396,6 +396,22 @@ importers:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@26.6.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)
 
+  examples/vanilla-js-examples/selection-tools:
+    dependencies:
+      '@canvas-tile-engine/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@canvas-tile-engine/renderer-canvas':
+        specifier: workspace:^
+        version: link:../../../packages/renderer-canvas
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.1
+        version: 7.3.1(@types/node@26.6.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.51.2)(tsx@4.23.15)
+
   examples/vanilla-js-examples/spritesheet:
     dependencies:
       '@canvas-tile-engine/core':

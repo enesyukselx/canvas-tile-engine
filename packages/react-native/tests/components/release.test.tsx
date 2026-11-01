@@ -102,12 +102,14 @@ describe("balanced native press callbacks (real wrapper, core and GestureProcess
         expect(events).toEqual(["down"]);
         up([remaining]);
         expect(events).toEqual(["down", "up"]);
-        expect(fake.dispatchPointerUp).toHaveBeenCalledWith({
-            x: FIRST.x,
-            y: FIRST.y,
-            clientX: FIRST.x,
-            clientY: FIRST.y,
-        });
+        expect(fake.dispatchPointerUp).toHaveBeenCalledWith(
+            expect.objectContaining({
+                x: FIRST.x,
+                y: FIRST.y,
+                clientX: FIRST.x,
+                clientY: FIRST.y,
+            }),
+        );
     });
 
     it("does not invent a release for a gesture that started with two fingers and emitted no down", () => {
@@ -180,7 +182,9 @@ describe("balanced native press callbacks (real wrapper, core and GestureProcess
         move([{ ...FIRST, x: 70, y: 80 }]);
         up([]);
         expect(events).toEqual(["down", "up"]);
-        expect(fake.dispatchPointerUp).toHaveBeenCalledWith({ x: 70, y: 80, clientX: 70, clientY: 80 });
+        expect(fake.dispatchPointerUp).toHaveBeenCalledWith(
+            expect.objectContaining({ x: 70, y: 80, clientX: 70, clientY: 80 }),
+        );
     });
 
     it("cancels if a move reveals all touches disappeared, ignoring later stale terminal events", () => {

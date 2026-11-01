@@ -209,6 +209,7 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
             () => {
                 this.onCameraChange?.();
             },
+            deps.input,
         );
 
         this.animationController = new AnimationController(
@@ -373,6 +374,11 @@ export class RendererSkia implements IRenderer<SkiaMount, SkImage> {
 
     dispatchPointerLeave(pointer: NormalizedPointer): void {
         this.gestureProcessor.handlePointerLeave(pointer);
+    }
+
+    /** Interrupted touch ownership is cancellation, never a successful release. */
+    dispatchCancel(pointer?: NormalizedPointer): void {
+        this.gestureProcessor.handleCancel(pointer);
     }
 
     dispatchTouchStart(pointers: NormalizedPointer[]): void {

@@ -72,6 +72,7 @@ engine.render();
 - Camera state: pan, zoom, bounds, smooth movement, resize-aware center updates.
 - Coordinate transforms: screen/pointer coordinates to raw and snapped world coordinates.
 - Event callbacks: click, right-click, hover, mouse/touch down, mouse/touch up, leave, zoom, resize.
+- Selection tools: additive normalized input, single/modifier/marquee selection, group translation, snapping, and model adapters. See [Selection and Move Tools](../../docs/docs/js/selection_tools.md).
 - Layered drawing: lower layers draw first, higher layers draw on top.
 - Draw helpers: rect, circle, image, text, line, path, grid lines, static rect/circle/image, and custom draw functions.
 - Performance basics: viewport culling, RBush spatial indexing for large item sets, and static draw caches where the renderer supports them.

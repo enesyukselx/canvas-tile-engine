@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Config, CoordinateTransformer, ViewportState } from "@canvas-tile-engine/core";
 import { Camera } from "../../core/src/modules/Camera";
+import { InputRouter } from "../../core/src/modules/InputRouter";
 import { RendererCanvas } from "../../renderer-canvas/src/RendererCanvas";
 import { RendererWebGL } from "../../renderer-webgl/src/RendererWebGL";
 
@@ -23,6 +24,7 @@ describe.each([
     let canvas: HTMLCanvasElement;
     let camera: Camera;
     let config: Config;
+    let input: InputRouter;
 
     function mouse(target: EventTarget, type: string, x = 30, y = 40, buttons = 1): void {
         target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0, buttons }));
@@ -58,7 +60,8 @@ describe.each([
             eventHandlers: { drag: true, click: true, zoom: true, hover: true },
         });
         renderer = new Renderer();
-        renderer.init({ wrapper, camera, config, viewport, transformer: new CoordinateTransformer(camera) });
+        input = new InputRouter();
+        renderer.init({ wrapper, camera, config, viewport, transformer: new CoordinateTransformer(camera), input });
         renderer.setupEvents();
         renderer.onMouseDown = vi.fn();
         renderer.onMouseUp = vi.fn();
@@ -70,6 +73,7 @@ describe.each([
 
     afterEach(() => {
         renderer.destroy();
+        input.destroy();
         wrapper.remove();
         vi.restoreAllMocks();
     });
@@ -96,6 +100,75 @@ describe.each([
         mouse(document, "mousemove", 300, 300);
         expect(camera.x).toBe(-70);
         expect(renderer.onCameraChange).toHaveBeenCalledTimes(2);
+    });
+
+    it("captures tool drags outside the canvas with modifiers and preserves callback observers", () => {
+        config.updateEventHandlers({ drag: false });
+        const handleInput = vi.fn((event) => event.type === "pointerdown");
+        const observer = vi.fn();
+        input.setTool({ handleInput });
+        input.subscribe(observer);
+        canvas.dispatchEvent(
+            new MouseEvent("mousedown", {
+                bubbles: true,
+                clientX: 30,
+                clientY: 40,
+                button: 0,
+                buttons: 1,
+                shiftKey: true,
+                ctrlKey: true,
+                metaKey: true,
+                altKey: true,
+            }),
+        );
+        expect(handleInput).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "pointerdown",
+                pointer: {
+                    x: 20,
+                    y: 20,
+                    clientX: 30,
+                    clientY: 40,
+                    pointerId: 1,
+                    pointerType: "mouse",
+                    button: 0,
+                    buttons: 1,
+                    shiftKey: true,
+                    ctrlKey: true,
+                    metaKey: true,
+                    altKey: true,
+                },
+            }),
+        );
+        mouse(document.body, "mousemove", 300, 400);
+        expect(handleInput).toHaveBeenLastCalledWith(expect.objectContaining({ type: "pointermove" }));
+        expect(observer).toHaveBeenLastCalledWith(expect.objectContaining({ type: "pointermove" }), true);
+        mouse(document.body, "mouseup", 300, 400, 0);
+        expect(handleInput).toHaveBeenLastCalledWith(expect.objectContaining({ type: "pointerup" }));
+        expect(renderer.onMouseDown).toHaveBeenCalledTimes(1);
+        expect(renderer.onMouseUp).toHaveBeenCalledTimes(1);
+        expect(renderer.onCameraChange).not.toHaveBeenCalled();
+        expect(input.captured).toBe(false);
+    });
+
+    it("claims tool touches independently of camera gates and reports native cancellation", () => {
+        config.updateEventHandlers({ drag: false, click: false, zoom: false, hover: false });
+        const handleInput = vi.fn((event) => event.type === "pointerdown");
+        input.setTool({ handleInput });
+        expect(touch("touchstart", [1], [1]).defaultPrevented).toBe(true);
+        expect(handleInput).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: "pointerdown",
+                pointer: expect.objectContaining({ pointerId: 1, pointerType: "touch" }),
+            }),
+        );
+        touch("touchmove", [1], [1]);
+        touch("touchcancel", [], [1]);
+        expect(handleInput).toHaveBeenLastCalledWith(
+            expect.objectContaining({ type: "pointercancel", reason: "cancel" }),
+        );
+        expect(input.captured).toBe(false);
+        expect(renderer.onClick).not.toHaveBeenCalled();
     });
 
     it("keeps hover local and delivers a normal click after an interrupted drag", () => {
