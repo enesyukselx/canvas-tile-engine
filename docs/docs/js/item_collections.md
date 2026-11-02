@@ -55,12 +55,13 @@ An item key identifies an object inside the collection. `DrawOptions.id` identif
 | `size` | Current number of items. |
 | `keyAt(index)` | Key at the current array position, or `undefined`. |
 | `insert(item)` | Appends an item. Duplicate keys throw before insertion. |
+| `insertAt(index, item)` | Inserts at a dense position from `0` through `size`, shifting later items. Invalid indices and duplicate keys throw before insertion. |
 | `update(key, patchOrUpdater)` | Replaces the item with a shallow copy, preserving its key and position; returns the replacement. Missing keys and key changes throw. |
 | `remove(key)` | Removes and compacts the array; returns `false` if the key is absent. |
 | `batch(callback)` | Groups synchronous mutations, including nested batches. Returns the callback result. |
 | `subscribe(listener)` | Receives a read-only array of insert/update/remove deltas after changes; returns an unsubscribe function. It does not emit an initial snapshot. |
 
-Update patches are shallow. Replace nested values such as `style`, `data`, path `commands`, or `points` immutably. Do not mutate objects returned by `get()` or `items`, and do not push into the exposed array. To change a key, remove the old item and insert a new one; the new item is appended.
+Update patches are shallow. Replace nested values such as `style`, `data`, path `commands`, or `points` immutably. Do not mutate objects returned by `get()` or `items`, and do not push into the exposed array. To change a key, remove the old item and insert a new one; use `insertAt(index, item)` with the old position to keep its place.
 
 `batch` groups synchronous work; it is not an async transaction and provides no rollback. If its callback throws, successful changes are still delivered before the error propagates. Subscriber errors do not prevent other subscribers from receiving the changes; the first error is rethrown after notification delivery. Reentrant mutations queue their notifications until the current listeners finish. Collection state changes immediately; all engine registrations are synchronized when the outermost mutation finishes. A subscriber added during a batch receives only changes made after it subscribed.
 
@@ -77,7 +78,7 @@ engine.onClick = (coords) => {
 };
 ```
 
-`key` is stable across updates. `index` is the current dense array position and can change after a removal. Updates preserve item order; insertions draw last within the registration. Existing `clip`, `visibleOf`, `interactiveOf`, and `hitTest: false` rules still apply. Text remains excluded from hit testing.
+`key` is stable across updates. `index` is the current dense array position and can change after an earlier removal or `insertAt`. Updates preserve item order; `insert` draws last within the registration and `insertAt` draws at its position. Existing `clip`, `visibleOf`, `interactiveOf`, and `hitTest: false` rules still apply. Text remains excluded from hit testing.
 
 An update refreshes hit geometry before the scheduled repaint, including for collections larger than 500 items. A point query or rectangle query immediately after `update()` therefore sees the new geometry. During a subscriber callback, other subscribers may not have received the current notification yet; query the engine after the mutation returns when current geometry is required.
 

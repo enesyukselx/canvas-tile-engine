@@ -68,9 +68,9 @@ interface CollectionNotification<T> {
 }
 
 /**
- * An ordered, keyed source for live draw items. Insertions append, updates keep
- * their position, and removals compact the same backing array. An update always
- * replaces the item with a shallow copy; nested data must also be changed
+ * An ordered, keyed source for live draw items. insert appends, insertAt chooses
+ * a position, updates keep their position, and removals compact the same backing
+ * array. An update always replaces the item with a shallow copy; nested data must also be changed
  * immutably. Mutating an item or the exposed array directly is unsupported.
  *
  * Notifications are synchronous after a mutation (or the outermost batch).
@@ -90,6 +90,8 @@ export class ItemCollection<T extends object> implements ReadonlyItemCollection<
     private batchDepth = 0;
     private notifying = false;
     private lastChangeSequence = 0;
+    private replayingHistory = false;
+    private historyMutationLocked = false;
 
     constructor(items: readonly T[], options: ItemCollectionOptions<T>) {
         this.keyOf = options.keyOf;
@@ -122,15 +124,23 @@ export class ItemCollection<T extends object> implements ReadonlyItemCollection<
 
     /** Append an item. Duplicate or invalid keys throw before the collection changes. */
     insert(item: T): void {
+        this.insertAt(this.values.length, item);
+    }
+
+    /**
+     * Insert at a dense position from 0 through size, preserving the item's
+     * identity. Inserting before existing items shifts their indices.
+     */
+    insertAt(index: number, item: T): void {
+        this.assertMutable();
+        if (!Number.isInteger(index) || index < 0 || index > this.values.length) {
+            throw new RangeError("ItemCollection: insertion index must be an integer between 0 and size");
+        }
         const key = this.readKey(item);
         if (this.entries.has(key)) {
             throw new Error(`ItemCollection: duplicate key ${String(key)}`);
         }
-        const index = this.values.length;
-        this.entries.set(key, { item, index });
-        this.values.push(item);
-        this.keys.push(key);
-        this.record({ type: "insert", key, item, index });
+        this.applyChange({ type: "insert", key, item, index });
     }
 
     /**
@@ -139,6 +149,7 @@ export class ItemCollection<T extends object> implements ReadonlyItemCollection<
      * The updater must not mutate the previous item or its nested values.
      */
     update(key: ItemKey, change: Partial<T> | ((item: Readonly<T>) => T)): T {
+        this.assertMutable();
         const entry = this.entries.get(key);
         if (!entry) {
             throw new Error(`ItemCollection: unknown key ${String(key)}`);
@@ -161,6 +172,7 @@ export class ItemCollection<T extends object> implements ReadonlyItemCollection<
 
     /** Remove one item and compact the array. Returns false for an unknown key. */
     remove(key: ItemKey): boolean {
+        this.assertMutable();
         const entry = this.entries.get(key);
         if (!entry) {
             return false;
@@ -183,6 +195,7 @@ export class ItemCollection<T extends object> implements ReadonlyItemCollection<
      * still notify subscribers before its error is rethrown.
      */
     batch<R>(callback: () => R): R {
+        this.assertMutable();
         this.batchDepth++;
         let result!: R;
         let callbackError: unknown;
@@ -215,6 +228,112 @@ export class ItemCollection<T extends object> implements ReadonlyItemCollection<
             subscriber.active = false;
             this.subscribers.delete(subscriber);
         };
+    }
+
+    /** @internal History controls must run outside source batches and notifications. */
+    _assertHistoryIdle(): void {
+        if (this.batchDepth > 0 || this.notifying || this.replayingHistory) {
+            throw new Error("ItemCollection: history controls cannot run during a batch or notification");
+        }
+    }
+
+    /** @internal Lock source edits during history replay and state notifications. */
+    _lockHistoryMutations(): () => void {
+        if (this.historyMutationLocked) {
+            throw new Error("ItemCollection: another history replay already owns this source");
+        }
+        this.historyMutationLocked = true;
+        return () => {
+            this.historyMutationLocked = false;
+        };
+    }
+
+    /**
+     * @internal Validate a replay before writing, then publish one batch. The
+     * returned errors happened after the data committed, during notification.
+     */
+    _replayHistory(changes: readonly ItemCollectionChange<T>[]): readonly unknown[] {
+        this._assertHistoryIdle();
+        this.replayingHistory = true;
+        try {
+            const virtualItems = new Map<ItemKey, T | undefined>();
+            // Membership operations need a temporary order simulation. Update-only
+            // gestures validate just the touched keys, without copying the scene.
+            const virtualKeys = changes.some((change) => change.type !== "update") ? this.keys.slice() : this.keys;
+            const get = (key: ItemKey) => (virtualItems.has(key) ? virtualItems.get(key) : this.entries.get(key)?.item);
+            for (const change of changes) {
+                const { key, index, item } = change;
+                const current = get(key);
+                if (change.type === "insert") {
+                    if (current !== undefined || !Number.isInteger(index) || index < 0 || index > virtualKeys.length) {
+                        throw new Error(`ItemCollection: history insert conflicts at key ${String(key)}`);
+                    }
+                    if (!sameKey(this.readKey(item), key)) {
+                        throw new Error(`ItemCollection: history item key changed for ${String(key)}`);
+                    }
+                    virtualKeys.splice(index, 0, key);
+                    virtualItems.set(key, item);
+                } else {
+                    const expected = change.type === "update" ? change.previous : item;
+                    if (current !== expected || !sameKey(virtualKeys[index], key)) {
+                        throw new Error(`ItemCollection: history conflicts with the current item ${String(key)}`);
+                    }
+                    if (change.type === "remove") {
+                        virtualKeys.splice(index, 1);
+                        virtualItems.set(key, undefined);
+                    } else {
+                        if (!sameKey(this.readKey(item), key)) {
+                            throw new Error(`ItemCollection: history item key changed for ${String(key)}`);
+                        }
+                        virtualItems.set(key, item);
+                    }
+                }
+            }
+            this.batchDepth++;
+            try {
+                for (const change of changes) {
+                    this.applyChange(change);
+                }
+            } finally {
+                this.batchDepth--;
+            }
+            try {
+                this.flush();
+                return [];
+            } catch (error) {
+                return [error];
+            }
+        } finally {
+            this.replayingHistory = false;
+        }
+    }
+
+    private assertMutable(): void {
+        if (this.replayingHistory || this.historyMutationLocked) {
+            throw new Error("ItemCollection: cannot mutate the source during history replay or state notification");
+        }
+    }
+
+    private applyChange(change: ItemCollectionChange<T>): void {
+        const { key, item, index } = change;
+        if (change.type === "insert") {
+            this.values.splice(index, 0, item);
+            this.keys.splice(index, 0, key);
+            this.entries.set(key, { item, index });
+        } else if (change.type === "remove") {
+            this.values.splice(index, 1);
+            this.keys.splice(index, 1);
+            this.entries.delete(key);
+        } else {
+            this.values[index] = item;
+            this.entries.get(key)!.item = item;
+        }
+        if (change.type !== "update") {
+            for (let i = index; i < this.keys.length; i++) {
+                this.entries.get(this.keys[i])!.index = i;
+            }
+        }
+        this.record(change);
     }
 
     private readKey(item: T): ItemKey {
@@ -287,4 +406,8 @@ export class ItemCollection<T extends object> implements ReadonlyItemCollection<
             throw firstError;
         }
     }
+}
+
+function sameKey(a: ItemKey | undefined, b: ItemKey): boolean {
+    return a === b || Object.is(a, b);
 }

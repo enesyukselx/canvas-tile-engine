@@ -248,9 +248,19 @@ const png = await renderToBuffer({
 | [server.md](references/server.md) | `renderToBuffer`, `RendererServer`, fonts, output formats, HTTP endpoint pattern. |
 | [sprites.md](references/sprites.md) | `sprite` source rects, `SpriteSheet`, `SpriteAnimator`, the `<Sprite>` component. |
 | [performance.md](references/performance.md) | What the engine already optimizes, renderer choice, WebGL specifics, static caches, budgets. |
+| [history.md](references/history.md) | `History` transactions, undo/redo, collection history adapters, custom store commands, error and replay guarantees (core >= 0.12). |
 | [recipes.md](references/recipes.md) | Complete builds to copy and adapt: game map, minimap, pixel painter, fixed board, responsive map, sprites, server image, RN board, WebGL heatmap. |
 
 For a full app: read this file, then [core-api](references/core-api.md) +
 [drawing](references/drawing.md) + [events](references/events.md) (the
 sections you need), then the platform file, then copy the nearest recipe
 from [recipes](references/recipes.md) and adapt it.
+
+## Undoable editor operations (core >= 0.12)
+
+Read [history](references/history.md) when adding undo/redo, cancelable drags,
+or brush transactions. Use `createItemCollectionHistory` for one source or
+`History` + `itemCollectionHistoryAdapter` + `attachItemCollectionHistory` for
+several typed collections. Group gestures with `beginTransaction` / `commit` /
+`cancel`; keep scene data in the collections and identify sources/items by
+stable IDs/keys. Generic `History` adapters also support application stores.

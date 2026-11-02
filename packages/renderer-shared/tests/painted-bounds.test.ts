@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ItemCollection } from "@canvas-tile-engine/core";
+import { createItemCollectionHistory, ItemCollection } from "@canvas-tile-engine/core";
 import type { Bounds, Rect } from "@canvas-tile-engine/core";
 import {
     boxPaintBounds,
@@ -193,6 +193,37 @@ describe("painted geometry", () => {
 });
 
 describe("PaintedCuller", () => {
+    it("restores paint order after middle insertion and history replay without slowing appends", () => {
+        const original = Array.from({ length: 501 }, (_, id) => ({ id, x: 0, y: 0 }));
+        const source = new ItemCollection(original, { keyOf: (item) => item.id });
+        const history = createItemCollectionHistory(source);
+        const boundsOf = vi.fn(() => viewport);
+        const culler = new PaintedCuller(source.items, boundsOf);
+        source.subscribe((changes) => culler.applyChanges(changes));
+        expect(culler.query(viewport, 10)).toEqual(original);
+        expect(boundsOf).toHaveBeenCalledTimes(501);
+        const appended = { id: 501, x: 0, y: 0 };
+        source.insert(appended);
+        expect(culler.query(viewport, 10).at(-1)).toBe(appended);
+        expect(boundsOf).toHaveBeenCalledTimes(502);
+        source.remove(1);
+        expect(culler.query(viewport, 10)[1]).toBe(original[2]);
+        expect(boundsOf).toHaveBeenCalledTimes(502);
+        history.undo();
+        expect(culler.query(viewport, 10)).toEqual([...original, appended]);
+        expect(boundsOf).toHaveBeenCalledTimes(1004);
+        history.redo();
+        expect(culler.query(viewport, 10)[1]).toBe(original[2]);
+        const before = { id: 502, x: 0, y: 0 };
+        source.batch(() => {
+            source.insertAt(0, before);
+            source.update(0, { x: 5 });
+            source.remove(2);
+        });
+        expect(culler.query(viewport, 10)).toEqual(source.items);
+        expect(culler.query(viewport, 10)[0]).toBe(before);
+    });
+
     it.each([0, 1, 500])("leaves %i items for precise linear culling without building an index", (count) => {
         const items = Array.from({ length: count }, (_, id) => ({ id }));
         const boundsOf = vi.fn(() => viewport);

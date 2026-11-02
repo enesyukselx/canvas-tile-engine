@@ -180,6 +180,16 @@ export class PaintedCuller<T> {
                 continue;
             }
             if (change.type === "insert") {
+                if (change.index < this.entries.length) {
+                    // A positional restore changes paint order. Rebuild on the
+                    // next query from the final registration view; appends and
+                    // geometry-only updates keep their incremental fast path.
+                    this.index = undefined;
+                    this.scale = undefined;
+                    this.entries = [];
+                    this.unboundedCount = 0;
+                    continue;
+                }
                 const { value, bounded } = this.indexedItem(change.item, this.scale);
                 const token = this.index.insert(value);
                 this.entries.splice(change.index, 0, { token, bounded });

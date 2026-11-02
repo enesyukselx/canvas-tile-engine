@@ -126,3 +126,20 @@ export type {
     // Callbacks
     ClickInfo,
 } from "@canvas-tile-engine/core";
+
+export {
+    History,
+    HistoryCommittedError,
+    HistoryReplayError,
+    createItemCollectionHistory,
+    attachItemCollectionHistory,
+    itemCollectionHistoryAdapter,
+} from "@canvas-tile-engine/core";
+export type {
+    HistoryAdapter,
+    HistoryDirection,
+    HistoryOptions,
+    HistoryState,
+    ItemCollectionHistoryCommand,
+    ItemCollectionHistoryOptions,
+} from "@canvas-tile-engine/core";
