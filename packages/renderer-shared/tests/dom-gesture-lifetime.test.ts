@@ -151,6 +151,19 @@ describe.each([
         expect(input.captured).toBe(false);
     });
 
+    it("keeps hover local to the canvas while a tool owns the press", () => {
+        input.setTool({ handleInput: () => true });
+        mouse(canvas, "mousedown");
+        mouse(canvas, "mousemove", 40, 50);
+        expect(renderer.onHover).toHaveBeenCalledTimes(1);
+        mouse(canvas, "mouseleave", 300, 400);
+        mouse(document.body, "mousemove", 300, 400);
+        expect(renderer.onMouseLeave).toHaveBeenCalledTimes(1);
+        expect(renderer.onHover).toHaveBeenCalledTimes(1);
+        mouse(document.body, "mouseup", 300, 400, 0);
+        expect(input.captured).toBe(false);
+    });
+
     it("claims tool touches independently of camera gates and reports native cancellation", () => {
         config.updateEventHandlers({ drag: false, click: false, zoom: false, hover: false });
         const handleInput = vi.fn((event) => event.type === "pointerdown");

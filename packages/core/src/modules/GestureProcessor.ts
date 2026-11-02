@@ -158,6 +158,11 @@ export class GestureProcessor {
         return this.input?.dispatch({ type, pointer, ...this.processCoords(pointer) }) ?? false;
     }
 
+    private insideCanvas(pointer: NormalizedPointer): boolean {
+        const { width, height } = this.canvasBoundsGetter();
+        return pointer.x >= 0 && pointer.y >= 0 && pointer.x <= width && pointer.y <= height;
+    }
+
     /** Includes a tool-owned press, so renderers keep forwarding outside moves. */
     get trackingPointer(): boolean {
         return this.isDragging || this.input?.captured === true;
@@ -268,16 +273,18 @@ export class GestureProcessor {
      * the caller knows whether to `preventDefault` — nothing else is ever
      * suppressed.
      *
-     * `Tab`, `Escape`, `Home`, `End`, `PageUp` and `PageDown` are deliberately
-     * absent and must stay absent: leaving them to the browser is what keeps
-     * the surface escapable (SC 2.1.2). Ctrl, Meta and Alt combinations are
-     * always ignored so browser and screen-reader shortcuts keep working.
-     * Shift is ignored too, except on the zoom keys — `+` and `_` *are* the
-     * shifted spellings of `=` and `-` on common layouts, so a blanket Shift
-     * bail would make the documented `+` binding unreachable.
+     * The active tool sees every key first and may consume it (a selection
+     * tool takes Escape while cancelling an edit), except `Tab`: a tool's
+     * claim on it is ignored, because leaving Tab to the browser is what keeps
+     * the surface escapable (SC 2.1.2). The camera never consumes `Tab`,
+     * `Escape`, `Home`, `End`, `PageUp` or `PageDown`, and ignores Ctrl, Meta
+     * and Alt combinations so browser and screen-reader shortcuts keep
+     * working. Shift is ignored too, except on the zoom keys — `+` and `_`
+     * *are* the shifted spellings of `=` and `-` on common layouts, so a
+     * blanket Shift bail would make the documented `+` binding unreachable.
      */
     handleKeyDown = (event: NormalizedKey): boolean => {
-        if (this.input?.dispatch({ type: "keydown", key: event })) {
+        if (this.input?.dispatch({ type: "keydown", key: event }) && event.key !== "Tab") {
             return true;
         }
         if (event.ctrlKey || event.metaKey || event.altKey) {
@@ -411,7 +418,9 @@ export class GestureProcessor {
             this.lastPos = { x: pointer.clientX, y: pointer.clientY };
         }
         if (handled || !this.isDragging) {
-            if (this.onHover && this.config.get().eventHandlers.hover) {
+            // A captured press keeps receiving document moves after the
+            // pointer leaves; hover stays local to the canvas, as for pans.
+            if (this.onHover && this.config.get().eventHandlers.hover && (!handled || this.insideCanvas(pointer))) {
                 const { coords, mouse, client } = this.processCoords(pointer);
                 this.onHover(coords, mouse, client);
             }
