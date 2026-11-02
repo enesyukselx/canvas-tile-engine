@@ -23,6 +23,21 @@ export { useCanvasTileEngine } from "./hooks";
 // Context
 export { useEngineContext, type EngineContextValue } from "./context";
 
+// Platform-neutral selection tools and input subscriptions.
+export { SelectionController, createItemCollectionSelectionAdapter, translateItem } from "@canvas-tile-engine/core";
+export type {
+    EngineInputEvent,
+    EnginePointerEvent,
+    EngineTool,
+    SelectionAdapter,
+    SelectionEngine,
+    ItemCollectionSelectionOptions,
+    SelectionControllerOptions,
+    SelectionSnapshot,
+    SelectionTransform,
+    TranslatableItem,
+} from "@canvas-tile-engine/core";
+
 // Types
 export type {
     CanvasTileEngineProps,

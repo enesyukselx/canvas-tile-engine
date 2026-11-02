@@ -4,6 +4,10 @@ sidebar_position: 3
 
 # Interactions & Events
 
+For ready-made selection, rectangle selection, group dragging, and snapping,
+see [Selection and Move Tools](./selection_tools.md). Tools use additive input
+subscriptions and keep the callback properties below available to your app.
+
 The core engine normalizes mouse, touch, wheel, and resize input into world-space callbacks. Events are disabled by default, so enable only the interaction paths your UI needs.
 
 ```ts

@@ -1,0 +1,22 @@
+{
+    "name": "vanilla-js-selection",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "typecheck": "tsc --noEmit",
+        "format": "oxfmt",
+        "format:check": "oxfmt --check"
+    },
+    "dependencies": {
+        "@canvas-tile-engine/core": "workspace:^",
+        "@canvas-tile-engine/renderer-canvas": "workspace:^"
+    },
+    "devDependencies": {
+        "typescript": "~5.9.3",
+        "vite": "^7.3.1"
+    }
+}

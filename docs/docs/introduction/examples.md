@@ -8,30 +8,31 @@ Example projects live in the repository under [`examples`](https://github.com/en
 
 ## Vanilla JavaScript
 
-| Example | Command |
-| :-- | :-- |
-| Game map | `pnpm --filter vanilla-js-game-map dev` |
-| Spritesheet | `pnpm --filter vanilla-js-spritesheet dev` |
+| Example         | Command                                    |
+| :-------------- | :----------------------------------------- |
+| Game map        | `pnpm --filter vanilla-js-game-map dev`    |
+| Spritesheet     | `pnpm --filter vanilla-js-spritesheet dev` |
+| Selection tools | `pnpm --filter vanilla-js-selection dev`   |
 
 ## React
 
-| Example | Command |
-| :-- | :-- |
-| Game map | `pnpm --filter react-game-map dev` |
+| Example             | Command                                       |
+| :------------------ | :-------------------------------------------- |
+| Game map            | `pnpm --filter react-game-map dev`            |
 | Responsive game map | `pnpm --filter react-responsive-game-map dev` |
-| Pixel paint | `pnpm --filter react-pixel-paint dev` |
-| Spritesheet | `pnpm --filter react-spritesheet dev` |
+| Pixel paint         | `pnpm --filter react-pixel-paint dev`         |
+| Spritesheet         | `pnpm --filter react-spritesheet dev`         |
 
 ## React Native
 
-| Example | Command |
-| :-- | :-- |
+| Example             | Command                                                                                             |
+| :------------------ | :-------------------------------------------------------------------------------------------------- |
 | Responsive game map | See `examples/react-native/responsive-game-map` and run it with your React Native or Expo workflow. |
 
 ## Server Rendering
 
-| Example | Command |
-| :-- | :-- |
+| Example                   | Command                                        |
+| :------------------------ | :--------------------------------------------- |
 | Game map image generation | `pnpm --filter renderer-server-game-map start` |
 
 ## Workspace Setup

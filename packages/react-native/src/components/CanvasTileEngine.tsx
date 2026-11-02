@@ -66,6 +66,8 @@ const toPointer = (t: TouchData): NormalizedPointer => ({
     y: t.y,
     clientX: t.x,
     clientY: t.y,
+    pointerId: t.id,
+    pointerType: "touch",
 });
 
 // Pointers that remain on screen after this event: on up events some
@@ -149,9 +151,11 @@ function CanvasTileEngineBase({
     // re-render so the View re-reads the engine's resolved snapshot.
     const [, setA11yVersion] = useState(0);
     const [configClaimsTouches, setConfigClaimsTouches] = useState(false);
+    const [toolClaimsTouches, setToolClaimsTouches] = useState(false);
 
     const instanceRef = useRef<CanvasTileEngineCore<SkiaMount, SkImage> | null>(null);
     const unsubscribeEventHandlersRef = useRef<(() => void) | null>(null);
+    const unsubscribeToolRef = useRef<(() => void) | null>(null);
     const sizeRef = useRef({ width: 0, height: 0 });
     const tapRef = useRef<TapState | null>(null);
     // The renderer actually wired to the engine. Captured at creation so gesture
@@ -298,6 +302,10 @@ function CanvasTileEngineBase({
                     setConfigClaimsTouches(handlersClaimTouches(handlers));
                 unsubscribeEventHandlersRef.current = instance._subscribeEventHandlers(updateGestureGate);
                 updateGestureGate(instance.getConfig().eventHandlers);
+                unsubscribeToolRef.current = instance.subscribeToolChange((tool) =>
+                    setToolClaimsTouches(tool !== null),
+                );
+                setToolClaimsTouches(instance.getTool() !== null);
                 engine._setInstance(instance);
                 setReady(true);
                 instance.render();
@@ -397,6 +405,9 @@ function CanvasTileEngineBase({
         // Release and click are independent, with taps owned by this wrapper.
         const activeRenderer = rendererRef.current;
         activeRenderer.dispatchTouchEnd([]);
+        if (cancelled) {
+            activeRenderer.dispatchCancel(pointer);
+        }
         if (pointer) {
             if (cancelled) {
                 activeRenderer.dispatchPointerLeave(pointer);
@@ -412,6 +423,8 @@ function CanvasTileEngineBase({
             finishGesture(true);
             unsubscribeEventHandlersRef.current?.();
             unsubscribeEventHandlersRef.current = null;
+            unsubscribeToolRef.current?.();
+            unsubscribeToolRef.current = null;
             instanceRef.current?.destroy();
             instanceRef.current = null;
             engine._setInstance(null);
@@ -434,7 +447,7 @@ function CanvasTileEngineBase({
         if (!instance) {
             return false;
         }
-        if (handlersClaimTouches(instance.getConfig().eventHandlers)) {
+        if (instance.getTool() !== null || handlersClaimTouches(instance.getConfig().eventHandlers)) {
             return true;
         }
         return Boolean(callbacksRef.current.onMouseDown || callbacksRef.current.onMouseUp);
@@ -583,7 +596,8 @@ function CanvasTileEngineBase({
     // the callback ref updates after commit and would lag prop removals by
     // one render. Keep the transport mounted so in-flight touch cleanup is
     // still delivered when the native blocker is disabled.
-    const interactionsClaimed = ready && (configClaimsTouches || Boolean(onMouseDown || onMouseUp));
+    const interactionsClaimed =
+        ready && (toolClaimsTouches || configClaimsTouches || Boolean(onMouseDown || onMouseUp));
 
     // The transport reads live state through refs; runOnJS keeps the
     // callbacks on the JS thread (the engine is a plain JS object) even when

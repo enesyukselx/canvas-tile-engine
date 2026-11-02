@@ -80,7 +80,9 @@ describe("touch transport (react-native-gesture-handler)", () => {
 
         down(touchEvent([{ id: 0, x: 40, y: 60 }]));
 
-        expect(fake.dispatchTouchStart).toHaveBeenCalledWith([{ x: 40, y: 60, clientX: 40, clientY: 60 }]);
+        expect(fake.dispatchTouchStart).toHaveBeenCalledWith([
+            expect.objectContaining({ x: 40, y: 60, clientX: 40, clientY: 60 }),
+        ]);
     });
 
     it("reports a tap as touchStart, touchEnd([]) and dispatchTap for the lifted pointer", () => {
@@ -93,8 +95,12 @@ describe("touch transport (react-native-gesture-handler)", () => {
         // touchEnd carries no changed pointer: the engine's own touch-end click
         // path would double-fire alongside dispatchTap below.
         expect(fake.dispatchTouchEnd).toHaveBeenCalledWith([]);
-        expect(fake.dispatchPointerUp).toHaveBeenCalledWith({ x: 42, y: 61, clientX: 42, clientY: 61 });
-        expect(fake.dispatchTap).toHaveBeenCalledWith({ x: 42, y: 61, clientX: 42, clientY: 61 });
+        expect(fake.dispatchPointerUp).toHaveBeenCalledWith(
+            expect.objectContaining({ x: 42, y: 61, clientX: 42, clientY: 61 }),
+        );
+        expect(fake.dispatchTap).toHaveBeenCalledWith(
+            expect.objectContaining({ x: 42, y: 61, clientX: 42, clientY: 61 }),
+        );
     });
 
     it("does not tap when the finger travelled past the move threshold", () => {
@@ -104,7 +110,9 @@ describe("touch transport (react-native-gesture-handler)", () => {
         move(touchEvent([{ id: 0, x: 80, y: 60 }]));
         up(touchEvent([{ id: 0, x: 80, y: 60 }]));
 
-        expect(fake.dispatchTouchMove).toHaveBeenCalledWith([{ x: 80, y: 60, clientX: 80, clientY: 60 }]);
+        expect(fake.dispatchTouchMove).toHaveBeenCalledWith([
+            expect.objectContaining({ x: 80, y: 60, clientX: 80, clientY: 60 }),
+        ]);
         expect(fake.dispatchTap).not.toHaveBeenCalled();
         // The lift is still reported so onMouseUp fires.
         expect(fake.dispatchPointerUp).toHaveBeenCalledTimes(1);
@@ -138,7 +146,9 @@ describe("touch transport (react-native-gesture-handler)", () => {
                 [{ id: 0, x: 40, y: 60 }],
             ),
         );
-        expect(fake.dispatchTouchEnd).toHaveBeenCalledWith([{ x: 100, y: 60, clientX: 100, clientY: 60 }]);
+        expect(fake.dispatchTouchEnd).toHaveBeenCalledWith([
+            expect.objectContaining({ x: 100, y: 60, clientX: 100, clientY: 60 }),
+        ]);
 
         // Final lift: multi-touch disqualifies the tap, but must release the press.
         up(touchEvent([{ id: 1, x: 100, y: 60 }]));

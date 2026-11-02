@@ -48,6 +48,17 @@ export {
 } from "./modules/ItemCollection";
 export type { HitResult, HitTestOptions, HitTestRectOptions, HitKind } from "./modules/HitTester";
 export { GestureProcessor } from "./modules/GestureProcessor";
+export type { EngineInput, EngineInputEvent, EnginePointerEvent, EngineTool } from "./modules/InputRouter";
+export { SelectionController, createItemCollectionSelectionAdapter } from "./modules/SelectionController";
+export type {
+    SelectionAdapter,
+    SelectionEngine,
+    ItemCollectionSelectionOptions,
+    SelectionControllerOptions,
+    SelectionSnapshot,
+    SelectionTransform,
+} from "./modules/SelectionController";
+export { translateItem, type TranslatableItem } from "./utils/translateItem";
 export type {
     NormalizedPointer,
     NormalizedPinch,

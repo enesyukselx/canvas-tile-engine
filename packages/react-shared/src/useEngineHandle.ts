@@ -31,6 +31,8 @@ import type {
     ImageDrawOptions,
     StaticDrawOptions,
     ReducedMotionSetting,
+    EngineTool,
+    EngineInputEvent,
 } from "@canvas-tile-engine/core";
 
 /** Dummy handle returned when engine is not ready */
@@ -166,6 +168,12 @@ export interface EngineHandleBase<TMount, TImage, TCtx> {
 
     /** Request a frame, coalescing repeated requests before the next frame. No-op before mount. */
     requestRender(): void;
+
+    /** Attach after mount; pre-mount subscriptions are no-ops, like draw calls. */
+    subscribeInput(listener: (event: EngineInputEvent, handled: boolean) => void): () => void;
+    setTool(tool: EngineTool | null): void;
+    getTool(): EngineTool | null;
+    subscribeToolChange(listener: (tool: EngineTool | null) => void): () => void;
 
     /** Get the current view center in world coordinates */
     getCenter(): Coords;
@@ -429,6 +437,22 @@ export function useEngineHandle<TMount, TImage, TCtx, TExtras extends object = R
 
             requestRender() {
                 instanceRef.current?.requestRender();
+            },
+
+            subscribeInput(listener) {
+                return instanceRef.current?.subscribeInput(listener) ?? (() => {});
+            },
+
+            setTool(tool) {
+                instanceRef.current?.setTool(tool);
+            },
+
+            getTool() {
+                return instanceRef.current?.getTool() ?? null;
+            },
+
+            subscribeToolChange(listener) {
+                return instanceRef.current?.subscribeToolChange(listener) ?? (() => {});
             },
 
             getCenter() {

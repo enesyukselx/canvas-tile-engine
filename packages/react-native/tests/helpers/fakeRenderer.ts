@@ -89,6 +89,7 @@ export function createFakeRenderer() {
     const dispatchPointerMove: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handlePointerMove(pointer));
     const dispatchPointerUp: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handlePointerUp(pointer));
     const dispatchPointerLeave: Mock = vi.fn((pointer: NormalizedPointer) => gestures?.handlePointerLeave(pointer));
+    const dispatchCancel: Mock = vi.fn((pointer?: NormalizedPointer) => gestures?.handleCancel(pointer));
     const dispatchTouchStart: Mock = vi.fn((pointers: NormalizedPointer[]) => gestures?.handleTouchStart(pointers));
     const dispatchTouchMove: Mock = vi.fn((pointers: NormalizedPointer[]) => gestures?.handleTouchMove(pointers));
     const dispatchTouchEnd: Mock = vi.fn((remaining: NormalizedPointer[], changed?: NormalizedPointer) =>
@@ -108,6 +109,7 @@ export function createFakeRenderer() {
                     return { left: 0, top: 0, x: 0, y: 0, width, height, right: width, bottom: height };
                 },
                 () => renderer.onCameraChange?.(),
+                deps.input,
             );
             gestures.onClick = (...args) => renderer.onClick?.(...args);
             gestures.onRightClick = (...args) => renderer.onRightClick?.(...args);
@@ -130,6 +132,7 @@ export function createFakeRenderer() {
         dispatchPointerMove,
         dispatchPointerUp,
         dispatchPointerLeave,
+        dispatchCancel,
         dispatchTouchStart,
         dispatchTouchMove,
         dispatchTouchEnd,
@@ -149,6 +152,7 @@ export function createFakeRenderer() {
         dispatchPointerMove,
         dispatchPointerUp,
         dispatchPointerLeave,
+        dispatchCancel,
         dispatchTouchStart,
         dispatchTouchMove,
         dispatchTouchEnd,

@@ -77,6 +77,11 @@ scenes (one layering caveat in [performance](references/performance.md)).
    `eventHandlers: { drag: true, zoom: true, click: true }`. An interactive
    web surface also becomes a keyboard tab stop (core >= 0.12): give it an
    `accessibility.label`.
+   For ready-made selection and moving (core >= 0.12), activate a
+   `SelectionController` with `engine.setTool(controller)`. It captures its
+   own input without replacing application callbacks. Read
+   [selection tools](references/selection-tools.md) for modifiers, marquee,
+   group translation, snapping, lifecycle and native touch ownership.
 7. **Culling is automatic.** Off-screen items are skipped and an R-tree kicks
    in above 500 items. Pass 100k items straight to a draw call.
 
@@ -243,6 +248,7 @@ const png = await renderToBuffer({
 | [drawing.md](references/drawing.md) | Retained draw model, ids, `styleOf`/`visibleOf`/`interactiveOf`, every primitive, origin, gradients, clipping, static caches, custom drawing, screen-fixed overlays. |
 | [item-collections.md](references/item-collections.md) | `ItemCollection` keyed insert/update/remove/batch, subscriptions, hit keys, React usage, lifecycle and limits (core >= 0.12). |
 | [events.md](references/events.md) | Flags, callback payloads, keyboard control, runtime mode switching, interaction patterns. |
+| [selection-tools.md](references/selection-tools.md) | `SelectionController`, adapters, marquee, group drag, snapping, `setTool`/`subscribeInput`, transform hooks (core >= 0.12). |
 | [react.md](references/react.md) | `useCanvasTileEngine` handle, the compound components and their props, lifecycle rules, types, pitfalls. |
 | [react-native.md](references/react-native.md) | RN component, sizing boards to the screen, touch behavior, Skia types and custom drawing, platform differences. |
 | [server.md](references/server.md) | `renderToBuffer`, `RendererServer`, fonts, output formats, HTTP endpoint pattern. |

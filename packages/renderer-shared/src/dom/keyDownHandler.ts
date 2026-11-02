@@ -5,8 +5,9 @@ import type { GestureProcessor } from "@canvas-tile-engine/core";
  * `GestureProcessor.handleKeyDown`.
  *
  * `preventDefault` runs ONLY for a key the engine actually consumed. Anything
- * else — `Tab`, `Escape`, `Home`/`End`, screen-reader shortcuts — must reach
- * the browser untouched, which is what keeps the surface escapable (SC 2.1.2).
+ * else reaches the browser untouched. The default camera leaves Tab, Escape,
+ * Home/End and screen-reader shortcuts alone; a selection tool consumes
+ * Escape only while cancelling an active edit. Tab always remains available.
  *
  * Only keys pressed while the key target itself has focus are handled. Key
  * events bubble, and in vanilla JS the wrapper is the app's own element, often

@@ -304,6 +304,7 @@ export class RendererWebGL implements IRenderer {
             () => {
                 this.onCameraChange?.();
             },
+            deps.input,
         );
 
         // Initialize EventBinder with normalized handlers
@@ -415,18 +416,27 @@ export class RendererWebGL implements IRenderer {
 
     // ─── Normalize Helpers ───
 
-    private normalizePointer(e: MouseEvent | Touch): NormalizedPointer {
+    private normalizePointer(e: MouseEvent | Touch, modifiers?: TouchEvent): NormalizedPointer {
         const rect = this.canvas.getBoundingClientRect();
+        const mouse = "button" in e ? e : undefined;
+        const keys = mouse ?? modifiers;
         return {
             x: e.clientX - rect.left,
             y: e.clientY - rect.top,
             clientX: e.clientX,
             clientY: e.clientY,
+            pointerId: "identifier" in e ? e.identifier : 1,
+            pointerType: mouse ? "mouse" : "touch",
+            ...(mouse ? { button: mouse.button, buttons: mouse.buttons } : {}),
+            shiftKey: keys?.shiftKey ?? false,
+            ctrlKey: keys?.ctrlKey ?? false,
+            metaKey: keys?.metaKey ?? false,
+            altKey: keys?.altKey ?? false,
         };
     }
 
-    private normalizeTouches(touches: TouchList): NormalizedPointer[] {
-        return Array.from(touches).map((t) => this.normalizePointer(t));
+    private normalizeTouches(touches: TouchList, event?: TouchEvent): NormalizedPointer[] {
+        return Array.from(touches).map((t) => this.normalizePointer(t, event));
     }
 
     // ─── Event Handlers (DOM → Normalize → GestureProcessor) ───
@@ -456,7 +466,7 @@ export class RendererWebGL implements IRenderer {
     };
 
     private handleMouseMove = (e: MouseEvent): boolean => {
-        if (e.currentTarget !== this.canvas && !this.gestureProcessor.dragging) {
+        if (e.currentTarget !== this.canvas && !this.gestureProcessor.trackingPointer) {
             return false;
         }
         this.gestureProcessor.handlePointerMove(this.normalizePointer(e));
@@ -498,7 +508,13 @@ export class RendererWebGL implements IRenderer {
     // mouse callbacks via the browser's synthetic mouse events.
     private touchInteractionsEnabled(): boolean {
         const eventHandlers = this.config.get().eventHandlers;
-        return Boolean(eventHandlers.click || eventHandlers.drag || eventHandlers.zoom || eventHandlers.hover);
+        return Boolean(
+            this.gestureProcessor.toolsEnabled ||
+            eventHandlers.click ||
+            eventHandlers.drag ||
+            eventHandlers.zoom ||
+            eventHandlers.hover,
+        );
     }
 
     private handleTouchStart = (e: TouchEvent): boolean => {
@@ -506,7 +522,7 @@ export class RendererWebGL implements IRenderer {
             return false;
         }
         e.preventDefault();
-        this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.targetTouches));
+        this.gestureProcessor.handleTouchStart(this.normalizeTouches(e.targetTouches, e));
         return true;
     };
 
@@ -515,7 +531,7 @@ export class RendererWebGL implements IRenderer {
             return;
         }
         e.preventDefault();
-        this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.targetTouches));
+        this.gestureProcessor.handleTouchMove(this.normalizeTouches(e.targetTouches, e));
     };
 
     private handleTouchEnd = (e: TouchEvent): void => {
@@ -523,12 +539,12 @@ export class RendererWebGL implements IRenderer {
             // Handlers may have been disabled mid-gesture: reset the
             // processor's drag/pinch state (no changed pointer → no
             // callbacks) without claiming the event.
-            this.gestureProcessor.handleTouchEnd(this.normalizeTouches(e.targetTouches));
+            this.gestureProcessor.handleTouchEnd(this.normalizeTouches(e.targetTouches, e));
             return;
         }
         e.preventDefault();
-        const remaining = this.normalizeTouches(e.targetTouches);
-        const changed = e.changedTouches.length > 0 ? this.normalizePointer(e.changedTouches[0]) : undefined;
+        const remaining = this.normalizeTouches(e.targetTouches, e);
+        const changed = e.changedTouches.length > 0 ? this.normalizePointer(e.changedTouches[0], e) : undefined;
         this.gestureProcessor.handleTouchEnd(remaining, changed);
     };
 

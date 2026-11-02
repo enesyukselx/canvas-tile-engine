@@ -15,6 +15,20 @@ import type * as Binding from "../dist/index";
 type Data = { id: string };
 
 describe("core type re-exports", () => {
+    it("re-exports selection and input contracts from published declarations", () => {
+        expectTypeOf<typeof Binding.SelectionController>().toEqualTypeOf<typeof Core.SelectionController>();
+        expectTypeOf<typeof Binding.createItemCollectionSelectionAdapter>().toEqualTypeOf<
+            typeof Core.createItemCollectionSelectionAdapter
+        >();
+        expectTypeOf<typeof Binding.translateItem>().toEqualTypeOf<typeof Core.translateItem>();
+        expectTypeOf<Binding.EngineInputEvent>().toEqualTypeOf<Core.EngineInputEvent>();
+        expectTypeOf<Binding.EngineTool>().toEqualTypeOf<Core.EngineTool>();
+        expectTypeOf<Binding.SelectionSnapshot>().toEqualTypeOf<Core.SelectionSnapshot>();
+        expectTypeOf<Binding.SelectionAdapter<Core.Rect<Data>>>().toEqualTypeOf<
+            Core.SelectionAdapter<Core.Rect<Data>>
+        >();
+        expectTypeOf<Binding.EngineHandle>().toMatchTypeOf<Core.SelectionEngine>();
+    });
     it("re-exports the live collection API", () => {
         expectTypeOf<typeof Binding.ItemCollection>().toEqualTypeOf<typeof Core.ItemCollection>();
         expectTypeOf<typeof Binding.isItemCollection>().toEqualTypeOf<typeof Core.isItemCollection>();
