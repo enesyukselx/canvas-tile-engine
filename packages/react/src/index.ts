@@ -57,6 +57,8 @@ export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 export {
     CanvasTileEngine as CanvasTileEngineCore,
     ConfigValidationError,
+    ItemCollection,
+    isItemCollection,
     gridToSize,
     fitScale,
     itemsBounds,
@@ -72,6 +74,11 @@ export type {
     SpriteRect,
     SpriteSheetOptions,
     SpriteAnimation,
+    ItemKey,
+    ItemCollectionOptions,
+    ItemCollectionChange,
+    ReadonlyItemCollection,
+    DrawItems,
 } from "@canvas-tile-engine/core";
 
 // Re-export the rest of core's app-facing types (everything but the

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CoordinateTransformer, Coords, ICamera } from "@canvas-tile-engine/core";
+import { CoordinateTransformer, Coords, ICamera, ItemCollection, type PathItem } from "@canvas-tile-engine/core";
 import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import type { RGBA } from "../../src/utils/color";
@@ -39,6 +39,91 @@ const square = [
     { x: 4, y: 4 },
     { x: 0, y: 4 },
 ];
+
+describe("WebGLDraw collection path caches", () => {
+    it("keeps bounds and flattened curves with their item through removal and replacement", () => {
+        const { draw, render } = setup();
+        const curve = (id: string, x: number): PathItem & { id: string } => ({
+            id,
+            commands: [
+                { type: "moveTo", x, y: 1 },
+                { type: "bezierCurveTo", cp1x: x, cp1y: 4, cp2x: x + 2, cp2y: 4, x: x + 2, y: 1 },
+                { type: "closePath" },
+            ],
+            style: { fillStyle: "#f00" },
+        });
+        const items = [curve("a", 0), curve("b", 3)];
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const handle = draw.drawPath(source.items as typeof items);
+        source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+        const first = makeRecordingGL();
+        render(first.gl);
+        expect(first.fills).toHaveLength(2);
+
+        source.batch(() => {
+            source.remove("a");
+            source.update("b", curve("b", 6));
+        });
+        const moved = makeRecordingGL();
+        render(moved.gl);
+        expect(moved.fills).toHaveLength(1);
+        expect(moved.fills[0].rings[0][0]).toEqual({ x: 65, y: 15 });
+        source.update("b", curve("b", 100));
+        const offscreen = makeRecordingGL();
+        render(offscreen.gl);
+        expect(offscreen.fills).toHaveLength(0);
+        source.insert(curve("c", 1));
+        const inserted = makeRecordingGL();
+        render(inserted.gl);
+        expect(inserted.fills).toHaveLength(1);
+        expect(inserted.fills[0].rings[0][0]).toEqual({ x: 15, y: 15 });
+    });
+
+    it("remeasures and re-flattens a removed path when its identity is inserted again", () => {
+        const { draw, render } = setup();
+        const path: PathItem & { id: string } = {
+            id: "a",
+            commands: [
+                { type: "moveTo", x: 1, y: 1 },
+                { type: "lineTo", x: 3, y: 3 },
+                { type: "lineTo", x: 1, y: 3 },
+                { type: "closePath" },
+            ],
+            style: { fillStyle: "#f00" },
+        };
+        const items = [path];
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const handle = draw.drawPath(source.items as typeof items);
+        source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+        const first = makeRecordingGL();
+        render(first.gl);
+        expect(first.fills[0].rings[0][0]).toEqual({ x: 15, y: 15 });
+
+        source.remove("a");
+        path.commands = [
+            { type: "moveTo", x: 6, y: 1 },
+            { type: "lineTo", x: 8, y: 3 },
+            { type: "lineTo", x: 6, y: 3 },
+            { type: "closePath" },
+        ];
+        source.insert(path);
+        const moved = makeRecordingGL();
+        render(moved.gl);
+        expect(moved.fills[0].rings[0][0]).toEqual({ x: 65, y: 15 });
+
+        source.remove("a");
+        path.commands = [
+            { type: "moveTo", x: 100, y: 1 },
+            { type: "lineTo", x: 102, y: 3 },
+            { type: "lineTo", x: 100, y: 3 },
+            { type: "closePath" },
+        ];
+        source.insert(path);
+        const offscreen = makeRecordingGL();
+        render(offscreen.gl);
+        expect(offscreen.fills).toHaveLength(0);
+    });
+});
 
 describe("WebGLDraw path items", () => {
     it("fills via stencil-cover with the item's fill rule and skips the stroke when fill-only", () => {

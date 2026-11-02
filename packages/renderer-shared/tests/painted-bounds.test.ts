@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ItemCollection } from "@canvas-tile-engine/core";
 import type { Bounds, Rect } from "@canvas-tile-engine/core";
 import {
     boxPaintBounds,
@@ -274,5 +275,109 @@ describe("PaintedCuller", () => {
             }
         }
         expect(boundsOf.mock.calls.every(([, scale]) => scale === Infinity)).toBe(true);
+    });
+});
+
+describe("PaintedCuller collection updates", () => {
+    const makeItems = (count = 600) =>
+        Array.from({ length: count }, (_, id) => ({ id, x: 1000 + id * 10, y: 0, size: 1 }));
+
+    it("moves one indexed item without remeasuring the batch or changing paint order", () => {
+        const items = makeItems();
+        items[0].x = 0;
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const boundsOf = vi.fn((item: Rect, scale: number) => boxPaintBounds(item, scale));
+        const culler = new PaintedCuller(source.items, boundsOf);
+        source.subscribe((changes) => culler.applyChanges(changes));
+        expect(culler.query(viewport, 10)).toEqual([items[0]]);
+        expect(boundsOf).toHaveBeenCalledTimes(600);
+
+        const previous = source.get(599)!;
+        const moved = source.update(599, { x: 0 });
+        expect(culler.query(viewport, 10)).toEqual([items[0], moved]);
+        expect(culler.query({ minX: previous.x, maxX: previous.x + 1, minY: 0, maxY: 1 }, 10)).toEqual([]);
+        expect(boundsOf).toHaveBeenCalledTimes(601);
+        expect(culler.query(viewport, 10)).toEqual([items[0], moved]);
+        expect(boundsOf).toHaveBeenCalledTimes(601);
+    });
+
+    it("applies sequential indices when a batched source already contains its final items", () => {
+        const source = new ItemCollection(makeItems(), { keyOf: (item) => item.id });
+        const boundsOf = vi.fn((item: Rect, scale: number) => boxPaintBounds(item, scale));
+        const culler = new PaintedCuller(source.items, boundsOf);
+        source.subscribe((changes) => culler.applyChanges(changes));
+        expect(culler.query(viewport, 10)).toEqual([]);
+
+        source.batch(() => {
+            source.remove(0);
+            source.update(1, { x: 0 });
+            source.insert({ id: 700, x: 1000, y: 0, size: 1 });
+            source.update(700, { x: 0 });
+            source.remove(2);
+        });
+        expect(culler.query(viewport, 10)).toEqual([source.get(1), source.get(700)]);
+        expect(boundsOf).toHaveBeenCalledTimes(603);
+    });
+
+    it("expands pixel padding for an updated marker while retaining the world index", () => {
+        const items: Rect[] = [
+            { x: 20, y: 0, sizePx: 10 },
+            ...Array.from({ length: 599 }, (_, i) => ({ x: 1000 + i, y: 1000 })),
+        ];
+        const boundsOf = vi.fn((item: Rect, scale: number) => boxPaintBounds(item, scale));
+        const culler = new PaintedCuller(items, boundsOf, false, (item) => boxPixelPadding(item));
+        expect(culler.query(viewport, 10)).toEqual([]);
+        const previous = items[0];
+        const item = { ...previous, sizePx: 500 };
+        items[0] = item;
+        culler.applyChanges([{ type: "update", key: 0, index: 0, previous, item }]);
+        expect(culler.query(viewport, 10)).toEqual([item]);
+        expect(culler.query(viewport, 100)).toEqual([]);
+        expect(boundsOf).toHaveBeenCalledTimes(601);
+    });
+
+    it("recovers from unknown bounds without moving the recovered item to the front", () => {
+        const items = makeItems().map((item) => ({ ...item, unknown: item.id === 0 }));
+        items[1].x = 0;
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const boundsOf = vi.fn((item: (typeof items)[number], scale: number) =>
+            item.unknown ? UNBOUNDED : boxPaintBounds(item, scale),
+        );
+        const culler = new PaintedCuller(source.items, boundsOf);
+        source.subscribe((changes) => culler.applyChanges(changes));
+        expect(culler.query(viewport, 10)).toBe(source.items);
+        const first = source.update(0, { unknown: false, x: 0 });
+        expect(culler.query(viewport, 10)).toEqual([first, items[1]]);
+        expect(boundsOf).toHaveBeenCalledTimes(601);
+
+        source.update(0, { unknown: true });
+        expect(culler.query(viewport, 10)).toBe(source.items);
+        source.remove(0);
+        expect(culler.query(viewport, 10)).toEqual([items[1]]);
+        expect(boundsOf).toHaveBeenCalledTimes(602);
+    });
+
+    it("keeps a warmed tree valid across the linear/indexed threshold", () => {
+        const source = new ItemCollection(makeItems(500), { keyOf: (item) => item.id });
+        const boundsOf = vi.fn((item: Rect, scale: number) => boxPaintBounds(item, scale));
+        const culler = new PaintedCuller(source.items, boundsOf);
+        source.subscribe((changes) => culler.applyChanges(changes));
+        expect(culler.query(viewport, 10)).toBe(source.items);
+        expect(boundsOf).not.toHaveBeenCalled();
+        source.insert({ id: 501, x: 0, y: 0, size: 1 });
+        expect(culler.query(viewport, 10)).toEqual([source.get(501)]);
+        expect(boundsOf).toHaveBeenCalledTimes(501);
+        source.remove(501);
+        expect(culler.query(viewport, 10)).toBe(source.items);
+        source.insert({ id: 502, x: 0, y: 0, size: 1 });
+        expect(culler.query(viewport, 10)).toEqual([source.get(502)]);
+        expect(boundsOf).toHaveBeenCalledTimes(502);
+    });
+
+    it("preserves every occurrence in an ordinary array with repeated object references", () => {
+        const item = { x: 0, y: 0, size: 1 };
+        const items = [item, item, ...makeItems()];
+        const culler = new PaintedCuller(items, (value, scale) => boxPaintBounds(value, scale));
+        expect(culler.query(viewport, 10)).toEqual([item, item]);
     });
 });

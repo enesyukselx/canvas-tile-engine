@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CoordinateTransformer, type ICamera, type Rect, type Text } from "@canvas-tile-engine/core";
+import { CoordinateTransformer, ItemCollection, type ICamera, type Rect, type Text } from "@canvas-tile-engine/core";
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
 import type { GLRenderer, ImageInstance, LineInstance, ShapeInstance } from "../../src/modules/gl/GLRenderer";
@@ -52,7 +52,7 @@ function setup() {
             topLeft: { x: 0, y: 0 },
         });
     };
-    return { draw, render, camera: camera as { scale: number }, ctx, shapes, lines, images, texts };
+    return { draw, render, layers, camera: camera as { scale: number }, ctx, shapes, lines, images, texts };
 }
 
 function batch<T extends { x: number; y: number }>(item: T, count: number): T[] {
@@ -164,5 +164,60 @@ describe("WebGL stroke and text edge cases", () => {
         draw.drawText({ x: -100, y: 1, text: "possibly overhanging", fontPx: 10 });
         render();
         expect(texts).toEqual(["possibly overhanging"]);
+    });
+});
+
+describe("WebGL live collection registrations", () => {
+    it.each(["drawRect", "drawCircle", "drawImage"] as const)(
+        "%s updates indexed items without adding registrations",
+        (method) => {
+            const { draw, render, layers, shapes, images } = setup();
+            const add = vi.spyOn(layers, "add");
+            const img = { width: 10, height: 10 } as HTMLImageElement;
+            const items = Array.from({ length: 600 }, (_, id) => ({
+                id,
+                x: 1000 + id,
+                y: 1000,
+                size: 1,
+                style: { fillStyle: "#f00" },
+                img,
+            }));
+            const source = new ItemCollection(items, { keyOf: (item) => item.id });
+            const handle = draw[method](source.items as typeof items);
+            source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+            render();
+            expect(shapes.length + images.length).toBe(0);
+            source.update(0, { x: 2, y: 2 });
+            render();
+            expect(shapes.length + images.length).toBe(1);
+            source.batch(() => {
+                source.insert({ ...items[0], id: 700, x: 3, y: 3 });
+                source.remove(0);
+                source.update(700, { x: 4 });
+            });
+            render();
+            expect(shapes.length + images.length).toBe(1);
+            expect(add).toHaveBeenCalledTimes(1);
+            draw.removeDrawHandle(handle);
+            source.update(700, { x: 5 });
+            render();
+            expect(shapes.length + images.length).toBe(0);
+        },
+    );
+
+    it("refreshes only the changed text geometry after its first frame", () => {
+        const { draw, render, texts } = setup();
+        const items = Array.from({ length: 600 }, (_, id) => ({ id, x: 1000 + id, y: 1000, text: "old", fontPx: 10 }));
+        const source = new ItemCollection(items, { keyOf: (item) => item.id });
+        const handle = draw.drawText(source.items as typeof items);
+        source.subscribe((changes) => draw.applyDrawChanges(handle, changes));
+        render();
+        expect(texts).toEqual([]);
+        source.update(0, { x: 2, y: 2, text: "updated" });
+        render();
+        expect(texts).toEqual(["updated"]);
+        source.remove(0);
+        render();
+        expect(texts).toEqual([]);
     });
 });

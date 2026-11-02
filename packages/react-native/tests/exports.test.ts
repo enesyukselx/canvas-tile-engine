@@ -15,6 +15,39 @@ import type * as Binding from "../dist/index";
 type Data = { id: string };
 
 describe("core type re-exports", () => {
+    it("re-exports the live collection API", () => {
+        expectTypeOf<typeof Binding.ItemCollection>().toEqualTypeOf<typeof Core.ItemCollection>();
+        expectTypeOf<typeof Binding.isItemCollection>().toEqualTypeOf<typeof Core.isItemCollection>();
+        expectTypeOf<Binding.ItemKey>().toEqualTypeOf<Core.ItemKey>();
+        expectTypeOf<Binding.ItemCollectionOptions<Core.Rect<Data>>>().toEqualTypeOf<
+            Core.ItemCollectionOptions<Core.Rect<Data>>
+        >();
+        expectTypeOf<Binding.ItemCollectionChange<Core.Rect<Data>>>().toEqualTypeOf<
+            Core.ItemCollectionChange<Core.Rect<Data>>
+        >();
+        expectTypeOf<Binding.ReadonlyItemCollection<Core.Rect<Data>>>().toEqualTypeOf<
+            Core.ReadonlyItemCollection<Core.Rect<Data>>
+        >();
+        expectTypeOf<Binding.DrawItems<Core.Rect<Data>>>().toEqualTypeOf<Core.DrawItems<Core.Rect<Data>>>();
+    });
+
+    it("accepts typed collections through all dynamic draw props and the imperative handle", () => {
+        expectTypeOf<Core.ItemCollection<Core.Rect<Data>>>().toMatchTypeOf<Binding.RectProps["items"]>();
+        expectTypeOf<Core.ItemCollection<Core.Circle<Data>>>().toMatchTypeOf<Binding.CircleProps["items"]>();
+        expectTypeOf<Core.ItemCollection<Core.Line<Data>>>().toMatchTypeOf<Binding.LineProps["items"]>();
+        expectTypeOf<Core.ItemCollection<Core.PathItem<Data>>>().toMatchTypeOf<Binding.PathProps["items"]>();
+        expectTypeOf<Core.ItemCollection<Core.Text<Data>>>().toMatchTypeOf<Binding.TextProps["items"]>();
+        expectTypeOf<Core.ItemCollection<Core.ImageItem<Binding.SkImage, Data>>>().toMatchTypeOf<
+            Binding.ImageProps["items"]
+        >();
+        expectTypeOf<Core.ItemCollection<Core.Rect<Data>>>().toMatchTypeOf<
+            Parameters<Binding.EngineHandle["drawRect"]>[0]
+        >();
+        expectTypeOf<Core.ItemCollection<Core.ImageItem<Binding.SkImage, Data>>>().toMatchTypeOf<
+            Parameters<Binding.EngineHandle["drawImage"]>[0]
+        >();
+    });
+
     it("re-exports the config types", () => {
         expectTypeOf<Binding.ZoomMode>().toEqualTypeOf<Core.ZoomMode>();
         expectTypeOf<Binding.KeyboardConfig>().toEqualTypeOf<Core.KeyboardConfig>();

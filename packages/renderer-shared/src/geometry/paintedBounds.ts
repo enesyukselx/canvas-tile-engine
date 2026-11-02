@@ -7,7 +7,15 @@ import {
     resolveLineWidthPx,
     resolveOrigin,
 } from "@canvas-tile-engine/core";
-import type { Bounds, Line, LineStyle, Rect, Text } from "@canvas-tile-engine/core";
+import type {
+    Bounds,
+    ItemCollectionChange,
+    Line,
+    LineStyle,
+    Rect,
+    SpatialIndexToken,
+    Text,
+} from "@canvas-tile-engine/core";
 
 /** Inclusive intersection, shared by the indexed and linear draw paths. */
 export function intersectsBounds(a: Bounds, b: Bounds): boolean {
@@ -120,9 +128,13 @@ export function textPaintBounds(item: Text, scale: number, localPxBounds: Bounds
     );
 }
 
+type IndexedPaintItem<T> = { x: number; y: number; width: number; height: number; item: T };
+type PaintIndexEntry<T> = { token: SpatialIndexToken<IndexedPaintItem<T>>; bounded: boolean };
+
 /**
- * Large immutable registrations retain an R-tree of painted boxes. Shapes
- * provide a bounded pixel contribution, so their world-only index survives
+ * Large registrations retain an R-tree of painted boxes. Collection changes
+ * update only the affected entries, without replacing the draw registration.
+ * Shapes provide a bounded pixel contribution, so their world-only index survives
  * zoom unchanged. Measured text rebuilds only when scale/font metrics change.
  *
  * Live style callbacks can arbitrarily enlarge strokes or text. Those draws
@@ -130,42 +142,105 @@ export function textPaintBounds(item: Text, scale: number, localPxBounds: Bounds
  * The same loop supplies the precise test below the index threshold.
  */
 export class PaintedCuller<T> {
-    private index?: SpatialIndex<{ x: number; y: number; width: number; height: number; item: T }>;
+    private index?: SpatialIndex<IndexedPaintItem<T>>;
+    // A token per occurrence preserves legacy arrays with repeated references.
+    // Change indices describe sequential operations, so this list follows the
+    // deltas even when a collection's backing array already holds the final batch.
+    private entries: PaintIndexEntry<T>[] = [];
+    private unboundedCount = 0;
     private scale?: number;
     private revision?: number;
+    private pixelPadding?: number;
+    private pixelPaddingOf?: (item: T) => number;
 
     constructor(
-        private items: T[],
+        private items: readonly T[],
         private boundsOf: (item: T, scale: number) => Bounds,
         private liveBounds = false,
-        private pixelPadding?: number,
-    ) {}
+        pixelPadding?: number | ((item: T) => number),
+    ) {
+        if (typeof pixelPadding === "function") {
+            this.pixelPaddingOf = pixelPadding;
+            this.pixelPadding = items.reduce((max, item) => Math.max(max, pixelPadding(item)), 0);
+        } else {
+            this.pixelPadding = pixelPadding;
+        }
+    }
 
-    query(viewport: Bounds, scale: number, revision = 0): T[] {
+    /** Apply committed collection deltas; the shared items array is already current. */
+    applyChanges(changes: readonly ItemCollectionChange<T>[]): void {
+        for (const change of changes) {
+            if (change.type !== "remove" && this.pixelPaddingOf) {
+                // A conservative high-water mark avoids rescanning the collection
+                // when its former widest marker is removed or shrunk.
+                this.pixelPadding = Math.max(this.pixelPadding ?? 0, this.pixelPaddingOf(change.item));
+            }
+            if (!this.index || this.scale === undefined) {
+                // The first indexed query will build from the final live list.
+                continue;
+            }
+            if (change.type === "insert") {
+                const { value, bounded } = this.indexedItem(change.item, this.scale);
+                const token = this.index.insert(value);
+                this.entries.splice(change.index, 0, { token, bounded });
+                if (!bounded) {
+                    this.unboundedCount++;
+                }
+                continue;
+            }
+            const entry = this.entries[change.index];
+            if (change.type === "remove") {
+                this.index.remove(entry.token);
+                this.entries.splice(change.index, 1);
+                if (!entry.bounded) {
+                    this.unboundedCount--;
+                }
+            } else {
+                const { value, bounded } = this.indexedItem(change.item, this.scale);
+                this.index.update(entry.token, value);
+                if (entry.bounded !== bounded) {
+                    this.unboundedCount += bounded ? -1 : 1;
+                }
+                entry.bounded = bounded;
+            }
+        }
+    }
+
+    private indexedItem(item: T, scale: number): { value: IndexedPaintItem<T>; bounded: boolean } {
+        const bounds = this.boundsOf(item, scale);
+        const bounded = finiteBounds(bounds);
+        // Unknown text metrics force a scan, but retain a harmless indexed slot
+        // so becoming measurable later preserves its original painting order.
+        return {
+            bounded,
+            value: bounded
+                ? {
+                      item,
+                      x: (bounds.minX + bounds.maxX) / 2,
+                      y: (bounds.minY + bounds.maxY) / 2,
+                      width: bounds.maxX - bounds.minX,
+                      height: bounds.maxY - bounds.minY,
+                  }
+                : { item, x: 0, y: 0, width: 0, height: 0 },
+        };
+    }
+
+    query(viewport: Bounds, scale: number, revision = 0): readonly T[] {
         if (this.items.length <= 500 || this.liveBounds) {
             return this.items;
         }
         const indexScale = this.pixelPadding !== undefined ? Infinity : scale;
         if (this.scale !== indexScale || this.revision !== revision) {
-            const entries = this.items.map((item) => ({ item, bounds: this.boundsOf(item, indexScale) }));
-            // Incomplete font metrics are not spatially indexable. Paint them
-            // conservatively instead of inventing a finite text width.
-            this.index = entries.every(({ bounds }) => finiteBounds(bounds))
-                ? SpatialIndex.fromArray(
-                      entries.map(({ item, bounds }) => ({
-                          item,
-                          x: (bounds.minX + bounds.maxX) / 2,
-                          y: (bounds.minY + bounds.maxY) / 2,
-                          width: bounds.maxX - bounds.minX,
-                          height: bounds.maxY - bounds.minY,
-                      })),
-                  )
-                : undefined;
+            const entries = this.items.map((item) => this.indexedItem(item, indexScale));
+            this.index = new SpatialIndex();
+            const tokens = this.index.load(entries.map(({ value }) => value));
+            this.entries = entries.map(({ bounded }, i) => ({ token: tokens[i], bounded }));
+            this.unboundedCount = entries.reduce((count, entry) => count + (entry.bounded ? 0 : 1), 0);
             this.scale = indexScale;
             this.revision = revision;
         }
         const pad = (this.pixelPadding ?? 0) / scale;
-        return this.index
+        return this.index && this.unboundedCount === 0
             ? this.index
                   .query(viewport.minX - pad, viewport.minY - pad, viewport.maxX + pad, viewport.maxY + pad)
                   .map(({ item }) => item)

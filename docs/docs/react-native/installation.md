@@ -137,6 +137,8 @@ The same compound components are available:
 
 Keep large `items` arrays stable with `useMemo` or state. New array identities re-register draw callbacks and can rebuild spatial indexes.
 
+For frequently changing items, import `ItemCollection` from `@canvas-tile-engine/react-native` and keep its instance stable. Dynamic Rect, Circle, Image, Text, Line, and Path accept it; keyed updates refresh Skia and hit testing automatically. See [Live Item Collections](../js/item_collections.md#react-and-react-native).
+
 ## Images And Sprites
 
 `engine.loadImage(uri)` resolves to a Skia `SkImage`.

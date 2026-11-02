@@ -189,26 +189,12 @@ function CanvasTileEngineBase({
         };
     });
 
-    // Debounced render - multiple draw components calling requestRender in the
-    // same frame trigger only one render.
-    const rafIdRef = useRef<number | null>(null);
+    // Share the core scheduler with collection updates so a child repaint and
+    // an imperative item change in the same frame produce only one render.
+    // The engine owns cancellation when this component unmounts.
     const requestRender = useCallback(() => {
-        if (rafIdRef.current !== null) {
-            return;
-        }
-        rafIdRef.current = requestAnimationFrame(() => {
-            rafIdRef.current = null;
-            engine.render();
-        });
+        engine.requestRender();
     }, [engine]);
-
-    useEffect(() => {
-        return () => {
-            if (rafIdRef.current !== null) {
-                cancelAnimationFrame(rafIdRef.current);
-            }
-        };
-    }, []);
 
     // The mount contract handed to the engine: it records each frame painter
     // into an SkPicture and triggers a re-render.

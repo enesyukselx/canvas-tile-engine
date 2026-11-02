@@ -36,7 +36,16 @@ export type { CornerArc } from "./utils/pathCorners";
 export { Config, normalizeConfig } from "./modules/Config";
 export { ViewportState } from "./modules/ViewportState";
 export { CoordinateTransformer } from "./modules/CoordinateTransformer";
-export { SpatialIndex } from "./modules/SpatialIndex";
+export { SpatialIndex, type SpatialIndexToken } from "./modules/SpatialIndex";
+export {
+    ItemCollection,
+    isItemCollection,
+    type ItemCollectionOptions,
+    type ItemCollectionChange,
+    type ReadonlyItemCollection,
+    type ItemKey,
+    type DrawItems,
+} from "./modules/ItemCollection";
 export type { HitResult, HitTestOptions, HitTestRectOptions, HitKind } from "./modules/HitTester";
 export { GestureProcessor } from "./modules/GestureProcessor";
 export type {

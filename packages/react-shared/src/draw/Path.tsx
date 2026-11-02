@@ -2,6 +2,7 @@ import { useEffect, useRef, memo } from "react";
 import { useEngineContext } from "../EngineContext";
 import type {
     Bounds,
+    DrawItems,
     PathItem,
     PathDecorationStyle,
     StyleOf,
@@ -15,8 +16,10 @@ export interface PathProps {
      * data }`). Compared by reference: a new array identity re-registers the
      * draw callback, so keep it stable with useMemo/useState instead of an
      * inline literal.
+     * A stable ItemCollection updates and repaints imperatively without a
+     * parent render or re-registration.
      */
-    items: PathItem | PathItem[];
+    items: DrawItems<PathItem>;
     layer?: number;
     /**
      * Paint-time decoration: the returned fields overlay the item's own

@@ -211,6 +211,70 @@ describe("SpatialIndex", () => {
         });
     });
 
+    describe("incremental changes", () => {
+        it("updates old and new spatial partitions while preserving registration order", () => {
+            const items = Array.from({ length: 1000 }, (_, id) => ({ id, x: id * 10, y: id % 17, size: 2 }));
+            const tokens = index.load(items);
+            const moved = { ...items[5], x: 9000, y: 0, width: 40, height: 4 };
+
+            expect(index.update(tokens[5], moved)).toBe(true);
+            expect(index.query(49, 4, 51, 6)).toEqual([]);
+            expect(index.query(8990, -1, 8991, 1)).toContain(moved);
+            expect(index.query(-1, -1, 10001, 20)).toEqual(items.map((item, i) => (i === 5 ? moved : item)));
+        });
+
+        it("removes by saved bounds even when the item object itself was mutated", () => {
+            const items = Array.from({ length: 1000 }, (_, id) => ({ id, x: id * 10, y: 0, size: 2 }));
+            const tokens = index.load(items);
+            items[5].x = 50000;
+
+            expect(index.update(tokens[5], items[5])).toBe(true);
+            expect(index.query(49, -1, 51, 1)).toEqual([]);
+            expect(index.query(49999, -1, 50001, 1)).toEqual([items[5]]);
+            expect(index.query(-1, -1, 50001, 1)).toHaveLength(items.length);
+        });
+
+        it("addresses repeated object references independently", () => {
+            const repeated = { id: 1, x: 0, y: 0 };
+            const middle = { id: 2, x: 0, y: 0 };
+            const tokens = index.load([repeated, middle, repeated]);
+            const replacement = { id: 3, x: 0, y: 0 };
+
+            expect(tokens[0]).not.toBe(tokens[2]);
+            expect(index.update(tokens[2], replacement)).toBe(true);
+            expect(index.query(-1, -1, 1, 1)).toEqual([repeated, middle, replacement]);
+            expect(index.remove(tokens[0])).toBe(true);
+            expect(index.query(-1, -1, 1, 1)).toEqual([middle, replacement]);
+        });
+
+        it("appends inserted occurrences after bulk loads and does not resurrect removed tokens", () => {
+            const first = { id: 1, x: 0, y: 0 };
+            const [token] = index.load([first]);
+            const second = { id: 2, x: 0, y: 0 };
+            index.insert(second);
+            expect(index.remove(token)).toBe(true);
+            expect(index.remove(token)).toBe(false);
+            expect(index.update(token, first)).toBe(false);
+            index.insert(first);
+            expect(index.query(-1, -1, 1, 1)).toEqual([second, first]);
+        });
+
+        it("rejects foreign and cleared tokens without changing either tree", () => {
+            const item = { id: 1, x: 0, y: 0 };
+            const token = index.insert(item);
+            const other = new SpatialIndex<TestItem>();
+            expect(other.remove(token)).toBe(false);
+            expect(other.update(token, { ...item, x: 10 })).toBe(false);
+            expect(index.query(-1, -1, 1, 1)).toEqual([item]);
+            index.clear();
+            const replacement = { id: 2, x: 0, y: 0 };
+            index.insert(replacement);
+            expect(index.remove(token)).toBe(false);
+            expect(index.update(token, item)).toBe(false);
+            expect(index.query(-1, -1, 1, 1)).toEqual([replacement]);
+        });
+    });
+
     describe("fromArray", () => {
         it("creates index from array of items", () => {
             const items: TestItem[] = [

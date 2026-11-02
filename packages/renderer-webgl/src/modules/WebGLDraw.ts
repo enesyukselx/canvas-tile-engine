@@ -33,6 +33,7 @@ import {
     DrawTransform,
 } from "@canvas-tile-engine/core";
 import type {
+    ItemCollectionChange,
     Paint,
     PaintBox,
     RendererClipOptions,
@@ -45,7 +46,7 @@ import type {
     TextDecorationStyle,
 } from "@canvas-tile-engine/core";
 import { appendDashedSegment } from "../utils/dash";
-import { type DrawCallback, DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
+import { type DrawCallback, DrawChanges, DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import {
     PaintedCuller,
     boxPaintBounds,
@@ -103,6 +104,8 @@ const CIRCLE_STROKE_SEGMENTS = 48;
 export type WebGLDrawContext = DrawContext<CanvasRenderingContext2D> & { gl: GLRenderer };
 
 export class WebGLDraw {
+    private drawChanges = new DrawChanges();
+
     /** Transform helpers handed to custom draw callbacks. */
     private drawTransform: DrawTransform = {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
@@ -127,6 +130,11 @@ export class WebGLDraw {
         fn: DrawCallback<WebGLDrawContext>,
     ): DrawHandle {
         return this.layers.add(layer, fn, options?.clip);
+    }
+
+    /** Update the caches belonging to an existing collection registration. */
+    applyDrawChanges(handle: DrawHandle, changes: readonly ItemCollectionChange<unknown>[]): void {
+        this.drawChanges.apply(handle, changes);
     }
 
     addDrawFunction(
@@ -186,10 +194,10 @@ export class WebGLDraw {
             list,
             (item, scale) => boxPaintBounds(item, scale, item.style),
             !!styleOf,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+            (item) => boxPixelPadding(item, item.style),
         );
 
-        return this.register(layer, options, ({ gl, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -274,6 +282,8 @@ export class WebGLDraw {
             gl.drawShapes(shapes);
             gl.drawLines(lines);
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     drawCircle(
@@ -289,10 +299,10 @@ export class WebGLDraw {
             list,
             (item, scale) => boxPaintBounds(item, scale, item.style, false),
             !!styleOf,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item, item.style)), 0),
+            (item) => boxPixelPadding(item, item.style),
         );
 
-        return this.register(layer, options, ({ gl, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -369,6 +379,8 @@ export class WebGLDraw {
             gl.drawShapes(shapes);
             gl.drawLines(lines);
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     drawLine(
@@ -435,7 +447,7 @@ export class WebGLDraw {
         let culler: PaintedCuller<Text> | undefined;
         let measuringContext: CanvasRenderingContext2D;
 
-        return this.register(layer, options, ({ ctx, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ ctx, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             ctx.save();
             measuringContext = ctx;
@@ -493,6 +505,8 @@ export class WebGLDraw {
             }
             ctx.restore();
         });
+        this.drawChanges.add(handle, (changes: readonly ItemCollectionChange<Text>[]) => culler?.applyChanges(changes));
+        return handle;
     }
 
     drawPath(
@@ -502,33 +516,37 @@ export class WebGLDraw {
     ): DrawHandle {
         const styleOf = options?.styleOf;
         const visibleOf = options?.visibleOf;
-        // Conservative world bounds per item for culling, computed once.
-        const itemBounds = items.map((item) => pathItemBounds(item));
+        // Identity-keyed bounds survive insertion/removal; immutable collection
+        // updates invalidate only the replaced item.
+        const itemBounds = new WeakMap(items.map((item) => [item, pathItemBounds(item)] as const));
 
         // WebGL has no native curves: command paths flatten in world space,
         // cached per scale bucket and re-flattened only when the camera
         // scale drifts beyond 2x — sampling stays near the on-screen pixel
         // density without per-frame CPU cost, and faceting never shows on
         // deep zoom.
-        const flatCache: Array<{ scale: number; subpaths: Subpath[] } | null> = items.map(() => null);
-        const subpathsFor = (n: number, item: PathItem): Subpath[] => {
+        const flatCache = new WeakMap<PathItem, { scale: number; subpaths: Subpath[] }>();
+        const subpathsFor = (item: PathItem): Subpath[] => {
             const scale = this.camera.scale;
-            const cached = flatCache[n];
+            const cached = flatCache.get(item);
             if (cached && scale >= cached.scale / 2 && scale <= cached.scale * 2) {
                 return cached.subpaths;
             }
             const subpaths = flattenPathCommands(item.commands!, ARC_SEGMENT_LENGTH / scale);
-            flatCache[n] = { scale, subpaths };
+            flatCache.set(item, { scale, subpaths });
             return subpaths;
         };
 
-        return this.register(layer, options, ({ gl, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ gl, config, topLeft }) => {
             const viewport = getViewportBounds(topLeft, config);
             let lines: LineInstance[] = [];
 
             for (let n = 0; n < items.length; n++) {
                 const item = items[n];
-                const bounds = itemBounds[n];
+                if (!itemBounds.has(item)) {
+                    itemBounds.set(item, pathItemBounds(item));
+                }
+                const bounds = itemBounds.get(item);
                 if (!bounds || visibleOf?.(item) === false) {
                     continue;
                 }
@@ -545,7 +563,7 @@ export class WebGLDraw {
                 // corner-rounded) points polyline as a single subpath.
                 let subpaths: Array<{ points: Coords[]; closed: boolean }>;
                 if (item.commands !== undefined) {
-                    subpaths = subpathsFor(n, item).map((sub) => ({
+                    subpaths = subpathsFor(item).map((sub) => ({
                         points: sub.points.map((p) => this.transformer.worldToScreen(p.x, p.y)),
                         closed: sub.closed,
                     }));
@@ -615,6 +633,17 @@ export class WebGLDraw {
 
             gl.drawLines(lines);
         });
+        this.drawChanges.add(handle, (changes: readonly ItemCollectionChange<PathItem>[]) => {
+            for (const change of changes) {
+                itemBounds.delete(change.item);
+                flatCache.delete(change.item);
+                if (change.type === "update") {
+                    itemBounds.delete(change.previous);
+                    flatCache.delete(change.previous);
+                }
+            }
+        });
+        return handle;
     }
 
     drawImage(
@@ -629,10 +658,10 @@ export class WebGLDraw {
             list,
             (item, scale) => boxPaintBounds(item, scale),
             false,
-            list.reduce((max, item) => Math.max(max, boxPixelPadding(item)), 0),
+            (item) => boxPixelPadding(item),
         );
 
-        return this.register(layer, options, ({ gl, config, topLeft }) => {
+        const handle = this.register(layer, options, ({ gl, config, topLeft }) => {
             const bounds = getViewportBounds(topLeft, config);
             const visibleItems = culler.query(bounds, this.camera.scale);
 
@@ -713,6 +742,8 @@ export class WebGLDraw {
 
             gl.drawImages(images);
         });
+        this.drawChanges.add(handle, culler.applyChanges.bind(culler));
+        return handle;
     }
 
     drawGridLines(
@@ -815,14 +846,17 @@ export class WebGLDraw {
     // ─── Layer management ───
 
     removeDrawHandle(handle: DrawHandle) {
+        this.drawChanges.remove(handle);
         this.layers.remove(handle);
     }
 
     clearLayer(layer: number) {
+        this.drawChanges.clear(layer);
         this.layers.clear(layer);
     }
 
     clearAll() {
+        this.drawChanges.clear();
         this.layers.clear();
     }
 
@@ -830,6 +864,7 @@ export class WebGLDraw {
      * Release cached resources and layer callbacks.
      */
     destroy() {
+        this.drawChanges.clear();
         this.layers.clear();
         this.colorParser.clear();
         this.textBounds.clear();

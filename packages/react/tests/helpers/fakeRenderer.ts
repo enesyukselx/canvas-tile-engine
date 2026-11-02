@@ -14,6 +14,9 @@ import type { DrawHandle, IDrawAPI, IImageLoader, IRenderer, Rect as RectType } 
  */
 export function createFakeRenderer() {
     const drawRectCalls: Array<RectType | RectType[]> = [];
+    // The core passes a stable, mutable array for a collection. This recorder
+    // has no culling cache to update, but records incremental invalidations.
+    const applyDrawChanges: Mock = vi.fn();
     // Live registrations by handle id. Destroying the renderer drops them all,
     // so with one renderer shared by two engines (StrictMode's dev
     // double-mount) only the surviving engine's registrations remain.
@@ -39,6 +42,7 @@ export function createFakeRenderer() {
         drawStaticRect: (_items: unknown, _key: unknown, layer?: number) => register("staticRect", layer),
         drawStaticCircle: (_items: unknown, _key: unknown, layer?: number) => register("staticCircle", layer),
         drawStaticImage: (_items: unknown, _key: unknown, layer?: number) => register("staticImage", layer),
+        applyDrawChanges,
         removeDrawHandle: (handle: DrawHandle) => {
             live.delete(handle.id);
         },
@@ -84,5 +88,5 @@ export function createFakeRenderer() {
         setupEvents: () => {},
     };
 
-    return { renderer, drawRectCalls, liveCount, render, resize, resizeWithAnimation, destroy };
+    return { renderer, drawRectCalls, liveCount, applyDrawChanges, render, resize, resizeWithAnimation, destroy };
 }

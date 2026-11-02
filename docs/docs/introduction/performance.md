@@ -22,6 +22,8 @@ engine.drawRect(largeArrayOfTiles, 1);
 
 Use one draw call with an array instead of thousands of draw calls.
 
+For incremental changes, register an [ItemCollection](../js/item_collections.md) once and call `update`, `insert`, or `remove`. The engine updates affected spatial entries and hit geometry while retaining the draw handle. `batch` groups notifications and repaint requests. Each registration creates its stable view once; updates do not copy the whole collection. Removal still shifts dense array positions, and cache invalidation from zoom or font metrics can rebuild an index. Ordinary arrays retain their existing re-registration rules after geometry changes.
+
 ### Renderer Batching
 
 - Canvas2D reduces repeated style changes while iterating visible items.
