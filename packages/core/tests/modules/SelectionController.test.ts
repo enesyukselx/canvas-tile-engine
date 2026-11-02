@@ -255,6 +255,56 @@ describe("selection tools", () => {
         expect(selection.selectedIds).toEqual(["b"]);
     });
 
+    it("keeps a pending press and its click through live model updates", () => {
+        const { engine, selection, items, gestures, change } = setup();
+        const legacy = vi.fn();
+        engine.onClick = legacy;
+        gestures.handlePointerDown(pointer(0));
+        items.update("a", { style: { fillStyle: "red" } });
+        gestures.handlePointerUp(pointer(0));
+        gestures.handleClick(pointer(0));
+        expect(selection.selectedIds).toEqual(["a"]);
+        expect(change).toHaveBeenCalledTimes(1);
+        expect(legacy).toHaveBeenCalledTimes(1);
+    });
+
+    it("translates from values updated before the drag starts and rolls back to them", () => {
+        const { selection, items, gestures, end } = setup();
+        gestures.handlePointerDown(pointer(0));
+        items.update("a", { y: 1 });
+        gestures.handlePointerMove(pointer(2));
+        expect(items.get("a")).toMatchObject({ x: 2, y: 1 });
+        selection.cancel();
+        expect(items.get("a")).toMatchObject({ x: 0, y: 1 });
+        expect(end).toHaveBeenCalledExactlyOnceWith({ kind: "translate", ids: ["a"], cancelled: true });
+    });
+
+    it("narrows a group click even when selection is mirrored into the model", () => {
+        let mirror: (ids: readonly string[]) => void = () => {};
+        const { selection, items, gestures } = setup(undefined, {
+            onSelectionChange: (ids) => mirror(ids as string[]),
+        });
+        mirror = (ids) =>
+            items.batch(() => {
+                for (const item of items.items) {
+                    items.update(item.id, { data: ids.includes(item.id) });
+                }
+            });
+        selection.setSelection(["a", "b"]);
+        gestures.handlePointerDown(pointer(0));
+        gestures.handlePointerUp(pointer(0));
+        expect(selection.selectedIds).toEqual(["a"]);
+        expect(items.get("b")?.data).toBe(false);
+    });
+
+    it("never lets a tool consume Tab", () => {
+        const { engine, gestures } = setup();
+        engine.setTool({ handleInput: (event) => event.type === "keydown" });
+        expect(gestures.handleKeyDown({ key: "Tab" })).toBe(false);
+        expect(gestures.handleKeyDown({ key: "Tab", shiftKey: true })).toBe(false);
+        expect(gestures.handleKeyDown({ key: "Escape" })).toBe(true);
+    });
+
     it("aborts reentrant source edits before a drag can commit them as its own preview", () => {
         const { selection, items, gestures, end } = setup();
         selection.setSelection(["a", "b"]);

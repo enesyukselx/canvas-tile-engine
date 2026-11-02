@@ -199,10 +199,36 @@ export class SelectionController<T extends object> implements EngineTool {
         if (this.applying || this.disposed) {
             return;
         }
-        if (this.press && [...this.press.applied].some(([id, value]) => this.options.adapter.get(id) !== value)) {
+        const press = this.press;
+        if (press && !press.transform) {
+            this.followSource(press);
+        } else if (press && [...press.applied].some(([id, value]) => this.options.adapter.get(id) !== value)) {
             this.cancel();
         }
         this.replaceSelection(this.selected);
+    }
+
+    /**
+     * Before a preview is written the model still belongs to the application:
+     * a live update (a sprite tick, a mirrored selection flag) must not abort
+     * the press. Translate from the current values instead.
+     */
+    private followSource(press: Press<T>): void {
+        const adapter = this.options.adapter;
+        for (const id of [...press.originals.keys()]) {
+            const item = adapter.get(id);
+            if (item === undefined || this.options.locked?.(item, id) === true || !this.canSelect(id)) {
+                press.originals.delete(id);
+                press.applied.delete(id);
+            } else {
+                press.originals.set(id, item);
+                press.applied.set(id, item);
+            }
+        }
+        const anchorItem = press.hit === undefined ? undefined : adapter.get(press.hit);
+        if (anchorItem) {
+            press.anchor = adapter.anchor(anchorItem);
+        }
     }
 
     handleInput(event: EngineInputEvent): boolean {
@@ -361,11 +387,16 @@ export class SelectionController<T extends object> implements EngineTool {
     }
 
     private applyDelta(press: Press<T>, delta: Coords): void {
+        if (!press.transform) {
+            // Adapters are not required to notify synchronously.
+            this.followSource(press);
+        }
         if (!press.originals.size) {
             return;
         }
         const adapter = this.options.adapter;
         if (
+            press.transform &&
             [...press.applied].some(
                 ([id, value]) =>
                     adapter.get(id) !== value || this.options.locked?.(value, id) === true || !this.canSelect(id),
