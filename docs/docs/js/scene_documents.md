@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 2.2
 ---
 
 # Scene Documents
@@ -130,7 +130,7 @@ const nextAttachment = reopened.attach(engine, {
 currentAttachment = nextAttachment;
 ```
 
-Schema or image-resolution failure happens before any engine registration changes. Attachment validates current collection contents again, stages all new registrations, and removes the previous attachment only after staging succeeds. It does not clear layers or unrelated drawings. A failed registration removes handles already returned by the renderer and leaves the previous attachment in place. A replacement must be an active attachment on the same engine.
+Schema or image-resolution failure happens before any engine registration changes. Attachment validates current collection contents again, stages all new registrations, and removes the previous attachment only after staging succeeds. It does not clear layers or unrelated drawings. Because the new registrations are added last, a replacement paints and hit-tests above every unrelated drawing that shares one of its layer numbers, even where the previous scene was below it; give application overlays their own layer numbers. A failed registration removes handles already returned by the renderer and leaves the previous attachment in place. A replacement must be an active attachment on the same engine.
 
 `restoreCamera` defaults to `false`. When enabled and the document contains a camera, attachment applies scale and center through the normal engine setters. Existing scale limits and camera bounds still clamp the requested values. Read `getScale()` and `getCenter()` afterward when you need the applied camera. No camera change occurs during preparation.
 
@@ -150,7 +150,7 @@ Full validation runs during create, parse, prepare, capture and attach. Live col
 
 ## Schema Lifecycle and Migrations
 
-The first built-in format is `schemaVersion: 1`. Unknown future versions are rejected. Older application-defined formats require explicit migration functions; the library does not assume an undocumented legacy format.
+The first built-in format is `schemaVersion: 1`. Unknown future versions are rejected. Older application-defined formats require explicit migration functions; the library does not assume an undocumented legacy format. Migrations are keyed by the input's numeric `schemaVersion`, so a legacy document must carry one (for example `0`) before parsing; input without a `schemaVersion` is rejected before any migration runs.
 
 ```ts
 import { parseSceneDocument, type SceneMigrations } from "@canvas-tile-engine/core";

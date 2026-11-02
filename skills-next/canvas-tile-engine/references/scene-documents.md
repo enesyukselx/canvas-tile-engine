@@ -46,6 +46,8 @@ const reopened = await prepareScene(parseSceneDocument(json), {
     resolveImage: (asset) => engine.images.load(asset.src!),
 });
 attachment = reopened.attach(engine, { replace: attachment, restoreCamera: true });
+// The replacement registers last: it now paints above other drawings on the
+// same layer numbers, so keep app overlays on their own layers.
 // Dispose when this owner unmounts:
 attachment.dispose();
 ```
@@ -123,7 +125,9 @@ observer side effects or intermediate frames. Multiple rollback errors use
 
 There is no assumed legacy engine format. Register a `SceneMigrations`
 `ReadonlyMap<number, (oldJson) => unknown>` only for an app-defined older
-schema. Each step must increment `schemaVersion` by exactly one. JSON safety
+schema. Migrations are keyed by the input's numeric `schemaVersion`; add one
+(e.g. `0`) to legacy JSON first, since input without it is rejected before any
+migration runs. Each step must increment `schemaVersion` by exactly one. JSON safety
 is rechecked after each step and full validation runs on the final version.
 Unknown future versions and older versions without a registered migration
 are rejected. Migration functions remain application code, not document data.
