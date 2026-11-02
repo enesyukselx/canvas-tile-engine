@@ -47,7 +47,8 @@ canvas UI still needs its own state/subscription.
   shallow copy. Replace nested `style`, `data`, `commands`, and `points`
   immutably. Never mutate the read-only `items` view or values from `get`.
 - `get(key)`, `size`, `items`, and `keyAt(index)` read the current source.
-  Insertions append; updates keep their order; removal compacts the array.
+  `insert` appends and `insertAt(index, item)` (0..size) inserts in place;
+  updates keep their order; removal compacts the array.
 - `batch(callback)` groups synchronous mutations and nested batches.
   It is not an async transaction. Successful changes still notify if the
   callback throws; no rollback. Subscribers receive immutable delta

@@ -85,7 +85,10 @@ Bridge a Redux/Zustand/custom store with its ordinary synchronous update API.
 The facade above must check the expected value and atomically replace it:
 each adapter command either commits completely or throws without changing the
 model. `execute` applies and records; `record` only records an already-applied
-command. Never use both for the same edit. Keep commands immutable.
+command. Never use both for the same edit. `record` calls made while
+history applies a command through its adapter (a store subscription seeing
+undo/redo/cancel/execute) are ignored, so subscriptions need no filter.
+Keep commands immutable.
 
 Optional `merge(previous,next)` compacts adjacent transaction commands;
 `undefined` keeps both. Optional `release(command)` releases command-owned

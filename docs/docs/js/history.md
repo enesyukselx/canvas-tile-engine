@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 2.3
 ---
 
 # Transactions and Undo/Redo
@@ -150,11 +150,12 @@ function positionHistory(store: PositionStore) {
     });
 }
 
+declare const store: PositionStore; // your application's store facade
 const history = positionHistory(store);
 history.execute({ id: "seat-A1", before: store.get("seat-A1"), after: { x: 4, y: 2 } }, "Move seat");
 ```
 
-Use `execute` when history should apply the command. Use `record` when the store has already applied it, for example from a store subscription; do not replay the same edit through both routes. Commands are immutable. `merge(previous, next)` is optional and only compacts adjacent commands within an open transaction. Returning `undefined` keeps both commands. Optional `release(command)` runs for evicted, canceled, merged, cleared, or disposed records. It may release command-owned references but must not alter the document or free assets the current document still uses. Merge and release hooks must not mutate the model.
+Use `execute` when history should apply the command. Use `record` when the store has already applied it, for example from a store subscription; do not replay the same edit through both routes. A subscription also observes history's own `undo`, `redo`, `cancel`, and `execute`; `record` calls made while history is applying a command through its adapter are ignored, so the subscription does not need to filter them. Commands are immutable. `merge(previous, next)` is optional and only compacts adjacent commands within an open transaction. Returning `undefined` keeps both commands. Optional `release(command)` runs for evicted, canceled, merged, cleared, or disposed records. It may release command-owned references but must not alter the document or free assets the current document still uses. Merge and release hooks must not mutate the model.
 
 ## React and React Native Controls
 

@@ -247,6 +247,7 @@ const png = await renderToBuffer({
 | [server.md](references/server.md) | `renderToBuffer`, `RendererServer`, fonts, output formats, HTTP endpoint pattern. |
 | [sprites.md](references/sprites.md) | `sprite` source rects, `SpriteSheet`, `SpriteAnimator`, the `<Sprite>` component. |
 | [performance.md](references/performance.md) | What the engine already optimizes, renderer choice, WebGL specifics, static caches, budgets. |
+| [history.md](references/history.md) | `History` transactions, undo/redo, collection history adapters, custom store commands, error and replay guarantees (core >= 0.12). |
 | [recipes.md](references/recipes.md) | Complete builds to copy and adapt: game map, minimap, pixel painter, fixed board, responsive map, sprites, server image, RN board, WebGL heatmap. |
 
 For a full app: read this file, then [core-api](references/core-api.md) +
