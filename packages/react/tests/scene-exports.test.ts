@@ -17,4 +17,9 @@ describe("published scene document re-exports", () => {
         expectTypeOf<Binding.SceneAttachment>().toEqualTypeOf<Core.SceneAttachment>();
         expectTypeOf<Binding.SceneMigration>().toEqualTypeOf<Core.SceneMigration>();
     });
+
+    it("publishes no PreparedScene constructor, so prepareScene stays the only entry", () => {
+        type Constructible<C> = C extends new (...args: never[]) => unknown ? true : false;
+        expectTypeOf<Constructible<typeof Binding.PreparedScene>>().toEqualTypeOf<false>();
+    });
 });

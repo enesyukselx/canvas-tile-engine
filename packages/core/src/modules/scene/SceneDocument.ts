@@ -181,8 +181,18 @@ interface RuntimeBatch<TImage> {
 export class PreparedScene<TImage = unknown> {
     private readonly batches = new Map<string, RuntimeBatch<TImage>>();
 
-    /** @internal Use prepareScene to validate and resolve assets first. */
-    constructor(
+    /** @internal Built by prepareScene, which validates and resolves assets first. */
+    static fromPrepared<TImage>(
+        document: SceneDocument,
+        images: ReadonlyMap<string, TImage>,
+        limits: SceneLimits,
+    ): PreparedScene<TImage> {
+        return new PreparedScene(document, images, limits);
+    }
+
+    // Private, not stripped from declarations: a stripped constructor would
+    // publish an implicit no-argument one that crashes at runtime.
+    private constructor(
         private readonly document: SceneDocument,
         private readonly images: ReadonlyMap<string, TImage>,
         private readonly limits: SceneLimits,
@@ -377,5 +387,5 @@ export async function prepareScene<TImage = unknown>(
             return [asset.id, image] as const;
         }),
     );
-    return new PreparedScene(document, new Map(entries), limits);
+    return PreparedScene.fromPrepared(document, new Map(entries), limits);
 }
