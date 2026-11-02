@@ -975,6 +975,34 @@ describe("CanvasTileEngine", () => {
             expect(drawAPI.drawImage.mock.calls[0][2]).toEqual({ visibleOf: visible });
         });
 
+        it("threads clip through to the renderer draw API on every dynamic draw kind", () => {
+            const { e, drawAPI } = createEngineWithDrawAPI();
+            const clip = { minX: 0, maxX: 4, minY: 0, maxY: 2 };
+
+            e.drawRect({ x: 1, y: 1, size: 1 }, 1, { clip });
+            e.drawCircle({ x: 1, y: 1, size: 1 }, 1, { clip });
+            e.drawText({ x: 1, y: 1, text: "a" }, 2, { clip });
+            e.drawLine({ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }, undefined, 1, { clip });
+            e.drawPath(
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: 1, y: 1 },
+                    ],
+                },
+                1,
+                { clip },
+            );
+            e.drawImage({ x: 1, y: 1, size: 1, img: testImg }, 1, { clip });
+
+            expect(drawAPI.drawRect.mock.calls[0][2]).toMatchObject({ clip });
+            expect(drawAPI.drawCircle.mock.calls[0][2]).toMatchObject({ clip });
+            expect(drawAPI.drawText.mock.calls[0][2]).toMatchObject({ clip });
+            expect(drawAPI.drawLine.mock.calls[0][3]).toMatchObject({ clip });
+            expect(drawAPI.drawPath.mock.calls[0][2]).toMatchObject({ clip });
+            expect(drawAPI.drawImage.mock.calls[0][2]).toMatchObject({ clip });
+        });
+
         it("visibleOf reads live state: hiding an item drops it from hit queries without re-registering", () => {
             const { e } = createEngineWithDrawAPI();
             const hidden = new Set<string>();

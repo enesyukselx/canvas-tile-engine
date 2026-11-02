@@ -1328,6 +1328,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
         this.replacePreviousDraw(options?.id);
         const handle = this.renderer.getDrawAPI().drawImage(data, layer, {
             visibleOf: options?.visibleOf as VisibleOf<ImageItem<TImage>> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
             this.hitTester.register(handle, "image", data, layer, {
