@@ -106,6 +106,27 @@ describe("core type re-exports", () => {
         expectTypeOf<Binding.ClickInfo>().toEqualTypeOf<Core.ClickInfo>();
     });
 
+    it("re-exports the history values and types", () => {
+        expectTypeOf<typeof Binding.History>().toEqualTypeOf<typeof Core.History>();
+        expectTypeOf<typeof Binding.HistoryCommittedError>().toEqualTypeOf<typeof Core.HistoryCommittedError>();
+        expectTypeOf<typeof Binding.HistoryReplayError>().toEqualTypeOf<typeof Core.HistoryReplayError>();
+        expectTypeOf<typeof Binding.createItemCollectionHistory>().toEqualTypeOf<
+            typeof Core.createItemCollectionHistory
+        >();
+        expectTypeOf<typeof Binding.attachItemCollectionHistory>().toEqualTypeOf<
+            typeof Core.attachItemCollectionHistory
+        >();
+        expectTypeOf<typeof Binding.itemCollectionHistoryAdapter>().toEqualTypeOf<
+            typeof Core.itemCollectionHistoryAdapter
+        >();
+        expectTypeOf<Binding.HistoryAdapter<Data>>().toEqualTypeOf<Core.HistoryAdapter<Data>>();
+        expectTypeOf<Binding.HistoryDirection>().toEqualTypeOf<Core.HistoryDirection>();
+        expectTypeOf<Binding.HistoryOptions<Data>>().toEqualTypeOf<Core.HistoryOptions<Data>>();
+        expectTypeOf<Binding.HistoryState>().toEqualTypeOf<Core.HistoryState>();
+        expectTypeOf<Binding.ItemCollectionHistoryCommand>().toEqualTypeOf<Core.ItemCollectionHistoryCommand>();
+        expectTypeOf<Binding.ItemCollectionHistoryOptions>().toEqualTypeOf<Core.ItemCollectionHistoryOptions>();
+    });
+
     it("types the handle's hit-test results with the re-exported HitResult", () => {
         expectTypeOf<ReturnType<Binding.EngineHandle["hitTestFirst"]>>().toEqualTypeOf<
             Binding.HitResult<HTMLImageElement> | undefined
