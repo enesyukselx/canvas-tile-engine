@@ -27,6 +27,10 @@ package's `.d.ts` files before using it.
 
 ## Package selection (decide first)
 
+For JSON save/reopen workflows (core >= 0.12), read
+[scene documents](references/scene-documents.md). Preserve ordered typed
+batches and resolve asset references before attaching the prepared scene.
+
 | You are building | Install | Read |
 | :-- | :-- | :-- |
 | Vanilla JS/TS web app | `@canvas-tile-engine/core` + `@canvas-tile-engine/renderer-canvas` | [core-api](references/core-api.md), [drawing](references/drawing.md), [events](references/events.md) |
@@ -246,6 +250,7 @@ const png = await renderToBuffer({
 | [react.md](references/react.md) | `useCanvasTileEngine` handle, the compound components and their props, lifecycle rules, types, pitfalls. |
 | [react-native.md](references/react-native.md) | RN component, sizing boards to the screen, touch behavior, Skia types and custom drawing, platform differences. |
 | [server.md](references/server.md) | `renderToBuffer`, `RendererServer`, fonts, output formats, HTTP endpoint pattern. |
+| [scene-documents.md](references/scene-documents.md) | Versioned JSON scene documents: create/validate/parse/stringify, `prepareScene`, live collections, `attach`/`replace`, migrations (core >= 0.12). |
 | [sprites.md](references/sprites.md) | `sprite` source rects, `SpriteSheet`, `SpriteAnimator`, the `<Sprite>` component. |
 | [performance.md](references/performance.md) | What the engine already optimizes, renderer choice, WebGL specifics, static caches, budgets. |
 | [recipes.md](references/recipes.md) | Complete builds to copy and adapt: game map, minimap, pixel painter, fixed board, responsive map, sprites, server image, RN board, WebGL heatmap. |

@@ -54,6 +54,48 @@ export type {
 export type { EngineHandle } from "./hooks/useCanvasTileEngine";
 
 // Re-export core class and utilities
+// Portable scene documents (core >= 0.12).
+export {
+    SCENE_SCHEMA_VERSION,
+    DEFAULT_SCENE_LIMITS,
+    SceneValidationError,
+    SceneAttachmentError,
+    PreparedScene,
+    createSceneDocument,
+    validateSceneDocument,
+    parseSceneDocument,
+    stringifySceneDocument,
+    prepareScene,
+} from "@canvas-tile-engine/core";
+export type {
+    SceneJsonValue,
+    SceneJsonObject,
+    SceneKind,
+    SceneAsset,
+    SceneCamera,
+    SceneRect,
+    SceneCircle,
+    SceneLine,
+    SceneText,
+    ScenePath,
+    SceneImage,
+    SceneItemMap,
+    SceneRuntimeItemMap,
+    SceneBatch,
+    SceneLayer,
+    SceneDocument,
+    SceneDocumentInput,
+    SceneLimits,
+    SceneMigration,
+    SceneMigrations,
+    SceneReadOptions,
+    PrepareSceneOptions,
+    SceneCollection,
+    SceneTarget,
+    SceneAttachment,
+    SceneAttachOptions,
+} from "@canvas-tile-engine/core";
+
 export {
     CanvasTileEngine as CanvasTileEngineCore,
     ConfigValidationError,
