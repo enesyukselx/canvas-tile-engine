@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 3.1
 ---
 
 # Selection and Move Tools
@@ -188,7 +188,7 @@ For React UI that tracks a controller, `useSyncExternalStore(tool.subscribe, too
 
 `engine.subscribeInput((event, handled) => ...)` adds an observer without replacing `onClick`, `onMouseDown`, or other callback properties. It returns an unsubscribe function. Events are `pointerdown`, `pointermove`, `pointerup`, `pointerleave`, `pointercancel`, and `keydown`. Pointer events carry the existing `coords`, `mouse`, and `client` coordinate groups plus `pointer` metadata: optional ID, type, buttons, and Shift/Ctrl/Meta/Alt flags. Cancellation carries a reason (`"cancel"` or `"multitouch"`); key events carry a normalized `key` object.
 
-Only one `EngineTool` is active. Its `handleInput(event)` runs before observers and camera defaults. Return `true` from `pointerdown` to capture the whole press. `handled` tells observers whether the tool owns that event. `cancel()` is called when switching away; optional `dispose()` runs when the engine is destroyed with that tool active. `subscribeToolChange(listener)` reports changes without altering the tool. Legacy callbacks remain connected and ordinary clicks still reach them; a dragged or cancelled press does not produce a click.
+Only one `EngineTool` is active. Its `handleInput(event)` runs before observers and camera defaults. Return `true` from `pointerdown` to capture the whole press. `handled` tells observers whether the tool owns that event. Keys reach the tool first, but a tool's `true` for `Tab` is ignored so focus can always leave the surface. `cancel()` is called when switching away; optional `dispose()` runs when the engine is destroyed with that tool active. `subscribeToolChange(listener)` reports changes without altering the tool. Legacy callbacks remain connected and ordinary clicks still reach them; a dragged or cancelled press does not produce a click.
 
 Custom interactive renderers can opt in by passing `deps.input` as the sixth `GestureProcessor` constructor argument. Continue forwarding captured outside moves using `trackingPointer`, claim touches while `toolsEnabled`, preserve pointer metadata, and forward real cancellation. Server rendering has no input transport; programmatic selection and translation remain platform-neutral.
 
@@ -198,6 +198,6 @@ Custom interactive renderers can opt in by passing `deps.input` as the sixth `Ge
 
 `onTransformStart({ kind: "translate", ids })` fires once before the first real geometry update. `onTransformEnd({ kind: "translate", ids, cancelled })` closes it once on commit or cancellation. Clicks, locked-only drags, and zero translations do not open a transaction. Use these hooks to connect an application's history or persistence layer. No history implementation is required by this controller.
 
-Cancellation restores the original immutable items only if the model still contains the controller's last preview values. External replacement/deletion aborts a drag without overwriting the external values; remaining owned previews are restored. If a model or UI subscriber throws, cleanup and the end hook still run before the first error is rethrown. Application transaction systems need their own policy for external changes during an open transaction: rolling back an entire model transaction may also roll back those external edits.
+Cancellation restores the original immutable items only if the model still contains the controller's last preview values. Until a press writes its first preview, external updates (live data, sprite frames, selection flags mirrored into the model) are followed: the press continues and translates the current values, and removed, locked, or unselectable items drop out. Once a preview is written, external replacement/deletion aborts the drag without overwriting the external values; remaining owned previews are restored. If a model or UI subscriber throws, cleanup and the end hook still run before the first error is rethrown. Application transaction systems need their own policy for external changes during an open transaction: rolling back an entire model transaction may also roll back those external edits.
 
 This release supplies selection and translation. Resize/rotate handles, exact painted selection bounds, lasso selection, alignment guides, edge auto-pan, and an editor UI remain follow-on work. `itemsBounds` is a camera-independent layout helper; it ignores rotation, origin offsets, and fixed pixel sizes, so it should not be treated as accurate transform-handle geometry.

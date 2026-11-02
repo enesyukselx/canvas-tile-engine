@@ -247,6 +247,7 @@ const png = await renderToBuffer({
 | [core-api.md](references/core-api.md) | Coordinate spaces, construction, full config reference, every engine method, image loading, utilities, exported types. |
 | [drawing.md](references/drawing.md) | Retained draw model, ids, `styleOf`/`visibleOf`/`interactiveOf`, every primitive, origin, gradients, clipping, static caches, custom drawing, screen-fixed overlays. |
 | [events.md](references/events.md) | Flags, callback payloads, keyboard control, runtime mode switching, interaction patterns. |
+| [selection-tools.md](references/selection-tools.md) | `SelectionController`, adapters, marquee, group drag, snapping, `setTool`/`subscribeInput`, transform hooks (core >= 0.12). |
 | [react.md](references/react.md) | `useCanvasTileEngine` handle, the compound components and their props, lifecycle rules, types, pitfalls. |
 | [react-native.md](references/react-native.md) | RN component, sizing boards to the screen, touch behavior, Skia types and custom drawing, platform differences. |
 | [server.md](references/server.md) | `renderToBuffer`, `RendererServer`, fonts, output formats, HTTP endpoint pattern. |
