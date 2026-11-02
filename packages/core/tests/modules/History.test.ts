@@ -63,6 +63,55 @@ describe("History", () => {
         expect(store.history.canUndo).toBe(false);
     });
 
+    it("lets a store subscription record every change without recording history's own replays", () => {
+        let value = 0;
+        const listeners = new Set<(change: Change) => void>();
+        const set = (after: number) => {
+            const change = { before: value, after };
+            value = after;
+            listeners.forEach((listener) => listener(change));
+        };
+        const history = new History<Change>({
+            adapter: {
+                redo: (change) => set(change.after),
+                undo: (change) => set(change.before),
+            },
+        });
+        listeners.add((change) => history.record(change));
+
+        set(1);
+        expect(history.state).toMatchObject({ undoDepth: 1, redoDepth: 0 });
+        expect(history.undo()).toBe(true);
+        expect(value).toBe(0);
+        expect(history.state).toMatchObject({ undoDepth: 0, redoDepth: 1 });
+        expect(history.redo()).toBe(true);
+        expect(value).toBe(1);
+        history.execute({ before: 1, after: 2 });
+        expect(history.state).toMatchObject({ undoDepth: 2, redoDepth: 0 });
+        history.beginTransaction();
+        set(3);
+        expect(history.cancel()).toBe(true);
+        expect(value).toBe(2);
+        expect(history.state).toMatchObject({ undoDepth: 2, redoDepth: 0, inTransaction: false });
+    });
+
+    it("keeps the state object and stays quiet while a transaction only accumulates commands", () => {
+        const store = counter();
+        const listener = vi.fn();
+        store.history.subscribe(listener);
+        store.history.beginTransaction("Drag");
+        const state = store.history.state;
+        expect(listener).toHaveBeenCalledTimes(1);
+        for (let i = 1; i <= 5; i++) {
+            store.history.record(store.applyExternally(i));
+        }
+        expect(store.history.state).toBe(state);
+        expect(listener).toHaveBeenCalledTimes(1);
+        store.history.commit();
+        expect(listener).toHaveBeenCalledTimes(2);
+        expect(store.history.state).toMatchObject({ undoDepth: 1, undoLabel: "Drag" });
+    });
+
     it("groups a drag into one entry and reverses commands in the correct order", () => {
         const store = counter();
         store.history.beginTransaction("Move selection");

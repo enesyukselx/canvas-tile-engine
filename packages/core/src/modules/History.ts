@@ -92,6 +92,7 @@ export class History<TCommand> {
     private readonly listeners = new Set<(state: HistoryState) => void>();
     private readonly lifecycle = new Set<HistoryLifecycle>();
     private busy = false;
+    private replaying = 0;
     private isDisposed = false;
     private isFaulted = false;
     private snapshot: HistoryState;
@@ -130,8 +131,16 @@ export class History<TCommand> {
         });
     }
 
-    /** Record an already-applied command, for store subscriptions and collection deltas. */
+    /**
+     * Record an already-applied command, for store subscriptions and collection
+     * deltas. Calls made while this history is applying a command through its
+     * adapter are ignored: a store subscription also observes history's own
+     * undo/redo/cancel/execute, and that change is already the replayed entry.
+     */
     record(command: TCommand, label?: string): void {
+        if (this.replaying > 0) {
+            return;
+        }
         this.run(
             (errors) => {
                 this.addRecord(command, label, errors);
@@ -321,6 +330,7 @@ export class History<TCommand> {
     }
 
     private apply(command: TCommand, direction: HistoryDirection, errors: unknown[]): void {
+        this.replaying++;
         try {
             this.adapter[direction](command);
         } catch (error) {
@@ -329,6 +339,8 @@ export class History<TCommand> {
             } else {
                 throw error;
             }
+        } finally {
+            this.replaying--;
         }
     }
 
@@ -440,7 +452,13 @@ export class History<TCommand> {
     }
 
     private publish(errors: unknown[]): void {
-        this.snapshot = this.makeState();
+        const next = this.makeState();
+        // Keep the snapshot stable (and stay quiet) when nothing visible
+        // changed, e.g. for every update recorded inside an open transaction.
+        if ((Object.keys(next) as (keyof HistoryState)[]).every((key) => next[key] === this.snapshot[key])) {
+            return;
+        }
+        this.snapshot = next;
         for (const listener of [...this.listeners]) {
             if (!this.listeners.has(listener)) {
                 continue;
