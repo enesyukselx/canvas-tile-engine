@@ -15,6 +15,7 @@ import {
 import { Circle, DrawObject, ImageItem, Line, PathItem, PathStyle, Rect, Text } from "./draw-object";
 import { CanvasTileEngineConfig } from "./config";
 import type { DefaultImage, DefaultMount } from "./platform";
+import type { ItemCollectionChange } from "../modules/ItemCollection";
 
 export type Coords = {
     x: number;
@@ -172,6 +173,13 @@ export interface IRenderer<TMount = DefaultMount, TImage = DefaultImage> {
 }
 
 export interface IDrawAPI<TImage = DefaultImage> {
+    /**
+     * Refresh a live collection registration after its stable items array has
+     * changed. Implementations update only affected cached geometry/index
+     * entries and preserve the draw handle and its paint order. Optional for
+     * compatibility with custom renderers; collections require this method.
+     */
+    applyDrawChanges?(handle: DrawHandle, changes: readonly ItemCollectionChange<unknown>[]): void;
     addDrawFunction(
         fn: (ctx: unknown, coords: Coords, config: Required<CanvasTileEngineConfig>, transform: DrawTransform) => void,
         layer?: number,

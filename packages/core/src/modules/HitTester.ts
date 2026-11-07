@@ -13,7 +13,8 @@ import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathF
 import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { maxPxExtent, resolveBoxWorld, resolveSizeWorld } from "../utils/itemSize";
 import { resolveOrigin, computeOriginOffset } from "../utils/origin";
-import { SpatialIndex } from "./SpatialIndex";
+import { SpatialIndex, type SpatialIndexToken } from "./SpatialIndex";
+import type { ItemCollectionChange, ItemKey, ReadonlyItemCollection } from "./ItemCollection";
 
 /** Primitive kinds that participate in hit testing. */
 export type HitKind = "rect" | "circle" | "image" | "path" | "line";
@@ -30,6 +31,8 @@ export type HitResult<TImage = unknown, TData = unknown> = {
     handle: DrawHandle;
     /** Position of the item inside its draw call's items array. */
     index: number;
+    /** Stable item key, present when the draw call uses an ItemCollection. */
+    key?: ItemKey;
 };
 
 export type HitTestOptions = {
@@ -94,7 +97,49 @@ type HitEntry = {
     index?: SpatialIndex<BoxedItem> | null;
     /** Item object -> position in `items`, built alongside the lazy index. */
     indexMap?: Map<HitItem, number>;
+    /** Live collection metadata; its stable array is shared with `items`. */
+    collection?: Pick<ReadonlyItemCollection<unknown>, "keyAt">;
+    indexTokens?: Map<HitItem, SpatialIndexToken<BoxedItem>>;
+    worldExtents?: ExtentTracker;
+    pixelExtents?: ExtentTracker;
 };
+
+/** Count extents so removals and size reductions can shrink the query padding. */
+class ExtentTracker {
+    private counts = new Map<number, number>();
+    max = 0;
+
+    add(value: number): void {
+        if (!(value > 0)) {
+            return;
+        }
+        this.counts.set(value, (this.counts.get(value) ?? 0) + 1);
+        this.max = Math.max(this.max, value);
+    }
+
+    remove(value: number): void {
+        const count = this.counts.get(value);
+        if (count === undefined) {
+            return;
+        }
+        if (count > 1) {
+            this.counts.set(value, count - 1);
+        } else {
+            this.counts.delete(value);
+            if (value === this.max) {
+                this.max = 0;
+                for (const extent of this.counts.keys()) {
+                    this.max = Math.max(this.max, extent);
+                }
+            }
+        }
+    }
+}
+
+function worldExtent(item: HitItem): number {
+    const rect = item as Rect;
+    return Math.max(rect.size ?? 1, rect.width ?? 0, rect.height ?? 0);
+}
 
 // Same threshold the renderers use for culling: linear scan is faster below it.
 const SPATIAL_INDEX_THRESHOLD = 500;
@@ -124,8 +169,8 @@ function intersectBounds(a: RectRegion, b: Bounds): RectRegion | null {
  * Maintained by the engine's draw delegations, so no renderer participates.
  * Geometry mirrors the renderers' drawing math (origin anchoring, image
  * aspect fit, rotation) in world units. Like rendering itself, results
- * reflect item positions as of the draw call - mutating positions requires
- * re-registration.
+ * reflect item positions as of the draw call. Live collections deliver
+ * incremental changes; ordinary arrays require re-registration after edits.
  *
  * Points are expected in ITEM space (integers are cell centers). Event
  * payloads report `coords.raw` in corner space - the cell of item `k` spans
@@ -203,6 +248,86 @@ export class HitTester {
         });
     }
 
+    /** Attach metadata after registration, without owning a second subscription. */
+    attachCollection(handle: DrawHandle, collection: Pick<ReadonlyItemCollection<unknown>, "keyAt">): void {
+        const entry = this.entries.get(handle.id);
+        if (!entry) {
+            return;
+        }
+        entry.collection = collection;
+        if (entry.kind === "path" || entry.kind === "line") {
+            return;
+        }
+        entry.worldExtents = new ExtentTracker();
+        entry.pixelExtents = new ExtentTracker();
+        for (const item of entry.items) {
+            entry.worldExtents.add(worldExtent(item));
+            entry.pixelExtents.add(maxPxExtent(item as Rect));
+        }
+    }
+
+    /** Apply already-committed collection edits before the next render or query. */
+    applyChanges(handle: DrawHandle, changes: readonly ItemCollectionChange<HitItem>[]): void {
+        const entry = this.entries.get(handle.id);
+        if (!entry?.collection) {
+            return;
+        }
+        let removed = false;
+        for (const change of changes) {
+            const previous =
+                change.type === "update" ? change.previous : change.type === "remove" ? change.item : undefined;
+            const next = change.type === "remove" ? undefined : change.item;
+            if (previous) {
+                entry.worldExtents?.remove(worldExtent(previous));
+                entry.pixelExtents?.remove(maxPxExtent(previous as Rect));
+                if (entry.kind === "path") {
+                    this.flattenCache.delete(previous as PathItem);
+                }
+            }
+            if (next) {
+                entry.worldExtents?.add(worldExtent(next));
+                entry.pixelExtents?.add(maxPxExtent(next as Rect));
+                if (entry.kind === "path") {
+                    // An object may have been edited while it was unregistered,
+                    // then inserted into a different collection registration.
+                    this.flattenCache.delete(next as PathItem);
+                }
+            }
+            if (entry.index && entry.indexTokens) {
+                if (change.type === "insert") {
+                    entry.indexTokens.set(change.item, entry.index.insert(change.item as BoxedItem));
+                } else {
+                    const token = entry.indexTokens.get(previous!);
+                    if (token) {
+                        entry.indexTokens.delete(previous!);
+                        if (change.type === "update") {
+                            entry.index.update(token, change.item as BoxedItem);
+                            entry.indexTokens.set(change.item, token);
+                        } else {
+                            entry.index.remove(token);
+                        }
+                    }
+                }
+                if (previous) {
+                    entry.indexMap!.delete(previous);
+                }
+                if (next) {
+                    entry.indexMap!.set(next, change.index);
+                }
+            }
+            removed ||= change.type === "remove";
+        }
+        // Dense array positions shift after removal, while the R-Tree's stable
+        // paint order needs no rebuild. Do this once per notification batch.
+        if (removed && entry.indexMap) {
+            entry.indexMap = new Map(entry.items.map((item, index) => [item, index]));
+        }
+        if (entry.worldExtents && entry.pixelExtents) {
+            entry.maxSize = entry.worldExtents.max;
+            entry.maxSizePx = entry.pixelExtents.max;
+        }
+    }
+
     remove(handle: DrawHandle): void {
         this.entries.delete(handle.id);
     }
@@ -256,14 +381,7 @@ export class HitTester {
                     if (!this.testItem(point, item, entry, padding)) {
                         continue;
                     }
-                    results.push({
-                        item,
-                        kind: entry.kind,
-                        layer: entry.layer,
-                        handle: entry.handle,
-                        index: entry.indexMap!.get(item)!,
-                        seq: entry.seq,
-                    });
+                    results.push(this.resultFor(entry, item, entry.indexMap!.get(item)!));
                 }
             } else {
                 for (let i = 0; i < entry.items.length; i++) {
@@ -271,14 +389,7 @@ export class HitTester {
                     if (!this.testItem(point, item, entry, padding)) {
                         continue;
                     }
-                    results.push({
-                        item,
-                        kind: entry.kind,
-                        layer: entry.layer,
-                        handle: entry.handle,
-                        index: i,
-                        seq: entry.seq,
-                    });
+                    results.push(this.resultFor(entry, item, i));
                 }
             }
         }
@@ -300,8 +411,26 @@ export class HitTester {
             return;
         }
         // Only anchor-positioned kinds reach here (see `indexable` in hitTest).
-        entry.index = SpatialIndex.fromArray(entry.items as BoxedItem[]);
+        if (entry.collection) {
+            entry.index = new SpatialIndex<BoxedItem>();
+            const tokens = entry.index.load(entry.items as BoxedItem[]);
+            entry.indexTokens = new Map(entry.items.map((item, i) => [item, tokens[i]]));
+        } else {
+            entry.index = SpatialIndex.fromArray(entry.items as BoxedItem[]);
+        }
         entry.indexMap = new Map(entry.items.map((item, i) => [item, i]));
+    }
+
+    private resultFor(entry: HitEntry, item: HitItem, index: number): HitResult & { seq: number } {
+        return {
+            item,
+            kind: entry.kind,
+            layer: entry.layer,
+            handle: entry.handle,
+            index,
+            seq: entry.seq,
+            ...(entry.collection ? { key: entry.collection.keyAt(index) } : {}),
+        };
     }
 
     /** World-space box the item is drawn into, mirroring the renderers' math. */
@@ -513,14 +642,7 @@ export class HitTester {
                     if (!this.testItemRect(region, item, entry, mode)) {
                         continue;
                     }
-                    results.push({
-                        item,
-                        kind: entry.kind,
-                        layer: entry.layer,
-                        handle: entry.handle,
-                        index: entry.indexMap!.get(item)!,
-                        seq: entry.seq,
-                    });
+                    results.push(this.resultFor(entry, item, entry.indexMap!.get(item)!));
                 }
             } else {
                 for (let i = 0; i < entry.items.length; i++) {
@@ -528,14 +650,7 @@ export class HitTester {
                     if (!this.testItemRect(region, item, entry, mode)) {
                         continue;
                     }
-                    results.push({
-                        item,
-                        kind: entry.kind,
-                        layer: entry.layer,
-                        handle: entry.handle,
-                        index: i,
-                        seq: entry.seq,
-                    });
+                    results.push(this.resultFor(entry, item, i));
                 }
             }
         }

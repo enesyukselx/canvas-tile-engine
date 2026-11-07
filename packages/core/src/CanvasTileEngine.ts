@@ -4,6 +4,7 @@ import { CoordinateTransformer } from "./modules/CoordinateTransformer";
 import { ViewportState } from "./modules/ViewportState";
 import { AnimationController } from "./modules/AnimationController";
 import { HitTester, HitResult, HitTestOptions, HitTestRectOptions, HitItem } from "./modules/HitTester";
+import { isItemCollection, type DrawItems, type ItemCollectionChange } from "./modules/ItemCollection";
 import { DEFAULT_VALUES } from "./constants";
 import { validateCoords, validateScale } from "./utils/validateConfig";
 import { fitScale } from "./utils/fitScale";
@@ -69,6 +70,11 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
     private drawIds = new Map<string, { handle: DrawHandle; cacheKey?: string }>();
     private drawIdByHandle = new Map<symbol, string>();
     private eventHandlersListeners = new Set<(handlers: Readonly<EventHandlers>) => void>();
+    private collectionBindings = new Map<symbol, { handle: DrawHandle; unsubscribe: () => void }>();
+    private pendingFrame: number | undefined;
+    private renderRequested = false;
+    private renderGeneration = 0;
+    private destroyed = false;
 
     public canvasWrapper: TMount;
     /**
@@ -398,6 +404,9 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
 
     /** Tear down listeners and observers. */
     destroy() {
+        this.destroyed = true;
+        this.cancelRequestedRender();
+        this.clearCollectionBindings();
         this.eventHandlersListeners.clear();
         this.animationController.cancelAll();
         this.renderer.destroy();
@@ -408,7 +417,47 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
 
     /** Render a frame using the active renderer. */
     render() {
+        this.cancelRequestedRender();
+        if (this.destroyed) {
+            return;
+        }
         this.renderer.render();
+    }
+
+    /**
+     * Request one frame for any number of changes in the current turn.
+     * Uses requestAnimationFrame when available, otherwise a microtask.
+     * Collection changes call this automatically. `render()` remains
+     * synchronous and consumes a pending request; destroy cancels it.
+     */
+    requestRender(): void {
+        if (this.destroyed || this.renderRequested) {
+            return;
+        }
+        this.renderRequested = true;
+        const generation = ++this.renderGeneration;
+        const flush = () => {
+            if (this.destroyed || !this.renderRequested || generation !== this.renderGeneration) {
+                return;
+            }
+            this.renderRequested = false;
+            this.pendingFrame = undefined;
+            this.renderer.render();
+        };
+        if (typeof requestAnimationFrame === "function") {
+            this.pendingFrame = requestAnimationFrame(flush);
+        } else {
+            void Promise.resolve().then(flush);
+        }
+    }
+
+    private cancelRequestedRender(): void {
+        if (this.pendingFrame !== undefined && typeof cancelAnimationFrame === "function") {
+            cancelAnimationFrame(this.pendingFrame);
+        }
+        this.pendingFrame = undefined;
+        this.renderRequested = false;
+        this.renderGeneration++;
     }
 
     /**
@@ -844,6 +893,71 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
 
     // ─── Draw helpers ───────────
 
+    private prepareDrawItems<T>(items: DrawItems<T>): T | T[] {
+        if (!isItemCollection<T>(items)) {
+            return items;
+        }
+        if (this.destroyed) {
+            throw new Error("[CanvasTileEngine] Cannot register an ItemCollection on a destroyed engine.");
+        }
+        if (typeof this.renderer.getDrawAPI().applyDrawChanges !== "function") {
+            throw new Error(
+                "[CanvasTileEngine] This renderer must implement applyDrawChanges to draw an ItemCollection.",
+            );
+        }
+        // A registration owns one stable view, updated only by delivered
+        // deltas. Reentrant source mutations cannot get ahead of its indexes.
+        return items.items.slice();
+    }
+
+    private bindCollection<T>(handle: DrawHandle, items: DrawItems<T>, data: T | T[]): void {
+        if (!isItemCollection<T>(items)) {
+            return;
+        }
+        const values = data as T[];
+        const keys = values.map((_, index) => items.keyAt(index));
+        this.hitTester.attachCollection(handle, { keyAt: (index) => keys[index] });
+        const draw = this.renderer.getDrawAPI();
+        const unsubscribe = items.subscribe((changes) => {
+            if (this.destroyed || !this.collectionBindings.has(handle.id)) {
+                return;
+            }
+            for (const change of changes) {
+                if (change.type === "insert") {
+                    values.push(change.item);
+                    keys.push(change.key);
+                } else if (change.type === "update") {
+                    values[change.index] = change.item;
+                } else {
+                    values.splice(change.index, 1);
+                    keys.splice(change.index, 1);
+                }
+            }
+            // Update geometry synchronously before the coalesced frame.
+            this.hitTester.applyChanges(handle, changes as readonly ItemCollectionChange<HitItem>[]);
+            draw.applyDrawChanges!(handle, changes);
+            this.requestRender();
+        });
+        this.collectionBindings.set(handle.id, { handle, unsubscribe });
+    }
+
+    private unbindCollection(handle: DrawHandle): void {
+        const binding = this.collectionBindings.get(handle.id);
+        if (!binding) {
+            return;
+        }
+        this.collectionBindings.delete(handle.id);
+        binding.unsubscribe();
+    }
+
+    private clearCollectionBindings(layer?: number): void {
+        for (const binding of this.collectionBindings.values()) {
+            if (layer === undefined || binding.handle.layer === layer) {
+                this.unbindCollection(binding.handle);
+            }
+        }
+    }
+
     /**
      * Tear down the registration previously stored under `id`, if any:
      * draw callback, hit-test entries, and (for static draws) the offscreen
@@ -860,6 +974,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
         }
         this.drawIds.delete(id);
         this.drawIdByHandle.delete(prev.handle.id);
+        this.unbindCollection(prev.handle);
         this.renderer.getDrawAPI().removeDrawHandle(prev.handle);
         this.hitTester.remove(prev.handle);
         if (prev.cacheKey !== undefined) {
@@ -909,26 +1024,28 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * nor hit-tests), and `interactiveOf` (per-item hit-test opt-out).
      */
     drawRect<TData = unknown>(
-        items: Rect<TData> | Array<Rect<TData>>,
+        items: DrawItems<Rect<TData>>,
         layer: number = 1,
         options?: RectDrawOptions<TData>,
     ): DrawHandle {
+        const data = this.prepareDrawItems(items);
         this.replacePreviousDraw(options?.id);
         // TData only narrows the callback's item type for callers; renderers
         // hand back items from this same registration, so widening is safe.
-        const handle = this.renderer.getDrawAPI().drawRect(items, layer, {
+        const handle = this.renderer.getDrawAPI().drawRect(data, layer, {
             styleOf: options?.styleOf as StyleOf<Rect, ShapeDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Rect> | undefined,
             clip: options?.clip,
         });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "rect", items, layer, {
+            this.hitTester.register(handle, "rect", data, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
                 clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
+        this.bindCollection(handle, items, data);
         return handle;
     }
 
@@ -1034,19 +1151,20 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * derives from the registration-time stroke width.
      */
     drawLine<TData = unknown>(
-        items: Array<Line<TData>> | Line<TData>,
+        items: DrawItems<Line<TData>>,
         style?: LineStyle,
         layer: number = 1,
         options?: LineDrawOptions<TData>,
     ): DrawHandle {
+        const data = this.prepareDrawItems(items);
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawLine(items, style, layer, {
+        const handle = this.renderer.getDrawAPI().drawLine(data, style, layer, {
             styleOf: options?.styleOf as StyleOf<Line, LineDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Line> | undefined,
             clip: options?.clip,
         });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "line", items, layer, {
+            this.hitTester.register(handle, "line", data, layer, {
                 style,
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
@@ -1054,6 +1172,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
             });
         }
         this.trackDrawId(options?.id, handle);
+        this.bindCollection(handle, items, data);
         return handle;
     }
 
@@ -1069,24 +1188,26 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * nor hit-tests), and `interactiveOf` (per-item hit-test opt-out).
      */
     drawCircle<TData = unknown>(
-        items: Circle<TData> | Array<Circle<TData>>,
+        items: DrawItems<Circle<TData>>,
         layer: number = 1,
         options?: CircleDrawOptions<TData>,
     ): DrawHandle {
+        const data = this.prepareDrawItems(items);
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawCircle(items, layer, {
+        const handle = this.renderer.getDrawAPI().drawCircle(data, layer, {
             styleOf: options?.styleOf as StyleOf<Circle, ShapeDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Circle> | undefined,
             clip: options?.clip,
         });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "circle", items, layer, {
+            this.hitTester.register(handle, "circle", data, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
                 clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
+        this.bindCollection(handle, items, data);
         return handle;
     }
 
@@ -1117,17 +1238,19 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * ```
      */
     drawText<TData = unknown>(
-        items: Array<Text<TData>> | Text<TData>,
+        items: DrawItems<Text<TData>>,
         layer: number = 2,
         options?: TextDrawOptions<TData>,
     ): DrawHandle {
+        const data = this.prepareDrawItems(items);
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawText(items, layer, {
+        const handle = this.renderer.getDrawAPI().drawText(data, layer, {
             styleOf: options?.styleOf as StyleOf<Text, TextDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<Text> | undefined,
             clip: options?.clip,
         });
         this.trackDrawId(options?.id, handle);
+        this.bindCollection(handle, items, data);
         return handle;
     }
 
@@ -1160,12 +1283,13 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * ```
      */
     drawPath<TData = unknown>(
-        items: PathItem<TData> | Array<PathItem<TData>>,
+        items: DrawItems<PathItem<TData>>,
         layer: number = 1,
         options?: PathDrawOptions<TData>,
     ): DrawHandle {
+        const data = this.prepareDrawItems(items);
         this.replacePreviousDraw(options?.id);
-        const list = Array.isArray(items) ? items : [items];
+        const list = Array.isArray(data) ? data : [data];
         const handle = this.renderer.getDrawAPI().drawPath(list, layer, {
             styleOf: options?.styleOf as StyleOf<PathItem, PathDecorationStyle> | undefined,
             visibleOf: options?.visibleOf as VisibleOf<PathItem> | undefined,
@@ -1179,6 +1303,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
             });
         }
         this.trackDrawId(options?.id, handle);
+        this.bindCollection(handle, items, data);
         return handle;
     }
 
@@ -1195,22 +1320,25 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * like `opacity` (mutate + `render()`).
      */
     drawImage<TData = unknown>(
-        items: Array<ImageItem<TImage, TData>> | ImageItem<TImage, TData>,
+        items: DrawItems<ImageItem<TImage, TData>>,
         layer: number = 1,
         options?: ImageDrawOptions<TImage, TData>,
     ): DrawHandle {
+        const data = this.prepareDrawItems(items);
         this.replacePreviousDraw(options?.id);
-        const handle = this.renderer.getDrawAPI().drawImage(items, layer, {
+        const handle = this.renderer.getDrawAPI().drawImage(data, layer, {
             visibleOf: options?.visibleOf as VisibleOf<ImageItem<TImage>> | undefined,
+            clip: options?.clip,
         });
         if (options?.hitTest !== false) {
-            this.hitTester.register(handle, "image", items, layer, {
+            this.hitTester.register(handle, "image", data, layer, {
                 visibleOf: options?.visibleOf as VisibleOf<HitItem> | undefined,
                 interactiveOf: options?.interactiveOf as InteractiveOf<HitItem> | undefined,
                 clip: options?.clip,
             });
         }
         this.trackDrawId(options?.id, handle);
+        this.bindCollection(handle, items, data);
         return handle;
     }
 
@@ -1279,6 +1407,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * Does not clear other callbacks on the same layer.
      */
     removeDrawHandle(handle: DrawHandle) {
+        this.unbindCollection(handle);
         this.renderer.getDrawAPI().removeDrawHandle(handle);
         this.hitTester.remove(handle);
         this.untrackDrawHandle(handle);
@@ -1296,6 +1425,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * ```
      */
     clearLayer(layer: number) {
+        this.clearCollectionBindings(layer);
         this.renderer.getDrawAPI().clearLayer(layer);
         this.hitTester.clearLayer(layer);
         for (const [id, entry] of this.drawIds) {
@@ -1320,6 +1450,7 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * ```
      */
     clearAll() {
+        this.clearCollectionBindings();
         this.renderer.getDrawAPI().clearAll();
         // Every static cache (or Skia picture) is orphaned once all callbacks
         // are gone; dropping them releases their memory.
@@ -1339,9 +1470,9 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
      * handled internally.
      *
      * Text, grid lines, and custom draw functions never enter hit testing.
-     * Like rendering, results reflect item positions as of the draw call:
-     * mutating an item's position requires re-registration (style mutation
-     * is fine).
+     * ItemCollection mutations refresh hit geometry synchronously and add a
+     * stable `key` to each hit. Ordinary item/array geometry changes require
+     * re-registration to refresh cached spatial data.
      *
      * `padding` (world units) and `paddingPx` (screen pixels, zoom
      * independent) expand every item's hit geometry outward - generous

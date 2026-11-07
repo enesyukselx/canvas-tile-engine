@@ -6,6 +6,8 @@ sidebar_position: 2
 
 The React package provides declarative draw components that automatically manage layer registration and rendering. All components use **world coordinates**, and the engine handles scaling and positioning.
 
+`Rect`, `Circle`, `Image`, `Text`, `Line`, and `Path` also accept a stable `ItemCollection` as their `items` prop. Its keyed updates repaint automatically without rerendering React or replacing the draw handle. See [Live Item Collections](../js/item_collections.md#react-and-react-native) for a complete example. Static components and Sprite keep their existing inputs.
+
 :::tip Type Safety
 All drawing types are exported from the package. See [Types Reference](/docs/introduction/types) for complete type definitions.
 

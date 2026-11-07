@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "@testing-library/react";
+import { ItemCollection } from "@canvas-tile-engine/core";
 import type {
     CanvasTileEngineConfig,
     Coords,
     DrawHandle,
+    DrawItems,
     DrawTransform,
     ImageItem,
     Rect as RectType,
@@ -41,14 +43,14 @@ type RegisteredDrawFn = (
 function createFakeHandle() {
     const makeHandle = (layer = 1): DrawHandle => ({ id: Symbol("handle"), layer });
     return {
-        drawRect: vi.fn((_items: RectType | RectType[], layer: number = 1, _options?: RectDrawOptions) =>
+        drawRect: vi.fn((_items: DrawItems<RectType>, layer: number = 1, _options?: RectDrawOptions) =>
             makeHandle(layer),
         ),
         drawCircle: vi.fn(() => makeHandle()),
         drawLine: vi.fn(() => makeHandle()),
         drawText: vi.fn(() => makeHandle()),
         drawPath: vi.fn(() => makeHandle()),
-        drawImage: vi.fn((_items: ImageItem<unknown> | ImageItem<unknown>[], layer: number = 1, _options?: unknown) =>
+        drawImage: vi.fn((_items: DrawItems<ImageItem<unknown>>, layer: number = 1, _options?: unknown) =>
             makeHandle(layer),
         ),
         drawGridLines: vi.fn(() => makeHandle()),
@@ -82,6 +84,80 @@ afterEach(() => {
 });
 
 describe("draw components", () => {
+    it.each([
+        [
+            "Rect",
+            "drawRect",
+            () => {
+                const items = new ItemCollection([TILE], { keyOf: () => "tile" });
+                return { items, ui: <Rect items={items} /> };
+            },
+        ],
+        [
+            "Circle",
+            "drawCircle",
+            () => {
+                const items = new ItemCollection([{ x: 0, y: 0 }], { keyOf: () => "dot" });
+                return { items, ui: <Circle items={items} /> };
+            },
+        ],
+        [
+            "Line",
+            "drawLine",
+            () => {
+                const items = new ItemCollection([{ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }], {
+                    keyOf: () => "line",
+                });
+                return { items, ui: <Line items={items} /> };
+            },
+        ],
+        [
+            "Text",
+            "drawText",
+            () => {
+                const items = new ItemCollection([{ x: 0, y: 0, text: "hi" }], { keyOf: () => "label" });
+                return { items, ui: <Text items={items} /> };
+            },
+        ],
+        [
+            "Path",
+            "drawPath",
+            () => {
+                const items = new ItemCollection(
+                    [
+                        {
+                            points: [
+                                { x: 0, y: 0 },
+                                { x: 1, y: 1 },
+                            ],
+                        },
+                    ],
+                    {
+                        keyOf: () => "path",
+                    },
+                );
+                return { items, ui: <Path items={items} /> };
+            },
+        ],
+        [
+            "Image",
+            "drawImage",
+            () => {
+                const items = new ItemCollection([{ x: 0, y: 0, img: "img" }], { keyOf: () => "image" });
+                return { items, ui: <Image items={items} /> };
+            },
+        ],
+    ] as const)("%s forwards a live collection instead of an array snapshot", (_name, method, makeCase) => {
+        const engine = createFakeHandle();
+        const { items, ui } = makeCase();
+        const { rerender } = renderWith(engine, ui);
+
+        const calls = engine[method].mock.calls as unknown[][];
+        expect(calls[0][0]).toBe(items);
+        rerender(ui);
+        expect(engine[method]).toHaveBeenCalledTimes(1);
+    });
+
     it.each([
         ["Rect", "drawRect", () => <Rect items={TILE} />],
         ["Circle", "drawCircle", () => <Circle items={{ x: 1, y: 1 }} />],

@@ -59,11 +59,16 @@ scenes (one layering caveat in [performance](references/performance.md)).
    layer, { id: "units" })` replaces the previous registration with that id
    (draw + hit-test entries). Without an id, every call adds another copy.
    Static draws use their `cacheKey` as the id.
+   For frequent per-item geometry edits, use a stable `ItemCollection`
+   (core >= 0.12): `insert` / `update` / `remove` / `batch` maintain caches
+   and hit testing, then automatically request a frame. Read
+   [live collections](references/item-collections.md) before implementing them.
 4. **Decoration is not geometry.** Selection, hover, highlight and filters go
    through `styleOf` / `visibleOf` / `interactiveOf` in the draw options:
    they read your state live on every frame, so you mutate state and call
    `render()` - no new arrays, no re-registration. Geometry changes
-   (position, size, line width) re-register with the same id. Rules per
+   (position, size, line width) use collection updates, or re-register an
+   ordinary array with the same id. Rules per
    primitive: [drawing](references/drawing.md#styleof-visibleof-interactiveof).
 5. **Layers are z-order.** Lower numbers paint first (defaults: grid 0,
    shapes/images 1, text 2). Inside one draw call, array order is paint order.
@@ -236,6 +241,7 @@ const png = await renderToBuffer({
 | :-- | :-- |
 | [core-api.md](references/core-api.md) | Coordinate spaces, construction, full config reference, every engine method, image loading, utilities, exported types. |
 | [drawing.md](references/drawing.md) | Retained draw model, ids, `styleOf`/`visibleOf`/`interactiveOf`, every primitive, origin, gradients, clipping, static caches, custom drawing, screen-fixed overlays. |
+| [item-collections.md](references/item-collections.md) | `ItemCollection` keyed insert/update/remove/batch, subscriptions, hit keys, React usage, lifecycle and limits (core >= 0.12). |
 | [events.md](references/events.md) | Flags, callback payloads, keyboard control, runtime mode switching, interaction patterns. |
 | [react.md](references/react.md) | `useCanvasTileEngine` handle, the compound components and their props, lifecycle rules, types, pitfalls. |
 | [react-native.md](references/react-native.md) | RN component, sizing boards to the screen, touch behavior, Skia types and custom drawing, platform differences. |

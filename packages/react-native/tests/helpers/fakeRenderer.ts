@@ -23,6 +23,9 @@ import type { RendererSkia, SkiaMount, SkImage } from "@canvas-tile-engine/rende
  */
 export function createFakeRenderer() {
     const drawRectCalls: Array<RectType | RectType[]> = [];
+    // The core updates the registration's stable array before notifying the
+    // renderer. This recorder has no culling cache of its own.
+    const applyDrawChanges: Mock = vi.fn();
     const makeHandle = (layer = 1): DrawHandle => ({ id: Symbol("handle"), layer });
 
     const drawAPI = {
@@ -40,6 +43,7 @@ export function createFakeRenderer() {
         drawStaticRect: () => makeHandle(),
         drawStaticCircle: () => makeHandle(),
         drawStaticImage: () => makeHandle(),
+        applyDrawChanges,
         removeDrawHandle: () => {},
         clearLayer: () => {},
         clearAll: () => {},
@@ -134,6 +138,7 @@ export function createFakeRenderer() {
     return {
         renderer,
         drawRectCalls,
+        applyDrawChanges,
         paintFrame,
         render,
         resize,
