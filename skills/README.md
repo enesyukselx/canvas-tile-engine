@@ -54,7 +54,7 @@ Or invoke it explicitly: `/canvas-tile-engine`.
 
 ## Versioning
 
-Written against `@canvas-tile-engine/core@0.11.x` and the renderer/binding
+Written against `@canvas-tile-engine/core@0.12.x` and the renderer/binding
 packages published alongside it. This directory always describes what is on
 npm: the upcoming copy lives in `skills-next/`, and the release ("Version
 Packages") PR copies it here and updates the version above, so the skill
