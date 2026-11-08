@@ -43,6 +43,11 @@ export type LinearGradient = {
 export type Paint = string | LinearGradient;
 
 export type DrawObject<TData = unknown> = {
+    /**
+     * Position in world units (item space: integers are cell centers). Must
+     * be finite, like `y`: an item at `NaN` or ±Infinity paints nothing and
+     * never hits, on every renderer.
+     */
     x: number;
     y: number;
     /**
@@ -235,7 +240,12 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size" | 
     };
 };
 export type Line<TData = unknown> = {
+    /**
+     * Start point in world units. Both endpoints must be finite: a line with
+     * a `NaN` or ±Infinity coordinate paints nothing and never hits.
+     */
     from: Coords;
+    /** End point in world units. Must be finite, see {@link from}. */
     to: Coords;
     /**
      * Per-item style, overlaying the call-level `style` argument field by
@@ -330,7 +340,11 @@ export type PathItem<TData = unknown> = {
      * when both are set, `commands` wins.
      */
     commands?: PathCommand[];
-    /** Polyline vertices in world units (item space: integers are cell centers). */
+    /**
+     * Polyline vertices in world units (item space: integers are cell
+     * centers). Must be finite: one `NaN` or ±Infinity point makes the whole
+     * path paint nothing and never hit.
+     */
     points?: Coords[];
     /**
      * Join the last point back to the first with a closing segment.

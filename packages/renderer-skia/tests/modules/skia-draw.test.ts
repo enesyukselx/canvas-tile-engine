@@ -1009,6 +1009,96 @@ describe("negative and NaN extents", () => {
     });
 });
 
+// Position contract shared by all renderers; mirrors the fixture values in the
+// canvas, webgl, and server suites. An item whose position, endpoint or path
+// point is NaN or ±Infinity paints nothing, dynamic or static.
+describe("non-finite positions", () => {
+    const style = { fillStyle: "#f00", strokeStyle: "#00f", lineWidthPx: 2 };
+    const fakeImage = { width: () => 10, height: () => 10 } as never;
+    const at = [
+        { x: NaN, y: 2 },
+        { x: 2, y: Infinity },
+        { x: -Infinity, y: 2 },
+    ];
+    const drawOps = (ops: Op[]) => ops.filter((o) => o.op !== "rotate" && o.op !== "translate" && o.op !== "scale");
+
+    it("issues no draw for any kind at a non-finite position", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(
+            at.map((p) => ({ ...p, style, rotate: 30 })),
+            1,
+        );
+        draw.drawCircle(
+            at.map((p) => ({ ...p, style })),
+            1,
+        );
+        draw.drawImage(
+            at.map((p) => ({ ...p, img: fakeImage, flipX: true })),
+            1,
+        );
+        draw.drawText(
+            at.map((p) => ({ ...p, text: "lost", style: { fillStyle: "#000" } })),
+            2,
+        );
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: Infinity, y: 2 } },
+                { from: { x: NaN, y: 0 }, to: { x: 3, y: 3 } },
+            ],
+            { strokeStyle: "#00f" },
+            2,
+        );
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 1, y: 1 },
+                        { x: NaN, y: 2 },
+                        { x: 5, y: 5 },
+                    ],
+                    style,
+                },
+                {
+                    points: [
+                        { x: 1, y: 1 },
+                        { x: 5, y: Infinity },
+                    ],
+                    style,
+                },
+            ],
+            2,
+        );
+        render(canvas);
+
+        expect(drawOps(ops)).toEqual([]);
+    });
+
+    it("keeps a static picture's cull rect finite around the valid items", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        const valid = { x: 5, y: 5, size: 1, style };
+
+        draw.drawStaticRect([...at.map((p) => ({ ...p, style })), valid], "rects");
+        draw.drawStaticCircle([...at.map((p) => ({ ...p, style })), valid], "circles");
+        draw.drawStaticImage([...at.map((p) => ({ ...p, img: fakeImage })), { ...valid, img: fakeImage }], "images");
+        render(canvas);
+
+        // One NaN or Infinity in the union made the cull rect non-finite, and
+        // Skia then paints nothing of the picture at all. The non-finite items
+        // themselves still reach the recorder; Skia drops non-finite geometry
+        // natively (checked against CanvasKit), so only the valid ones paint.
+        const pictures = ops.filter((o) => o.op === "picture").map((o) => o.picture as MockPicture);
+        expect(pictures).toHaveLength(3);
+        for (const picture of pictures) {
+            const bounds = picture.bounds as { x: number; y: number; width: number; height: number };
+            expect(Object.values(bounds).every(Number.isFinite)).toBe(true);
+            expect(bounds.width).toBeLessThan(20);
+        }
+    });
+});
+
 // Per-item line style contract shared by all renderers: item.style overlays
 // the call-level style field by field; the shared stroke paint is mutated for
 // the item's draw and restored for the rest of the batch.

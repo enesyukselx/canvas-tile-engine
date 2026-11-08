@@ -19,5 +19,6 @@ export {
     textPaintBounds,
     intersectsBounds,
     PaintedCuller,
+    NOWHERE,
     UNBOUNDED,
 } from "./paintedBounds";

@@ -4,8 +4,10 @@
  */
 
 import RBush from "rbush";
+import { isFinitePoint } from "../utils/finitePoint";
 
 export interface SpatialItem {
+    /** Anchor position. A non-finite `x` or `y` indexes the item nowhere: no finite query finds it. */
     x: number;
     y: number;
     /**
@@ -33,6 +35,14 @@ declare const spatialIndexToken: unique symbol;
 function nonNegative(value: number): number {
     return value > 0 ? value : 0;
 }
+
+/**
+ * Inverted infinite box for an item with a non-finite position. No finite
+ * query intersects it, and it is the identity of RBush's min/max bbox merge, so it
+ * never widens (or, unlike NaN, poisons) an ancestor node. Removal still finds
+ * it: every node "contains" it.
+ */
+const NOWHERE = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity } as const;
 
 /** Opaque handle for one indexed occurrence, even when item references repeat. */
 export interface SpatialIndexToken<T> {
@@ -107,6 +117,16 @@ export class SpatialIndex<T extends SpatialItem> {
      */
     query(minX: number, minY: number, maxX: number, maxY: number): T[] {
         const results = this.tree.search({ minX, minY, maxX, maxY });
+        // RBush returns every entry of a node the query fully contains without
+        // testing each one, so a nowhere entry (the only inverted box) can ride
+        // along. Compact it out in place; `search` hands back a fresh array.
+        let kept = 0;
+        for (const entry of results) {
+            if (entry.minX <= entry.maxX) {
+                results[kept++] = entry;
+            }
+        }
+        results.length = kept;
         // R-Tree traversal follows spatial partitions, not paint order. Sort only
         // the matching entries so culling preserves the array's stacking order.
         results.sort((a, b) => a.order - b.order);
@@ -136,6 +156,9 @@ export class SpatialIndex<T extends SpatialItem> {
     }
 
     private boundsOf(item: T): Pick<RBushItem<T>, "minX" | "minY" | "maxX" | "maxY"> {
+        if (!isFinitePoint(item)) {
+            return { ...NOWHERE };
+        }
         const size = typeof item.size === "number" ? item.size : 0;
         // Negative and NaN extents index as a point: an inverted box (min > max)
         // would never be found again, and NaN would poison the tree's bounds.

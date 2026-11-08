@@ -12,6 +12,8 @@ import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
 import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { maxPxExtent, resolveBoxWorld, resolveSizeWorld } from "../utils/itemSize";
+import { isFinitePoint } from "../utils/finitePoint";
+import { pathItemBounds } from "../utils/itemBounds";
 import { resolveOrigin, computeOriginOffset } from "../utils/origin";
 import { SpatialIndex, type SpatialIndexToken } from "./SpatialIndex";
 import type { ItemCollectionChange, ItemKey, ReadonlyItemCollection } from "./ItemCollection";
@@ -147,6 +149,23 @@ function worldExtent(item: HitItem): number {
  */
 function emptyBox(box: { w: number; h: number }): boolean {
     return !(box.w > 0) && !(box.h > 0);
+}
+
+/**
+ * Positions must be finite: an item at `NaN` or ±Infinity, a line with such an
+ * endpoint, or a `points` path with such a vertex paints nothing on any
+ * renderer, so it never hits. Paths reuse `pathItemBounds`, the same check the
+ * renderers skip a path on (command lists follow `pathCommandsBounds`).
+ */
+function finiteGeometry(item: HitItem, kind: HitKind): boolean {
+    if (kind === "line") {
+        const line = item as Line;
+        return isFinitePoint(line.from) && isFinitePoint(line.to);
+    }
+    if (kind === "path") {
+        return pathItemBounds(item as PathItem) !== null;
+    }
+    return isFinitePoint(item as BoxedItem);
 }
 
 // Same threshold the renderers use for culling: linear scan is faster below it.
@@ -708,12 +727,13 @@ export class HitTester {
     }
 
     /** Per-item gate shared by point and rect queries: hidden items never
-     * hit (only `false` opts out — `undefined` means visible/interactive). */
+     * hit (only `false` opts out — `undefined` means visible/interactive),
+     * and neither do items with non-finite geometry, which no renderer paints. */
     private itemHittable(item: HitItem, entry: HitEntry): boolean {
         if (entry.visibleOf?.(item) === false || entry.interactiveOf?.(item) === false) {
             return false;
         }
-        return true;
+        return finiteGeometry(item, entry.kind);
     }
 
     private testItemRect(rect: RectRegion, item: HitItem, entry: HitEntry, mode: "intersect" | "contain"): boolean {

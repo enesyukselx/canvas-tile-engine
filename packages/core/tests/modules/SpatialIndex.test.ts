@@ -360,3 +360,39 @@ describe("negative and NaN extents", () => {
         expect(index.query(7, 0, 7, 0)).toEqual([items[7]]);
     });
 });
+
+describe("non-finite positions", () => {
+    const grid = () => Array.from({ length: 200 }, (_, i) => ({ x: i % 20, y: Math.floor(i / 20), size: 1 }));
+
+    it.each([NaN, Infinity, -Infinity])("indexes an item at %s nowhere without hiding the rest", (value) => {
+        const items = grid();
+        items[7].x = value;
+        items[42].y = value;
+        const index = SpatialIndex.fromArray(items);
+
+        expect(index.query(-1e9, -1e9, 1e9, 1e9)).toHaveLength(198);
+        expect(index.query(8, 0, 8, 0)).toEqual([items[8]]);
+        expect(index.query(15, 9, 15, 9)).toEqual([items[195]]);
+    });
+
+    it("keeps insert, update and remove working around nowhere entries", () => {
+        const items = grid();
+        const index = new SpatialIndex<{ x: number; y: number; size: number }>();
+        const tokens = index.load(items);
+        const lost = { x: NaN, y: 3, size: 1 };
+        const lostToken = index.insert(lost);
+        index.insert({ x: Infinity, y: Infinity, size: 1 });
+
+        expect(index.query(0, 3, 0, 3)).toEqual([items[60]]);
+
+        // Into and out of nowhere, then removed while nowhere.
+        expect(index.update(tokens[60], { x: NaN, y: NaN, size: 1 })).toBe(true);
+        expect(index.query(0, 3, 0, 3)).toEqual([]);
+        const back = { x: 0, y: 3, size: 1 };
+        expect(index.update(tokens[60], back)).toBe(true);
+        expect(index.query(0, 3, 0, 3)).toEqual([back]);
+        expect(index.remove(lostToken)).toBe(true);
+        expect(index.remove(lostToken)).toBe(false);
+        expect(index.query(-1e9, -1e9, 1e9, 1e9)).toHaveLength(200);
+    });
+});

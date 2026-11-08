@@ -131,6 +131,27 @@ describe("WebGLDraw negative and NaN extents", () => {
         expect(shapes).toHaveLength(0);
         expect(lines).toHaveLength(0);
     });
+
+    // Position contract, mirrored in the canvas, skia, and server suites: a
+    // NaN or ±Infinity position paints nothing, dynamic or static.
+    it("emits no fill or outline for a rect or circle at a non-finite position", () => {
+        const { draw, render } = setup();
+        const { gl, shapes, lines } = makeRecordingGL();
+        const items = [
+            { x: NaN, y: 2, style },
+            { x: 2, y: Infinity, style },
+            { x: -Infinity, y: 2, style, rotate: 30 },
+        ];
+
+        draw.drawRect(items, 1);
+        draw.drawStaticRect(items, "rects", 1);
+        draw.drawCircle(items, 1);
+        draw.drawStaticCircle(items, "circles", 1);
+        render(gl);
+
+        expect(shapes).toHaveLength(0);
+        expect(lines).toHaveLength(0);
+    });
 });
 
 describe("WebGLDraw rounded rectangles", () => {

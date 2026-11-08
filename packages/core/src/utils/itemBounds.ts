@@ -1,6 +1,7 @@
 import type { Bounds, Coords, PathCommand } from "../types";
 import { pathCommandsBounds } from "./flattenPath";
 import { resolveBoxWorld } from "./itemSize";
+import { isFinitePoint } from "./finitePoint";
 import { isItemCollection, type ReadonlyItemCollection } from "../modules/ItemCollection";
 
 /**
@@ -45,8 +46,10 @@ export type BoundedItem = AnchoredItem | EndpointItem | OutlineItem;
  * Conservative world bounds of one path item: the control-point hull for
  * command paths (curves never leave it), the vertex box for polylines.
  *
- * Null means "nothing is drawn" — an empty command list, or fewer than two
- * points — which is also how the renderers decide to skip a path entirely.
+ * Null means "nothing is drawn" — an empty command list, fewer than two
+ * points, or any `NaN` or infinite point — which is also how the renderers
+ * and the hit tester decide to skip a path entirely. Command lists follow
+ * {@link pathCommandsBounds}.
  */
 export function pathItemBounds(item: OutlineItem): Bounds | null {
     if (item.commands !== undefined) {
@@ -63,6 +66,12 @@ export function pathItemBounds(item: OutlineItem): Bounds | null {
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const p of points) {
+        // One bad point skips the whole path. Renderers disagreed otherwise:
+        // Canvas2D drops just the point, Skia the whole path, WebGL the
+        // segments around it, and @napi-rs/canvas aborts on a rounded corner.
+        if (!isFinitePoint(p)) {
+            return null;
+        }
         if (p.x < minX) {
             minX = p.x;
         }
@@ -83,6 +92,9 @@ export function pathItemBounds(item: OutlineItem): Bounds | null {
 function boundsOf(item: BoundedItem): Bounds | null {
     const endpoints = item as Partial<EndpointItem>;
     if (endpoints.from && endpoints.to) {
+        if (!isFinitePoint(endpoints.from) || !isFinitePoint(endpoints.to)) {
+            return null;
+        }
         return {
             minX: Math.min(endpoints.from.x, endpoints.to.x),
             maxX: Math.max(endpoints.from.x, endpoints.to.x),
@@ -96,8 +108,9 @@ function boundsOf(item: BoundedItem): Bounds | null {
         return pathItemBounds(outline);
     }
 
+    // Also rejects an object with no position at all.
     const anchored = item as AnchoredItem;
-    if (typeof anchored.x !== "number" || typeof anchored.y !== "number") {
+    if (!isFinitePoint(anchored)) {
         return null;
     }
     // The renderers' own resolver with pixel sizes ignored, so the scale
@@ -143,8 +156,9 @@ function boundsOf(item: BoundedItem): Bounds | null {
  *   has no font metrics, so a long label reaches past this box.
  *
  * Items that draw nothing (a one-point path, an anchored item with size 0 or a
- * negative/NaN extent, an object carrying no geometry) are skipped. Returns
- * null when nothing in the list has bounds.
+ * negative/NaN extent, an item with a non-finite position, endpoint or point,
+ * an object carrying no geometry) are skipped. Returns null when nothing in
+ * the list has bounds.
  */
 export function itemsBounds(items: readonly BoundedItem[] | ReadonlyItemCollection<BoundedItem>): Bounds | null {
     let minX = Infinity;

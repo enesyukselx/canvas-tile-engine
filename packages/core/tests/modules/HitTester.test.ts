@@ -297,6 +297,108 @@ describe("HitTester negative and NaN extents", () => {
     });
 });
 
+// Position contract shared with every renderer: an item whose position,
+// endpoint or path geometry is NaN or ±Infinity paints nothing and must never
+// hit, on the linear and the spatial-index path alike.
+describe("HitTester non-finite positions", () => {
+    const img = { width: 10, height: 10 };
+    const values = [NaN, Infinity, -Infinity];
+    const everywhere = { minX: -1e9, maxX: 1e9, minY: -1e9, maxY: 1e9 };
+
+    it.each(values)("never hits a rect, circle or image at %s", (value) => {
+        const ht = new HitTester();
+        for (const [kind, extra] of [
+            ["rect", { size: 2 }],
+            ["circle", { size: 2 }],
+            ["image", { size: 2, img }],
+        ] as const) {
+            ht.register(
+                handle(1),
+                kind,
+                [
+                    { x: value, y: 0, ...extra },
+                    { x: 0, y: value, ...extra },
+                ],
+                1,
+            );
+            ht.register(handle(1), kind, { x: value, y: value, ...extra }, 1, { ignoreSizePx: true });
+        }
+
+        expect(ht.hitTest({ x: 0, y: 0 }, { padding: 1e6 })).toHaveLength(0);
+        expect(ht.hitTest({ x: value, y: value })).toHaveLength(0);
+        expect(ht.hitTestRect(everywhere)).toHaveLength(0);
+        expect(ht.hitTestRect(everywhere, { mode: "contain" })).toHaveLength(0);
+    });
+
+    it.each(values)("never hits a line with an endpoint coordinate of %s", (value) => {
+        const ht = new HitTester(() => 40);
+        ht.register(
+            handle(1),
+            "line",
+            [
+                { from: { x: 0, y: 0 }, to: { x: value, y: 0 } },
+                { from: { x: 0, y: value }, to: { x: 4, y: 0 } },
+            ],
+            1,
+            { style: { strokeStyle: "red", lineWidthPx: 8 } },
+        );
+
+        expect(ht.hitTest({ x: 1, y: 0 }, { padding: 1 })).toHaveLength(0);
+        expect(ht.hitTestRect({ minX: 0.5, maxX: 3, minY: -1, maxY: 1 })).toHaveLength(0);
+    });
+
+    it.each(values)("never hits a points path with a %s vertex", (value) => {
+        const ht = new HitTester(() => 40);
+        const style = { fillStyle: "red", strokeStyle: "red", lineWidthPx: 8 };
+        // Every segment but the ones touching the bad vertex is finite.
+        ht.register(
+            handle(1),
+            "path",
+            [
+                {
+                    points: [
+                        { x: 0, y: 0 },
+                        { x: value, y: 2 },
+                        { x: 4, y: 0 },
+                        { x: 4, y: 4 },
+                        { x: 0, y: 4 },
+                    ],
+                    style,
+                },
+                {
+                    points: [
+                        { x: 4, y: 0 },
+                        { x: 4, y: 4 },
+                        { x: value, y: 4 },
+                    ],
+                    closed: true,
+                    style: { ...style, cornerRadius: 0.5 },
+                },
+            ],
+            1,
+        );
+
+        expect(ht.hitTest({ x: 4, y: 2 }, { padding: 0.5 })).toHaveLength(0);
+        expect(ht.hitTest({ x: 3, y: 1 })).toHaveLength(0);
+        expect(ht.hitTestRect({ minX: 3.5, maxX: 4.5, minY: 1, maxY: 3 })).toHaveLength(0);
+    });
+
+    it("indexes a non-finite item nowhere, so its neighbours still hit past 500 items", () => {
+        const ht = new HitTester();
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i, y: 0, size: 1 }));
+        items[100].x = NaN;
+        items[200].y = Infinity;
+        ht.register(handle(1), "rect", items, 1);
+
+        expect(ht.hitTestFirst({ x: 101, y: 0 })?.index).toBe(101);
+        expect(ht.hitTestFirst({ x: 300, y: 0 })?.index).toBe(300);
+        expect(ht.hitTestFirst({ x: 200, y: 0 })).toBeUndefined();
+        expect(ht.hitTestRect({ minX: 98.6, maxX: 102.4, minY: -1, maxY: 1 }).map((hit) => hit.index)).toEqual([
+            102, 101, 99,
+        ]);
+    });
+});
+
 describe("HitTester padding", () => {
     it("expands circles by the padding radius", () => {
         const ht = new HitTester();

@@ -83,6 +83,38 @@ describe("itemsBounds", () => {
         });
     });
 
+    // Position contract shared by every renderer: a non-finite position,
+    // endpoint or point paints nothing, so it is skipped like any other item
+    // that draws nothing, instead of turning the box infinite.
+    describe("non-finite positions", () => {
+        const square = { x: 0, y: 0, size: 2 };
+        const squareBounds = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+
+        it.each([NaN, Infinity, -Infinity])("skips an anchored item at x or y = %s", (value) => {
+            expect(itemsBounds([{ x: value, y: 0 }])).toBeNull();
+            expect(itemsBounds([square, { x: value, y: 0 }, { x: 0, y: value }])).toEqual(squareBounds);
+        });
+
+        it.each([NaN, Infinity, -Infinity])("skips a line with an endpoint coordinate of %s", (value) => {
+            const lines: Line[] = [
+                { from: { x: value, y: 0 }, to: { x: 5, y: 5 } },
+                { from: { x: 0, y: 0 }, to: { x: 5, y: value } },
+            ];
+            expect(itemsBounds([square, ...lines])).toEqual(squareBounds);
+        });
+
+        it.each([NaN, Infinity, -Infinity])("skips a polyline with a point coordinate of %s", (value) => {
+            const path: PathItem = {
+                points: [
+                    { x: 0, y: 0 },
+                    { x: value, y: 10 },
+                    { x: 20, y: 20 },
+                ],
+            };
+            expect(itemsBounds([square, path])).toEqual(squareBounds);
+        });
+    });
+
     describe("lines", () => {
         it("boxes the two endpoints regardless of direction", () => {
             const box = { minX: 1, maxX: 4, minY: 2, maxY: 6 };
@@ -274,5 +306,27 @@ describe("pathItemBounds", () => {
                 commands: [{ type: "arc", x: 5, y: 5, radius: 3, startAngle: 0, endAngle: 90 }],
             }),
         ).toEqual({ minX: 2, maxX: 8, minY: 2, maxY: 8 });
+    });
+
+    // Null is what the renderers and the hit tester skip a whole path on, so
+    // one bad vertex must not leave the rest of the polyline drawable.
+    it.each([NaN, Infinity, -Infinity])("treats a polyline with a %s vertex as drawing nothing", (value) => {
+        expect(
+            pathItemBounds({
+                points: [
+                    { x: 0, y: 0 },
+                    { x: 4, y: value },
+                    { x: 8, y: 0 },
+                ],
+            }),
+        ).toBeNull();
+        expect(
+            pathItemBounds({
+                points: [
+                    { x: value, y: 0 },
+                    { x: 4, y: 4 },
+                ],
+            }),
+        ).toBeNull();
     });
 });

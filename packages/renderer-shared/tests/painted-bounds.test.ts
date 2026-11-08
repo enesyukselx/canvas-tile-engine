@@ -6,6 +6,7 @@ import {
     boxPixelPadding,
     intersectsBounds,
     linePaintBounds,
+    NOWHERE,
     PaintedCuller,
     pathPaintBounds,
     textPaintBounds,
@@ -192,6 +193,31 @@ describe("painted geometry", () => {
     });
 });
 
+// Position contract shared by every renderer: a non-finite position or
+// endpoint paints nothing, so every dynamic draw loop culls it here. An
+// infinite endpoint would otherwise still reach into the viewport.
+describe("painted geometry of non-finite positions", () => {
+    const everywhere: Bounds = { minX: -1e9, minY: -1e9, maxX: 1e9, maxY: 1e9 };
+    const local: Bounds = { minX: -5, minY: -5, maxX: 5, maxY: 5 };
+
+    it.each([NaN, Infinity, -Infinity])("intersects no viewport for x or y = %s", (value) => {
+        const bounds = [
+            boxPaintBounds({ x: value, y: 0, size: 2 }, 10, { strokeStyle: "red" }),
+            boxPaintBounds({ x: 0, y: value, size: 2 }, 10, undefined, false),
+            linePaintBounds({ from: { x: 0, y: 0 }, to: { x: value, y: 0 } }, 10),
+            linePaintBounds({ from: { x: 0, y: value }, to: { x: 5, y: 5 } }, 10),
+            textPaintBounds({ x: value, y: 0, text: "label" }, 10, local),
+            // Before the metrics check: unmeasured text would read as UNBOUNDED.
+            textPaintBounds({ x: 0, y: value, text: "label" }, 10, UNBOUNDED),
+        ];
+
+        for (const box of bounds) {
+            expect(box).toBe(NOWHERE);
+            expect(intersectsBounds(everywhere, box)).toBe(false);
+        }
+    });
+});
+
 describe("PaintedCuller", () => {
     it.each([0, 1, 500])("leaves %i items for precise linear culling without building an index", (count) => {
         const items = Array.from({ length: count }, (_, id) => ({ id }));
@@ -239,6 +265,19 @@ describe("PaintedCuller", () => {
         expect(culler.query(viewport, 10)).toBe(items);
         expect(culler.query(viewport, 20)).toBe(items);
         expect(boundsOf).not.toHaveBeenCalled();
+    });
+
+    it("indexes an item with a non-finite position nowhere instead of scanning every frame", () => {
+        const items: Rect[] = [
+            { x: 0, y: 0 },
+            { x: NaN, y: 0 },
+            { x: 0, y: Infinity },
+            ...Array.from({ length: 500 }, (_, n) => ({ x: 10000 + n, y: 0 })),
+        ];
+        const culler = new PaintedCuller(items, (item, scale) => boxPaintBounds(item, scale));
+
+        expect(culler.query(viewport, 10)).toEqual([items[0]]);
+        expect(culler.query({ minX: -1e9, minY: -1e9, maxX: 1e9, maxY: 1e9 }, 10)).toHaveLength(501);
     });
 
     it("falls back to a scan when any item has unknown painted bounds", () => {

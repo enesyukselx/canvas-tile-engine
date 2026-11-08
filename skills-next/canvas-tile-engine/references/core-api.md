@@ -448,7 +448,8 @@ if (bounds) {
 
 Keep the guard: a selection or hit result can be empty (`!` only for sets
 known to be non-empty). Items that draw nothing are skipped (on core >= 0.12
-that includes anchored items with size 0 or a negative/`NaN` extent). Camera-
+that includes anchored items with size 0 or a negative/`NaN` extent, and
+items with a `NaN`/infinite position, line endpoint or path point). Camera-
 independent, so it ignores `origin` offsets and `rotate` (add `padding` for
 slack), `sizePx`/`fontPx`, and glyph extents (a `Text` counts its `size`
 box). `pathItemBounds(item)` is the single-path building block.

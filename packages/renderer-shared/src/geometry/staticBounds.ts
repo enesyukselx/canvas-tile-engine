@@ -1,6 +1,7 @@
 import {
     DEFAULT_VALUES,
     computeOriginOffset,
+    isFinitePoint,
     resolveBoxWorld,
     resolveLineWidthPx,
     resolveOrigin,
@@ -41,15 +42,28 @@ function strokePadding(style: Rect["style"], scale: number): number {
     return style?.strokeStyle ? Math.max(1, resolveLineWidthPx(style, scale)) / (2 * scale) : 0;
 }
 
-/** Corner-space world bounds, including the rotated rectangle's miter corners. */
-export function staticRectPaintBounds(item: Rect, scale: number): Bounds {
+/**
+ * Corner-space world bounds, including the rotated rectangle's miter corners.
+ *
+ * Like the other static helpers, null for an item with a non-finite position:
+ * it paints nothing, and one NaN or Infinity in the union would make the whole
+ * cache (a Canvas2D bitmap, a Skia picture's cull rect) non-finite, so either
+ * nothing painted or the cache was disabled.
+ */
+export function staticRectPaintBounds(item: Rect, scale: number): Bounds | null {
+    if (!isFinitePoint(item)) {
+        return null;
+    }
     const { width, height } = resolveBoxWorld(item, scale, false);
     const c = center(item, width, height);
     const stroke = strokePadding(item.style, scale);
     return rotatedBounds(c.x, c.y, width / 2 + stroke, height / 2 + stroke, item.rotate ?? 0);
 }
 
-export function staticCirclePaintBounds(item: Circle, scale: number): Bounds {
+export function staticCirclePaintBounds(item: Circle, scale: number): Bounds | null {
+    if (!isFinitePoint(item)) {
+        return null;
+    }
     const size = resolveSizeWorld(item, scale, false);
     const c = center(item, size, size);
     const radius = size / 2 + strokePadding(item.style, scale);
@@ -62,6 +76,9 @@ export function staticImagePaintBounds(
     imageWidth: number,
     imageHeight: number,
 ): Bounds | null {
+    if (!isFinitePoint(item)) {
+        return null;
+    }
     const sourceWidth = item.sprite?.w ?? imageWidth;
     const sourceHeight = item.sprite?.h ?? imageHeight;
     if (![imageWidth, imageHeight, sourceWidth, sourceHeight].every((value) => Number.isFinite(value) && value > 0)) {

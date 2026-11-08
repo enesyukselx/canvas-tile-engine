@@ -15,6 +15,7 @@ import {
     Text,
     resolveLineWidthPx,
     resolveBoxPx,
+    isFinitePoint,
     isGradient,
     normalizeStops,
     gradientAxisPx,
@@ -1017,6 +1018,12 @@ export class CanvasDraw<
         // Render all items using the provided render function
         resetPass?.();
         for (const item of items) {
+            // A non-finite position paints nothing (the dynamic path culls it).
+            // Static caches draw every item unculled, and @napi-rs/canvas aborts the
+            // process on an arc() with a NaN or infinite center.
+            if (!isFinitePoint(item)) {
+                continue;
+            }
             // World units only: the cache is rendered once at renderScale
             // and blitted afterwards, so a screen-pixel size could not hold
             // its size across zooms. `ignoreSizePx` keeps hit testing in
