@@ -84,6 +84,9 @@ function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coor
     return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
 }
 
+/** What a gradient that paints nothing resolves to: transparent black. */
+const TRANSPARENT_FILL = "rgba(0, 0, 0, 0)";
+
 // Conservative max dimension, in physical (backing-store) pixels, for an
 // offscreen static cache (browser limits often 16384 or 32767).
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
@@ -836,6 +839,14 @@ export class CanvasDraw<
     ): string | CanvasGradientLike {
         if (!isGradient(paint)) {
             return paint;
+        }
+
+        // A browser paints a gradient with no stops as transparent black;
+        // @napi-rs/canvas throws at fill time instead, aborting the render.
+        // Hand both the transparent fill the browser would paint. Only the
+        // fill is affected: strokes and outlines draw as usual.
+        if (paint.stops.length === 0) {
+            return TRANSPARENT_FILL;
         }
 
         const axis = gradientAxisPx(paint, box, toScreen);

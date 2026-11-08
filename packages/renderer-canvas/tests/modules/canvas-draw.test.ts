@@ -1542,4 +1542,17 @@ describe("CanvasDraw gradient fills", () => {
         expect(gradients).toHaveLength(0);
         expect(fills).toEqual(["#0f0"]);
     });
+
+    it("fills transparent for a gradient with no stops", () => {
+        // What a browser paints an empty gradient as; @napi-rs/canvas would
+        // throw on the empty gradient object itself
+        const { draw, render } = setup();
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+
+        draw.drawRect([{ x: 2, y: 2, style: { fillStyle: { ...topToBottom, stops: [] } } }], 1);
+        render(ctx);
+
+        expect(gradients).toHaveLength(0);
+        expect(fills).toEqual(["rgba(0, 0, 0, 0)"]);
+    });
 });
