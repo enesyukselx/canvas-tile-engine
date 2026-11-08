@@ -47,6 +47,8 @@ engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#22c55e" } }, 1);
 engine.render();
 ```
 
+`scale` is the zoom level in screen pixels per world unit, so at `scale: 48` a `size: 1` cell is 48 px wide. Sizes, `radius`, and shape `lineWidth` are world units and zoom with the camera; fields ending in `Px` and the `drawGridLines` line width are screen pixels.
+
 ## With React
 
 ```tsx
@@ -96,7 +98,7 @@ Use `RendererCanvas` as the default choice for web apps, documentation examples,
 
 - Core engine: [`@canvas-tile-engine/core`](../core)
 - React bindings: [`@canvas-tile-engine/react`](../react)
-- Full docs: [canvastileengine.dev](https://canvastileengine.dev)
+- Full docs: [canvastileengine.dev](https://www.canvastileengine.dev/docs/introduction/renderers)
 
 ## License
 

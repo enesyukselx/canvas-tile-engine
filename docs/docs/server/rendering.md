@@ -96,8 +96,10 @@ const png = await renderToBuffer({
 Use `RendererServer` directly when you need to keep the engine around, resize manually, or decide when to encode.
 
 ```ts
-import { CanvasTileEngine } from "@canvas-tile-engine/core";
+import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { RendererServer, SERVER_MOUNT } from "@canvas-tile-engine/renderer-server";
+
+const config: CanvasTileEngineConfig = { scale: 32, size: { width: 512, height: 512 } };
 
 const renderer = new RendererServer({ pixelRatio: 1 });
 const engine = new CanvasTileEngine(SERVER_MOUNT, config, renderer, { x: 0, y: 0 });
@@ -144,12 +146,22 @@ const context: SKRSContext2D = canvas.getContext("2d");
 Register fonts in headless environments before drawing text.
 
 ```ts
-import { registerFont } from "@canvas-tile-engine/renderer-server";
+import { registerFont, renderToBuffer } from "@canvas-tile-engine/renderer-server";
 
 registerFont("./fonts/Inter.ttf", "Inter");
 
-engine.drawText({ x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#fff" } }, 2);
+const png = await renderToBuffer({
+    config: { scale: 40, size: { width: 320, height: 160 }, backgroundColor: "#0b1021" },
+    draw: (engine) => {
+        engine.drawText(
+            { x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#e2e8f0" } },
+            2,
+        );
+    },
+});
 ```
+
+Give text an explicit `fillStyle` that contrasts with `backgroundColor`.
 
 `GlobalFonts` is also re-exported for advanced font management.
 

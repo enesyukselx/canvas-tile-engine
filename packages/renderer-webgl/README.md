@@ -44,10 +44,12 @@ const config: CanvasTileEngineConfig = {
 const engine = new CanvasTileEngine(wrapper, config, new RendererWebGL(), { x: 0, y: 0 });
 
 engine.drawGridLines(1, 1, "#1e293b", 0);
-engine.drawRect({ x: 0, y: 0, size: 1, radius: 4, style: { fillStyle: "#22c55e" } }, 1);
+engine.drawRect({ x: 0, y: 0, size: 1, radius: 0.1, style: { fillStyle: "#22c55e" } }, 1);
 engine.drawCircle({ x: 2, y: 1, size: 0.8, style: { fillStyle: "#38bdf8" } }, 1);
 engine.render();
 ```
+
+`scale` is the zoom level in screen pixels per world unit, so at `scale: 48` a `size: 1` cell is 48 px wide. Sizes, `radius`, and shape `lineWidth` are world units and zoom with the camera; fields ending in `Px` and the `drawGridLines` line width are screen pixels.
 
 ## With React
 
@@ -76,14 +78,14 @@ export function Map() {
 | WebGL canvas      | Rects, circles, images, lines, paths, grid lines, and shape strokes.         |
 | 2D overlay canvas | Text, coordinate overlay, debug HUD, `addDrawFunction`, and `engine.onDraw`. |
 
-Geometry is drawn in layer order, batching consecutive compatible paints within each draw call. Each item's fill is painted before its stroke, and both precede the next item's fill. Mixed fills and strokes can require additional GPU calls to preserve this order. Filled rects, rounded rects, and circles use shader-based rendering; lines and paths are expanded into triangles; images are uploaded as cached GPU textures.
+Geometry is drawn in layer order, batching consecutive compatible paints within each draw call. Each item's fill is painted before its stroke, and both precede the next item's fill (renderer-webgl >= 0.8). Mixed fills and strokes can require additional GPU calls to preserve this order. Filled rects, rounded rects, and circles use shader-based rendering; lines and paths are expanded into triangles; images are uploaded as cached GPU textures.
 
 ## Differences From Canvas2D
 
 - Text and user custom draw functions live on the upper 2D overlay, so they composite above every WebGL primitive even if their layer number is lower. Ordering within each surface is preserved.
 - `drawStaticRect`, `drawStaticCircle`, and `drawStaticImage` delegate to dynamic drawing and use the same order-preserving GPU batches instead of the Canvas2D offscreen static cache.
 - Image sources are uploaded to the GPU and cached. Dimension changes are detected automatically, but if you mutate pixels at the same size, call `renderer.invalidateTexture(source)`.
-- The texture cache holds sources weakly: once your app drops an image or canvas and it is garbage-collected, its GPU texture is deleted too. You do not need `invalidateTexture` to free memory.
+- The texture cache holds sources weakly (renderer-webgl >= 0.8): once your app drops an image or canvas and it is garbage-collected, its GPU texture is deleted too. You do not need `invalidateTexture` to free memory.
 - The renderer prefers WebGL 2 and falls back to WebGL 1. If neither is available, `init()` throws.
 
 ## Canvas Fallback
@@ -117,7 +119,7 @@ engine.render();
 
 - Canvas2D renderer: [`@canvas-tile-engine/renderer-canvas`](../renderer-canvas)
 - Core engine: [`@canvas-tile-engine/core`](../core)
-- Full docs: [canvastileengine.dev](https://canvastileengine.dev)
+- Full docs: [canvastileengine.dev](https://www.canvastileengine.dev/docs/introduction/renderers)
 
 ## License
 

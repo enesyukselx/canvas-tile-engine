@@ -23,8 +23,10 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-webgl
 Minimal setup:
 
 ```ts
-import { CanvasTileEngine } from "@canvas-tile-engine/core";
+import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const config: CanvasTileEngineConfig = { scale: 48, size: { width: 800, height: 500 } };
 
 const wrapper = document.getElementById("map") as HTMLDivElement;
 const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), { x: 0, y: 0 });
@@ -47,8 +49,10 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/react @canvas-tile-engi
 ```
 
 ```tsx
-import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { CanvasTileEngine, useCanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const config: CanvasTileEngineConfig = { scale: 48, size: { width: 800, height: 500 } };
 
 function App() {
     const engine = useCanvasTileEngine();
