@@ -598,9 +598,10 @@ export class CanvasDraw<
                 }
 
                 if (filled) {
-                    // A path's box is its bounding box on screen, so a
-                    // box-unit gradient spans the shape the same way it does
-                    // on a rect.
+                    // A path's box is its conservative box on screen (every
+                    // vertex and control point, plus each arc's full circle),
+                    // so a box-unit gradient spans it the way it spans a rect.
+                    // Curves and partial arcs can sit well inside it.
                     const topLeftPx = this.transformer.worldToScreen(bounds.minX, bounds.minY);
                     const bottomRightPx = this.transformer.worldToScreen(bounds.maxX, bounds.maxY);
                     ctx.fillStyle = this.toFillStyle(

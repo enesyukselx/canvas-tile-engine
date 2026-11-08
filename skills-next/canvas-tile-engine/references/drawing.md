@@ -220,9 +220,14 @@ pin whose tip sits on the point: `{ mode: "self", x: 0.5, y: 1 }`.
 `strokeStyle` and text fills stay color strings.
 
 - `"box"` units (default): `from`/`to` are FRACTIONS of the item's own drawn
-  box (a path's bounding box), so one gradient object is "top to bottom" for
-  every item whatever its size, position or rotation (a rotated shape's ramp
-  turns with it). One spec serves a whole series.
+  box, so one gradient object is "top to bottom" for every item whatever its
+  size, position or rotation (a rotated shape's ramp turns with it). One spec
+  serves a whole series.
+- A path's box is CONSERVATIVE, not tight: every vertex and control point
+  plus each arc's full circle. Exact for `points` polylines, but curves and
+  partial arcs (pie slices, gauges, smoothed area charts) can sit well inside
+  it, so only part of the ramp shows. Use `units: "world"` there for exact
+  placement.
 - `"world"` units: `from`/`to` are item-space coordinates; the ramp spans the
   scene and neighbouring items each show their slice of it.
 - Stops are clamped to `0..1` and sorted; two stops at one offset make a hard

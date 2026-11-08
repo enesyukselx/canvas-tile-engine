@@ -197,9 +197,11 @@ engine.drawRect({ x: 2, y: 2, width: 4, height: 3, style: { fillStyle: ramp } },
 | :-- | :-- |
 | `from`, `to` | The axis the ramp runs along. |
 | `stops` | `{ offset, color }` pairs. Offsets are clamped to `0..1` and sorted; two stops at one offset make a hard break. An empty list paints nothing, a single stop paints flat. |
-| `units` | `"box"` (default) reads `from`/`to` as fractions of the item's own drawn box. `"world"` reads them as world coordinates. |
+| `units` | `"box"` (default) reads `from`/`to` as fractions of the item's own drawn box (for a path, its conservative box; see below). `"world"` reads them as world coordinates. |
 
 Box units make one gradient object reusable: `{ from: { x: 0, y: 0 }, to: { x: 0, y: 1 } }` means "top to bottom" for every item that uses it, whatever its size, position or rotation — a rotated shape's ramp turns with the shape. World units place the axis in the scene instead, so neighbouring items each show their own slice of a single ramp, and it moves and scales with the camera.
+
+On a path, the box is a conservative one: it spans every vertex and control point, plus the full circle of each arc. That is exact for a polyline, but curves and partial arcs (pie slices, gauges, smoothed area charts) can sit well inside it, so only part of the ramp shows on them. Use `units: "world"` when the ramp has to line up with the drawn shape exactly.
 
 Strokes and text stay color strings. A stroke has no box to normalize an axis against, and "along the stroke" and "across the stroke" are equally fair readings of one axis, so the ambiguity is left out of the API rather than answered differently by each renderer.
 

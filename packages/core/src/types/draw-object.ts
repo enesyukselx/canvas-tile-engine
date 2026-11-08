@@ -12,7 +12,8 @@ export type ColorStop = {
  * {@link to}.
  *
  * With the default `"box"` units the endpoints are fractions of the drawn
- * box — `{ x: 0, y: 0 }` to `{ x: 0, y: 1 }` is "top to bottom" for every item
+ * box (for a path, its conservative box; see {@link PathStyle.fillStyle}) —
+ * `{ x: 0, y: 0 }` to `{ x: 0, y: 1 }` is "top to bottom" for every item
  * that uses it, whatever its size or position, so one gradient object can be
  * shared by a whole series. `"world"` units place the endpoints in world
  * coordinates instead, for a ramp that spans the scene rather than the item;
@@ -245,7 +246,11 @@ export type PathStyle = {
     /** Fill color, or a gradient ({@link Paint}). Setting it makes the path a
      * filled shape: the outline is implicitly closed for filling and hit
      * testing covers the interior. A gradient's `"box"` units are relative to
-     * the path's bounding box. */
+     * the path's conservative box: it spans every vertex and control point,
+     * plus the full circle of each arc. That is exact for `points` and
+     * straight segments, but curves and partial arcs can sit well inside it,
+     * so only part of the ramp shows on them. Use `units: "world"` to place
+     * the ramp exactly. */
     fillStyle?: Paint;
     strokeStyle?: string;
     /** Stroke width in world units; scales with zoom. Ignored when

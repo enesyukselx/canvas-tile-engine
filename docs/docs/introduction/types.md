@@ -41,7 +41,7 @@ type LinearGradient = {
 };
 ```
 
-With `"box"` units `from`/`to` are fractions of the item's own drawn box, so one object means "top to bottom" for every item that uses it — including a rotated one, whose ramp turns with it. With `"world"` units they are world coordinates, so the ramp spans the scene and moves with the camera. Stop offsets are clamped to `0..1` and sorted before painting; two stops at one offset make a hard break.
+With `"box"` units `from`/`to` are fractions of the item's own drawn box (for a path, a conservative box that curves and partial arcs can sit well inside; see [Gradient Fills](../js/drawing_and_layers.md#gradient-fills)), so one object means "top to bottom" for every item that uses it — including a rotated one, whose ramp turns with it. With `"world"` units they are world coordinates, so the ramp spans the scene and moves with the camera. Stop offsets are clamped to `0..1` and sorted before painting; two stops at one offset make a hard break.
 
 `strokeStyle` and text fills stay plain color strings.
 
