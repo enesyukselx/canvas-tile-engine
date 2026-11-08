@@ -1,6 +1,7 @@
 import type { Bounds, Coords, PathCommand } from "../types";
 import { pathCommandsBounds } from "./flattenPath";
 import { resolveBoxWorld } from "./itemSize";
+import { isItemCollection, type ReadonlyItemCollection } from "../modules/ItemCollection";
 
 /**
  * An anchor-positioned item: `Rect`, `Circle`, `Text` and `ImageItem` all
@@ -129,7 +130,9 @@ function boundsOf(item: BoundedItem): Bounds | null {
  *
  * Accepts every item kind the draw API does, mixed freely: anchored items
  * (`Rect`, `Circle`, `Text`, `ImageItem`) contribute their cell box, `Line` its
- * two endpoints, `PathItem` its vertex box or control-point hull.
+ * two endpoints, `PathItem` its vertex box or control-point hull. Takes the
+ * same lists the draw calls do: an array (readonly ones included) or a live
+ * `ItemCollection`, read at call time.
  *
  * Camera-independent by design, which leaves out:
  *
@@ -143,13 +146,15 @@ function boundsOf(item: BoundedItem): Bounds | null {
  * negative/NaN extent, an object carrying no geometry) are skipped. Returns
  * null when nothing in the list has bounds.
  */
-export function itemsBounds(items: BoundedItem[]): Bounds | null {
+export function itemsBounds(items: readonly BoundedItem[] | ReadonlyItemCollection<BoundedItem>): Bounds | null {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
 
-    for (const item of items) {
+    // A collection is not iterable itself; its `items` view is the live list.
+    const list = isItemCollection(items) ? items.items : items;
+    for (const item of list) {
         const box = boundsOf(item);
         if (!box) {
             continue;

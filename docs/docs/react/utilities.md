@@ -120,7 +120,7 @@ const applyContent = (bounds: Bounds) => {
 
 ## itemsBounds
 
-The world rectangle enclosing a list of items — the missing half of `fitBounds` and `fitScale`, both of which take a rectangle you had to compute by hand. Because the `items` array you memoize for a draw component is exactly what it takes, "frame the current selection" becomes one call:
+The world rectangle enclosing a list of items — the missing half of `fitBounds` and `fitScale`, both of which take a rectangle you had to compute by hand. It takes the same item sources as the draw components (a memoized or readonly array, or an `ItemCollection`, read at call time), so "frame the current selection" becomes one call:
 
 ```tsx
 import { itemsBounds } from "@canvas-tile-engine/react";

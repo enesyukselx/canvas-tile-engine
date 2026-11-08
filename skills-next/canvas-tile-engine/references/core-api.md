@@ -425,7 +425,9 @@ const config = {
 
 (core >= 0.12.) `itemsBounds(items)` returns the item-space `Bounds`
 enclosing a list of items of any kinds (hit results go straight in), or
-`null` when nothing in it has bounds:
+`null` when nothing in it has bounds. `items` is any source a draw call
+takes: an array (readonly too) or an `ItemCollection`, whose current items
+are read at call time:
 
 | Kind                              | Box |
 | --------------------------------- | --- |

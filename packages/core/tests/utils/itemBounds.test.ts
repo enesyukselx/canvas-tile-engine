@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { itemsBounds, pathItemBounds } from "../../src/utils/itemBounds";
+import { ItemCollection, type ReadonlyItemCollection } from "../../src/modules/ItemCollection";
 import type { Circle, ImageItem, Line, PathItem, Rect, Text } from "../../src/types";
 
 describe("itemsBounds", () => {
@@ -180,6 +181,66 @@ describe("itemsBounds", () => {
                 minY: 1,
                 maxY: 3,
             });
+        });
+    });
+
+    // The same item sources the draw calls accept. These calls are also the
+    // type-level test: the suite is type-checked, and each line used to be
+    // TS2345 (and a collection threw "items is not iterable" at runtime).
+    describe("item sources", () => {
+        type Seat = { id: string };
+        const seats: Rect<Seat>[] = [
+            { x: 0, y: 0, size: 1, data: { id: "a" } },
+            { x: 3, y: 2, size: 1, data: { id: "b" } },
+        ];
+        const seatBounds = { minX: -0.5, maxX: 3.5, minY: -0.5, maxY: 2.5 };
+
+        it("accepts a readonly array", () => {
+            const frozen: readonly Rect<Seat>[] = Object.freeze([...seats]);
+            expect(itemsBounds(frozen)).toEqual(seatBounds);
+        });
+
+        it("accepts an ItemCollection and its read-only items view", () => {
+            const collection = new ItemCollection(seats, { keyOf: (seat) => seat.data!.id });
+            const view: ReadonlyItemCollection<Rect<Seat>> = collection;
+
+            expect(itemsBounds(collection)).toEqual(seatBounds);
+            expect(itemsBounds(view)).toEqual(seatBounds);
+            expect(itemsBounds(collection.items)).toEqual(seatBounds);
+        });
+
+        it("reads a collection's live contents at call time", () => {
+            const collection = new ItemCollection(seats, { keyOf: (seat) => seat.data!.id });
+
+            collection.insert({ x: 10, y: 10, size: 2, data: { id: "c" } });
+            expect(itemsBounds(collection)).toEqual({ minX: -0.5, maxX: 11, minY: -0.5, maxY: 11 });
+
+            collection.batch(() => {
+                for (const seat of [...collection.items]) {
+                    collection.remove(seat.data!.id);
+                }
+            });
+            expect(itemsBounds(collection)).toBeNull();
+        });
+
+        it("accepts a mixed-kind collection", () => {
+            const mixed = new ItemCollection<Rect | Line>(
+                [
+                    { x: 0, y: 0, size: 2 },
+                    { from: { x: 4, y: -3 }, to: { x: 6, y: 1 } },
+                ],
+                { keyOf: (item) => ("from" in item ? "line" : "rect") },
+            );
+            expect(itemsBounds(mixed)).toEqual({ minX: -1, maxX: 6, minY: -3, maxY: 1 });
+        });
+
+        it("types every draw-call list source as valid input, but not arbitrary iterables", () => {
+            type Input = Parameters<typeof itemsBounds>[0];
+            expectTypeOf<readonly Rect<Seat>[]>().toMatchTypeOf<Input>();
+            expectTypeOf<ItemCollection<Rect<Seat>>>().toMatchTypeOf<Input>();
+            expectTypeOf<ReadonlyItemCollection<Circle | Line | PathItem>>().toMatchTypeOf<Input>();
+            // Like the draw calls, a Set or other iterable is not an item source.
+            expectTypeOf<Set<Rect<Seat>>>().not.toMatchTypeOf<Input>();
         });
     });
 });
