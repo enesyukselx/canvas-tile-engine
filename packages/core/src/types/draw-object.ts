@@ -271,6 +271,10 @@ export type PathStyle = {
  * One drawing command of a free-form path, mirroring the Canvas2D path API.
  * Coordinates and radii are world units (item space); angles are degrees
  * (engine convention, like `rotate`) — renderers convert to radians.
+ *
+ * Every number must be finite. A path whose command list holds a `NaN` or
+ * infinite value, or an arc with a negative `radius`, paints nothing and
+ * never hits, on every renderer.
  */
 export type PathCommand =
     | { type: "moveTo"; x: number; y: number }
@@ -279,7 +283,9 @@ export type PathCommand =
      * Center-based circular arc from `startAngle` to `endAngle` (degrees,
      * 0 = +x axis, positive angles sweep clockwise in screen space). `ccw`
      * defaults to false. Like Canvas2D, a line connects the current point to
-     * the arc's start when the subpath is already open.
+     * the arc's start when the subpath is already open. `radius` must be zero
+     * or positive: a negative one empties the whole path (Canvas2D's own
+     * `arc()` would throw).
      */
     | {
           type: "arc";

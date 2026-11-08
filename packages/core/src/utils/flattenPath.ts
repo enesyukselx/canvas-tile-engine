@@ -32,6 +32,71 @@ function arcSweep(startRad: number, endRad: number, ccw: boolean): number {
 }
 
 /**
+ * Can this command list be drawn? Every number in it must be finite, and
+ * every arc radius zero or positive.
+ *
+ * A list that fails is empty on every renderer: it paints nothing and never
+ * hits. {@link pathCommandsBounds} returns null for it (which is how the
+ * renderers decide to skip a path), {@link flattenPathCommands} returns no
+ * subpaths (WebGL, hit testing) and `traceCommands` traces nothing (Canvas2D,
+ * server, Skia). Left to the platforms, the same input disagreed: browser
+ * Canvas2D throws `IndexSizeError` from `arc()` on a negative radius, which
+ * aborts the frame; `@napi-rs/canvas` aborts the Node process on a non-finite
+ * arc center; Skia drops the arc or the whole path; and the flattened
+ * geometry mirrored a negative arc through its center.
+ * @internal
+ */
+export function pathCommandsDrawable(commands: readonly PathCommand[]): boolean {
+    for (const cmd of commands) {
+        switch (cmd.type) {
+            case "moveTo":
+            case "lineTo":
+                if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) {
+                    return false;
+                }
+                break;
+            case "arc":
+                if (
+                    !Number.isFinite(cmd.x) ||
+                    !Number.isFinite(cmd.y) ||
+                    !Number.isFinite(cmd.radius) ||
+                    cmd.radius < 0 ||
+                    !Number.isFinite(cmd.startAngle) ||
+                    !Number.isFinite(cmd.endAngle)
+                ) {
+                    return false;
+                }
+                break;
+            case "quadraticCurveTo":
+                if (
+                    !Number.isFinite(cmd.cpx) ||
+                    !Number.isFinite(cmd.cpy) ||
+                    !Number.isFinite(cmd.x) ||
+                    !Number.isFinite(cmd.y)
+                ) {
+                    return false;
+                }
+                break;
+            case "bezierCurveTo":
+                if (
+                    !Number.isFinite(cmd.cp1x) ||
+                    !Number.isFinite(cmd.cp1y) ||
+                    !Number.isFinite(cmd.cp2x) ||
+                    !Number.isFinite(cmd.cp2y) ||
+                    !Number.isFinite(cmd.x) ||
+                    !Number.isFinite(cmd.y)
+                ) {
+                    return false;
+                }
+                break;
+            case "closePath":
+                break;
+        }
+    }
+    return true;
+}
+
+/**
  * Flattens a Canvas2D-style command list into polyline subpaths, following
  * Canvas2D path semantics: each `moveTo` starts a new subpath; `lineTo`/
  * curves with no open subpath implicitly move first; `arc` draws a
@@ -43,9 +108,15 @@ function arcSweep(startRad: number, endRad: number, ccw: boolean): number {
  * spacing between samples, in the same unit as the coordinates — callers
  * flatten in world units with `ARC_SEGMENT_LENGTH / scale` to sample at the
  * renderers' screen-pixel density.
+ *
+ * A list {@link pathCommandsDrawable} rejects (a negative arc radius or a
+ * non-finite number) flattens to no subpaths at all.
  */
 export function flattenPathCommands(commands: PathCommand[], maxSegment: number): Subpath[] {
     const subpaths: Subpath[] = [];
+    if (!pathCommandsDrawable(commands)) {
+        return subpaths;
+    }
     let current: Coords[] = [];
     let closed = false;
 
@@ -150,11 +221,16 @@ export function flattenPathCommands(commands: PathCommand[], maxSegment: number)
  * hull: every endpoint and control point, and each arc's full center±radius
  * box. Curves never leave their control hull, so this over-approximates —
  * cheap, camera-independent, and safe for culling. Returns null for an
- * empty list.
+ * empty list, and for one that cannot be drawn (a negative arc radius or a
+ * non-finite number, see {@link pathCommandsDrawable}): the renderers skip a
+ * path without bounds, so it paints nothing.
  */
 export function pathCommandsBounds(
     commands: PathCommand[],
 ): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (!pathCommandsDrawable(commands)) {
+        return null;
+    }
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;

@@ -738,6 +738,39 @@ describe("HitTester command paths", () => {
         expect(ht.hitTestFirst({ x: 8.4, y: 5 })).toBeUndefined();
     });
 
+    // Same contract the renderers paint by: a list with a negative arc radius
+    // or a non-finite number is empty. Flattened as given, a negative radius
+    // mirrored the slice through its center and hit the opposite quadrant.
+    it.each([
+        ["a negative arc radius", { radius: -3 }],
+        ["a NaN arc center", { x: NaN }],
+        ["an infinite arc angle", { endAngle: Infinity }],
+    ])("never hits a path whose commands hold %s, point or marquee", (_case, arc) => {
+        const ht = scaled();
+        ht.register(
+            handle(1),
+            "path",
+            {
+                commands: [
+                    { type: "moveTo", x: 5, y: 5 },
+                    { type: "arc", x: 5, y: 5, radius: 3, startAngle: 0, endAngle: 90, ...arc },
+                    { type: "closePath" },
+                ],
+                style: { fillStyle: "red", strokeStyle: "blue", lineWidthPx: 4 },
+            },
+            1,
+        );
+
+        for (const point of [
+            { x: 6, y: 6 }, // inside the real slice
+            { x: 4, y: 4 }, // inside its mirror image
+            { x: 5, y: 5 }, // the center vertex
+        ]) {
+            expect(ht.hitTestFirst(point)).toBeUndefined();
+        }
+        expect(ht.hitTestRect({ minX: 0, maxX: 10, minY: 0, maxY: 10 })).toEqual([]);
+    });
+
     it("hits an unfilled bezier on the stroke, tested against the flattened curve", () => {
         const ht = scaled();
         ht.register(
