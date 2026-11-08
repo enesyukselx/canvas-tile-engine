@@ -171,6 +171,7 @@ Key public contracts:
 - Uses `@napi-rs/canvas` with no DOM and no interaction/event loop.
 - `renderToBuffer()` is the preferred one-shot API.
 - Supports PNG/JPEG/WebP output, font registration, image loading from paths, static caches, and custom drawing via `SKRSContext2D`.
+- Ships the `cte-render` bin (`src/cli.ts`, logic in `src/cli/runCli.ts`, built to `dist/cli.mjs`). It renders a preview module that exports `{ config, center, draw }` and is what the skill's "Verify by rendering" step runs. Keep it the package's only bin: `npx -y @canvas-tile-engine/renderer-server` relies on npm picking the single bin. It adds no runtime export; `tests/package-contract.mjs` runs it from the packed tarball.
 
 `renderer-shared` (internal, not published):
 

@@ -198,6 +198,42 @@ const png = await renderToBuffer({
 - **Do not roll your own** culling, spatial index, pan/zoom math, DPR
   handling or coordinate conversion - the engine does all of it.
 
+## Verify by rendering
+
+Half-cell offsets, an off-center board and the wrong shape on top all
+typecheck, and you cannot see a canvas. After writing or changing drawing
+code, render a reference image and look at it:
+
+1. Write a throwaway preview module outside `src/` with the app's config,
+   center and draw calls (React components become the matching
+   `engine.draw*` calls):
+
+   ```js
+   // map.preview.mjs
+   export const config = { scale: 48, size: { width: 800, height: 500 }, backgroundColor: "#0f172a" };
+   export const center = { x: 3.5, y: 3.5 }; // 8x8 board: (N-1)/2
+   const tiles = [/* the app's items: import them or paste them */];
+   export function draw(engine) {
+       engine.drawRect(tiles, 1);
+   }
+   ```
+
+2. Render it with grid and coordinate overlays:
+   `npx -y @canvas-tile-engine/renderer-server@latest map.preview.mjs -o /tmp/map.png --grid --coords`
+   (keep `@latest`, so an older renderer-server in the project without the
+   command cannot shadow it)
+3. Open the PNG with your image-viewing tool and check it. `--grid` draws
+   every cell boundary above the scene and `--coords` numbers the cells, so
+   each item should sit inside the cell its `x`/`y` names, the board should
+   be centered, and the layer order should match the intent. The command
+   also prints the final center, scale and visible range in item space.
+4. Fix, re-render, then delete the preview module and the image.
+
+The image comes from the Canvas2D drawing code; WebGL draws text above all
+shapes and React Native Skia can differ in details. Nothing interactive
+runs, so check events in the app itself. Options, TypeScript modules and
+limits: [server](references/server.md#preview-a-scene-from-the-command-line).
+
 ## Troubleshooting
 
 | Symptom | Usual cause |
@@ -234,6 +270,7 @@ const png = await renderToBuffer({
 | 50k+ items, heatmaps | [performance](references/performance.md), [recipes: heatmap](references/recipes.md#9-heavy-heatmap-on-webgl-vanilla) |
 | Spritesheet animation | [sprites](references/sprites.md) |
 | PNG/JPEG/WebP on the server | [server](references/server.md) |
+| Look at what a scene draws | [Verify by rendering](#verify-by-rendering), [server: cte-render](references/server.md#preview-a-scene-from-the-command-line) |
 
 ## Reference files
 
@@ -245,7 +282,7 @@ const png = await renderToBuffer({
 | [events.md](references/events.md) | Flags, callback payloads, keyboard control, runtime mode switching, interaction patterns. |
 | [react.md](references/react.md) | `useCanvasTileEngine` handle, the compound components and their props, lifecycle rules, types, pitfalls. |
 | [react-native.md](references/react-native.md) | RN component, sizing boards to the screen, touch behavior, Skia types and custom drawing, platform differences. |
-| [server.md](references/server.md) | `renderToBuffer`, `RendererServer`, fonts, output formats, HTTP endpoint pattern. |
+| [server.md](references/server.md) | `renderToBuffer`, `RendererServer`, fonts, output formats, HTTP endpoint pattern, the `cte-render` preview command. |
 | [sprites.md](references/sprites.md) | `sprite` source rects, `SpriteSheet`, `SpriteAnimator`, the `<Sprite>` component. |
 | [performance.md](references/performance.md) | What the engine already optimizes, renderer choice, WebGL specifics, static caches, budgets. |
 | [recipes.md](references/recipes.md) | Complete builds to copy and adapt: game map, minimap, pixel painter, fixed board, responsive map, sprites, server image, RN board, WebGL heatmap. |

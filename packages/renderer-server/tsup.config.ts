@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
+// tsup runs from the package directory.
+const { version } = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
+
 export default defineConfig({
-    entry: ["src/index.ts"],
+    // `cli` is the `cte-render` bin (package.json `bin`); only `cli.mjs` is used.
+    entry: { index: "src/index.ts", cli: "src/cli.ts" },
     format: ["cjs", "esm"],
     dts: {
         // The DTS bundler widens external `export type` class re-exports to
@@ -10,6 +15,9 @@ export default defineConfig({
         entry: { index: "src/exports.ts" },
         footer: 'export type { Image, Canvas, SKRSContext2D } from "@napi-rs/canvas";',
     },
+    // Keep every entry self-contained: no shared chunk between the library and the bin.
+    splitting: false,
+    define: { __CTE_RENDER_VERSION__: JSON.stringify(version) },
     sourcemap: true,
     minify: true,
     clean: true,

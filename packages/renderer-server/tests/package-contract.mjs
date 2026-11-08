@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -165,6 +165,69 @@ try {
             assert.ok(ts.flattenDiagnosticMessageText(rejected[index].messageText, "\n").includes(`'${name}'`));
         }
         console.log(`Packed consumer .${extension}: type-only exports, runtime exports, and PNG rendering passed`);
+    }
+
+    // The `cte-render` bin runs from the packed artifact and resolves core from
+    // the consumer, as it does after `npx` or a project install.
+    const serverRoot = join(consumer, "node_modules", "@canvas-tile-engine/renderer-server");
+    const manifest = JSON.parse(readFileSync(join(serverRoot, "package.json"), "utf8"));
+    assert.deepEqual(manifest.bin, { "cte-render": "dist/cli.mjs" });
+    const bin = join(serverRoot, manifest.bin["cte-render"]);
+    assert.ok(readFileSync(bin, "utf8").startsWith("#!/usr/bin/env node\n"), "The bin needs a node shebang");
+    assert.equal(run(process.execPath, [bin, "--version"], consumer).trim(), manifest.version);
+
+    const preview = (annotation) => `
+export const config = { scale: 4, size: { width: 8, height: 6 } };
+export function draw(engine${annotation}) {
+    engine.drawRect({ x: 0, y: 0, size: 1, style: { fillStyle: "#f00" } });
+}
+`;
+    const previews = [["preview.mjs", preview("")]];
+    // Node strips types natively from 22.18 / 23.6; older runtimes skip the .mts case.
+    if (process.features.typescript) {
+        previews.push(["preview.mts", preview(": { drawRect(item: object): unknown }")]);
+    }
+    for (const [file, source] of previews) {
+        writeFileSync(join(consumer, file), source);
+        const out = join(consumer, `${file}.png`);
+        const stdout = run(process.execPath, [bin, file, "-o", out, "--grid", "--coords"], consumer);
+        assert.ok(stdout.startsWith(`Wrote ${out} (8x6 px, png)`), stdout);
+        assert.equal(readFileSync(out).subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+        console.log(`Packed bin: cte-render rendered ${file}`);
+    }
+
+    // Process lifecycle: what the preview module leaves behind must not hang the
+    // command or turn a failure into exit 0.
+    const config = "export const config = { scale: 4, size: { width: 8, height: 6 } };";
+    mkdirSync(join(consumer, "cjs"));
+    writeFileSync(join(consumer, "cjs/package.json"), JSON.stringify({ type: "commonjs" }));
+    const lifecycle = [
+        ["timer.mjs", `setInterval(() => {}, 1000);\n${config}`, 0, /^Wrote /],
+        [
+            "hang.mjs",
+            `${config}\nexport function draw() { return new Promise(() => {}); }`,
+            1,
+            /never finished loading or drawing/,
+        ],
+        [
+            "stray.mjs",
+            `${config}\nexport function draw() { Promise.reject(new Error("stray")); }`,
+            1,
+            /^cte-render: stray \(from a promise nothing awaited\)\n$/,
+        ],
+        ["cjs/scene.js", config, 1, /rename it to \.mjs\/\.mts/],
+    ];
+    for (const [file, source, status, output] of lifecycle) {
+        writeFileSync(join(consumer, file), source);
+        const result = spawnSync(process.execPath, [bin, file, "-o", join(consumer, "lifecycle.png")], {
+            cwd: consumer,
+            encoding: "utf8",
+            timeout: 30_000,
+        });
+        assert.equal(result.signal, null, `${file} timed out`);
+        assert.equal(result.status, status, `${file}: ${result.stderr}`);
+        assert.match(status === 0 ? result.stdout : result.stderr, output);
+        console.log(`Packed bin: ${file} exits ${status}`);
     }
 } finally {
     rmSync(consumer, { recursive: true, force: true });
