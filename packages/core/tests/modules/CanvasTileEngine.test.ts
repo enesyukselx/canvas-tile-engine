@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasTileEngine } from "../../src/CanvasTileEngine";
 import { fitScale } from "../../src/utils/fitScale";
-import type { CanvasTileEngineConfig, Coords, IRenderer, PathItem } from "../../src/types";
+import { ConfigValidationError } from "../../src/utils/validateConfig";
+import type { Bounds, CanvasTileEngineConfig, Coords, IRenderer, PathItem } from "../../src/types";
 
 type Mount = Record<string, never>;
 
@@ -1093,6 +1094,174 @@ describe("CanvasTileEngine", () => {
                 { interactiveOf: () => false },
             );
             expect(e.hitTestFirst({ x: 7.5, y: 6 })).toBeUndefined();
+        });
+    });
+
+    describe("clip validation and corner order", () => {
+        const testImg = { width: 10, height: 10 } as unknown as HTMLImageElement;
+
+        function createEngineWithDrawAPI() {
+            let seq = 0;
+            const handle = (layer = 1) => ({ id: Symbol(`draw-${seq++}`), layer });
+            const drawAPI = {
+                drawRect: vi.fn((_items: unknown, layer?: number, _options?: unknown) => handle(layer)),
+                drawCircle: vi.fn((_items: unknown, layer?: number, _options?: unknown) => handle(layer)),
+                drawText: vi.fn((_items: unknown, layer?: number, _options?: unknown) => handle(layer)),
+                drawLine: vi.fn((_items: unknown, _style: unknown, layer?: number, _options?: unknown) =>
+                    handle(layer),
+                ),
+                drawPath: vi.fn((_items: unknown, layer?: number, _options?: unknown) => handle(layer)),
+                drawImage: vi.fn((_items: unknown, layer?: number, _options?: unknown) => handle(layer)),
+                drawStaticRect: vi.fn((_items: unknown, _key: string, layer?: number, _options?: unknown) =>
+                    handle(layer),
+                ),
+                drawStaticCircle: vi.fn((_items: unknown, _key: string, layer?: number, _options?: unknown) =>
+                    handle(layer),
+                ),
+                drawStaticImage: vi.fn((_items: unknown, _key: string, layer?: number, _options?: unknown) =>
+                    handle(layer),
+                ),
+                drawGridLines: vi.fn((_cellSize: number, _style: unknown, layer?: number, _options?: unknown) =>
+                    handle(layer),
+                ),
+                addDrawFunction: vi.fn((_fn: unknown, layer?: number, _options?: unknown) => handle(layer)),
+                removeDrawHandle: vi.fn(),
+                clearLayer: vi.fn(),
+                clearAll: vi.fn(),
+                clearStaticCache: vi.fn(),
+            };
+            const renderer = createMockRenderer();
+            (renderer.getDrawAPI as ReturnType<typeof vi.fn>).mockReturnValue(drawAPI);
+            return { e: new CanvasTileEngine<Mount>({}, baseConfig, renderer), drawAPI };
+        }
+
+        type DrawAPIMock = ReturnType<typeof createEngineWithDrawAPI>["drawAPI"];
+        type Register = (e: CanvasTileEngine<Mount>, clip: Bounds, id: string) => unknown;
+
+        // Every registration path, the renderer method it lands in, and the
+        // position of the options argument in that call.
+        const registrations: Array<[string, Register, keyof DrawAPIMock, number]> = [
+            ["drawRect", (e, clip, id) => e.drawRect({ x: 1, y: 1 }, 1, { id, clip }), "drawRect", 2],
+            ["drawCircle", (e, clip, id) => e.drawCircle({ x: 1, y: 1 }, 1, { id, clip }), "drawCircle", 2],
+            ["drawText", (e, clip, id) => e.drawText({ x: 1, y: 1, text: "a" }, 2, { id, clip }), "drawText", 2],
+            [
+                "drawLine",
+                (e, clip, id) => e.drawLine({ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }, undefined, 1, { id, clip }),
+                "drawLine",
+                3,
+            ],
+            [
+                "drawPath",
+                (e, clip, id) =>
+                    e.drawPath(
+                        {
+                            points: [
+                                { x: 0, y: 0 },
+                                { x: 1, y: 1 },
+                            ],
+                        },
+                        1,
+                        { id, clip },
+                    ),
+                "drawPath",
+                2,
+            ],
+            [
+                "drawImage",
+                (e, clip, id) => e.drawImage({ x: 1, y: 1, size: 1, img: testImg }, 1, { id, clip }),
+                "drawImage",
+                2,
+            ],
+            [
+                "drawStaticRect",
+                (e, clip, id) => e.drawStaticRect([{ x: 1, y: 1 }], id, 1, { clip }),
+                "drawStaticRect",
+                3,
+            ],
+            [
+                "drawStaticCircle",
+                (e, clip, id) => e.drawStaticCircle([{ x: 1, y: 1 }], id, 1, { clip }),
+                "drawStaticCircle",
+                3,
+            ],
+            [
+                "drawStaticImage",
+                (e, clip, id) => e.drawStaticImage([{ x: 1, y: 1, size: 1, img: testImg }], id, 1, { clip }),
+                "drawStaticImage",
+                3,
+            ],
+            ["drawGridLines", (e, clip, id) => e.drawGridLines(1, 1, "black", 0, { id, clip }), "drawGridLines", 3],
+            ["addDrawFunction", (e, clip, id) => e.addDrawFunction(() => {}, 1, { id, clip }), "addDrawFunction", 2],
+        ];
+
+        const optionsOf = (drawAPI: DrawAPIMock, method: keyof DrawAPIMock, at: number) =>
+            (drawAPI[method] as ReturnType<typeof vi.fn>).mock.calls[0][at] as { clip?: Bounds };
+
+        it.each(registrations)(
+            "%s hands the renderer an inverted clip as the sorted rectangle",
+            (_name, register, method, optionsAt) => {
+                const { e, drawAPI } = createEngineWithDrawAPI();
+                register(e, { minX: 4, maxX: 0, minY: 2, maxY: -1 }, "a");
+
+                expect(optionsOf(drawAPI, method, optionsAt).clip).toEqual({ minX: 0, maxX: 4, minY: -1, maxY: 2 });
+            },
+        );
+
+        it.each(registrations)(
+            "%s rejects a non-finite clip edge before replacing an existing registration",
+            (_name, register, method) => {
+                const { e, drawAPI } = createEngineWithDrawAPI();
+                register(e, { minX: 0, maxX: 4, minY: 0, maxY: 2 }, "a");
+
+                expect(() => register(e, { minX: 0, maxX: NaN, minY: 0, maxY: 2 }, "a")).toThrow(ConfigValidationError);
+                // Nothing registered, and the registration it would replace survives.
+                expect(drawAPI[method]).toHaveBeenCalledTimes(1);
+                expect(drawAPI.removeDrawHandle).not.toHaveBeenCalled();
+                expect(drawAPI.clearStaticCache).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each([NaN, Infinity, -Infinity, "1", undefined, null])("rejects clip edge %s", (value) => {
+            const { e } = createEngineWithDrawAPI();
+
+            expect(() =>
+                e.drawRect({ x: 1, y: 1 }, 1, { clip: { minX: 0, maxX: value as number, minY: 0, maxY: 2 } }),
+            ).toThrow(
+                new ConfigValidationError(
+                    `[CanvasTileEngine] Invalid config: clip.maxX must be a finite number, got ${value}`,
+                ),
+            );
+        });
+
+        it("hit-tests through an inverted clip like the sorted one", () => {
+            const { e } = createEngineWithDrawAPI();
+            // Cells 0..3 x 0..2 in item space, written max-first
+            e.drawRect(
+                [
+                    { x: 1, y: 1, size: 1 },
+                    { x: 6, y: 1, size: 1 },
+                ],
+                1,
+                { clip: { minX: 3.5, maxX: -0.5, minY: 2.5, maxY: -0.5 } },
+            );
+
+            // Queries take raw (corner-space) coordinates
+            expect(e.hitTestFirst({ x: 1.5, y: 1.5 })).toBeDefined();
+            expect(e.hitTestFirst({ x: 6.5, y: 1.5 })).toBeUndefined();
+            expect(e.hitTestRect({ minX: 0, maxX: 10, minY: 0, maxY: 3 })).toHaveLength(1);
+        });
+
+        it("takes item space: cells 0..N-1 are -0.5..N-0.5", () => {
+            const { e } = createEngineWithDrawAPI();
+            const cells = Array.from({ length: 6 }, (_, x) => ({ x, y: 0, size: 1 }));
+            // Cells 0..3, the shape the docs example uses
+            e.drawRect(cells, 1, { clip: { minX: -0.5, maxX: 3.5, minY: -0.5, maxY: 0.5 } });
+
+            // Raw coords: cell k spans [k, k + 1], so both edges of cells 0 and
+            // 3 are inside and cell 4 is wholly outside
+            expect(e.hitTestFirst({ x: 0.1, y: 0.5 })?.index).toBe(0);
+            expect(e.hitTestFirst({ x: 3.9, y: 0.5 })?.index).toBe(3);
+            expect(e.hitTestFirst({ x: 4.1, y: 0.5 })).toBeUndefined();
         });
     });
 

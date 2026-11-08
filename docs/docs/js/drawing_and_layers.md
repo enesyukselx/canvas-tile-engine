@@ -556,18 +556,21 @@ engine.drawImage(
 Every draw method takes a `clip` in its options: a world rectangle the registration is confined to. Nothing it draws paints outside, and nothing outside it hit-tests.
 
 ```ts
-const plotArea = { minX: -0.5, maxX: 40, minY: -0.5, maxY: 20 };
+const plotArea = { minX: -0.5, maxX: 39.5, minY: -0.5, maxY: 19.5 }; // cells 0..39 x 0..19
 
 engine.drawRect(bars, 1, { clip: plotArea });
 engine.drawLine(series, { strokeStyle: "#22d3ee" }, 1, { clip: plotArea });
 ```
 
-The rectangle is world (item) space — the same coordinates `fitBounds` and `hitTestRect` take — so it pans and zooms with the rest of the scene. That is what a chart's plot area wants: axes and labels drawn outside the clip stay put relative to the data, and panning cannot smear the series over them.
+The rectangle is world (item) space, so it pans and zooms with the rest of the scene. That is what a chart's plot area wants: axes and labels drawn outside the clip stay put relative to the data, and panning cannot smear the series over them.
+
+Item space is the space `fitBounds` and `itemsBounds` use: integers are cell centers, so cells `0..N-1` span `-0.5..N-0.5`. It is not the raw pointer space that `hitTest` and `hitTestRect` take, which is half a cell off. To build a clip from pointer input, subtract 0.5 from each `coords.raw` value.
 
 | | |
 | :-- | :-- |
 | Applies to | Every draw kind, including grid lines, the `drawStatic*` variants and `addDrawFunction`. |
 | Hit testing | Follows the clip. A point outside it cannot hit, and a marquee is narrowed to the overlap, so a selection half inside the clip cannot reach what is cut away. `padding` does not widen a clip — it grows an item's own tap target, and a target that is not drawn has nothing to grow. |
+| Corners | Any order, as with `hitTestRect`: an axis given max-first is swapped. Every edge must be finite; `NaN` or `Infinity` throws a [`ConfigValidationError`](../introduction/config.md#validation-errors). |
 | Shape | Axis-aligned rectangles only. An arbitrary shape would need the stencil buffer on WebGL, where path fills already live. |
 
 ## Advanced

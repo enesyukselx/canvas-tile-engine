@@ -481,7 +481,8 @@ limits, `minScale > maxScale`, `scale` outside explicit limits, an unknown
 runtime `setScale`/`goScale`, `setCenter`/`goCenter` (non-finite),
 `setScaleLimits`, `setBounds`, `setAccessibility`, `setReducedMotion`,
 `fitBounds`/`fitScale` (non-finite edge, `min >= max`, negative padding)
-throw the same way; `drawGridLines` throws a `RangeError` for a
+and every draw call's `clip` (non-finite edge; corners in any order are
+fine) throw the same way; `drawGridLines` throws a `RangeError` for a
 non-positive `cellSize`.
 
 ```ts

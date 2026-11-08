@@ -364,6 +364,11 @@ export interface DrawOptions {
      * That is the plot-area of a chart, the frame of a minimap inset, or any
      * "this layer belongs inside that box" region.
      *
+     * Corners may come in any order, as with `hitTestRect`: an axis given
+     * max-first is swapped. Every edge must be finite; `NaN` or `Infinity`
+     * throws a `ConfigValidationError` before anything is registered
+     * or replaced.
+     *
      * Axis-aligned rectangles only. Arbitrary shapes would need a stencil
      * pass on WebGL, where the stencil buffer already belongs to path fills.
      */

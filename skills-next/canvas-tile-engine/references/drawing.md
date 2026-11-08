@@ -431,8 +431,11 @@ engine.drawStaticRect(plotBackground, "plot-bg", 0, { clip: plotArea });
 
 - Item space, like `fitBounds`/`itemsBounds` (cells `0..N-1` =
   `-0.5..N-0.5`), so it pans and zooms with the scene - a chart plot area, a
-  minimap inset frame. NOT the corner space of `config.bounds`
+  minimap inset frame. NOT the corner space of `config.bounds`, nor the raw
+  space of `hitTest`/`hitTestRect`: from `coords.raw`, subtract 0.5
   ([coordinate spaces](core-api.md#coordinate-spaces)).
+- Corners in any order (an axis given max-first is swapped, like
+  `hitTestRect`); a `NaN`/`Infinity` edge throws `ConfigValidationError`.
 - Every draw kind takes it (primitives, `drawGridLines`, `drawStatic*`,
   `addDrawFunction`) on all four renderers; WebGL clips its GPU primitives
   and its 2D overlay (text, draw functions) alike.

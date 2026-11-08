@@ -1,10 +1,11 @@
-import { AccessibilityConfig, CanvasTileEngineConfig } from "../types";
+import { AccessibilityConfig, Bounds, CanvasTileEngineConfig } from "../types";
 
 /**
  * Thrown when a config value or a runtime camera/config argument is invalid:
  * the constructor's config, `setScale`/`goScale`, `setScaleLimits`,
  * `setBounds`, `setCenter`/`goCenter`, `fitBounds`, `fitScale`,
- * `setAccessibility` and `setReducedMotion`. The message starts with
+ * `setAccessibility`, `setReducedMotion` and a draw call's `clip` option
+ * (a non-finite edge). The message starts with
  * `[CanvasTileEngine] Invalid config:`. `drawGridLines` throws a
  * `RangeError` instead.
  *
@@ -278,6 +279,51 @@ export function validateFitBounds(
     if (paddingPx !== undefined && (typeof paddingPx !== "number" || !Number.isFinite(paddingPx) || paddingPx < 0)) {
         throw configError(`fitBounds paddingPx must be a non-negative finite number, got ${paddingPx}`);
     }
+}
+
+/**
+ * Validates a draw registration's `clip` and puts its corners in order.
+ *
+ * Corners may come in any order, as `hitTestRect` accepts them: an inverted
+ * axis is swapped rather than rejected, so every renderer and the hit tester
+ * get the same rectangle. Unsorted, the renderers disagreed (Canvas2D and
+ * Skia normalise a negative extent, a WebGL scissor collapses to nothing) and
+ * hit testing never matched. Every edge must be finite, like `fitBounds`: no
+ * renderer can cut on an infinite or NaN edge. `min === max` stays valid and
+ * clips everything away.
+ *
+ * Returns the same object when it is already in order, so the renderer and
+ * the hit tester keep sharing the caller's rectangle; a sorted copy otherwise.
+ * `null`/`undefined` mean no clip.
+ * @param clip The clip from the draw options.
+ * @throws {ConfigValidationError} If an edge is not a finite number.
+ * @internal
+ */
+export function normalizeClip(clip: Bounds | null | undefined): Bounds | undefined {
+    if (clip == null) {
+        return undefined;
+    }
+    const edges = [
+        ["minX", clip.minX],
+        ["maxX", clip.maxX],
+        ["minY", clip.minY],
+        ["maxY", clip.maxY],
+    ] as const;
+    for (const [name, value] of edges) {
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+            throw configError(`clip.${name} must be a finite number, got ${value}`);
+        }
+    }
+    const { minX, maxX, minY, maxY } = clip;
+    if (minX <= maxX && minY <= maxY) {
+        return clip;
+    }
+    return {
+        minX: Math.min(minX, maxX),
+        maxX: Math.max(minX, maxX),
+        minY: Math.min(minY, maxY),
+        maxY: Math.max(minY, maxY),
+    };
 }
 
 /**

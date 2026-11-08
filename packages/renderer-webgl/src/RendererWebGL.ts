@@ -78,8 +78,9 @@ export interface RendererWebGLOptions {
  * carries text, the coordinate overlay and `addDrawFunction`, and takes an
  * ordinary path clip. Only the scissor needs releasing — the overlay's clip is
  * context state inside the save/restore pair {@link Layer} already opened.
+ * @internal Exported for tests; not part of the package entry.
  */
-const webglClipAdapter: ClipAdapter<WebGLDrawContext> = ({ ctx, gl, transformer }, clip) => {
+export const webglClipAdapter: ClipAdapter<WebGLDrawContext> = ({ ctx, gl, transformer }, clip) => {
     const rect = clipRectPx(clip, (x, y) => transformer.worldToScreen(x, y));
 
     ctx.save();
