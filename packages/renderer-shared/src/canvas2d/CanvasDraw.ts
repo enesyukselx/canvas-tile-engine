@@ -84,6 +84,9 @@ function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coor
     return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
 }
 
+/** What a gradient that paints nothing resolves to: transparent black. */
+const TRANSPARENT_FILL = "rgba(0, 0, 0, 0)";
+
 // Conservative max dimension, in physical (backing-store) pixels, for an
 // offscreen static cache (browser limits often 16384 or 32767).
 const MAX_STATIC_CANVAS_DIMENSION = 16384;
@@ -598,9 +601,10 @@ export class CanvasDraw<
                 }
 
                 if (filled) {
-                    // A path's box is its bounding box on screen, so a
-                    // box-unit gradient spans the shape the same way it does
-                    // on a rect.
+                    // A path's box is its conservative box on screen (every
+                    // vertex and control point, plus each arc's full circle),
+                    // so a box-unit gradient spans it the way it spans a rect.
+                    // Curves and partial arcs can sit well inside it.
                     const topLeftPx = this.transformer.worldToScreen(bounds.minX, bounds.minY);
                     const bottomRightPx = this.transformer.worldToScreen(bounds.maxX, bounds.maxY);
                     ctx.fillStyle = this.toFillStyle(
@@ -837,7 +841,22 @@ export class CanvasDraw<
             return paint;
         }
 
+        // A browser paints a gradient with no stops as transparent black;
+        // @napi-rs/canvas throws at fill time instead, aborting the render.
+        // Hand both the transparent fill the browser would paint. Only the
+        // fill is affected: strokes and outlines draw as usual.
+        if (paint.stops.length === 0) {
+            return TRANSPARENT_FILL;
+        }
+
+        // A zero-length axis paints nothing either, per the Canvas2D spec,
+        // and a browser honors that. @napi-rs/canvas paints the last stop
+        // flat instead (Skia's degenerate-gradient fallback).
         const axis = gradientAxisPx(paint, box, toScreen);
+        if (axis.x0 === axis.x1 && axis.y0 === axis.y1) {
+            return TRANSPARENT_FILL;
+        }
+
         const key = `${paintKey(paint)}|${axis.x0},${axis.y0},${axis.x1},${axis.y1}`;
         const memoized = perFrame.get(key);
         if (memoized) {
