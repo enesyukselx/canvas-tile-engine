@@ -48,6 +48,27 @@ const MULTI_TOUCH_TAP_COOLDOWN_MS = 400;
 const handlersClaimTouches = (handlers: Readonly<EventHandlers>): boolean =>
     Boolean(handlers.click || handlers.drag || handlers.zoom || handlers.hover);
 
+// Once per app session, not per map: a config shared with a web build would
+// otherwise repeat the same warning for every map that mounts.
+let warnedResponsiveIgnored = false;
+
+/**
+ * Dev only: tell the app that `config.responsive` was dropped. Its modes drive
+ * the browser renderers' wrapper watchers, which have no native counterpart;
+ * this component sizes the engine from every `onLayout` instead.
+ */
+function warnResponsiveIgnored(mode: string): void {
+    if (warnedResponsiveIgnored || typeof process === "undefined" || process.env.NODE_ENV === "production") {
+        return;
+    }
+    warnedResponsiveIgnored = true;
+    console.warn(
+        `Canvas Tile Engine: config.responsive ("${mode}") has no effect on React Native and was turned off. ` +
+            `The view always follows its measured layout: size it with the style prop, and re-fit the camera ` +
+            `in onResize if it must track the view.`,
+    );
+}
+
 interface TapState {
     x: number;
     y: number;
@@ -283,7 +304,17 @@ function CanvasTileEngineBase({
 
             if (!instanceRef.current) {
                 // First layout: create the engine sized to the measured area.
-                const mergedConfig = { ...config, size: { ...config.size, width: w, height: h } };
+                // `responsive` is forced off: layout owns the size here, and
+                // core's resize() refuses to run while a mode is set, so a
+                // mode left on would freeze the viewport at this first size.
+                if (config.responsive) {
+                    warnResponsiveIgnored(config.responsive);
+                }
+                const mergedConfig: CanvasTileEngineProps["config"] = {
+                    ...config,
+                    responsive: false,
+                    size: { ...config.size, width: w, height: h },
+                };
                 const instance = new CanvasTileEngineCore<SkiaMount, SkImage>(mount, mergedConfig, renderer, center);
                 wireCallbacks(instance);
                 // The engine is created lazily on first layout, so a signal

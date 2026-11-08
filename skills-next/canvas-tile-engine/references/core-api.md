@@ -141,7 +141,9 @@ type CanvasTileEngineConfig = {
 Every mode uses the renderer's own `ResizeObserver` on the wrapper plus a
 devicePixelRatio watcher - add no window `resize` listener. While a mode is
 on, `engine.resize()` warns and no-ops and `eventHandlers.resize` is ignored.
-The server renderer ignores `responsive`; React Native uses `onLayout`.
+The server renderer ignores `responsive`. React Native turns it off (dev
+warning once) and resizes from every `onLayout`; see
+[react-native.md](react-native.md#platform-differences-vs-react-web).
 
 Scale limits adapt on resize so the camera never lands outside the
 gesture-reachable range: `"preserve-viewport"` scales `minScale` with the

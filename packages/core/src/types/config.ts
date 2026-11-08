@@ -113,7 +113,9 @@ export type CanvasTileEngineConfig = {
     /**
      * Hand canvas sizing to the wrapper element (browser renderers only).
      * `engine.resize()` and `eventHandlers.resize` are ignored while any mode
-     * is active — style the wrapper with CSS instead.
+     * is active — style the wrapper with CSS instead. The server renderer
+     * ignores it, and the React Native component turns it off: the native
+     * view always follows its measured layout.
      *
      * - `"preserve-scale"`: width follows the container, height stays at
      *   `size.height`. The visible world area grows with the container.
