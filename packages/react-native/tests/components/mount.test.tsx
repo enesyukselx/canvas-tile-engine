@@ -159,6 +159,50 @@ describe("CanvasTileEngine mount component (React Native)", () => {
         expect(fake.resizeWithAnimation).toHaveBeenCalledTimes(1);
     });
 
+    // Layout owns the size on native, so a responsive mode (typically from a
+    // config shared with a web build) must not reach core: its resize() guard
+    // would refuse every later layout and freeze the viewport at the first.
+    it.each(["fill", "preserve-scale", "preserve-viewport"] as const)(
+        "still resizes on a later layout with responsive: %j",
+        (responsive) => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const fake = createFakeRenderer();
+            let captured: EngineHandle | null = null;
+
+            function Harness() {
+                const engine = useCanvasTileEngine();
+                captured = engine;
+                return <CanvasTileEngine engine={engine} config={{ ...CONFIG, responsive }} renderer={fake.renderer} />;
+            }
+
+            render(<Harness />);
+            // The pre-mount snapshot and the mounted engine agree: off.
+            expect(captured!.getConfig().responsive).toBe(false);
+
+            act(() => emitLayout(300, 200));
+            const instance = captured!.instance;
+            expect(captured!.getConfig().responsive).toBe(false);
+
+            act(() => emitLayout(400, 200));
+
+            expect(captured!.instance).toBe(instance);
+            expect(fake.resizeWithAnimation).toHaveBeenCalledWith(400, 200, 0, undefined);
+            expect(captured!.getSize()).toEqual({ width: 400, height: 200 });
+
+            act(() => emitLayout(400, 200));
+            expect(fake.resizeWithAnimation).toHaveBeenCalledTimes(1);
+
+            // A rotation back resizes again.
+            act(() => emitLayout(200, 400));
+            expect(fake.resizeWithAnimation).toHaveBeenCalledTimes(2);
+            expect(captured!.getSize()).toEqual({ width: 200, height: 400 });
+
+            // Core's "resize() is disabled when responsive mode is enabled"
+            // guard never ran.
+            expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("resize() is disabled"));
+        },
+    );
+
     it("presents frames as Skia pictures sized to the measured layout", () => {
         const fake = createFakeRenderer();
 

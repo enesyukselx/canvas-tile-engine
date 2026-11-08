@@ -126,7 +126,7 @@ export function Board() {
 
 | Concern | React Native behavior |
 | :-- | :-- |
-| Sizing | The component measures its `View` with `onLayout`; `config.size` is only a placeholder (`{ width: 0, height: 0 }` is fine). The `View` defaults to `flex: 1` (your `style` merges over it), so its parent must give it room. `responsive` is not used. |
+| Sizing | The component measures its `View` with `onLayout`; `config.size` is only a placeholder (`{ width: 0, height: 0 }` is fine). The `View` defaults to `flex: 1` (your `style` merges over it), so its parent must give it room. Every layout change resizes the engine (center kept, scale unchanged) and fires `onResize`. `responsive` has no native modes (core >= 0.12): the component turns it off (`getConfig().responsive` is `false`, dev builds warn once). On older releases leave it unset on native: any mode froze the viewport at the first layout. |
 | `style` prop | React Native `ViewStyle`, not CSSProperties. No `className`. |
 | Handle | Same `EngineHandle` as the web, `isReady` and `instance` included (key effects on `engine.instance`). No `resize()`: layout sizes the view. |
 | Images | `TImage` is Skia's `SkImage`. `engine.loadImage(uri)` takes a URI STRING ([Images and sprites](#images-and-sprites-on-native)). |

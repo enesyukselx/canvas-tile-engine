@@ -65,7 +65,9 @@ This field reports the preference **as configured**, so persisting a `getConfig(
 
 ## Responsive Mode
 
-Responsive mode is handled by the browser renderers. It is ignored by the server renderer, and React Native uses layout measurement instead.
+Responsive mode is handled by the browser renderers. It is ignored by the server renderer.
+
+React Native has no responsive modes: the component sizes the engine from its measured `View` on every layout (`onLayout`), and `onResize` fires after each layout change. A `responsive` value in the config passed to it is turned off when the engine is created, so `getConfig().responsive` reports `false` there, and development builds warn once. No mode-specific behavior carries over: the scale stays where it is when the view changes size, as with `false`, so re-fit the camera in `onResize` (for example with `fitBounds`) if it must track the view.
 
 | Mode | Behavior |
 | :-- | :-- |
