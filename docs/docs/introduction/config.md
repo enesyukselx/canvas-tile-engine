@@ -256,7 +256,7 @@ The result is deeply frozen, like every `getConfig()` snapshot. It fills in defa
 
 ## Validation Errors
 
-The engine constructor and the runtime setters that take config-like input (`setScale`, `goScale`, `setScaleLimits`, `setBounds`, `setCenter`, `goCenter`, `fitBounds`, `setAccessibility`, `setReducedMotion`) and the `fitScale` helper throw a `ConfigValidationError` for an invalid value. Its message starts with `[CanvasTileEngine] Invalid config:` and names the offending value. `drawGridLines` is the exception: an invalid `cellSize` throws a `RangeError`.
+The engine constructor and the runtime setters that take config-like input (`setScale`, `goScale`, `setScaleLimits`, `setBounds`, `setCenter`, `goCenter`, `fitBounds`, `setAccessibility`, `setReducedMotion`) and the `fitScale` helper throw a `ConfigValidationError` for an invalid value, as does a draw call whose `clip` has a non-finite edge. Its message starts with `[CanvasTileEngine] Invalid config:` and names the offending value. `drawGridLines` is the exception: an invalid `cellSize` throws a `RangeError`.
 
 `ConfigValidationError` is exported by `@canvas-tile-engine/core` and re-exported by `@canvas-tile-engine/react` and `@canvas-tile-engine/react-native`:
 
