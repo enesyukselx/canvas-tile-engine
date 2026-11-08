@@ -5,6 +5,33 @@ import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
 import { GLRenderer, type LineInstance, type ShapeInstance } from "../../src/modules/gl/GLRenderer";
 import type { RGBA } from "../../src/utils/color";
 
+/**
+ * Round to the nearest IEEE half float (ties to even), as `Math.f16round` does.
+ * `Math.f16round` only exists from Node 24/25, and CI runs Node 22.
+ */
+function f16round(x: number): number {
+    if (!Number.isFinite(x) || x === 0) {
+        return x;
+    }
+    const a = Math.abs(x);
+    // Subnormals share the smallest normal exponent's 2^-24 spacing.
+    let e = Math.max(-14, Math.floor(Math.log2(a)));
+    if (e > -14 && 2 ** e > a) {
+        e--;
+    } else if (2 ** (e + 1) <= a) {
+        e++;
+    }
+    const q = 2 ** (e - 10);
+    const m = a / q;
+    let r = Math.floor(m);
+    const diff = m - r;
+    if (diff > 0.5 || (diff === 0.5 && r % 2 === 1)) {
+        r++;
+    }
+    const rounded = r * q;
+    return Math.sign(x) * (rounded > 65504 ? Infinity : rounded);
+}
+
 // Fake GL renderer that records shapes and every ramp registered against it.
 function makeRecordingGL() {
     const shapes: ShapeInstance[] = [];
@@ -352,7 +379,7 @@ describe("short gradient axes", () => {
      * two vertices, clamp the way the shader does.
      */
     function sampleMediump(t0: number, t1: number, w: number): number {
-        const t = Math.f16round(t0) * (1 - w) + Math.f16round(t1) * w;
+        const t = f16round(t0) * (1 - w) + f16round(t1) * w;
         return Math.min(Math.max(t, 0), 1);
     }
 
@@ -413,7 +440,7 @@ describe("short gradient axes", () => {
         const data = uploads.at(-1)!;
         const gradT = (vertex: number) => data[vertex * FLOATS_PER_SHAPE_VERTEX + 14];
         for (let v = 0; v < 6; v++) {
-            expect(Number.isFinite(Math.f16round(gradT(v)))).toBe(true);
+            expect(Number.isFinite(f16round(gradT(v)))).toBe(true);
         }
 
         // Vertex 0 is TL and vertex 1 TR, local x -201 and 201 (1px skirt).
@@ -448,7 +475,7 @@ describe("short gradient axes", () => {
         const quad = uploads.at(-1)!;
         const gradT = (vertex: number) => quad[vertex * LINE_FLOATS_PER_VERTEX + 6];
         for (let v = 0; v < 6; v++) {
-            expect(Number.isFinite(Math.f16round(gradT(v)))).toBe(true);
+            expect(Number.isFinite(f16round(gradT(v)))).toBe(true);
         }
         expect(sampleMediump(gradT(0), gradT(1), 199.5 / 400)).toBe(0);
         expect(sampleMediump(gradT(0), gradT(1), 200.5 / 400)).toBe(1);
