@@ -266,8 +266,7 @@ export class SkiaDraw {
             resetFill();
         }
         if (style?.strokeStyle) {
-            this.strokePaint.setColor(this.color(style.strokeStyle));
-            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, cellSize));
+            this.setStroke(this.color(style.strokeStyle), resolveLineWidthPx(style, cellSize));
             const dash = resolveLineDashPx(style, cellSize);
             if (dash) {
                 this.strokePaint.setPathEffect(Skia.PathEffect.MakeDash(dash, 0));
@@ -356,8 +355,7 @@ export class SkiaDraw {
             resetFill();
         }
         if (style?.strokeStyle) {
-            this.strokePaint.setColor(this.color(style.strokeStyle));
-            this.strokePaint.setStrokeWidth(resolveLineWidthPx(style, cellSize));
+            this.setStroke(this.color(style.strokeStyle), resolveLineWidthPx(style, cellSize));
             const dash = resolveLineDashPx(style, cellSize);
             if (dash) {
                 this.strokePaint.setPathEffect(Skia.PathEffect.MakeDash(dash, 0));
@@ -383,8 +381,7 @@ export class SkiaDraw {
             const bounds = getViewportBounds(topLeft, config);
             const baseColor = this.color(style?.strokeStyle ?? "#000000");
             const baseWidth = resolveLineWidthPx(style, this.camera.scale);
-            this.strokePaint.setColor(baseColor);
-            this.strokePaint.setStrokeWidth(baseWidth);
+            this.setStroke(baseColor, baseWidth);
             const dash = resolveLineDashPx(style, this.camera.scale);
             const baseDash = dash ? Skia.PathEffect.MakeDash(dash, 0) : null;
             if (baseDash) {
@@ -412,13 +409,14 @@ export class SkiaDraw {
                     // decoration width cannot desync paint from hit.
                     const registration = overlayLineStyle(style, item.style);
                     const merged = overlayLineStyle(registration, deco);
-                    this.strokePaint.setColor(this.color(merged.strokeStyle ?? "#000000"));
-                    this.strokePaint.setStrokeWidth(resolveLineWidthPx(registration, this.camera.scale));
+                    this.setStroke(
+                        this.color(merged.strokeStyle ?? "#000000"),
+                        resolveLineWidthPx(registration, this.camera.scale),
+                    );
                     const mergedDash = resolveLineDashPx(merged, this.camera.scale);
                     this.strokePaint.setPathEffect(mergedDash ? Skia.PathEffect.MakeDash(mergedDash, 0) : null);
                     canvas.drawLine(a.x, a.y, b.x, b.y, this.strokePaint);
-                    this.strokePaint.setColor(baseColor);
-                    this.strokePaint.setStrokeWidth(baseWidth);
+                    this.setStroke(baseColor, baseWidth);
                     this.strokePaint.setPathEffect(baseDash);
                     continue;
                 }
@@ -596,12 +594,14 @@ export class SkiaDraw {
                 // A fill-only item draws no outline; everything else strokes
                 // (defaulting to a hairline, matching the legacy behavior).
                 if (style?.strokeStyle !== undefined || !filled) {
-                    this.strokePaint.setColor(this.color(style?.strokeStyle ?? "#000000"));
                     // Width from item.style, not the decorated merge:
                     // hit testing reads the registration-time style, and
                     // the decoration types' width exclusion is type-level
                     // only — a smuggled width must not desync paint & hit.
-                    this.strokePaint.setStrokeWidth(resolveLineWidthPx(item.style, this.camera.scale));
+                    this.setStroke(
+                        this.color(style?.strokeStyle ?? "#000000"),
+                        resolveLineWidthPx(item.style, this.camera.scale),
+                    );
                     const dash = resolveLineDashPx(style, this.camera.scale);
                     if (dash) {
                         this.strokePaint.setPathEffect(Skia.PathEffect.MakeDash(dash, 0));
@@ -753,8 +753,11 @@ export class SkiaDraw {
             const startY = Math.floor(topLeft.y / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
             const endY = Math.ceil((topLeft.y + viewH) / step) * step - DEFAULT_VALUES.CELL_CENTER_OFFSET;
 
-            this.strokePaint.setColor(this.color(style.strokeStyle));
-            this.strokePaint.setStrokeWidth(style.lineWidth);
+            // The grid width is in screen pixels. An invisible width (0 or
+            // less) skips every drawLine call, each a JSI hop.
+            if (!this.setStroke(this.color(style.strokeStyle), style.lineWidth)) {
+                return;
+            }
 
             for (let x = startX; x <= endX; x += step) {
                 const p1 = this.transformer.worldToScreen(x, startY);
@@ -994,6 +997,33 @@ export class SkiaDraw {
             this.colorCache.set(value, parsed);
         }
         return parsed;
+    }
+
+    /**
+     * Set the shared stroke paint's color and width in screen pixels the way
+     * the Canvas2D renderers (`applyLineWidth`) and WebGL (`resolveStroke`)
+     * do: a width of 1 or more is used as is, and a narrower one draws a 1px
+     * line with the color's alpha scaled by the width, so 0 or less draws
+     * nothing. Skia's own rules differ: width 0 is a 1px hairline, and a
+     * negative width is ignored, leaving the previous stroke's width on the
+     * shared paint.
+     *
+     * Returns whether the stroke is visible. Drawing an invisible one is
+     * harmless (alpha 0), so callers only skip it to save native calls.
+     */
+    private setStroke(color: SkColor, widthPx: number): boolean {
+        // setColor replaces the whole RGBA, so it also undoes the alpha an
+        // earlier sub-pixel stroke scaled.
+        this.strokePaint.setColor(color);
+        if (widthPx >= 1) {
+            this.strokePaint.setStrokeWidth(widthPx);
+            return true;
+        }
+        // `> 0` also maps NaN to invisible.
+        const alpha = widthPx > 0 ? widthPx : 0;
+        this.strokePaint.setStrokeWidth(1);
+        this.strokePaint.setAlphaf(color[3] * alpha);
+        return alpha > 0;
     }
 
     /**
