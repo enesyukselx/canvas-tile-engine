@@ -60,6 +60,8 @@ export function Map() {
 }
 ```
 
+`scale` is the zoom level in screen pixels per world unit, so at `scale: 48` a `size: 1` cell is 48 px wide. Sizes, `radius`, and shape `lineWidth` are world units and zoom with the camera; fields ending in `Px` and the `GridLines` line width are screen pixels.
+
 ## Renderer Choice
 
 The renderer is a prop, so switching from Canvas2D to WebGL is intentionally small:
@@ -90,27 +92,38 @@ For large arrays, keep `items` stable with `useMemo` or state. A new array ident
 
 ## Imperative Access
 
-`useCanvasTileEngine()` returns a safe handle. Methods no-op before mount, and `isReady` tells you when the real engine is attached.
+`useCanvasTileEngine()` returns a safe handle. Methods no-op before mount, `isReady` tells you when the real engine is attached, and `engine.instance` is the attached engine (`null` before mount).
+
+Key imperative effects on `engine.instance`: it changes with every new engine, so the effect also runs again after a `key` remount, while an effect keyed on `isReady` does not. Keep the effect idempotent by removing what it drew in a cleanup: it can run twice as the engine attaches, and without a cleanup every run adds its draws again, so they paint and hit-test more than once.
 
 ```tsx
 import { useEffect } from "react";
-import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react";
+import { CanvasTileEngine, useCanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/react";
 import { RendererCanvas } from "@canvas-tile-engine/renderer-canvas";
+
+const config: CanvasTileEngineConfig = { scale: 48, size: { width: 800, height: 500 } };
 
 export function ImperativeMap() {
     const engine = useCanvasTileEngine();
 
     useEffect(() => {
-        if (!engine.isReady) return;
+        if (!engine.instance) return;
 
-        engine.drawGridLines(1, 1, "#334155", 0);
-        engine.drawCircle({ x: 2, y: 1, size: 0.8, style: { fillStyle: "#f97316" } }, 1);
+        const grid = engine.drawGridLines(1, 1, "#334155", 0);
+        const dot = engine.drawCircle({ x: 2, y: 1, size: 0.8, style: { fillStyle: "#f97316" } }, 1);
         engine.render();
-    }, [engine, engine.isReady]);
+
+        return () => {
+            engine.removeDrawHandle(grid);
+            engine.removeDrawHandle(dot);
+        };
+    }, [engine, engine.instance]);
 
     return <CanvasTileEngine engine={engine} config={config} renderer={new RendererCanvas()} />;
 }
 ```
+
+The component and the core engine class share the name `CanvasTileEngine`. Import the component from this package; the class is re-exported here as `CanvasTileEngineCore`, which is the type of `engine.instance`.
 
 ## Images And Sprites
 
@@ -135,7 +148,7 @@ function UnitLayer({ engine }: { engine: EngineHandle }) {
 
 ## Documentation
 
-- Full docs: [canvastileengine.dev](https://canvastileengine.dev/docs/react/installation)
+- Full docs: [canvastileengine.dev](https://www.canvastileengine.dev/docs/react/installation)
 - Core package: [`@canvas-tile-engine/core`](../core)
 - React Native equivalent: [`@canvas-tile-engine/react-native`](../react-native)
 

@@ -1345,12 +1345,19 @@ export class CanvasTileEngine<TMount = DefaultMount, TImage = DefaultImage> {
     /**
      * Draw grid lines at specified cell size.
      * @param cellSize Positive finite size of each grid cell in world units.
+     * @param lineWidth Line width in screen pixels (default 1). Unlike the
+     * world-unit `lineWidth` of rects, lines and paths, it does not scale with
+     * zoom. Widths below 1 draw a fainter hairline rather than a thinner one.
+     * @param strokeStyle Line color (default `"black"`).
+     * @param layer Layer order, lower draws first (default 0, under the shapes' default layer 1).
+     * @param options Optional `id` (re-registering with the same id replaces
+     * the previous registration instead of accumulating alongside it) and
+     * `clip` (confine the grid to a world rectangle).
      * @throws {RangeError} If cellSize is not a positive finite number.
-     * @param options Optional `id`: re-registering with the same id replaces
-     * the previous registration instead of accumulating alongside it.
      * @example
      * ```ts
-     * engine.drawGridLines(50);
+     * // A 1-cell grid of 1px lines, under shapes drawn on layer 1
+     * engine.drawGridLines(1, 1, "#1e293b", 0);
      * ```
      */
     drawGridLines(

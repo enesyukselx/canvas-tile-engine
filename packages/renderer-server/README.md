@@ -17,7 +17,8 @@ npm install @canvas-tile-engine/core @canvas-tile-engine/renderer-server
 
 ### Node-only TypeScript
 
-With `typescript` and `@types/node` installed, strict Node consumers can use
+Requires core >= 0.12 and renderer-server >= 0.7. With `typescript` and
+`@types/node` installed, strict Node consumers can use
 `lib: ["ES2022"]`, `types: ["node"]`, and `skipLibCheck: false`. No DOM library
 or browser ambient declarations are needed. `renderToBuffer` and the low-level
 engine constructor infer native image types from `RendererServer`.
@@ -46,13 +47,15 @@ const png = await renderToBuffer({
     pixelRatio: 2,
     draw: (engine) => {
         engine.drawGridLines(1, 1, "#1e2a45", 0);
-        engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 6, style: { fillStyle: "#4ade80" } }, 1);
+        engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 0.12, style: { fillStyle: "#4ade80" } }, 1);
         engine.drawCircle({ x: 2, y: 2, size: 1.4, style: { fillStyle: "#22d3ee" } }, 1);
     },
 });
 
 await writeFile("map.png", png);
 ```
+
+`scale` is the zoom level in screen pixels per world unit, so at `scale: 40` a `size: 1` cell is 40 px wide (80 output pixels at `pixelRatio: 2`). Sizes, `radius`, and shape `lineWidth` are world units and zoom with the camera; fields ending in `Px` and the `drawGridLines` line width are screen pixels.
 
 The `draw` callback can be async, which is useful for image loading:
 
@@ -71,8 +74,10 @@ const png = await renderToBuffer({
 Use `RendererServer` directly when you need to keep the engine around, resize manually, or choose when to encode.
 
 ```ts
-import { CanvasTileEngine } from "@canvas-tile-engine/core";
+import { CanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/core";
 import { RendererServer, SERVER_MOUNT } from "@canvas-tile-engine/renderer-server";
+
+const config: CanvasTileEngineConfig = { scale: 32, size: { width: 512, height: 512 } };
 
 const renderer = new RendererServer({ pixelRatio: 1 });
 const engine = new CanvasTileEngine(SERVER_MOUNT, config, renderer, { x: 0, y: 0 });
@@ -105,12 +110,22 @@ engine.destroy();
 System fonts are not guaranteed in CI, containers, or serverless runtimes. Register the fonts your map needs before rendering text:
 
 ```ts
-import { registerFont } from "@canvas-tile-engine/renderer-server";
+import { registerFont, renderToBuffer } from "@canvas-tile-engine/renderer-server";
 
 registerFont("./fonts/Inter.ttf", "Inter");
 
-engine.drawText({ x: 0, y: 0, text: "Hello", style: { fontFamily: "Inter" } }, 2);
+const png = await renderToBuffer({
+    config: { scale: 40, size: { width: 320, height: 160 }, backgroundColor: "#0b1021" },
+    draw: (engine) => {
+        engine.drawText(
+            { x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#e2e8f0" } },
+            2,
+        );
+    },
+});
 ```
+
+Give text an explicit `fillStyle` that contrasts with `backgroundColor`.
 
 `GlobalFonts` from `@napi-rs/canvas` is re-exported for advanced font management.
 
@@ -158,7 +173,7 @@ download or package publication is performed by this check.
 
 - Core engine: [`@canvas-tile-engine/core`](../core)
 - Browser Canvas2D renderer: [`@canvas-tile-engine/renderer-canvas`](../renderer-canvas)
-- Full docs: [canvastileengine.dev](https://canvastileengine.dev)
+- Full docs: [canvastileengine.dev](https://www.canvastileengine.dev/docs/server/rendering)
 
 ## License
 

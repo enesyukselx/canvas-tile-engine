@@ -1,7 +1,7 @@
 {
     "name": "@canvas-tile-engine/renderer-webgl",
     "version": "0.7.0",
-    "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with WebGL",
+    "description": "WebGL renderer for Canvas Tile Engine: batched GPU drawing of shapes, images, lines, paths, and grid lines in the browser. Requires @canvas-tile-engine/core.",
     "author": "Enes Yüksel",
     "license": "MIT",
     "repository": {
@@ -14,19 +14,17 @@
         "url": "https://github.com/enesyukselx/canvas-tile-engine/issues"
     },
     "keywords": [
-        "canvas",
+        "canvas-tile-engine",
+        "renderer",
         "webgl",
+        "webgl2",
+        "gpu",
+        "canvas",
+        "browser",
         "tile",
-        "engine",
-        "2d",
-        "map",
-        "game",
         "grid",
-        "visualization",
-        "interactive",
-        "pan",
-        "zoom",
-        "gpu"
+        "2d",
+        "map"
     ],
     "sideEffects": false,
     "main": "dist/index.cjs",

@@ -68,25 +68,36 @@ For large arrays, keep `items` stable with `useMemo` or state. A new array ident
 
 ## Imperative Access
 
+Key imperative effects on `engine.instance`: it changes with every new engine, so the effect also runs again after a `key` remount, while an effect keyed on `isReady` does not. Keep the effect idempotent by removing what it drew in a cleanup, so a second run on the same engine does not paint and hit-test everything twice.
+
 ```tsx
 import { useEffect } from "react";
-import { CanvasTileEngine, useCanvasTileEngine } from "@canvas-tile-engine/react-native";
+import { CanvasTileEngine, useCanvasTileEngine, type CanvasTileEngineConfig } from "@canvas-tile-engine/react-native";
 import { RendererSkia } from "@canvas-tile-engine/renderer-skia";
+
+const config: CanvasTileEngineConfig = { scale: 32, size: { width: 0, height: 0 } };
 
 export function ImperativeNativeMap() {
     const engine = useCanvasTileEngine();
 
     useEffect(() => {
-        if (!engine.isReady) return;
+        if (!engine.instance) return;
 
-        engine.drawGridLines(1, 1, "#334155", 0);
-        engine.drawRect({ x: 1, y: 1, size: 1, style: { fillStyle: "#4ade80" } }, 1);
+        const grid = engine.drawGridLines(1, 1, "#334155", 0);
+        const tile = engine.drawRect({ x: 1, y: 1, size: 1, style: { fillStyle: "#4ade80" } }, 1);
         engine.render();
-    }, [engine, engine.isReady]);
+
+        return () => {
+            engine.removeDrawHandle(grid);
+            engine.removeDrawHandle(tile);
+        };
+    }, [engine, engine.instance]);
 
     return <CanvasTileEngine engine={engine} renderer={new RendererSkia()} config={config} style={{ flex: 1 }} />;
 }
 ```
+
+The component and the core engine class share the name `CanvasTileEngine`. Import the component from this package; the class is re-exported here as `CanvasTileEngineCore`, which is the type of `engine.instance`.
 
 ## Images And Sprites
 
@@ -129,7 +140,7 @@ Everything else - hook handle, draw components, layers, culling, camera math, co
 - `config`, `center`, and `renderer` are read when the native engine is created. Remount with a new `key` to apply a new full config or renderer.
 - Use `engine.setEventHandlers`, `engine.setBounds`, `engine.setCenter`, `engine.goCenter`, `engine.setScale`, `zoomIn`, and `zoomOut` for runtime changes.
 - `onDraw` and `DrawFunction` receive a Skia `SkCanvas`.
-- A one-finger `onMouseDown` is paired with one `onMouseUp` when all fingers lift, even if multitouch suppresses the click. Cancellation or unmount instead sends `onMouseLeave` at the pressed finger's last known position. Drawing/selection tools should end their active press in either callback.
+- (react-native >= 0.7) A one-finger `onMouseDown` is paired with one `onMouseUp` when all fingers lift, even if multitouch suppresses the click. Cancellation or unmount instead sends `onMouseLeave` at the pressed finger's last known position. Drawing/selection tools should end their active press in either callback.
 - Static draw helpers record and replay Skia pictures, which is useful for thousands of non-changing items.
 
 ## Documentation

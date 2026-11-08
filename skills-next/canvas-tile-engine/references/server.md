@@ -126,7 +126,7 @@ render, then reference its family in `style.fontFamily`:
 
 ```ts
 import { fileURLToPath } from "node:url";
-import { registerFont } from "@canvas-tile-engine/renderer-server";
+import { registerFont, renderToBuffer } from "@canvas-tile-engine/renderer-server";
 
 // Absolute path: a relative one resolves against process.cwd(), not this file
 const fontPath = fileURLToPath(new URL("./fonts/Inter.ttf", import.meta.url));
@@ -134,8 +134,19 @@ if (!registerFont(fontPath, "Inter")) {
     throw new Error(`Font failed to register: ${fontPath}`);
 }
 
-engine.drawText({ x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#fff" } }, 2);
+const png = await renderToBuffer({
+    config: { scale: 40, size: { width: 320, height: 160 }, backgroundColor: "#0b1021" },
+    draw: (engine) => {
+        engine.drawText(
+            { x: 0, y: 0, text: "Hello", size: 1, style: { fontFamily: "Inter", fillStyle: "#e2e8f0" } },
+            2,
+        );
+    },
+});
 ```
+
+- Give text an explicit `fillStyle` that contrasts with `backgroundColor`
+  (the default background is white, so `"#fff"` text on it is invisible).
 
 - `registerFont(path: string, family?: string): boolean` takes a
   `.ttf`/`.otf`/`.woff2` file; `family` is the name to use in `fontFamily`

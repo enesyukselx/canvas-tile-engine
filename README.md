@@ -113,7 +113,7 @@ const config: CanvasTileEngineConfig = {
 const engine = new CanvasTileEngine(wrapper, config, new RendererCanvas(), { x: 0, y: 0 });
 
 engine.drawGridLines(1, 1, "#1e293b", 0);
-engine.drawRect({ x: 0, y: 0, size: 1, radius: 4, style: { fillStyle: "#22c55e" } }, 1);
+engine.drawRect({ x: 0, y: 0, size: 1, radius: 0.1, style: { fillStyle: "#22c55e" } }, 1);
 engine.drawText(
     {
         x: 0,
@@ -131,6 +131,8 @@ engine.onClick = (coords) => {
 
 engine.render();
 ```
+
+`scale` is the zoom level in screen pixels per world unit, so at `scale: 48` a `size: 1` cell is 48 px wide. Sizes, `radius`, and shape `lineWidth` are world units and zoom with the camera; fields ending in `Px` and the `drawGridLines` line width are screen pixels.
 
 ## React
 
@@ -220,7 +222,7 @@ const png = await renderToBuffer({
     pixelRatio: 2,
     draw: (engine) => {
         engine.drawGridLines(1, 1, "#1e2a45", 0);
-        engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 6, style: { fillStyle: "#4ade80" } }, 1);
+        engine.drawRect({ x: 0, y: 0, size: 0.9, radius: 0.12, style: { fillStyle: "#4ade80" } }, 1);
         engine.drawCircle({ x: 2, y: 2, size: 1.4, style: { fillStyle: "#22d3ee" } }, 1);
     },
 });
@@ -254,7 +256,7 @@ For package watch mode during local development, run `pnpm dev:lib` in a separat
 
 ## Documentation
 
-- Full docs: [canvastileengine.dev](https://canvastileengine.dev)
+- Full docs: [canvastileengine.dev](https://www.canvastileengine.dev/docs/introduction/getting_started)
 - Core API: [`packages/core`](./packages/core)
 - React API: [`packages/react`](./packages/react)
 - React Native API: [`packages/react-native`](./packages/react-native)

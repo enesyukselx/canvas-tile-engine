@@ -1,7 +1,7 @@
 {
     "name": "@canvas-tile-engine/renderer-skia",
     "version": "0.6.0",
-    "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with React Native Skia",
+    "description": "React Native Skia renderer for Canvas Tile Engine. Most apps use it through @canvas-tile-engine/react-native.",
     "author": "Enes Yüksel",
     "license": "MIT",
     "repository": {
@@ -14,18 +14,15 @@
         "url": "https://github.com/enesyukselx/canvas-tile-engine/issues"
     },
     "keywords": [
+        "canvas-tile-engine",
+        "renderer",
         "skia",
+        "react-native-skia",
         "react-native",
         "tile",
-        "engine",
-        "2d",
-        "map",
-        "game",
         "grid",
-        "visualization",
-        "interactive",
-        "pan",
-        "zoom"
+        "2d",
+        "map"
     ],
     "sideEffects": false,
     "main": "dist/index.cjs",

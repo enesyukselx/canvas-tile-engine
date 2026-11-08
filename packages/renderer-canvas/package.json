@@ -1,7 +1,7 @@
 {
     "name": "@canvas-tile-engine/renderer-canvas",
     "version": "0.8.0",
-    "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with Canvas",
+    "description": "HTML Canvas2D renderer for Canvas Tile Engine, the default choice for browser apps. Requires @canvas-tile-engine/core.",
     "author": "Enes Yüksel",
     "license": "MIT",
     "repository": {
@@ -14,17 +14,16 @@
         "url": "https://github.com/enesyukselx/canvas-tile-engine/issues"
     },
     "keywords": [
+        "canvas-tile-engine",
+        "renderer",
         "canvas",
+        "canvas2d",
+        "html5-canvas",
+        "browser",
         "tile",
-        "engine",
-        "2d",
-        "map",
-        "game",
         "grid",
-        "visualization",
-        "interactive",
-        "pan",
-        "zoom"
+        "2d",
+        "map"
     ],
     "sideEffects": false,
     "main": "dist/index.cjs",
