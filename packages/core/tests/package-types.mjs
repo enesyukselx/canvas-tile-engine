@@ -51,6 +51,31 @@ function unpackPackage(name) {
     assert.ok(!readdirSync(target).includes("src"));
 }
 
+// Every published package gives each condition a declaration of its own module
+// format: `import` gets the ESM `.d.mts`, `require` the CommonJS `.d.ts`. A
+// shared outer `types` condition would hand ESM importers the CommonJS file
+// ("Masquerading as CJS"), so TypeScript would accept a default import that
+// Node and bundlers reject. `import` stays ahead of `require` so resolvers that
+// assert both (Metro) keep picking the ESM build. The top-level `types` field
+// remains for node10 resolution.
+const entryExports = JSON.stringify({
+    import: { types: "./dist/index.d.mts", default: "./dist/index.mjs" },
+    require: { types: "./dist/index.d.ts", default: "./dist/index.cjs" },
+});
+for (const name of [
+    "core",
+    "react",
+    "react-native",
+    "renderer-canvas",
+    "renderer-webgl",
+    "renderer-skia",
+    "renderer-server",
+]) {
+    const manifest = JSON.parse(readFileSync(resolve(packageRoot, "..", name, "package.json"), "utf8"));
+    assert.equal(JSON.stringify(manifest.exports["."]), entryExports, `${name} exports["."]`);
+    assert.equal(manifest.types, "dist/index.d.ts", `${name} top-level types`);
+}
+
 const assertions = `
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type Assert<T extends true> = T;
@@ -216,6 +241,11 @@ new CanvasTileEngine(wrapper, config, new RendererWebGL()).drawImage({ x: 0, y: 
 const image: ImageItem = { x: 0, y: 0, img: "not a DOM image" };
 `;
 
+const defaultImportPackages = {
+    node: ["core", "renderer-server"],
+    browser: ["renderer-canvas", "renderer-webgl"],
+};
+
 function explain(diagnostics) {
     return ts.formatDiagnosticsWithColorAndContext(diagnostics, {
         getCanonicalFileName: (name) => name,
@@ -299,6 +329,27 @@ try {
                 platform === "node" ? [2322, 2322, 18048] : [2322, 2322, 2322],
                 explain(rejected),
             );
+            if (extension !== "cts") {
+                // ESM consumers read the ESM declarations, so a default import
+                // (none of the packages has one) fails to compile (TS1192)
+                // instead of compiling and then failing in Node or a bundler.
+                // CommonJS consumers are not checked: TypeScript lets them
+                // synthesize a default from any CommonJS declaration.
+                const names = defaultImportPackages[platform];
+                const defaultImport = join(consumer, `default-import-${platform}.${extension}`);
+                writeFileSync(
+                    defaultImport,
+                    names.map((name, index) => `import entry${index} from "@canvas-tile-engine/${name}";\n`).join(""),
+                );
+                const errors = ts.getPreEmitDiagnostics(
+                    ts.createProgram([defaultImport], { ...options, noEmit: true }),
+                );
+                assert.deepEqual(
+                    errors.map((diagnostic) => diagnostic.code),
+                    names.map(() => 1192),
+                    explain(errors),
+                );
+            }
             console.log(
                 `Packed ${platform} .${extension}: strict types${platform === "node" ? " and DOM-free PNG runtime" : " and browser defaults"} passed`,
             );
