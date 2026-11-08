@@ -936,4 +936,30 @@ describe("HitTester clipped registrations", () => {
 
         expect(ht.hitTestFirst({ x: 9, y: 2 })).toBeDefined();
     });
+
+    // Corners in any order, like hitTestRect's own rectangle: every renderer
+    // paints an inverted clip as the sorted one, so hit testing must agree.
+    it.each([
+        ["both axes", { minX: 5, maxX: 0, minY: 5, maxY: 0 }],
+        ["x only", { minX: 5, maxX: 0, minY: 0, maxY: 5 }],
+        ["y only", { minX: 0, maxX: 5, minY: 5, maxY: 0 }],
+    ])("treats a clip inverted on %s as the sorted rectangle", (_axes, clip) => {
+        const ht = new HitTester();
+        ht.register(
+            handle(1),
+            "rect",
+            [
+                { x: 2, y: 2 },
+                { x: 9, y: 2 },
+            ],
+            1,
+            { clip },
+        );
+
+        expect(ht.hitTestFirst({ x: 2, y: 2 })).toBeDefined();
+        expect(ht.hitTestFirst({ x: 9, y: 2 })).toBeUndefined();
+        const hits = ht.hitTestRect({ minX: 0, maxX: 12, minY: 0, maxY: 4 });
+        expect(hits).toHaveLength(1);
+        expect(hits[0].index).toBe(0);
+    });
 });

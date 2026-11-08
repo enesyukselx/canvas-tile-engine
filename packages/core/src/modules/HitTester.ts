@@ -13,6 +13,7 @@ import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathF
 import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { maxPxExtent, resolveBoxWorld, resolveSizeWorld } from "../utils/itemSize";
 import { resolveOrigin, computeOriginOffset } from "../utils/origin";
+import { normalizeClip } from "../utils/validateConfig";
 import { SpatialIndex, type SpatialIndexToken } from "./SpatialIndex";
 import type { ItemCollectionChange, ItemKey, ReadonlyItemCollection } from "./ItemCollection";
 
@@ -81,8 +82,9 @@ type HitEntry = {
     /** Static draw calls replay at a recorded scale, so `sizePx` is ignored
      * for them — the hit box must match what is actually drawn. */
     ignoreSizePx?: boolean;
-    /** World rectangle the registration is confined to. What is clipped away
-     * is not painted, so it must not answer queries either. */
+    /** World rectangle the registration is confined to, corners sorted at
+     * registration. What is clipped away is not painted, so it must not
+     * answer queries either. */
     clip?: Bounds;
     /** Call-level stroke style (line entries only; path items carry their
      * own). Per-item `Line.style` overlays it at test time. */
@@ -241,7 +243,10 @@ export class HitTester {
             maxSize,
             maxSizePx,
             ignoreSizePx: opts?.ignoreSizePx,
-            clip: opts?.clip,
+            // Corners in any order, like hitTestRect's own rectangle. The
+            // engine has already sorted it; this keeps the registry correct
+            // on its own.
+            clip: normalizeClip(opts?.clip),
             style: opts?.style,
             visibleOf: opts?.visibleOf,
             interactiveOf: opts?.interactiveOf,
