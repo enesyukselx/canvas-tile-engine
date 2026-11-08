@@ -565,6 +565,8 @@ export class RendererWebGL implements IRenderer {
         // ── WebGL surface: viewport + background clear ──
         this.glRenderer.setSize(size.width * dpr, size.height * dpr, size.width, size.height);
         this.glRenderer.clear(this.colorParser.parse(config.backgroundColor));
+        // Gradient ramp rows stay valid for a whole frame; only here may they be dropped.
+        this.glRenderer.beginFrame();
 
         // ── Overlay surface: reset transform (cleared each frame) ──
         this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);

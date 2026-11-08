@@ -2,20 +2,21 @@ import { describe, expect, it } from "vitest";
 import { CoordinateTransformer, ICamera } from "@canvas-tile-engine/core";
 import { Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
-import { GLRenderer, type LineInstance, type ShapeInstance } from "../../src/modules/gl/GLRenderer";
+import { GLRenderer, type LineInstance, type RampStop, type ShapeInstance } from "../../src/modules/gl/GLRenderer";
 import type { RGBA } from "../../src/utils/color";
 
 // Fake GL renderer that records shapes and every ramp registered against it.
 function makeRecordingGL() {
     const shapes: ShapeInstance[] = [];
-    const ramps: Array<{ key: string; stops: Array<{ offset: number; color: RGBA }> }> = [];
+    const ramps: Array<{ key: string; stops: RampStop[] }> = [];
     const paths: Array<{ color: RGBA; gradient: unknown }> = [];
     const gl = {
         drawShapes(items: ShapeInstance[]) {
             shapes.push(...items);
         },
         drawLines(_items: LineInstance[]) {},
-        rampRow(key: string, stops: Array<{ offset: number; color: RGBA }>) {
+        rampRow(stops: RampStop[]) {
+            const key = JSON.stringify(stops);
             const existing = ramps.findIndex((r) => r.key === key);
             if (existing >= 0) {
                 return existing;
@@ -209,7 +210,7 @@ describe("GLRenderer gradient ramps", () => {
         const { gl, textures } = makeFakeGL();
         const renderer = new GLRenderer(gl);
 
-        const row = renderer.rampRow("red-blue", [
+        const row = renderer.rampRow([
             { offset: 0, color: [1, 0, 0, 1] },
             { offset: 1, color: [0, 0, 1, 1] },
         ]);
@@ -243,11 +244,11 @@ describe("GLRenderer gradient ramps", () => {
         const { gl } = makeFakeGL();
         const renderer = new GLRenderer(gl);
 
-        const a = renderer.rampRow("a", [{ offset: 0, color: [1, 0, 0, 1] }]);
-        const b = renderer.rampRow("b", [{ offset: 0, color: [0, 1, 0, 1] }]);
+        const a = renderer.rampRow([{ offset: 0, color: [1, 0, 0, 1] }]);
+        const b = renderer.rampRow([{ offset: 0, color: [0, 1, 0, 1] }]);
 
         expect([a, b]).toEqual([0, 1]);
-        expect(renderer.rampRow("a", [{ offset: 0, color: [1, 0, 0, 1] }])).toBe(0);
+        expect(renderer.rampRow([{ offset: 0, color: [1, 0, 0, 1] }])).toBe(0);
     });
 
     it("writes the gradient parameter per vertex and a sentinel without one", () => {

@@ -17,7 +17,6 @@ import {
     isGradient,
     normalizeStops,
     gradientAxisPx,
-    paintKey,
     resolveLineDashPx,
     overlayLineStyle,
     resolveCornerRadiusPx,
@@ -159,12 +158,16 @@ export class WebGLDraw {
      * The flat color stays meaningful for a gradient — it is the first stop —
      * so anything that ignores the gradient (the stencil pass of a path fill)
      * still paints something sensible rather than black.
+     *
+     * A caller that queues shapes must pass `flush`: it draws the queue
+     * before the atlas restarts and reuses the rows those shapes reference.
      */
     private resolveFill(
         gl: GLRenderer,
         paint: Paint,
         box: PaintBox,
         toScreen: (x: number, y: number) => Coords = (x, y) => this.transformer.worldToScreen(x, y),
+        flush?: () => void,
     ): { color: RGBA; gradient?: ShapeGradient } {
         if (!isGradient(paint)) {
             return { color: this.colorParser.parse(paint) };
@@ -174,7 +177,7 @@ export class WebGLDraw {
             offset: stop.offset,
             color: this.colorParser.parse(stop.color),
         }));
-        const row = gl.rampRow(paintKey(paint), stops);
+        const row = gl.rampRow(stops, flush);
         return {
             color: stops[0]?.color ?? TRANSPARENT,
             gradient: { axis: gradientAxisPx(paint, box, toScreen), row },
@@ -203,6 +206,11 @@ export class WebGLDraw {
 
             let shapes: ShapeInstance[] = [];
             let lines: LineInstance[] = [];
+            // Draws the queued fills: before a stroke, and before the ramp atlas restarts.
+            const flushShapes = () => {
+                gl.drawShapes(shapes);
+                shapes = [];
+            };
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -246,6 +254,7 @@ export class WebGLDraw {
                         style.fillStyle,
                         { x: -pxW / 2, y: -pxH / 2, width: pxW, height: pxH },
                         (wx, wy) => unrotate(this.transformer.worldToScreen(wx, wy), cx, cy, rotation),
+                        flushShapes,
                     );
                     shapes.push({
                         cx,
@@ -260,10 +269,7 @@ export class WebGLDraw {
                 }
 
                 if (style?.strokeStyle) {
-                    if (shapes.length > 0) {
-                        gl.drawShapes(shapes);
-                        shapes = [];
-                    }
+                    flushShapes();
                     this.pushRectStroke(
                         lines,
                         cx,
@@ -308,6 +314,11 @@ export class WebGLDraw {
 
             let shapes: ShapeInstance[] = [];
             let lines: LineInstance[] = [];
+            // Draws the queued fills: before a stroke, and before the ramp atlas restarts.
+            const flushShapes = () => {
+                gl.drawShapes(shapes);
+                shapes = [];
+            };
 
             for (const item of visibleItems) {
                 if (visibleOf?.(item) === false) {
@@ -346,6 +357,7 @@ export class WebGLDraw {
                         style.fillStyle,
                         { x: -radius, y: -radius, width: radius * 2, height: radius * 2 },
                         (wx, wy) => unrotate(this.transformer.worldToScreen(wx, wy), cx, cy, 0),
+                        flushShapes,
                     );
                     shapes.push({
                         cx,
@@ -360,10 +372,7 @@ export class WebGLDraw {
                 }
 
                 if (style?.strokeStyle) {
-                    if (shapes.length > 0) {
-                        gl.drawShapes(shapes);
-                        shapes = [];
-                    }
+                    flushShapes();
                     this.pushCircleStroke(
                         lines,
                         cx,
