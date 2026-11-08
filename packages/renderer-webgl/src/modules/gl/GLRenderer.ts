@@ -39,7 +39,18 @@ export interface ShapeInstance {
 /** A gradient fill resolved for the GPU. */
 export interface ShapeGradient {
     axis: { x0: number; y0: number; x1: number; y1: number };
+    /**
+     * Atlas row from {@link GLRenderer.rampRow}. It stays valid until the next
+     * {@link GLRenderer.beginFrame}, or until a later `rampRow` call restarts
+     * the atlas, which it only does after running that call's `beforeReset`.
+     */
     row: number;
+}
+
+/** One normalized, parsed color stop of a gradient ramp. */
+export interface RampStop {
+    offset: number;
+    color: RGBA;
 }
 
 /** A solid colored line segment with a pixel width. */
@@ -88,8 +99,20 @@ const LINE_FLOATS_PER_VERTEX = 8; // pos(2) color(4) gradT(1) gradRow(1)
 
 /** Samples per ramp row. 256 is the usual gradient LUT width and is exact for 8-bit color. */
 const RAMP_WIDTH = 256;
-/** Rows before the atlas is reset; a scene realistically holds a handful. */
-const MAX_RAMP_ROWS = 256;
+const RAMP_ROW_BYTES = RAMP_WIDTH * 4;
+/**
+ * Rows the atlas may keep across frames; a scene realistically holds a
+ * handful. A soft cap: one frame may use more (see {@link GLRenderer.rampRow}).
+ */
+const RAMP_ROWS_SOFT_CAP = 256;
+/**
+ * The most rows one atlas can hold, whatever the texture size limit says. The
+ * fragment shaders run at mediump, which may be fp16: (row + 0.5) is exact
+ * there only below 1024, so a taller atlas would blend a row with its
+ * neighbor on such GPUs. With a power-of-two height up to this bound, the
+ * shader's row coordinate is exact even at fp16.
+ */
+const RAMP_ROWS_HARD_CAP = 1024;
 /** `a_gradRow` for a solid fill. */
 const NO_GRADIENT = -1;
 const TEXTURE_FLOATS_PER_VERTEX = 4; // pos(2) texcoord(2)
@@ -139,6 +162,44 @@ interface TextureEntry {
     height: number;
 }
 
+/** An atlas row and the last frame that asked for it. */
+interface RampEntry {
+    row: number;
+    frame: number;
+}
+
+/**
+ * What a ramp row's texels depend on: the normalized stops and their parsed
+ * colors, nothing else. The axis travels per instance, so gradients that
+ * differ only in direction or units share a row, and so do equal colors
+ * spelled differently.
+ */
+function rampKey(stops: readonly RampStop[]): string {
+    let key = "";
+    for (const { offset, color } of stops) {
+        key += `${offset}:${color[0]},${color[1]},${color[2]},${color[3]};`;
+    }
+    return key;
+}
+
+/** Smallest power of two that is at least `n` (n >= 1). */
+function ceilPowerOfTwo(n: number): number {
+    let p = 1;
+    while (p < n) {
+        p *= 2;
+    }
+    return p;
+}
+
+/** Largest power of two that is at most `n` (n >= 1). */
+function floorPowerOfTwo(n: number): number {
+    let p = 1;
+    while (p * 2 <= n) {
+        p *= 2;
+    }
+    return p;
+}
+
 /**
  * Thin batched drawing layer over a raw WebGL context.
  *
@@ -161,9 +222,19 @@ export class GLRenderer {
 
     /** Gradient ramp atlas: one RAMP_WIDTH row per distinct ramp. */
     private rampTexture: WebGLTexture | null = null;
-    private rampRows = new Map<string, number>();
-    private rampPixels = new Uint8Array(RAMP_WIDTH * 4);
-    private rampDirty = false;
+    private rampRows = new Map<string, RampEntry>();
+    /** CPU copy of the atlas; its capacity is always a power of two rows. */
+    private rampPixels = new Uint8Array(RAMP_ROW_BYTES);
+    /** Height of the ramp texture as last allocated on the GPU (0: never). */
+    private rampTextureRows = 0;
+    /** First row written since the last upload (Infinity: none). */
+    private rampDirtyFrom = Infinity;
+    /** Most rows the atlas may hold: the hard cap, or less on a small texture size limit. */
+    private maxRampRows: number;
+    /** Counts {@link beginFrame} calls, to stamp the rows each frame uses. */
+    private rampFrame = 0;
+    /** Distinct rows asked for since the frame began (or since a mid-frame restart). */
+    private rampRowsInFrame = 0;
 
     /**
      * Uploaded textures, keyed weakly so the cache never keeps alive an image
@@ -198,6 +269,13 @@ export class GLRenderer {
 
     constructor(gl: GL) {
         this.gl = gl;
+
+        // A lost context answers null; keep the bound the atlas always had.
+        const maxTextureSize: unknown = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        this.maxRampRows =
+            typeof maxTextureSize === "number" && maxTextureSize >= 1
+                ? Math.min(RAMP_ROWS_HARD_CAP, floorPowerOfTwo(maxTextureSize))
+                : RAMP_ROWS_SOFT_CAP;
 
         // Derivatives (fwidth) are core in GLSL ES 3.00 but not in ESSL 1.00, and some
         // WebGL2 drivers reject the OES_standard_derivatives extension pragma outright
@@ -322,46 +400,89 @@ export class GLRenderer {
     // ─── Gradient ramps ───
 
     /**
+     * Start a frame: the one point where the ramp atlas may drop rows.
+     *
+     * A row handed out by {@link rampRow} can still be referenced by shapes
+     * a draw call has queued but not flushed yet, so reusing it mid-frame
+     * would paint those shapes with another gradient. Rows are kept across
+     * frames, because a scene's gradients rarely change. The atlas is
+     * rebuilt on demand once it holds more than the soft cap and more than
+     * twice what the last frame used: that bounds memory for an app that
+     * keeps minting gradients (animated stops, a panned map of per-cell
+     * ramps), while a scene that shows many gradients every frame keeps its
+     * rows instead of re-rasterizing and re-uploading them each frame.
+     */
+    beginFrame() {
+        if (this.rampRows.size > Math.max(RAMP_ROWS_SOFT_CAP, 2 * this.rampRowsInFrame)) {
+            this.rampRows.clear();
+            if (this.rampPixels.length > RAMP_ROWS_SOFT_CAP * RAMP_ROW_BYTES) {
+                this.rampPixels = new Uint8Array(RAMP_ROWS_SOFT_CAP * RAMP_ROW_BYTES);
+            }
+        }
+        this.rampFrame++;
+        this.rampRowsInFrame = 0;
+    }
+
+    /**
      * Register a color ramp and get back its row in the atlas.
      *
-     * Rows are keyed structurally and kept across frames, because a scene's
-     * gradients rarely change; the texture only re-uploads when a new ramp
-     * shows up. An app that manufactures unbounded distinct gradients resets
-     * the atlas rather than growing without limit.
+     * Rows are keyed by the stops alone, so the texture only uploads when a
+     * new ramp shows up. Within a frame the atlas only grows, up to
+     * {@link maxRampRows}. A frame that needs more distinct ramps than that
+     * restarts the atlas mid-frame; `beforeReset` runs first, so the caller
+     * can draw the shapes it has queued against the current rows. A caller
+     * that draws each fill immediately has nothing to flush.
      */
-    rampRow(key: string, stops: Array<{ offset: number; color: RGBA }>): number {
+    rampRow(stops: readonly RampStop[], beforeReset?: () => void): number {
+        const key = rampKey(stops);
         const existing = this.rampRows.get(key);
         if (existing !== undefined) {
-            return existing;
+            if (existing.frame !== this.rampFrame) {
+                existing.frame = this.rampFrame;
+                this.rampRowsInFrame++;
+            }
+            return existing.row;
         }
 
-        if (this.rampRows.size >= MAX_RAMP_ROWS) {
+        if (this.rampRows.size >= this.maxRampRows) {
+            beforeReset?.();
             this.rampRows.clear();
+            this.rampRowsInFrame = 0;
         }
 
         const row = this.rampRows.size;
-        this.rampRows.set(key, row);
+        this.rampRows.set(key, { row, frame: this.rampFrame });
+        this.rampRowsInFrame++;
 
-        const needed = (row + 1) * RAMP_WIDTH * 4;
-        if (this.rampPixels.length < needed) {
-            const grown = new Uint8Array(needed);
-            grown.set(this.rampPixels);
-            this.rampPixels = grown;
-        }
-
+        this.ensureRampCapacity(row + 1);
         this.writeRamp(row, stops);
-        this.rampDirty = true;
+        this.rampDirtyFrom = Math.min(this.rampDirtyFrom, row);
         return row;
     }
 
+    /** Grow the CPU atlas by doubling, so it stays a power of two rows. */
+    private ensureRampCapacity(rows: number) {
+        const needed = rows * RAMP_ROW_BYTES;
+        if (this.rampPixels.length >= needed) {
+            return;
+        }
+        let capacity = this.rampPixels.length;
+        while (capacity < needed) {
+            capacity *= 2;
+        }
+        const grown = new Uint8Array(capacity);
+        grown.set(this.rampPixels);
+        this.rampPixels = grown;
+    }
+
     /** Rasterize one ramp into its atlas row. */
-    private writeRamp(row: number, stops: Array<{ offset: number; color: RGBA }>) {
-        const base = row * RAMP_WIDTH * 4;
+    private writeRamp(row: number, stops: readonly RampStop[]) {
+        const base = row * RAMP_ROW_BYTES;
 
         // An empty ramp paints nothing, matching the Canvas2D and Skia
         // behavior for a gradient with no stops.
         if (stops.length === 0) {
-            this.rampPixels.fill(0, base, base + RAMP_WIDTH * 4);
+            this.rampPixels.fill(0, base, base + RAMP_ROW_BYTES);
             return;
         }
 
@@ -405,7 +526,10 @@ export class GLRenderer {
      */
     private bindRamps(u_ramp: WebGLUniformLocation | null, u_rampRows: WebGLUniformLocation | null) {
         const gl = this.gl;
-        const rows = Math.max(1, this.rampRows.size);
+        // A power-of-two height keeps (row + 0.5) / height exact at mediump
+        // (see RAMP_ROWS_HARD_CAP), and lets the atlas grow by sub-uploads.
+        const used = this.rampRows.size;
+        const rows = ceilPowerOfTwo(Math.max(1, used));
 
         if (!this.rampTexture) {
             this.rampTexture = gl.createTexture();
@@ -417,19 +541,24 @@ export class GLRenderer {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            this.rampDirty = true;
         } else {
             gl.activeTexture(gl.TEXTURE1);
             gl.bindTexture(gl.TEXTURE_2D, this.rampTexture);
         }
 
-        if (this.rampDirty) {
-            const needed = rows * RAMP_WIDTH * 4;
-            const pixels =
-                this.rampPixels.length >= needed ? this.rampPixels.subarray(0, needed) : new Uint8Array(needed).fill(0);
+        if (rows !== this.rampTextureRows) {
+            this.ensureRampCapacity(rows);
+            const pixels = this.rampPixels.subarray(0, rows * RAMP_ROW_BYTES);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, RAMP_WIDTH, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-            this.rampDirty = false;
+            this.rampTextureRows = rows;
+        } else if (this.rampDirtyFrom < used) {
+            // Same height: upload only the rows written since the last bind,
+            // so an atlas filling up one fill at a time is not resent whole.
+            const from = this.rampDirtyFrom;
+            const pixels = this.rampPixels.subarray(from * RAMP_ROW_BYTES, used * RAMP_ROW_BYTES);
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, from, RAMP_WIDTH, used - from, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
         }
+        this.rampDirtyFrom = Infinity;
 
         gl.uniform1i(u_ramp, 1);
         gl.uniform1f(u_rampRows, rows);
@@ -971,6 +1100,11 @@ export class GLRenderer {
         }
         this.liveTextures.clear();
         this.textures = new WeakMap();
+        if (this.rampTexture) {
+            gl.deleteTexture(this.rampTexture);
+            this.rampTexture = null;
+            this.rampTextureRows = 0;
+        }
         gl.deleteBuffer(this.shapeBuffer);
         gl.deleteBuffer(this.lineBuffer);
         gl.deleteBuffer(this.textureBuffer);
