@@ -77,8 +77,9 @@ type TypeContract = [
     Assert<Equal<OrdinaryImage, NativeImage>>,
     Assert<Equal<OrdinaryCanvas, NativeCanvas>>,
     Assert<Equal<OrdinaryContext, NativeContext>>,
-    // NodeNext may synthesize a default for a CJS declaration; compare named exports.
-    Assert<Equal<Exclude<keyof typeof server, "default">, ${runtimeNames.map((name) => JSON.stringify(name)).join(" | ")}>>,
+    // No synthesized default: ESM imports must read the ESM (.d.mts) declaration,
+    // not the CommonJS one NodeNext would give a default from module.exports.
+    Assert<Equal<keyof typeof server, ${runtimeNames.map((name) => JSON.stringify(name)).join(" | ")}>>,
     Assert<Equal<ReturnType<RendererServer["getCanvas"]>, Canvas>>,
     Assert<Equal<ReturnType<RendererServer["getContext"]>, SKRSContext2D>>
 ];
