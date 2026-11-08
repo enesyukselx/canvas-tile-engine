@@ -1,7 +1,7 @@
 {
     "name": "@canvas-tile-engine/core",
     "version": "0.11.0",
-    "description": "Lightweight library for building interactive 2D grid-based maps and visualizations with Canvas",
+    "description": "Renderer-agnostic core of Canvas Tile Engine: camera, pan/zoom, coordinate transforms, events, layered draw API, sprites, and spatial indexing for zoomable 2D grids. Install it with a renderer package.",
     "author": "Enes Yüksel",
     "license": "MIT",
     "repository": {
@@ -14,17 +14,21 @@
         "url": "https://github.com/enesyukselx/canvas-tile-engine/issues"
     },
     "keywords": [
-        "canvas",
+        "canvas-tile-engine",
         "tile",
-        "engine",
+        "tilemap",
+        "grid",
         "2d",
         "map",
-        "game",
-        "grid",
-        "visualization",
-        "interactive",
+        "game-board",
+        "engine",
+        "camera",
         "pan",
-        "zoom"
+        "zoom",
+        "canvas",
+        "renderer-agnostic",
+        "spatial-index",
+        "typescript"
     ],
     "sideEffects": false,
     "main": "dist/index.cjs",
