@@ -30,6 +30,9 @@
         "napi-rs"
     ],
     "sideEffects": false,
+    "bin": {
+        "cte-render": "dist/cli.mjs"
+    },
     "main": "dist/index.cjs",
     "module": "dist/index.mjs",
     "types": "dist/index.d.ts",
@@ -56,7 +59,7 @@
         "format:check": "oxfmt --check"
     },
     "engines": {
-        "node": ">=18"
+        "node": ">=18.3.0"
     },
     "peerDependencies": {
         "@canvas-tile-engine/core": ">=0.12.0"
