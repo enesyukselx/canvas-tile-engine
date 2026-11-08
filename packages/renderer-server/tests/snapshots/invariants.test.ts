@@ -95,4 +95,51 @@ describe("pixel invariants", () => {
         });
         expectNearIdenticalPixels(dynamic, cached, "invariant-static-image");
     });
+
+    // Extent contract shared by every renderer: a negative or NaN extent
+    // empties the item, so the frame matches one where it was never drawn.
+    it("paints nothing for negative or NaN extents, dynamic or static", async () => {
+        const img = await makeTestImage();
+        const style = { fillStyle: "#22c55e", strokeStyle: "#f8fafc", lineWidthPx: 3 };
+        const rects = [
+            { x: -2, y: -1, size: -2, style },
+            { x: 0, y: 0, width: -4, height: 2, style },
+            { x: 2, y: 1, width: 3, height: NaN, style, rotate: 30 },
+            { x: -1, y: 2, size: -1.5, radius: 0.25, style },
+        ];
+        const circles = [
+            { x: -2, y: 1, size: -2, style },
+            { x: 1, y: -1, size: NaN, style },
+        ];
+        const images = [
+            { x: -2, y: -1, size: -2, img },
+            { x: 2, y: 1, size: -1.5, img, flipX: true, rotate: 45 },
+        ];
+        const background = (engine: Engine) => {
+            engine.drawGridLines(1, 1, "#334155", 0);
+        };
+
+        const empty = await renderToBuffer({ config, draw: background });
+        const dynamic = await renderToBuffer({
+            config,
+            draw: (engine) => {
+                background(engine);
+                engine.drawRect([...rects, { x: 0, y: 0, sizePx: -40, style }], 1);
+                engine.drawCircle([...circles, { x: 0, y: 0, sizePx: -40, style }], 1);
+                engine.drawImage([...images, { x: 0, y: 0, sizePx: -40, img }], 1);
+            },
+        });
+        const cached = await renderToBuffer({
+            config,
+            draw: (engine) => {
+                background(engine);
+                engine.drawStaticRect(rects, "negative-rects", 1);
+                engine.drawStaticCircle(circles, "negative-circles", 1);
+                engine.drawStaticImage(images, "negative-images", 1);
+            },
+        });
+
+        expectSamePixels(dynamic, empty, "invariant-negative-dynamic");
+        expectSamePixels(cached, empty, "invariant-negative-static");
+    });
 });

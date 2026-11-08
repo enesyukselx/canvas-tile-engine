@@ -73,6 +73,8 @@ Rounded rectangle radii apply to both the fill and border, including dashed and 
 
 As with Canvas2D `roundRect`, WebGL rejects negative radii and arrays outside one to four entries with `RangeError` when rendering; non-finite radii produce no geometry.
 
+Sizes must be zero or positive. A negative or `NaN` `size`, `width`, `height`, `sizePx`, `widthPx` or `heightPx` empties the whole item: it paints nothing (no fill, no border) and never hits, on every renderer. For a bar that grows down or to the left, keep the extent positive and move the anchor with `origin` instead: `{ mode: "self", x: 0.5, y: 0 }` hangs the bar below its point, `y: 1` stands it on top. A zero side is valid: a rect with a border and zero height strokes as a line.
+
 **Style Options:**
 
 - `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`), or a gradient — see [Gradient Fills](#gradient-fills)
@@ -521,6 +523,8 @@ drawImage(items: DrawItems<ImageItem>, layer?: number, options?: DrawOptions): D
 | `sprite`  | `SpriteRect`       | -                                  | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
 | `opacity` | `number`           | `1`                                | Opacity from 0 (transparent) to 1 (opaque). Ideal for ghost/preview placements.                                  |
 | `data`    | `TData`            | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`.                  |
+
+As with shapes, `size` and `sizePx` must be zero or positive: a negative or `NaN` size paints nothing and never hits. It does not mirror the image; use `flipX`/`flipY` for that.
 
 ```typescript
 // Single image

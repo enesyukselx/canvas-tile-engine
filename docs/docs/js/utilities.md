@@ -182,7 +182,7 @@ Each kind contributes the geometry it is drawn from:
 | `Line`                            | its two endpoints                                                         |
 | `Path`                            | vertex box for `points`, control-point hull for `commands`                |
 
-Items that draw nothing are skipped rather than counted: a path with fewer than two points, an empty command list, an object with no geometry at all.
+Items that draw nothing are skipped rather than counted: a path with fewer than two points, an empty command list, an anchored item with size 0 or a negative or `NaN` extent, an object with no geometry at all.
 
 Deliberately left out, so the result stays camera-independent:
 

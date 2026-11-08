@@ -937,6 +937,78 @@ describe("non-square rects", () => {
     });
 });
 
+// Extent contract shared by all renderers; mirrors the fixture values in the
+// canvas, webgl, and server suites. A negative or NaN size, width or height
+// empties the whole item, so every primitive is issued with no extent: Skia
+// paints nothing for an empty rect, a zero-radius circle or an empty image
+// destination, fill or stroke alike (an unsorted rect used to paint its
+// absolute box).
+describe("negative and NaN extents", () => {
+    const style = { fillStyle: "#f00", strokeStyle: "#00f", lineWidthPx: 2 };
+    const fakeImage = { width: () => 10, height: () => 10 } as never;
+    const invalidRects: Rect[] = [
+        { x: 2, y: 2, size: -2, style },
+        { x: 2, y: 2, width: -4, height: 2, style },
+        { x: 2, y: 2, width: 4, height: NaN, style },
+        { x: 2, y: 2, sizePx: -30, style },
+        { x: 2, y: 2, widthPx: 50, heightPx: -20, style },
+    ];
+    const invalidSizes = [{ size: -2 }, { size: NaN }, { sizePx: -30 }];
+    // Static pictures ignore pixel sizes, so only the world-unit cases apply.
+    const worldOnly = <T extends object>(items: T[]) =>
+        items.filter((item) => !("sizePx" in item) && !("widthPx" in item));
+
+    function expectEmpty(ops: Op[], count: { rect: number; circle: number; image: number }) {
+        const rects = ops.filter((o) => o.op === "rect").map((o) => o.rect as { width: number; height: number });
+        const circles = ops.filter((o) => o.op === "circle").map((o) => o.r);
+        const images = ops.filter((o) => o.op === "image").map((o) => o.dest as { width: number; height: number });
+        // Each rect is issued twice: fill, then stroke.
+        expect(rects).toHaveLength(count.rect * 2);
+        expect(rects.every(({ width, height }) => width === 0 && height === 0)).toBe(true);
+        expect(circles).toEqual(Array(count.circle * 2).fill(0));
+        expect(images).toHaveLength(count.image);
+        expect(images.every(({ width, height }) => width === 0 && height === 0)).toBe(true);
+    }
+
+    it("issues every dynamic primitive with no extent", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+
+        draw.drawRect(invalidRects, 1);
+        draw.drawCircle(
+            invalidSizes.map((size) => ({ x: 2, y: 2, ...size, style })),
+            1,
+        );
+        draw.drawImage(
+            invalidSizes.map((size) => ({ x: 2, y: 2, ...size, img: fakeImage })),
+            1,
+        );
+        render(canvas);
+
+        expectEmpty(ops, { rect: 5, circle: 3, image: 3 });
+    });
+
+    it("records static pictures with no extent", () => {
+        const { draw, render } = setup();
+        const { canvas, ops } = makeCanvas();
+        const sizes = worldOnly(invalidSizes);
+
+        draw.drawStaticRect(worldOnly(invalidRects), "rects");
+        draw.drawStaticCircle(
+            sizes.map((size) => ({ x: 2, y: 2, ...size, style })),
+            "circles",
+        );
+        draw.drawStaticImage(
+            sizes.map((size) => ({ x: 2, y: 2, ...size, img: fakeImage })),
+            "images",
+        );
+        render(canvas);
+
+        const recorded = ops.filter((o) => o.op === "picture").flatMap((o) => (o.picture as MockPicture).ops as Op[]);
+        expectEmpty(recorded, { rect: 3, circle: 2, image: 2 });
+    });
+});
+
 // Per-item line style contract shared by all renderers: item.style overlays
 // the call-level style field by field; the shared stroke paint is mutated for
 // the item's draw and restored for the rest of the batch.

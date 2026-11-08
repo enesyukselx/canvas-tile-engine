@@ -238,12 +238,9 @@ export class SkiaDraw {
         useSizePx: boolean,
         deco?: ShapeDecorationStyle,
     ) {
-        const size = item.size ?? 1;
         const origin = resolveOrigin(item.origin);
         const style = deco ? { ...item.style, ...deco } : item.style;
-        const box = useSizePx
-            ? resolveBoxPx(item, cellSize)
-            : { width: (item.width ?? size) * cellSize, height: (item.height ?? size) * cellSize };
+        const box = resolveBoxPx(item, cellSize, useSizePx);
         const pxW = box.width;
         const pxH = box.height;
         const { x: drawX, y: drawY } = computeOriginOffset(pos, pxW, pxH, origin, cellSize);
@@ -339,7 +336,7 @@ export class SkiaDraw {
     ) {
         const origin = resolveOrigin(item.origin);
         const style = deco ? { ...item.style, ...deco } : item.style;
-        const pxSize = useSizePx ? resolveSizePx(item, cellSize) : (item.size ?? 1) * cellSize;
+        const pxSize = resolveSizePx(item, cellSize, useSizePx);
         const radius = pxSize / 2;
         const { x: drawX, y: drawY } = computeOriginOffset(pos, pxSize, pxSize, origin, cellSize);
         const cx = drawX + radius;
@@ -672,7 +669,7 @@ export class SkiaDraw {
             return;
         }
 
-        const pxSize = useSizePx ? resolveSizePx(item, cellSize) : (item.size ?? 1) * cellSize;
+        const pxSize = resolveSizePx(item, cellSize, useSizePx);
 
         // Spritesheet source rect; defaults to the whole image
         const srcX = item.sprite?.x ?? 0;

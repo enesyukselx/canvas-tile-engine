@@ -219,6 +219,84 @@ describe("HitTester non-square rects", () => {
     });
 });
 
+// Extent contract shared with every renderer: a negative or NaN extent
+// empties the item, so it paints nothing and must never hit, padding or not.
+describe("HitTester negative and NaN extents", () => {
+    const img = { width: 10, height: 10 };
+    const invalid = [
+        ["rect", { x: 0, y: 0, size: -2 }],
+        ["rect", { x: 0, y: 0, size: NaN }],
+        ["rect", { x: 0, y: 0, width: -2, height: 2 }],
+        ["rect", { x: 0, y: 0, width: 2, height: NaN }],
+        ["rect", { x: 0, y: 0, sizePx: -20 }],
+        ["rect", { x: 0, y: 0, widthPx: 20, heightPx: -20 }],
+        ["circle", { x: 0, y: 0, size: -2 }],
+        ["circle", { x: 0, y: 0, size: NaN }],
+        ["circle", { x: 0, y: 0, sizePx: -20 }],
+        ["image", { x: 0, y: 0, size: -2, img }],
+        ["image", { x: 0, y: 0, sizePx: -20, img }],
+    ] as const;
+
+    it.each(invalid)("never point-hits a %s with %j", (kind, item) => {
+        const ht = new HitTester(() => 10);
+        ht.register(handle(1), kind, item, 1);
+
+        expect(ht.hitTest({ x: 0, y: 0 })).toHaveLength(0);
+        // Padding grows an item's geometry; it must not grow an empty one.
+        expect(ht.hitTest({ x: 0, y: 0 }, { padding: 1.2 })).toHaveLength(0);
+        expect(ht.hitTest({ x: 0.5, y: 0.5 }, { padding: 1.2 })).toHaveLength(0);
+    });
+
+    it.each(invalid)("never rect-hits a %s with %j", (kind, item) => {
+        const ht = new HitTester(() => 10);
+        ht.register(handle(1), kind, item, 1);
+        const around = { minX: -3, maxX: 3, minY: -3, maxY: 3 };
+
+        expect(ht.hitTestRect(around)).toHaveLength(0);
+        expect(ht.hitTestRect(around, { mode: "contain" })).toHaveLength(0);
+        expect(ht.hitTestRect({ minX: -0.1, maxX: 0.1, minY: -0.1, maxY: 0.1 })).toHaveLength(0);
+    });
+
+    it("applies the contract to static registrations, which read world sizes only", () => {
+        const ht = new HitTester(() => 10);
+        ht.register(handle(1), "rect", { x: 0, y: 0, size: -2, sizePx: 20 }, 1, { ignoreSizePx: true });
+        ht.register(handle(1), "circle", { x: 0, y: 0, size: -2, sizePx: 20 }, 1, { ignoreSizePx: true });
+
+        expect(ht.hitTest({ x: 0, y: 0 }, { padding: 1.2 })).toHaveLength(0);
+        expect(ht.hitTestRect({ minX: -3, maxX: 3, minY: -3, maxY: 3 })).toHaveLength(0);
+    });
+
+    it("never hits a size-0 item, which paints nothing either", () => {
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", { x: 0, y: 0, size: 0 }, 1);
+        ht.register(handle(1), "circle", { x: 0, y: 0, size: 0 }, 1);
+
+        expect(ht.hitTest({ x: 0, y: 0 }, { padding: 1 })).toHaveLength(0);
+    });
+
+    it("keeps a collapsed rect with one valid zero side hittable within padding", () => {
+        // It still strokes as a line, so only fully empty boxes are excluded.
+        const ht = new HitTester();
+        ht.register(handle(1), "rect", { x: 0, y: 0, width: 4, height: 0 }, 1);
+
+        expect(ht.hitTestFirst({ x: 1, y: 0.05 }, { padding: 0.1 })).toBeDefined();
+    });
+
+    it("skips invalid items on the spatial-index path without hiding their neighbours", () => {
+        const ht = new HitTester();
+        const items = Array.from({ length: 600 }, (_, i) => ({ x: i, y: 0, size: i % 2 === 0 ? 1 : -1 }));
+        items[100].size = NaN;
+        ht.register(handle(1), "circle", items, 1);
+
+        expect(ht.hitTestFirst({ x: 101, y: 0 }, { padding: 0.4 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 100, y: 0 }, { padding: 0.4 })).toBeUndefined();
+        expect(ht.hitTestFirst({ x: 102, y: 0 })?.index).toBe(102);
+        expect(ht.hitTestRect({ minX: 99.5, maxX: 104.5, minY: -1, maxY: 1 }).map((hit) => hit.index)).toEqual([
+            104, 102,
+        ]);
+    });
+});
+
 describe("HitTester padding", () => {
     it("expands circles by the padding radius", () => {
         const ht = new HitTester();

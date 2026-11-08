@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CoordinateTransformer, ICamera, ItemCollection, type PathItem } from "@canvas-tile-engine/core";
 import { DrawContext, Layer } from "@canvas-tile-engine/renderer-shared/scene";
 import { createBrowserCanvasDraw, type BrowserContext2D } from "../../src/modules/createCanvasDraw";
@@ -490,6 +490,139 @@ describe("CanvasDraw non-square rects", () => {
 
         expect(rects).toHaveLength(1);
         expect(rects[0].w).toBe(300);
+    });
+});
+
+// Fake 2D context that paints like a browser: arc() throws IndexSizeError on
+// a negative radius. Records the geometry of every rect/arc/drawImage call.
+function makeStrictCtx() {
+    const painted: Array<{ op: string; args: number[] }> = [];
+    const ctx = {
+        lineWidth: 1,
+        globalAlpha: 1,
+        fillStyle: "#000",
+        strokeStyle: "#000",
+        save() {},
+        restore() {},
+        beginPath() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        fill() {},
+        stroke() {},
+        setLineDash() {},
+        rect(...args: number[]) {
+            painted.push({ op: "rect", args });
+        },
+        arc(...args: number[]) {
+            if (args[2] < 0) {
+                throw new Error(`IndexSizeError: The radius provided (${args[2]}) is negative.`);
+            }
+            painted.push({ op: "arc", args });
+        },
+        drawImage(_img: unknown, ...args: number[]) {
+            painted.push({ op: "drawImage", args });
+        },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, painted };
+}
+
+// Extent contract shared by all renderers; the same fixture values are
+// asserted in the webgl, skia, and server suites. A negative or NaN size,
+// width or height empties the whole item: it paints nothing, fill or border.
+const STYLE = { fillStyle: "#f00", strokeStyle: "#00f", lineWidthPx: 2 };
+const INVALID_RECTS = [
+    { x: 2, y: 2, size: -2, style: STYLE },
+    { x: 2, y: 2, width: -4, height: 2, style: STYLE },
+    { x: 2, y: 2, width: 4, height: NaN, style: STYLE },
+    { x: 2, y: 2, sizePx: -30, style: STYLE },
+    { x: 2, y: 2, widthPx: 50, heightPx: -20, style: STYLE },
+];
+const INVALID_SIZES = [{ size: -2 }, { size: NaN }, { sizePx: -30 }];
+
+describe("CanvasDraw negative and NaN extents", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("paints an empty box for a rect with any invalid extent", () => {
+        const { draw, render } = setup();
+        const { ctx, painted } = makeStrictCtx();
+
+        draw.drawRect(INVALID_RECTS, 1);
+        render(ctx);
+
+        expect(painted).toHaveLength(INVALID_RECTS.length);
+        expect(painted.every(({ args: [, , w, h] }) => w === 0 && h === 0)).toBe(true);
+    });
+
+    it("never reaches arc() for an invalid circle, so later circles still paint", () => {
+        const { draw, render } = setup();
+        const { ctx, painted } = makeStrictCtx();
+
+        draw.drawCircle(
+            [
+                ...INVALID_SIZES.map((size) => ({ x: 2, y: 2, ...size, style: STYLE })),
+                { x: 5, y: 5, size: 1, style: STYLE },
+            ],
+            1,
+        );
+        expect(() => render(ctx)).not.toThrow();
+
+        expect(painted).toEqual([{ op: "arc", args: [55, 55, 5, 0, Math.PI * 2] }]);
+    });
+
+    it("draws an invalid image into an empty box instead of a mirrored one", () => {
+        const { draw, render } = setup();
+        const { ctx, painted } = makeStrictCtx();
+        const img = { width: 10, height: 10 } as HTMLImageElement;
+
+        draw.drawImage(
+            INVALID_SIZES.map((size) => ({ x: 2, y: 2, ...size, img })),
+            1,
+        );
+        render(ctx);
+
+        expect(painted).toHaveLength(INVALID_SIZES.length);
+        expect(painted.every(({ args: [, , w, h] }) => w === 0 && h === 0)).toBe(true);
+    });
+
+    it("records static caches without throwing or painting invalid items", () => {
+        const offscreen: Array<ReturnType<typeof makeStrictCtx>> = [];
+        vi.stubGlobal(
+            "OffscreenCanvas",
+            class {
+                constructor(
+                    public width: number,
+                    public height: number,
+                ) {}
+                getContext() {
+                    const strict = makeStrictCtx();
+                    offscreen.push(strict);
+                    return strict.ctx;
+                }
+            },
+        );
+        const { draw } = setup();
+        // Static caches ignore pixel sizes, so only the world-unit cases apply.
+        const worldRects = INVALID_RECTS.filter((item) => !("sizePx" in item) && !("widthPx" in item));
+
+        expect(() =>
+            draw.drawStaticCircle(
+                [
+                    { x: 2, y: 2, size: -2, style: STYLE },
+                    { x: 2, y: 2, size: NaN, style: STYLE },
+                    { x: 5, y: 5, size: 1, style: STYLE },
+                ],
+                "circles",
+            ),
+        ).not.toThrow();
+        draw.drawStaticRect(worldRects, "rects");
+
+        expect(offscreen).toHaveLength(2);
+        expect(offscreen[0].painted.map(({ op, args }) => [op, args[2]])).toEqual([["arc", 5]]);
+        expect(offscreen[1].painted).toHaveLength(worldRects.length);
+        expect(offscreen[1].painted.every(({ args: [, , w, h] }) => w === 0 && h === 0)).toBe(true);
     });
 });
 

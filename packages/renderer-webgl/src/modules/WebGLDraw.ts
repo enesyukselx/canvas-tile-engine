@@ -326,6 +326,12 @@ export class WebGLDraw {
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
                 const radius = pxSize / 2;
+                // A zero-radius circle paints nothing on Canvas2D and Skia. The
+                // SDF quad's 1px antialiasing skirt would still leave a faint
+                // dot here, so skip it (sizes are clamped, never negative).
+                if (!(radius > 0)) {
+                    continue;
+                }
                 const { x: drawX, y: drawY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
                 const cx = drawX + radius;
                 const cy = drawY + radius;

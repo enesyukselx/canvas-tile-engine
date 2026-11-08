@@ -1,5 +1,6 @@
 import type { Bounds, Coords, PathCommand } from "../types";
 import { pathCommandsBounds } from "./flattenPath";
+import { resolveBoxWorld } from "./itemSize";
 
 /**
  * An anchor-positioned item: `Rect`, `Circle`, `Text` and `ImageItem` all
@@ -9,7 +10,11 @@ import { pathCommandsBounds } from "./flattenPath";
 export interface AnchoredItem {
     x: number;
     y: number;
-    /** World-unit size; defaults to 1, the size the renderers draw with. */
+    /**
+     * World-unit size; defaults to 1, the size the renderers draw with. Like
+     * `width` and `height` it must be >= 0: a negative or NaN extent draws
+     * nothing, so the item is skipped.
+     */
     size?: number;
     /** Per-axis world width, overriding `size` on the x axis (non-square rects). */
     width?: number;
@@ -94,9 +99,15 @@ function boundsOf(item: BoundedItem): Bounds | null {
     if (typeof anchored.x !== "number" || typeof anchored.y !== "number") {
         return null;
     }
-    const size = anchored.size ?? 1;
-    const halfW = (anchored.width ?? size) / 2;
-    const halfH = (anchored.height ?? size) / 2;
+    // The renderers' own resolver with pixel sizes ignored, so the scale
+    // argument is unused. A negative or NaN extent empties the box as it does
+    // on screen, and a 0 x 0 box draws nothing.
+    const { width, height } = resolveBoxWorld(anchored, 1, false);
+    if (width === 0 && height === 0) {
+        return null;
+    }
+    const halfW = width / 2;
+    const halfH = height / 2;
     return {
         minX: anchored.x - halfW,
         maxX: anchored.x + halfW,
@@ -128,8 +139,9 @@ function boundsOf(item: BoundedItem): Bounds | null {
  * - measured text — `Text` contributes its `size` box, not glyph extents: core
  *   has no font metrics, so a long label reaches past this box.
  *
- * Items that draw nothing (a one-point path, an object carrying no geometry)
- * are skipped. Returns null when nothing in the list has bounds.
+ * Items that draw nothing (a one-point path, an anchored item with size 0 or a
+ * negative/NaN extent, an object carrying no geometry) are skipped. Returns
+ * null when nothing in the list has bounds.
  */
 export function itemsBounds(items: BoundedItem[]): Bounds | null {
     let minX = Infinity;

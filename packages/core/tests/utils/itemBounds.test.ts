@@ -51,6 +51,35 @@ describe("itemsBounds", () => {
             ];
             expect(itemsBounds(items)).toEqual(itemsBounds([...items].reverse()));
         });
+
+        // A negative or NaN extent paints nothing on every renderer, so it is
+        // skipped like any other item that draws nothing.
+        it.each([{ size: -4 }, { size: NaN }, { width: -2, height: 2 }, { width: 2, height: NaN }, { size: 0 }])(
+            "skips an item with %j instead of returning an inverted box",
+            (extent) => {
+                expect(itemsBounds([{ x: 2, y: 2, ...extent }])).toBeNull();
+                expect(
+                    itemsBounds([
+                        { x: 0, y: 0, size: 2 },
+                        { x: 50, y: -50, ...extent },
+                    ]),
+                ).toEqual({
+                    minX: -1,
+                    maxX: 1,
+                    minY: -1,
+                    maxY: 1,
+                });
+            },
+        );
+
+        it("keeps an item with one valid zero side", () => {
+            expect(itemsBounds([{ x: 0, y: 0, width: 4, height: 0 }])).toEqual({
+                minX: -2,
+                maxX: 2,
+                minY: 0,
+                maxY: 0,
+            });
+        });
     });
 
     describe("lines", () => {

@@ -195,6 +195,14 @@ the draw call infers `TData`, typing `item.data` in `styleOf` and friends.
 `fillStyle` fills, `strokeStyle` strokes, both work together; any CSS color
 string works. `lineDash`/`lineDashPx` dash the border; omit for solid.
 
+Sizes (`size`, `width`, `height`, `sizePx`, `widthPx`, `heightPx`) must be
+>= 0. On core >= 0.12 a negative or `NaN` extent empties the whole item on
+every renderer: no fill, no border, no hit, skipped by `itemsBounds` (older
+versions painted it differently per renderer and could throw on browser
+Canvas2D). For a bar growing down or left, keep the extent positive and
+move the anchor: `origin: { mode: "self", x: 0.5, y: 0 }` hangs it below
+its point. Never encode a negative value as a negative size.
+
 ### Origin / anchoring
 
 `origin` (Rect, Circle, Image; not Text) places the drawn box relative to

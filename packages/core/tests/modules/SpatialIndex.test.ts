@@ -332,3 +332,31 @@ describe("non-square bounding boxes", () => {
         expect(index.query(10, 11.5, 10, 11.5)).toHaveLength(0);
     });
 });
+
+describe("negative and NaN extents", () => {
+    it("indexes a negative-size item as its anchor point instead of an inverted box", () => {
+        const index = SpatialIndex.fromArray([{ x: 10, y: 10, size: -4 }]);
+
+        // An inverted box (minX 12 > maxX 8) only matched queries spanning it whole.
+        expect(index.query(10, 10, 10, 10)).toHaveLength(1);
+        expect(index.query(11, 10, 11, 10)).toHaveLength(0);
+    });
+
+    it("clamps each axis independently", () => {
+        const index = SpatialIndex.fromArray([{ x: 0, y: 0, width: 4, height: -2 }]);
+
+        expect(index.query(1.5, 0, 1.5, 0)).toHaveLength(1);
+        expect(index.query(0, 0.5, 0, 0.5)).toHaveLength(0);
+    });
+
+    it("does not let a NaN extent hide the rest of the tree", () => {
+        // NaN bounds propagate into every ancestor node, and no query can
+        // intersect a NaN box, so one bad item used to blank the whole index.
+        const items = Array.from({ length: 50 }, (_, i) => ({ x: i, y: 0, size: 1 }));
+        items[7].size = NaN;
+        const index = SpatialIndex.fromArray(items);
+
+        expect(index.query(20, 0, 20, 0)).toEqual([items[20]]);
+        expect(index.query(7, 0, 7, 0)).toEqual([items[7]]);
+    });
+});

@@ -9,7 +9,8 @@ export interface SpatialItem {
     x: number;
     y: number;
     /**
-     * Optional world-space size (width/height). Defaults to 0 for point-like items.
+     * Optional world-space size (width/height). Defaults to 0 for point-like
+     * items. Negative and NaN extents index as 0.
      */
     size?: number;
     /** Optional per-axis world width; overrides `size` on the x axis (non-square rects). */
@@ -28,6 +29,10 @@ interface RBushItem<T> {
 }
 
 declare const spatialIndexToken: unique symbol;
+
+function nonNegative(value: number): number {
+    return value > 0 ? value : 0;
+}
 
 /** Opaque handle for one indexed occurrence, even when item references repeat. */
 export interface SpatialIndexToken<T> {
@@ -132,8 +137,10 @@ export class SpatialIndex<T extends SpatialItem> {
 
     private boundsOf(item: T): Pick<RBushItem<T>, "minX" | "minY" | "maxX" | "maxY"> {
         const size = typeof item.size === "number" ? item.size : 0;
-        const halfW = (typeof item.width === "number" ? item.width : size) / 2;
-        const halfH = (typeof item.height === "number" ? item.height : size) / 2;
+        // Negative and NaN extents index as a point: an inverted box (min > max)
+        // would never be found again, and NaN would poison the tree's bounds.
+        const halfW = nonNegative(typeof item.width === "number" ? item.width : size) / 2;
+        const halfH = nonNegative(typeof item.height === "number" ? item.height : size) / 2;
         return {
             minX: item.x - halfW,
             minY: item.y - halfH,
