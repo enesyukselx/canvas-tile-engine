@@ -1100,6 +1100,11 @@ export class GLRenderer {
         }
         this.liveTextures.clear();
         this.textures = new WeakMap();
+        if (this.rampTexture) {
+            gl.deleteTexture(this.rampTexture);
+            this.rampTexture = null;
+            this.rampTextureRows = 0;
+        }
         gl.deleteBuffer(this.shapeBuffer);
         gl.deleteBuffer(this.lineBuffer);
         gl.deleteBuffer(this.textureBuffer);

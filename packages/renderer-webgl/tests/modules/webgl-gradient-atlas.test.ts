@@ -49,6 +49,8 @@ function makeAtlasGL(maxTextureSize: number) {
     let rampRows = 0;
     const draws: ShapeDraw[] = [];
     const uploads: Array<{ kind: "full" | "rows"; rows: number }> = [];
+    const created: object[] = [];
+    const deleted: object[] = [];
 
     const texel = (row: number, i: number): RGB => {
         const o = (row * RAMP_WIDTH + i) * 4;
@@ -65,7 +67,14 @@ function makeAtlasGL(maxTextureSize: number) {
                 rampRows = value;
             }
         },
-        createTexture: () => ({}),
+        createTexture: () => {
+            const texture = {};
+            created.push(texture);
+            return texture;
+        },
+        deleteTexture: (texture: object) => {
+            deleted.push(texture);
+        },
         bufferData: (_target: unknown, data: Float32Array) => {
             vertices = new Float32Array(data);
         },
@@ -117,7 +126,7 @@ function makeAtlasGL(maxTextureSize: number) {
         },
     }) as unknown as WebGLRenderingContext;
 
-    return { gl, draws, uploads };
+    return { gl, draws, uploads, created, deleted };
 }
 
 function setup(maxTextureSize = 4096) {
@@ -143,7 +152,7 @@ function setup(maxTextureSize = 4096) {
         gl.beginFrame();
         return paint();
     };
-    return { draw, paint, frame };
+    return { draw, paint, frame, renderer: gl, fake };
 }
 
 const hex = (color: RGB) => `#${color.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
@@ -194,6 +203,17 @@ function expectOwnRamps(draws: ShapeDraw[], lastStop: (first: RGB) => RGB) {
 const lastStopOf = (first: RGB) => stopsOf(first[0] | (first[1] << 8))[1];
 
 describe("WebGL gradient ramp atlas", () => {
+    it("deletes the ramp texture on dispose", () => {
+        const { draw, paint, renderer, fake } = setup();
+        draw.drawRect(gradientRects(3), 1);
+        paint();
+        expect(fake.created).toHaveLength(1);
+
+        renderer.dispose();
+
+        expect(fake.deleted).toContain(fake.created[0]);
+    });
+
     it("never reuses a row a queued shape still references (257 gradients, one fill-only batch)", () => {
         // A fresh renderer is at the start of its first frame. The atlas used
         // to restart at 256 rows mid-batch, so 256 of these sampled a row that
