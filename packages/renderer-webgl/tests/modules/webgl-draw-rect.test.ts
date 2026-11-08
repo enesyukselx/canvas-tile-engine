@@ -88,6 +88,72 @@ describe("WebGLDraw non-square rects", () => {
     });
 });
 
+// Extent contract shared by all renderers; mirrors the fixture values in the
+// canvas, skia, and server suites. A negative or NaN size, width or height
+// empties the whole item: no fill quad and no outline segments.
+describe("WebGLDraw negative and NaN extents", () => {
+    const style = { fillStyle: "#f00", strokeStyle: "#00f", lineWidthPx: 2 };
+    const invalidRects: Rect[] = [
+        { x: 2, y: 2, size: -2, style },
+        { x: 2, y: 2, width: -4, height: 2, style },
+        { x: 2, y: 2, width: 4, height: NaN, style },
+        { x: 2, y: 2, sizePx: -30, style },
+        { x: 2, y: 2, widthPx: 50, heightPx: -20, style },
+        { x: 2, y: 2, size: -2, radius: 0.2, style },
+    ];
+    const invalidSizes = [{ size: -2 }, { size: NaN }, { sizePx: -30 }];
+    // Static draws ignore pixel sizes, so only the world-unit cases apply.
+    const worldOnly = <T extends object>(items: T[]) =>
+        items.filter((item) => !("sizePx" in item) && !("widthPx" in item));
+
+    it("emits no fill or outline for a rect with any invalid extent", () => {
+        const { draw, render } = setup();
+        const { gl, shapes, lines } = makeRecordingGL();
+
+        draw.drawRect(invalidRects, 1);
+        draw.drawStaticRect(worldOnly(invalidRects), "rects", 1);
+        render(gl);
+
+        expect(shapes).toHaveLength(0);
+        expect(lines).toHaveLength(0);
+    });
+
+    it("emits no fill or outline ring for an invalid or zero-size circle", () => {
+        const { draw, render } = setup();
+        const { gl, shapes, lines } = makeRecordingGL();
+        // Size 0 too: the SDF quad's antialiasing skirt used to leave a faint dot.
+        const circles = [...invalidSizes, { size: 0 }].map((size) => ({ x: 2, y: 2, ...size, style }));
+
+        draw.drawCircle(circles, 1);
+        draw.drawStaticCircle(worldOnly(circles), "circles", 1);
+        render(gl);
+
+        expect(shapes).toHaveLength(0);
+        expect(lines).toHaveLength(0);
+    });
+
+    // Position contract, mirrored in the canvas, skia, and server suites: a
+    // NaN or ±Infinity position paints nothing, dynamic or static.
+    it("emits no fill or outline for a rect or circle at a non-finite position", () => {
+        const { draw, render } = setup();
+        const { gl, shapes, lines } = makeRecordingGL();
+        const items = [
+            { x: NaN, y: 2, style },
+            { x: 2, y: Infinity, style },
+            { x: -Infinity, y: 2, style, rotate: 30 },
+        ];
+
+        draw.drawRect(items, 1);
+        draw.drawStaticRect(items, "rects", 1);
+        draw.drawCircle(items, 1);
+        draw.drawStaticCircle(items, "circles", 1);
+        render(gl);
+
+        expect(shapes).toHaveLength(0);
+        expect(lines).toHaveLength(0);
+    });
+});
+
 describe("WebGLDraw rounded rectangles", () => {
     function record(radius: Rect["radius"], extra: Partial<Rect> = {}) {
         const { draw, render } = setup();

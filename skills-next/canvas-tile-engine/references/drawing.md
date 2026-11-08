@@ -195,6 +195,22 @@ the draw call infers `TData`, typing `item.data` in `styleOf` and friends.
 `fillStyle` fills, `strokeStyle` strokes, both work together; any CSS color
 string works. `lineDash`/`lineDashPx` dash the border; omit for solid.
 
+Sizes (`size`, `width`, `height`, `sizePx`, `widthPx`, `heightPx`) must be
+>= 0. On core >= 0.12 a negative or `NaN` extent empties the whole item on
+every renderer: no fill, no border, no hit, skipped by `itemsBounds` (older
+versions painted it differently per renderer and could throw on browser
+Canvas2D). For a bar growing down or left, keep the extent positive and
+move the anchor: `origin: { mode: "self", x: 0.5, y: 0 }` hangs it below
+its point. Never encode a negative value as a negative size.
+
+Positions must be finite, too. On core >= 0.12 an item whose `x`/`y` is
+`NaN` or +-Infinity paints nothing and never hits, and the rest of the draw
+call (static caches included) is unaffected; so does a `Line` with such an
+endpoint and a `points` path with such a vertex (the whole path is skipped). Older versions could abort the
+`renderer-server` process (a native `@napi-rs/canvas` panic) or empty a
+whole Skia static layer. Filter or clamp data from untrusted sources
+(`Number.isFinite`) before drawing it.
+
 ### Origin / anchoring
 
 `origin` (Rect, Circle, Image; not Text) places the drawn box relative to

@@ -73,6 +73,10 @@ Rounded rectangle radii apply to both the fill and border, including dashed and 
 
 As with Canvas2D `roundRect`, WebGL rejects negative radii and arrays outside one to four entries with `RangeError` when rendering; non-finite radii produce no geometry.
 
+Sizes must be zero or positive. A negative or `NaN` `size`, `width`, `height`, `sizePx`, `widthPx` or `heightPx` empties the whole item: it paints nothing (no fill, no border) and never hits, on every renderer. For a bar that grows down or to the left, keep the extent positive and move the anchor with `origin` instead: `{ mode: "self", x: 0.5, y: 0 }` hangs the bar below its point, `y: 1` stands it on top. A zero side is valid: a rect with a border and zero height strokes as a line.
+
+Positions must be finite. An item whose `x` or `y` is `NaN` or infinite paints nothing and never hits, on every renderer, and the rest of its draw call (a static cache included) is unaffected. The same holds for every draw kind: images and text, a line with such an endpoint, and a `points` path with such a vertex.
+
 **Style Options:**
 
 - `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`), or a gradient — see [Gradient Fills](#gradient-fills)
@@ -270,7 +274,7 @@ Dash patterns follow Canvas2D `setLineDash` semantics (odd-length patterns repea
 
 An item's `style` overrides the call-level style unit pair by unit pair: an item that sets either width field (or either dash field) replaces that whole pair, so an item's world-unit `lineWidth` is never shadowed by the call-level `lineWidthPx`. Because item styles are read at registration time (unlike `styleOf` decorations), they may change the stroke width — hit testing follows the item's own width.
 
-Lines participate in hit testing: a click/tap within half the stroke width of a segment hits it (with a minimum tap width for hairlines). An optional `data` field on each line carries through to hit results.
+Lines participate in hit testing: a click/tap within half the stroke width of a segment hits it (with a minimum tap width for hairlines). An optional `data` field on each line carries through to hit results. Both endpoints must be finite: a line with a `NaN` or infinite coordinate paints nothing and never hits.
 
 ### `drawPath`
 
@@ -378,6 +382,8 @@ engine.drawPath({
 Hit testing follows the same geometry: the hole is not clickable, curves hit on the actual curve (not the chord). `cornerRadius` applies to the `points` form only — with `commands`, draw arcs explicitly.
 
 Paths participate in hit testing: filled paths hit on their interior (under the item's `fillRule`), unfilled paths hit on the stroke itself — within half the stroke width, with a minimum tap width so hairlines stay tappable.
+
+Every `points` vertex must be finite: one `NaN` or infinite vertex makes the whole path paint nothing and never hit, rather than just dropping the bad vertex.
 
 Dash patterns flow continuously around corners, including rounded ones.
 
@@ -521,6 +527,8 @@ drawImage(items: DrawItems<ImageItem>, layer?: number, options?: DrawOptions): D
 | `sprite`  | `SpriteRect`       | -                                  | Source rectangle in sheet pixels — draws a sub-region of `img`. See [Spritesheet & Animation](./spritesheet.md). |
 | `opacity` | `number`           | `1`                                | Opacity from 0 (transparent) to 1 (opaque). Ideal for ghost/preview placements.                                  |
 | `data`    | `TData`            | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`.                  |
+
+As with shapes, `size` and `sizePx` must be zero or positive and `x`/`y` finite: a negative or `NaN` size, or a `NaN` or infinite position, paints nothing and never hits. A negative size does not mirror the image; use `flipX`/`flipY` for that.
 
 ```typescript
 // Single image

@@ -195,6 +195,50 @@ describe("WebGLDraw path items", () => {
     });
 });
 
+// Position contract shared by all renderers; mirrors the fixture values in the
+// canvas, skia, and server suites. One NaN or ±Infinity endpoint or `points`
+// vertex skips the whole line or path (it used to drop only the segments
+// around the bad vertex, and an infinite endpoint was not culled).
+describe("WebGLDraw non-finite lines and paths", () => {
+    it.each([NaN, Infinity, -Infinity])("emits no fill or segment for a %s coordinate", (value) => {
+        const { draw, render } = setup();
+        const { gl, fills, lines } = makeRecordingGL();
+        const style = { fillStyle: "#f00", strokeStyle: "#00f", lineWidthPx: 2 };
+
+        draw.drawLine(
+            [
+                { from: { x: 0, y: 0 }, to: { x: value, y: 2 } },
+                { from: { x: 1, y: value }, to: { x: 3, y: 3 } },
+            ],
+            { strokeStyle: "#00f" },
+        );
+        draw.drawPath([
+            {
+                points: [
+                    { x: 1, y: 1 },
+                    { x: value, y: 2 },
+                    { x: 5, y: 5 },
+                    { x: 1, y: 5 },
+                ],
+                closed: true,
+                style: { ...style, cornerRadius: 0.5 },
+            },
+            {
+                points: [
+                    { x: 1, y: 1 },
+                    { x: 5, y: 1 },
+                    { x: 5, y: value },
+                ],
+                style,
+            },
+        ]);
+        render(gl);
+
+        expect(fills).toHaveLength(0);
+        expect(lines).toHaveLength(0);
+    });
+});
+
 describe("WebGLDraw command paths", () => {
     it("fills multi-subpath commands as one stencil call with all rings", () => {
         const { draw, render } = setup();

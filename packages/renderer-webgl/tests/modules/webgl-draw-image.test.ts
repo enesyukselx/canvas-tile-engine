@@ -48,6 +48,48 @@ describe("WebGLDraw image opacity", () => {
     });
 });
 
+// Extent contract shared by all renderers; mirrors the fixture values in the
+// canvas, skia, and server suites. An invalid size empties the image box, so
+// the quad has no area instead of a negative (mirrored) one.
+describe("WebGLDraw image negative and NaN extents", () => {
+    it("draws an invalid image into an empty quad, dynamic or static", () => {
+        const { draw, render } = setup();
+        const { gl, drawn } = makeRecordingGL();
+        const items = [{ size: -2 }, { size: NaN }, { sizePx: -30 }].map((size) => ({
+            x: 2,
+            y: 2,
+            ...size,
+            img: fakeImage,
+        }));
+
+        draw.drawImage(items);
+        draw.drawStaticImage(
+            items.filter((item) => !("sizePx" in item)),
+            "images",
+        );
+        render(gl);
+
+        expect(drawn).toHaveLength(5);
+        expect(drawn.every(({ w, h }) => w === 0 && h === 0)).toBe(true);
+    });
+
+    it("draws nothing for an image at a non-finite position, dynamic or static", () => {
+        const { draw, render } = setup();
+        const { gl, drawn } = makeRecordingGL();
+        const items = [
+            { x: NaN, y: 2, img: fakeImage },
+            { x: 2, y: Infinity, img: fakeImage, flipX: true },
+            { x: -Infinity, y: 2, img: fakeImage, rotate: 45 },
+        ];
+
+        draw.drawImage(items);
+        draw.drawStaticImage(items, "images");
+        render(gl);
+
+        expect(drawn).toHaveLength(0);
+    });
+});
+
 describe("WebGLDraw image flip (texcoord swap)", () => {
     it("swaps u texcoords for flipX and v texcoords for flipY", () => {
         const { draw, render } = setup();

@@ -82,6 +82,31 @@ describe("CanvasDraw non-square rects", () => {
     });
 });
 
+// Extent contract shared by all renderers; mirrors the fixture values in the
+// canvas, webgl, and skia suites (pixel-level checks are in invariants.test.ts).
+describe("CanvasDraw negative and NaN extents", () => {
+    it("paints an empty box for a rect with any invalid extent", () => {
+        const { draw, render } = setup();
+        const { ctx, rects } = makeRectRecordingCtx();
+        const style = { fillStyle: "#f00", strokeStyle: "#00f", lineWidthPx: 2 };
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, size: -2, style },
+                { x: 2, y: 2, width: -4, height: 2, style },
+                { x: 2, y: 2, width: 4, height: NaN, style },
+                { x: 2, y: 2, sizePx: -30, style },
+                { x: 2, y: 2, widthPx: 50, heightPx: -20, style },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(rects).toHaveLength(5);
+        expect(rects.every(({ w, h }) => w === 0 && h === 0)).toBe(true);
+    });
+});
+
 // Fake 2D context recording setLineDash calls and strokes for dash tests.
 function makeDashRecordingCtx() {
     const dashes: number[][] = [];

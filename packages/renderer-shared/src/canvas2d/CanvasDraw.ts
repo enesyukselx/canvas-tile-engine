@@ -15,6 +15,7 @@ import {
     Text,
     resolveLineWidthPx,
     resolveBoxPx,
+    isFinitePoint,
     isGradient,
     normalizeStops,
     gradientAxisPx,
@@ -425,6 +426,13 @@ export class CanvasDraw<
                 const pos = this.transformer.worldToScreen(item.x, item.y);
                 const pxSize = sizeWorld * this.camera.scale;
                 const radius = pxSize / 2;
+                // Browsers throw IndexSizeError from arc() on a negative radius,
+                // aborting the whole frame. The resolver already clamps sizes;
+                // this keeps arc() unreachable without a positive radius, and a
+                // zero-radius circle paints nothing on any renderer anyway.
+                if (!(radius > 0)) {
+                    continue;
+                }
                 const { x: drawX, y: drawY } = computeOriginOffset(pos, pxSize, pxSize, origin, this.camera.scale);
 
                 // Only update style when changed
@@ -1010,13 +1018,18 @@ export class CanvasDraw<
         // Render all items using the provided render function
         resetPass?.();
         for (const item of items) {
+            // A non-finite position paints nothing (the dynamic path culls it).
+            // Static caches draw every item unculled, and @napi-rs/canvas aborts the
+            // process on an arc() with a NaN or infinite center.
+            if (!isFinitePoint(item)) {
+                continue;
+            }
             // World units only: the cache is rendered once at renderScale
             // and blitted afterwards, so a screen-pixel size could not hold
             // its size across zooms. `ignoreSizePx` keeps hit testing in
-            // step with what is drawn here.
-            const size = item.size ?? 1;
-            const pxW = (item.width ?? size) * renderScale;
-            const pxH = (item.height ?? size) * renderScale;
+            // step with what is drawn here. The resolver also empties a box
+            // with a negative or NaN extent, like the dynamic path.
+            const { width: pxW, height: pxH } = resolveBoxPx(item, renderScale, false);
             const origin = resolveOrigin(item.origin);
             // Cache-space equivalent of worldToScreen: cache pixel 0 is world minX.
             const pos = {
@@ -1365,6 +1378,11 @@ export class CanvasDraw<
             (ctx, item, x, y, pxSize, _pxH, toCacheSpace) => {
                 const style = item.style;
                 const radius = pxSize / 2;
+                // Same arc() guard as drawCircle: without it a negative radius
+                // throws at registration, while the cache records.
+                if (!(radius > 0)) {
+                    return;
+                }
 
                 const fill =
                     style?.fillStyle !== undefined

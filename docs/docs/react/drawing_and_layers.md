@@ -67,6 +67,10 @@ Draw basic geometric shapes. Pass a single object or an array for batch renderin
 | `radius` | `number \| number[]` | -                                  | Border radius in world units (scales with zoom). Single value for all corners, or `[topLeft, topRight, bottomRight, bottomLeft]` (only for `Rect`). |
 | `data`   | `TData`              | -                                  | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data` to identify what was hit.                            |
 
+Sizes must be zero or positive. A negative or `NaN` `size`, `width`, `height`, `sizePx`, `widthPx` or `heightPx` empties the whole item: it paints nothing (no fill, no border) and never hits, on every renderer. For a bar that grows down or to the left, keep the extent positive and move the anchor with `origin` instead: `{ mode: "self", x: 0.5, y: 0 }` hangs the bar below its point, `y: 1` stands it on top. A zero side is valid: a rect with a border and zero height strokes as a line.
+
+Positions must be finite. An item whose `x` or `y` is `NaN` or infinite paints nothing and never hits, on every renderer, and the rest of its component (a static cache included) is unaffected. The same holds for every component: images and text, a line with such an endpoint, and a `points` path with such a vertex, which skips the whole path.
+
 **Style Options:**
 
 - `fillStyle`: Fill color (e.g., `"#ff0000"`, `"rgba(0,0,0,0.5)"`), or a gradient — see [Gradient Fills](#gradient-fills)
@@ -435,6 +439,8 @@ There is no `styleOf` — images carry no `style`; appearance changes go through
 | `sprite`  | `SpriteRect`       | Source rectangle in sheet pixels — draws a sub-region of `img`. For animation, use [`<Sprite>`](./spritesheet.md). |
 | `opacity` | `number`           | Opacity from 0 (transparent) to 1 (opaque). Default `1`. Ideal for ghost/preview placements.                       |
 | `data`    | `TData`            | Arbitrary app data. Never read by the engine; returned on `hitTest` results as `hit.item.data`.                    |
+
+As with shapes, `size` and `sizePx` must be zero or positive and `x`/`y` finite: a negative or `NaN` size, or a `NaN` or infinite position, paints nothing and never hits. A negative size does not mirror the image; use `flipX`/`flipY` for that.
 
 ```tsx
 function MapWithImages() {

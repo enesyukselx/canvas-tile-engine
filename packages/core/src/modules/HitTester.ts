@@ -12,6 +12,8 @@ import { flattenPathCommands, type Subpath } from "../utils/flattenPath";
 import { ARC_SEGMENT_LENGTH, roundedPolyline, roundedRing } from "../utils/pathFlatten";
 import { overlayLineStyle, resolveCornerRadiusPx, resolveLineWidthPx } from "../utils/strokeStyle";
 import { maxPxExtent, resolveBoxWorld, resolveSizeWorld } from "../utils/itemSize";
+import { isFinitePoint } from "../utils/finitePoint";
+import { pathItemBounds } from "../utils/itemBounds";
 import { resolveOrigin, computeOriginOffset } from "../utils/origin";
 import { SpatialIndex, type SpatialIndexToken } from "./SpatialIndex";
 import type { ItemCollectionChange, ItemKey, ReadonlyItemCollection } from "./ItemCollection";
@@ -139,6 +141,31 @@ class ExtentTracker {
 function worldExtent(item: HitItem): number {
     const rect = item as Rect;
     return Math.max(rect.size ?? 1, rect.width ?? 0, rect.height ?? 0);
+}
+
+/**
+ * A 0 x 0 box (zero size, or any negative/NaN extent) paints nothing on any
+ * renderer, fill or border, so it never hits: padding has nothing to grow.
+ */
+function emptyBox(box: { w: number; h: number }): boolean {
+    return !(box.w > 0) && !(box.h > 0);
+}
+
+/**
+ * Positions must be finite: an item at `NaN` or ±Infinity, a line with such an
+ * endpoint, or a `points` path with such a vertex paints nothing on any
+ * renderer, so it never hits. Paths reuse `pathItemBounds`, the same check the
+ * renderers skip a path on (command lists follow `pathCommandsBounds`).
+ */
+function finiteGeometry(item: HitItem, kind: HitKind): boolean {
+    if (kind === "line") {
+        const line = item as Line;
+        return isFinitePoint(line.from) && isFinitePoint(line.to);
+    }
+    if (kind === "path") {
+        return pathItemBounds(item as PathItem) !== null;
+    }
+    return isFinitePoint(item as BoxedItem);
 }
 
 // Same threshold the renderers use for culling: linear scan is faster below it.
@@ -442,17 +469,13 @@ export class HitTester {
         // Every anchored kind may be pixel-sized (pixels win over world units);
         // static entries stay world-sized because their cache replays at the
         // recorded scale. Resolved per query because a pixel-sized item's world
-        // box changes with the camera scale.
-        const size = useSizePx ? resolveSizeWorld(item as Circle, this.getScale()) : (item.size ?? 1);
+        // box changes with the camera scale. The shared resolvers also clamp
+        // negative/NaN extents to an empty box, exactly as the renderers do.
+        const scale = this.getScale();
+        const size = resolveSizeWorld(item as Circle, scale, useSizePx);
         // Only rects support per-axis dimensions; circle stays size (diameter)
         // and image keeps its aspect-fit size box below.
-        const rect = item as Rect;
-        const box =
-            kind === "rect"
-                ? useSizePx
-                    ? resolveBoxWorld(rect, this.getScale())
-                    : { width: rect.width ?? size, height: rect.height ?? size }
-                : { width: size, height: size };
+        const box = kind === "rect" ? resolveBoxWorld(item as Rect, scale, useSizePx) : { width: size, height: size };
         const w = box.width;
         const h = box.height;
         const origin = resolveOrigin(item.origin);
@@ -660,8 +683,7 @@ export class HitTester {
     }
 
     /** Corners of the drawn box in world space, rotation applied. */
-    private boxCorners(item: BoxedItem, kind: HitKind, useSizePx: boolean): Coords[] {
-        const box = this.boxFor(item, kind, useSizePx);
+    private boxCorners(item: BoxedItem, box: { left: number; top: number; w: number; h: number }): Coords[] {
         const corners = [
             { x: box.left, y: box.top },
             { x: box.left + box.w, y: box.top },
@@ -705,12 +727,13 @@ export class HitTester {
     }
 
     /** Per-item gate shared by point and rect queries: hidden items never
-     * hit (only `false` opts out — `undefined` means visible/interactive). */
+     * hit (only `false` opts out — `undefined` means visible/interactive),
+     * and neither do items with non-finite geometry, which no renderer paints. */
     private itemHittable(item: HitItem, entry: HitEntry): boolean {
         if (entry.visibleOf?.(item) === false || entry.interactiveOf?.(item) === false) {
             return false;
         }
-        return true;
+        return finiteGeometry(item, entry.kind);
     }
 
     private testItemRect(rect: RectRegion, item: HitItem, entry: HitEntry, mode: "intersect" | "contain"): boolean {
@@ -755,8 +778,12 @@ export class HitTester {
             );
         }
 
+        const box = this.boxFor(item as BoxedItem, kind, !entry.ignoreSizePx);
+        if (emptyBox(box)) {
+            return false;
+        }
+
         if (kind === "circle") {
-            const box = this.boxFor(item as BoxedItem, kind, !entry.ignoreSizePx);
             const cx = box.left + box.w / 2;
             const cy = box.top + box.h / 2;
             const r = box.w / 2;
@@ -769,7 +796,7 @@ export class HitTester {
         }
 
         // rect / image: the (possibly rotated) drawn box as a convex quad
-        const corners = this.boxCorners(item as BoxedItem, kind, !entry.ignoreSizePx);
+        const corners = this.boxCorners(item as BoxedItem, box);
         if (mode === "contain") {
             return corners.every((c) => pointInRect(c, rect));
         }
@@ -795,6 +822,9 @@ export class HitTester {
         }
 
         const box = this.boxFor(item as BoxedItem, kind, !entry.ignoreSizePx);
+        if (emptyBox(box)) {
+            return false;
+        }
 
         if (kind === "circle") {
             const cx = box.left + box.w / 2;

@@ -1,15 +1,23 @@
 import {
     DEFAULT_VALUES,
     computeOriginOffset,
+    isFinitePoint,
+    resolveBoxWorld,
     resolveLineWidthPx,
     resolveOrigin,
+    resolveSizeWorld,
     type Bounds,
     type Circle,
     type ImageItem,
     type Rect,
 } from "@canvas-tile-engine/core";
 
-/** Static geometry uses world sizes even when the item carries pixel sizes. */
+/**
+ * Static geometry uses world sizes even when the item carries pixel sizes
+ * (`pixelSizes: false` below; the scale argument is then unused). The shared
+ * resolvers also empty a box with a negative or NaN extent, as the static
+ * paint paths do, so such an item adds only its anchor point.
+ */
 function center(item: Rect | Circle | ImageItem<unknown>, width: number, height: number) {
     const pos = {
         x: item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET,
@@ -34,19 +42,31 @@ function strokePadding(style: Rect["style"], scale: number): number {
     return style?.strokeStyle ? Math.max(1, resolveLineWidthPx(style, scale)) / (2 * scale) : 0;
 }
 
-/** Corner-space world bounds, including the rotated rectangle's miter corners. */
-export function staticRectPaintBounds(item: Rect, scale: number): Bounds {
-    const width = item.width ?? item.size ?? 1;
-    const height = item.height ?? item.size ?? 1;
+/**
+ * Corner-space world bounds, including the rotated rectangle's miter corners.
+ *
+ * Like the other static helpers, null for an item with a non-finite position:
+ * it paints nothing, and one NaN or Infinity in the union would make the whole
+ * cache (a Canvas2D bitmap, a Skia picture's cull rect) non-finite, so either
+ * nothing painted or the cache was disabled.
+ */
+export function staticRectPaintBounds(item: Rect, scale: number): Bounds | null {
+    if (!isFinitePoint(item)) {
+        return null;
+    }
+    const { width, height } = resolveBoxWorld(item, scale, false);
     const c = center(item, width, height);
     const stroke = strokePadding(item.style, scale);
-    return rotatedBounds(c.x, c.y, Math.abs(width) / 2 + stroke, Math.abs(height) / 2 + stroke, item.rotate ?? 0);
+    return rotatedBounds(c.x, c.y, width / 2 + stroke, height / 2 + stroke, item.rotate ?? 0);
 }
 
-export function staticCirclePaintBounds(item: Circle, scale: number): Bounds {
-    const size = item.size ?? 1;
+export function staticCirclePaintBounds(item: Circle, scale: number): Bounds | null {
+    if (!isFinitePoint(item)) {
+        return null;
+    }
+    const size = resolveSizeWorld(item, scale, false);
     const c = center(item, size, size);
-    const radius = Math.abs(size) / 2 + strokePadding(item.style, scale);
+    const radius = size / 2 + strokePadding(item.style, scale);
     return { minX: c.x - radius, minY: c.y - radius, maxX: c.x + radius, maxY: c.y + radius };
 }
 
@@ -56,18 +76,21 @@ export function staticImagePaintBounds(
     imageWidth: number,
     imageHeight: number,
 ): Bounds | null {
+    if (!isFinitePoint(item)) {
+        return null;
+    }
     const sourceWidth = item.sprite?.w ?? imageWidth;
     const sourceHeight = item.sprite?.h ?? imageHeight;
     if (![imageWidth, imageHeight, sourceWidth, sourceHeight].every((value) => Number.isFinite(value) && value > 0)) {
         return null;
     }
-    const size = item.size ?? 1;
+    const size = resolveSizeWorld(item, 1, false);
     const c = center(item, size, size);
     const aspect = sourceWidth / sourceHeight;
     const width = aspect > 1 ? size : size * aspect;
     const height = aspect > 1 ? size / aspect : size;
     // Aspect fitting and flips keep the image centered in its size box.
-    return rotatedBounds(c.x, c.y, Math.abs(width) / 2, Math.abs(height) / 2, item.rotate ?? 0);
+    return rotatedBounds(c.x, c.y, width / 2, height / 2, item.rotate ?? 0);
 }
 
 /**

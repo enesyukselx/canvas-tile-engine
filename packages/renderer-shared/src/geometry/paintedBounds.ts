@@ -2,6 +2,7 @@ import {
     DEFAULT_VALUES,
     SpatialIndex,
     computeOriginOffset,
+    isFinitePoint,
     overlayLineStyle,
     resolveBoxWorld,
     resolveLineWidthPx,
@@ -25,6 +26,14 @@ export function intersectsBounds(a: Bounds, b: Bounds): boolean {
 /** Unknown metrics must never become a false-negative cull. */
 export const UNBOUNDED: Bounds = { minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity };
 
+/**
+ * Bounds of an item with a non-finite position, endpoint or point, which
+ * paints nothing on any renderer: an inverted box that intersects no viewport.
+ * Returned by identity so the culler can index such an item nowhere instead
+ * of counting it as unbounded (which would force a full scan every frame).
+ */
+export const NOWHERE: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+
 function finiteBounds(bounds: Bounds): boolean {
     return Object.values(bounds).every(Number.isFinite);
 }
@@ -44,6 +53,9 @@ function rotatedBox(cx: number, cy: number, halfW: number, halfH: number, degree
  * escape it. Circles use the same box without rotation.
  */
 export function boxPaintBounds(item: Omit<Rect, "style">, scale: number, style?: Rect["style"], rotate = true): Bounds {
+    if (!isFinitePoint(item)) {
+        return NOWHERE;
+    }
     const { width, height } = resolveBoxWorld(item, scale);
     const pos = {
         x: item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET,
@@ -85,6 +97,10 @@ export function boxPixelPadding(item: Omit<Rect, "style">, style?: Rect["style"]
 }
 
 export function linePaintBounds(item: Line, scale: number, callStyle?: LineStyle): Bounds {
+    // An infinite endpoint would otherwise still reach into the viewport.
+    if (!isFinitePoint(item.from) || !isFinitePoint(item.to)) {
+        return NOWHERE;
+    }
     const style = overlayLineStyle(callStyle, item.style);
     const pad = Math.max(1, resolveLineWidthPx(style, scale)) / (2 * scale);
     const offset = DEFAULT_VALUES.CELL_CENTER_OFFSET;
@@ -113,6 +129,10 @@ export function pathPaintBounds(bounds: Bounds, style: LineStyle | undefined, sc
 
 /** Transform the platform-measured ink box about the text's anchor. */
 export function textPaintBounds(item: Text, scale: number, localPxBounds: Bounds): Bounds {
+    // Checked before the metrics: an unmeasured label must not be drawn at NaN.
+    if (!isFinitePoint(item)) {
+        return NOWHERE;
+    }
     if (!finiteBounds(localPxBounds)) {
         return UNBOUNDED;
     }
@@ -208,6 +228,11 @@ export class PaintedCuller<T> {
 
     private indexedItem(item: T, scale: number): { value: IndexedPaintItem<T>; bounded: boolean } {
         const bounds = this.boundsOf(item, scale);
+        if (bounds === NOWHERE) {
+            // Paints nothing (non-finite position): a NaN anchor indexes it
+            // where no query finds it, and it does not force a scan.
+            return { bounded: true, value: { item, x: NaN, y: NaN, width: 0, height: 0 } };
+        }
         const bounded = finiteBounds(bounds);
         // Unknown text metrics force a scan, but retain a harmless indexed slot
         // so becoming measurable later preserves its original painting order.

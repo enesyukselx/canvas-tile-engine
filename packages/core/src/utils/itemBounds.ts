@@ -1,5 +1,8 @@
 import type { Bounds, Coords, PathCommand } from "../types";
 import { pathCommandsBounds } from "./flattenPath";
+import { resolveBoxWorld } from "./itemSize";
+import { isFinitePoint } from "./finitePoint";
+import { isItemCollection, type ReadonlyItemCollection } from "../modules/ItemCollection";
 
 /**
  * An anchor-positioned item: `Rect`, `Circle`, `Text` and `ImageItem` all
@@ -9,7 +12,11 @@ import { pathCommandsBounds } from "./flattenPath";
 export interface AnchoredItem {
     x: number;
     y: number;
-    /** World-unit size; defaults to 1, the size the renderers draw with. */
+    /**
+     * World-unit size; defaults to 1, the size the renderers draw with. Like
+     * `width` and `height` it must be >= 0: a negative or NaN extent draws
+     * nothing, so the item is skipped.
+     */
     size?: number;
     /** Per-axis world width, overriding `size` on the x axis (non-square rects). */
     width?: number;
@@ -39,8 +46,10 @@ export type BoundedItem = AnchoredItem | EndpointItem | OutlineItem;
  * Conservative world bounds of one path item: the control-point hull for
  * command paths (curves never leave it), the vertex box for polylines.
  *
- * Null means "nothing is drawn" — an empty command list, or fewer than two
- * points — which is also how the renderers decide to skip a path entirely.
+ * Null means "nothing is drawn" — an empty command list, fewer than two
+ * points, or any `NaN` or infinite point — which is also how the renderers
+ * and the hit tester decide to skip a path entirely. Command lists follow
+ * {@link pathCommandsBounds}.
  */
 export function pathItemBounds(item: OutlineItem): Bounds | null {
     if (item.commands !== undefined) {
@@ -57,6 +66,12 @@ export function pathItemBounds(item: OutlineItem): Bounds | null {
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const p of points) {
+        // One bad point skips the whole path. Renderers disagreed otherwise:
+        // Canvas2D drops just the point, Skia the whole path, WebGL the
+        // segments around it, and @napi-rs/canvas aborts on a rounded corner.
+        if (!isFinitePoint(p)) {
+            return null;
+        }
         if (p.x < minX) {
             minX = p.x;
         }
@@ -77,6 +92,9 @@ export function pathItemBounds(item: OutlineItem): Bounds | null {
 function boundsOf(item: BoundedItem): Bounds | null {
     const endpoints = item as Partial<EndpointItem>;
     if (endpoints.from && endpoints.to) {
+        if (!isFinitePoint(endpoints.from) || !isFinitePoint(endpoints.to)) {
+            return null;
+        }
         return {
             minX: Math.min(endpoints.from.x, endpoints.to.x),
             maxX: Math.max(endpoints.from.x, endpoints.to.x),
@@ -90,13 +108,20 @@ function boundsOf(item: BoundedItem): Bounds | null {
         return pathItemBounds(outline);
     }
 
+    // Also rejects an object with no position at all.
     const anchored = item as AnchoredItem;
-    if (typeof anchored.x !== "number" || typeof anchored.y !== "number") {
+    if (!isFinitePoint(anchored)) {
         return null;
     }
-    const size = anchored.size ?? 1;
-    const halfW = (anchored.width ?? size) / 2;
-    const halfH = (anchored.height ?? size) / 2;
+    // The renderers' own resolver with pixel sizes ignored, so the scale
+    // argument is unused. A negative or NaN extent empties the box as it does
+    // on screen, and a 0 x 0 box draws nothing.
+    const { width, height } = resolveBoxWorld(anchored, 1, false);
+    if (width === 0 && height === 0) {
+        return null;
+    }
+    const halfW = width / 2;
+    const halfH = height / 2;
     return {
         minX: anchored.x - halfW,
         maxX: anchored.x + halfW,
@@ -118,7 +143,9 @@ function boundsOf(item: BoundedItem): Bounds | null {
  *
  * Accepts every item kind the draw API does, mixed freely: anchored items
  * (`Rect`, `Circle`, `Text`, `ImageItem`) contribute their cell box, `Line` its
- * two endpoints, `PathItem` its vertex box or control-point hull.
+ * two endpoints, `PathItem` its vertex box or control-point hull. Takes the
+ * same lists the draw calls do: an array (readonly ones included) or a live
+ * `ItemCollection`, read at call time.
  *
  * Camera-independent by design, which leaves out:
  *
@@ -128,16 +155,20 @@ function boundsOf(item: BoundedItem): Bounds | null {
  * - measured text — `Text` contributes its `size` box, not glyph extents: core
  *   has no font metrics, so a long label reaches past this box.
  *
- * Items that draw nothing (a one-point path, an object carrying no geometry)
- * are skipped. Returns null when nothing in the list has bounds.
+ * Items that draw nothing (a one-point path, an anchored item with size 0 or a
+ * negative/NaN extent, an item with a non-finite position, endpoint or point,
+ * an object carrying no geometry) are skipped. Returns null when nothing in
+ * the list has bounds.
  */
-export function itemsBounds(items: BoundedItem[]): Bounds | null {
+export function itemsBounds(items: readonly BoundedItem[] | ReadonlyItemCollection<BoundedItem>): Bounds | null {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
 
-    for (const item of items) {
+    // A collection is not iterable itself; its `items` view is the live list.
+    const list = isItemCollection(items) ? items.items : items;
+    for (const item of list) {
         const box = boundsOf(item);
         if (!box) {
             continue;

@@ -43,8 +43,19 @@ export type LinearGradient = {
 export type Paint = string | LinearGradient;
 
 export type DrawObject<TData = unknown> = {
+    /**
+     * Position in world units (item space: integers are cell centers). Must
+     * be finite, like `y`: an item at `NaN` or ±Infinity paints nothing and
+     * never hits, on every renderer.
+     */
     x: number;
     y: number;
+    /**
+     * Size in world units (a rect's side, a circle's diameter, an image's
+     * fit box). Default 1. Must be >= 0, like every size field: a negative or
+     * `NaN` size, width or height empties the item, so it paints nothing (no
+     * fill, no border) and never hits, on every renderer.
+     */
     size?: number;
     origin?: {
         mode?: "cell" | "self";
@@ -94,9 +105,15 @@ export type DrawObject<TData = unknown> = {
 };
 
 export type Rect<TData = unknown> = DrawObject<TData> & {
-    /** Width in world units. Defaults to `size`, so square rects are unchanged. */
+    /**
+     * Width in world units. Defaults to `size`, so square rects are unchanged.
+     * Must be >= 0: a negative or `NaN` width (or height) empties the whole
+     * rect. To grow a bar the other way, keep the extent positive and move
+     * its `origin` instead. A zero width with a positive height still strokes
+     * as a line.
+     */
     width?: number;
-    /** Height in world units. Defaults to `size`. */
+    /** Height in world units. Defaults to `size`. Must be >= 0, see {@link width}. */
     height?: number;
     /**
      * Fixed size in screen pixels for both axes, independent of zoom — the
@@ -104,12 +121,14 @@ export type Rect<TData = unknown> = DrawObject<TData> & {
      * precedence over {@link DrawObject.size} and {@link width}/{@link height},
      * and is itself overridden per axis by {@link widthPx}/{@link heightPx}.
      * Ignored by `drawStaticRect`: static caches replay at their recorded
-     * scale, so pixel sizing cannot hold there.
+     * scale, so pixel sizing cannot hold there. Must be >= 0, like
+     * {@link width}.
      */
     sizePx?: number;
     /**
      * Fixed width in screen pixels. Wins over {@link sizePx} and
-     * {@link width}. Same static-cache caveat as {@link sizePx}.
+     * {@link width}. Same static-cache caveat as {@link sizePx}. Must be >= 0,
+     * like {@link width}.
      */
     widthPx?: number;
     /** Fixed height in screen pixels. See {@link widthPx}. */
@@ -122,7 +141,8 @@ export type Circle<TData = unknown> = Omit<DrawObject<TData>, "rotate" | "radius
      * pattern (station dots, POI markers) analog of Text's `fontPx`. Takes
      * precedence over {@link DrawObject.size}. Ignored by `drawStaticCircle`:
      * static caches replay at their recorded scale, so pixel sizing cannot
-     * hold there.
+     * hold there. Must be >= 0: a negative or `NaN` diameter paints nothing
+     * and never hits.
      */
     sizePx?: number;
 };
@@ -177,7 +197,8 @@ export type ImageItem<TImage = DefaultImage, TData = unknown> = Omit<DrawObject<
      * images that must stay readable at any zoom level. Takes precedence
      * over {@link DrawObject.size}. Ignored by `drawStaticImage`: static
      * caches replay at their recorded scale, so pixel sizing cannot hold
-     * there.
+     * there. Must be >= 0: a negative or `NaN` size paints nothing (it is not
+     * a mirror; use {@link flipX}/{@link flipY}) and never hits.
      */
     sizePx?: number;
     /**
@@ -219,7 +240,12 @@ export type Text<TData = unknown> = Omit<DrawObject<TData>, "radius" | "size" | 
     };
 };
 export type Line<TData = unknown> = {
+    /**
+     * Start point in world units. Both endpoints must be finite: a line with
+     * a `NaN` or ±Infinity coordinate paints nothing and never hits.
+     */
     from: Coords;
+    /** End point in world units. Must be finite, see {@link from}. */
     to: Coords;
     /**
      * Per-item style, overlaying the call-level `style` argument field by
@@ -314,7 +340,11 @@ export type PathItem<TData = unknown> = {
      * when both are set, `commands` wins.
      */
     commands?: PathCommand[];
-    /** Polyline vertices in world units (item space: integers are cell centers). */
+    /**
+     * Polyline vertices in world units (item space: integers are cell
+     * centers). Must be finite: one `NaN` or ±Infinity point makes the whole
+     * path paint nothing and never hit.
+     */
     points?: Coords[];
     /**
      * Join the last point back to the first with a closing segment.

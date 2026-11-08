@@ -425,7 +425,9 @@ const config = {
 
 (core >= 0.12.) `itemsBounds(items)` returns the item-space `Bounds`
 enclosing a list of items of any kinds (hit results go straight in), or
-`null` when nothing in it has bounds:
+`null` when nothing in it has bounds. `items` is any source a draw call
+takes: an array (readonly too) or an `ItemCollection`, whose current items
+are read at call time:
 
 | Kind                              | Box |
 | --------------------------------- | --- |
@@ -445,7 +447,9 @@ if (bounds) {
 ```
 
 Keep the guard: a selection or hit result can be empty (`!` only for sets
-known to be non-empty). Items that draw nothing are skipped. Camera-
+known to be non-empty). Items that draw nothing are skipped (on core >= 0.12
+that includes anchored items with size 0 or a negative/`NaN` extent, and
+items with a `NaN`/infinite position, line endpoint or path point). Camera-
 independent, so it ignores `origin` offsets and `rotate` (add `padding` for
 slack), `sizePx`/`fontPx`, and glyph extents (a `Text` counts its `size`
 box). `pathItemBounds(item)` is the single-path building block.

@@ -168,9 +168,9 @@ from user selection or a hit test needs it.
 
 ### Parameters
 
-| Parameter | Type             | Description                                                                                              |
-| --------- | ---------------- | -------------------------------------------------------------------------------------------------------- |
-| `items`   | `BoundedItem[]`  | Any mix of drawn items. Every kind the draw API accepts fits as-is, so `hitTest` results need no filtering. |
+| Parameter | Type                                                       | Description                                                                                                                                                              |
+| --------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `items`   | `readonly BoundedItem[] \| ReadonlyItemCollection<BoundedItem>` | Any mix of drawn items. Every kind the draw API accepts fits as-is, so `hitTest` results need no filtering. Pass an [`ItemCollection`](./item_collections.md) directly: its current items are read at call time. |
 
 Returns `{ minX, maxX, minY, maxY }`, or `null` when nothing in the list has bounds (an empty list, or only items that draw nothing — guard before passing it on).
 
@@ -182,7 +182,7 @@ Each kind contributes the geometry it is drawn from:
 | `Line`                            | its two endpoints                                                         |
 | `Path`                            | vertex box for `points`, control-point hull for `commands`                |
 
-Items that draw nothing are skipped rather than counted: a path with fewer than two points, an empty command list, an object with no geometry at all.
+Items that draw nothing are skipped rather than counted: a path with fewer than two points, an empty command list, an anchored item with size 0 or a negative or `NaN` extent, an item with a `NaN` or infinite position, line endpoint or path point, an object with no geometry at all.
 
 Deliberately left out, so the result stays camera-independent:
 

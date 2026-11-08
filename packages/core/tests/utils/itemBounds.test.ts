@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { itemsBounds, pathItemBounds } from "../../src/utils/itemBounds";
+import { ItemCollection, type ReadonlyItemCollection } from "../../src/modules/ItemCollection";
 import type { Circle, ImageItem, Line, PathItem, Rect, Text } from "../../src/types";
 
 describe("itemsBounds", () => {
@@ -50,6 +51,67 @@ describe("itemsBounds", () => {
                 { x: 1, y: 1, size: 1 },
             ];
             expect(itemsBounds(items)).toEqual(itemsBounds([...items].reverse()));
+        });
+
+        // A negative or NaN extent paints nothing on every renderer, so it is
+        // skipped like any other item that draws nothing.
+        it.each([{ size: -4 }, { size: NaN }, { width: -2, height: 2 }, { width: 2, height: NaN }, { size: 0 }])(
+            "skips an item with %j instead of returning an inverted box",
+            (extent) => {
+                expect(itemsBounds([{ x: 2, y: 2, ...extent }])).toBeNull();
+                expect(
+                    itemsBounds([
+                        { x: 0, y: 0, size: 2 },
+                        { x: 50, y: -50, ...extent },
+                    ]),
+                ).toEqual({
+                    minX: -1,
+                    maxX: 1,
+                    minY: -1,
+                    maxY: 1,
+                });
+            },
+        );
+
+        it("keeps an item with one valid zero side", () => {
+            expect(itemsBounds([{ x: 0, y: 0, width: 4, height: 0 }])).toEqual({
+                minX: -2,
+                maxX: 2,
+                minY: 0,
+                maxY: 0,
+            });
+        });
+    });
+
+    // Position contract shared by every renderer: a non-finite position,
+    // endpoint or point paints nothing, so it is skipped like any other item
+    // that draws nothing, instead of turning the box infinite.
+    describe("non-finite positions", () => {
+        const square = { x: 0, y: 0, size: 2 };
+        const squareBounds = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+
+        it.each([NaN, Infinity, -Infinity])("skips an anchored item at x or y = %s", (value) => {
+            expect(itemsBounds([{ x: value, y: 0 }])).toBeNull();
+            expect(itemsBounds([square, { x: value, y: 0 }, { x: 0, y: value }])).toEqual(squareBounds);
+        });
+
+        it.each([NaN, Infinity, -Infinity])("skips a line with an endpoint coordinate of %s", (value) => {
+            const lines: Line[] = [
+                { from: { x: value, y: 0 }, to: { x: 5, y: 5 } },
+                { from: { x: 0, y: 0 }, to: { x: 5, y: value } },
+            ];
+            expect(itemsBounds([square, ...lines])).toEqual(squareBounds);
+        });
+
+        it.each([NaN, Infinity, -Infinity])("skips a polyline with a point coordinate of %s", (value) => {
+            const path: PathItem = {
+                points: [
+                    { x: 0, y: 0 },
+                    { x: value, y: 10 },
+                    { x: 20, y: 20 },
+                ],
+            };
+            expect(itemsBounds([square, path])).toEqual(squareBounds);
         });
     });
 
@@ -153,6 +215,66 @@ describe("itemsBounds", () => {
             });
         });
     });
+
+    // The same item sources the draw calls accept. These calls are also the
+    // type-level test: the suite is type-checked, and each line used to be
+    // TS2345 (and a collection threw "items is not iterable" at runtime).
+    describe("item sources", () => {
+        type Seat = { id: string };
+        const seats: Rect<Seat>[] = [
+            { x: 0, y: 0, size: 1, data: { id: "a" } },
+            { x: 3, y: 2, size: 1, data: { id: "b" } },
+        ];
+        const seatBounds = { minX: -0.5, maxX: 3.5, minY: -0.5, maxY: 2.5 };
+
+        it("accepts a readonly array", () => {
+            const frozen: readonly Rect<Seat>[] = Object.freeze([...seats]);
+            expect(itemsBounds(frozen)).toEqual(seatBounds);
+        });
+
+        it("accepts an ItemCollection and its read-only items view", () => {
+            const collection = new ItemCollection(seats, { keyOf: (seat) => seat.data!.id });
+            const view: ReadonlyItemCollection<Rect<Seat>> = collection;
+
+            expect(itemsBounds(collection)).toEqual(seatBounds);
+            expect(itemsBounds(view)).toEqual(seatBounds);
+            expect(itemsBounds(collection.items)).toEqual(seatBounds);
+        });
+
+        it("reads a collection's live contents at call time", () => {
+            const collection = new ItemCollection(seats, { keyOf: (seat) => seat.data!.id });
+
+            collection.insert({ x: 10, y: 10, size: 2, data: { id: "c" } });
+            expect(itemsBounds(collection)).toEqual({ minX: -0.5, maxX: 11, minY: -0.5, maxY: 11 });
+
+            collection.batch(() => {
+                for (const seat of [...collection.items]) {
+                    collection.remove(seat.data!.id);
+                }
+            });
+            expect(itemsBounds(collection)).toBeNull();
+        });
+
+        it("accepts a mixed-kind collection", () => {
+            const mixed = new ItemCollection<Rect | Line>(
+                [
+                    { x: 0, y: 0, size: 2 },
+                    { from: { x: 4, y: -3 }, to: { x: 6, y: 1 } },
+                ],
+                { keyOf: (item) => ("from" in item ? "line" : "rect") },
+            );
+            expect(itemsBounds(mixed)).toEqual({ minX: -1, maxX: 6, minY: -3, maxY: 1 });
+        });
+
+        it("types every draw-call list source as valid input, but not arbitrary iterables", () => {
+            type Input = Parameters<typeof itemsBounds>[0];
+            expectTypeOf<readonly Rect<Seat>[]>().toMatchTypeOf<Input>();
+            expectTypeOf<ItemCollection<Rect<Seat>>>().toMatchTypeOf<Input>();
+            expectTypeOf<ReadonlyItemCollection<Circle | Line | PathItem>>().toMatchTypeOf<Input>();
+            // Like the draw calls, a Set or other iterable is not an item source.
+            expectTypeOf<Set<Rect<Seat>>>().not.toMatchTypeOf<Input>();
+        });
+    });
 });
 
 describe("pathItemBounds", () => {
@@ -184,5 +306,27 @@ describe("pathItemBounds", () => {
                 commands: [{ type: "arc", x: 5, y: 5, radius: 3, startAngle: 0, endAngle: 90 }],
             }),
         ).toEqual({ minX: 2, maxX: 8, minY: 2, maxY: 8 });
+    });
+
+    // Null is what the renderers and the hit tester skip a whole path on, so
+    // one bad vertex must not leave the rest of the polyline drawable.
+    it.each([NaN, Infinity, -Infinity])("treats a polyline with a %s vertex as drawing nothing", (value) => {
+        expect(
+            pathItemBounds({
+                points: [
+                    { x: 0, y: 0 },
+                    { x: 4, y: value },
+                    { x: 8, y: 0 },
+                ],
+            }),
+        ).toBeNull();
+        expect(
+            pathItemBounds({
+                points: [
+                    { x: value, y: 0 },
+                    { x: 4, y: 4 },
+                ],
+            }),
+        ).toBeNull();
     });
 });

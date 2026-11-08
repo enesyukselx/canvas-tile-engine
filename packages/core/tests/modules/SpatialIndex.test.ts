@@ -332,3 +332,67 @@ describe("non-square bounding boxes", () => {
         expect(index.query(10, 11.5, 10, 11.5)).toHaveLength(0);
     });
 });
+
+describe("negative and NaN extents", () => {
+    it("indexes a negative-size item as its anchor point instead of an inverted box", () => {
+        const index = SpatialIndex.fromArray([{ x: 10, y: 10, size: -4 }]);
+
+        // An inverted box (minX 12 > maxX 8) only matched queries spanning it whole.
+        expect(index.query(10, 10, 10, 10)).toHaveLength(1);
+        expect(index.query(11, 10, 11, 10)).toHaveLength(0);
+    });
+
+    it("clamps each axis independently", () => {
+        const index = SpatialIndex.fromArray([{ x: 0, y: 0, width: 4, height: -2 }]);
+
+        expect(index.query(1.5, 0, 1.5, 0)).toHaveLength(1);
+        expect(index.query(0, 0.5, 0, 0.5)).toHaveLength(0);
+    });
+
+    it("does not let a NaN extent hide the rest of the tree", () => {
+        // NaN bounds propagate into every ancestor node, and no query can
+        // intersect a NaN box, so one bad item used to blank the whole index.
+        const items = Array.from({ length: 50 }, (_, i) => ({ x: i, y: 0, size: 1 }));
+        items[7].size = NaN;
+        const index = SpatialIndex.fromArray(items);
+
+        expect(index.query(20, 0, 20, 0)).toEqual([items[20]]);
+        expect(index.query(7, 0, 7, 0)).toEqual([items[7]]);
+    });
+});
+
+describe("non-finite positions", () => {
+    const grid = () => Array.from({ length: 200 }, (_, i) => ({ x: i % 20, y: Math.floor(i / 20), size: 1 }));
+
+    it.each([NaN, Infinity, -Infinity])("indexes an item at %s nowhere without hiding the rest", (value) => {
+        const items = grid();
+        items[7].x = value;
+        items[42].y = value;
+        const index = SpatialIndex.fromArray(items);
+
+        expect(index.query(-1e9, -1e9, 1e9, 1e9)).toHaveLength(198);
+        expect(index.query(8, 0, 8, 0)).toEqual([items[8]]);
+        expect(index.query(15, 9, 15, 9)).toEqual([items[195]]);
+    });
+
+    it("keeps insert, update and remove working around nowhere entries", () => {
+        const items = grid();
+        const index = new SpatialIndex<{ x: number; y: number; size: number }>();
+        const tokens = index.load(items);
+        const lost = { x: NaN, y: 3, size: 1 };
+        const lostToken = index.insert(lost);
+        index.insert({ x: Infinity, y: Infinity, size: 1 });
+
+        expect(index.query(0, 3, 0, 3)).toEqual([items[60]]);
+
+        // Into and out of nowhere, then removed while nowhere.
+        expect(index.update(tokens[60], { x: NaN, y: NaN, size: 1 })).toBe(true);
+        expect(index.query(0, 3, 0, 3)).toEqual([]);
+        const back = { x: 0, y: 3, size: 1 };
+        expect(index.update(tokens[60], back)).toBe(true);
+        expect(index.query(0, 3, 0, 3)).toEqual([back]);
+        expect(index.remove(lostToken)).toBe(true);
+        expect(index.remove(lostToken)).toBe(false);
+        expect(index.query(-1e9, -1e9, 1e9, 1e9)).toHaveLength(200);
+    });
+});
