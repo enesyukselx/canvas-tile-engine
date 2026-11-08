@@ -4,6 +4,11 @@ import type { Bounds } from "@canvas-tile-engine/core";
 
 export interface GridLinesProps {
     cellSize: number;
+    /**
+     * Line width in screen pixels (default 1). Unlike the world-unit
+     * `lineWidth` of rects, lines and paths, it does not scale with zoom.
+     * Widths below 1 draw a fainter hairline rather than a thinner one.
+     */
     lineWidth?: number;
     strokeStyle?: string;
     layer?: number;
