@@ -99,3 +99,41 @@ describe("gradient fills with no stops", () => {
         expect(pixel(50, 32)).toEqual([0, 255, 0, 255]);
     });
 });
+
+// The Canvas2D spec paints nothing for a zero-length axis, and a browser does
+// exactly that. @napi-rs/canvas falls back on Skia's degenerate gradient and
+// paints the last stop flat instead.
+describe("gradient fills with a zero-length axis", () => {
+    const point = { x: 0.5, y: 0.5 };
+    const twoStops = [
+        { offset: 0, color: "#ff0000" },
+        { offset: 1, color: "#0000ff" },
+    ];
+
+    it.each([
+        ["box units, two stops", { ...gradient(twoStops), from: point, to: point }],
+        ["box units, one stop", { ...gradient([{ offset: 0.5, color: "#0000ff" }]), from: point, to: point }],
+        ["world units", { ...gradient(twoStops), units: "world" as const, from: point, to: point }],
+    ])("paints nothing (%s)", (_name, fillStyle) => {
+        const { engine, pixel } = setup();
+
+        engine.drawRect({ x: 0, y: 0, size: 2, style: { fillStyle } });
+        engine.drawCircle({ x: 0, y: 0, size: 1, style: { fillStyle } }, 2);
+        engine.render();
+
+        expect(pixel(32, 32)).toEqual(WHITE);
+        expect(pixel(14, 32)).toEqual(WHITE);
+    });
+
+    it("paints nothing from a static cache", () => {
+        const { engine, pixel } = setup();
+
+        engine.drawStaticRect(
+            [{ x: 0, y: 0, size: 2, style: { fillStyle: { ...gradient(twoStops), from: point, to: point } } }],
+            "zero-axis",
+        );
+        engine.render();
+
+        expect(pixel(32, 32)).toEqual(WHITE);
+    });
+});

@@ -327,6 +327,44 @@ describe("gradients with fewer than two stops", () => {
     });
 });
 
+// The Canvas2D spec paints nothing for a zero-length axis, whatever the stops,
+// and a browser does exactly that. Skia's degenerate-gradient fallback would
+// paint the last stop flat (and a single stop would take the flat path), so
+// the axis is checked before either.
+describe("gradients with a zero-length axis", () => {
+    const point = { x: 0.5, y: 0.5 };
+    const zeroBox: LinearGradient = { ...ramp, from: point, to: point };
+    const zeroWorld: LinearGradient = { ...ramp, units: "world", from: point, to: point };
+    const zeroSingle: LinearGradient = { ...zeroBox, stops: [{ offset: 0.5, color: "#0f0" }] };
+
+    it("paints no fill but keeps the stroke", () => {
+        const { draw, render } = setup();
+        const { canvas, ops, fills } = makeCanvas();
+
+        draw.drawRect([
+            { x: 1, y: 1, style: { fillStyle: zeroBox, strokeStyle: "#000" } },
+            { x: 3, y: 1, rotate: 30, style: { fillStyle: zeroWorld } },
+        ]);
+        draw.drawCircle({ x: 5, y: 1, style: { fillStyle: zeroSingle } });
+        render(canvas);
+
+        expect(fills).toHaveLength(0);
+        expect(gradientCalls).toHaveLength(0);
+        expect(ops.filter((o) => o.style === PaintStyle.Stroke)).toHaveLength(1);
+    });
+
+    it("records no fill into a static picture", () => {
+        const { draw } = setup({ x: -10, y: -10, scale: 10 });
+        const pictureFills = trackPictureFills();
+
+        draw.drawStaticRect([{ x: 1, y: 1, style: { fillStyle: zeroWorld } }], "zero-axis");
+        draw.drawStaticCircle([{ x: 1, y: 1, style: { fillStyle: zeroSingle } }], "zero-axis-circle");
+
+        expect(pictureFills).toHaveLength(0);
+        expect(gradientCalls).toHaveLength(0);
+    });
+});
+
 // A static picture is recorded as if the camera sat at the origin and replay
 // adds the live camera offset back, so a world axis has to be recorded in that
 // same picture space. Projecting it with the registration-time camera bakes

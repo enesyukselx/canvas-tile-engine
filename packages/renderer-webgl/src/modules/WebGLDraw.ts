@@ -79,7 +79,7 @@ function unrotate(point: Coords, cx: number, cy: number, rotation: number): Coor
     return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
 }
 
-/** Fill color for a gradient with no stops: paints nothing, like Canvas2D. */
+/** Fill color for a gradient that paints nothing (no stops, or a zero-length axis), like Canvas2D. */
 const TRANSPARENT: RGBA = [0, 0, 0, 0];
 // Segment count used to approximate a stroked circle outline.
 const CIRCLE_STROKE_SEGMENTS = 48;
@@ -170,6 +170,13 @@ export class WebGLDraw {
             return { color: this.colorParser.parse(paint) };
         }
 
+        // A zero-length axis paints nothing, as Canvas2D specifies; sampling
+        // it would paint the first stop flat.
+        const axis = gradientAxisPx(paint, box, toScreen);
+        if (axis.x0 === axis.x1 && axis.y0 === axis.y1) {
+            return { color: TRANSPARENT };
+        }
+
         const stops = normalizeStops(paint.stops).map((stop) => ({
             offset: stop.offset,
             color: this.colorParser.parse(stop.color),
@@ -177,7 +184,7 @@ export class WebGLDraw {
         const row = gl.rampRow(paintKey(paint), stops);
         return {
             color: stops[0]?.color ?? TRANSPARENT,
-            gradient: { axis: gradientAxisPx(paint, box, toScreen), row },
+            gradient: { axis, row },
         };
     }
 

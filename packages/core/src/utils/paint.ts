@@ -66,8 +66,9 @@ export function gradientAxisPx(
 
 /**
  * Gradient parameter `t` at a screen point, the value a color ramp is sampled
- * with. Projects the point onto the axis; a zero-length axis yields 0, which
- * is what Canvas2D and Skia both paint (the first stop's color).
+ * with. Projects the point onto the axis. A zero-length axis yields 0 only so
+ * the result stays finite: such a gradient paints nothing (the Canvas2D rule
+ * every renderer follows), so renderers never sample it.
  */
 export function gradientT(axis: { x0: number; y0: number; x1: number; y1: number }, x: number, y: number): number {
     const dx = axis.x1 - axis.x0;

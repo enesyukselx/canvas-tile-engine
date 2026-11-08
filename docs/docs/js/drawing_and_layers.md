@@ -195,7 +195,7 @@ engine.drawRect({ x: 2, y: 2, width: 4, height: 3, style: { fillStyle: ramp } },
 
 | Field | Meaning |
 | :-- | :-- |
-| `from`, `to` | The axis the ramp runs along. |
+| `from`, `to` | The axis the ramp runs along. A zero-length axis (`from` and `to` on the same point) paints nothing, as in Canvas2D. |
 | `stops` | `{ offset, color }` pairs. Offsets are clamped to `0..1` and sorted; two stops at one offset make a hard break. An empty list paints nothing, a single stop paints flat. |
 | `units` | `"box"` (default) reads `from`/`to` as fractions of the item's own drawn box (for a path, its conservative box; see below). `"world"` reads them as world coordinates. |
 

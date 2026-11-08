@@ -148,6 +148,49 @@ describe("WebGLDraw gradient fills", () => {
         expect(paths[0].gradient).toEqual({ axis: { x0: 15, y0: 15, x1: 15, y1: 25 }, row: 0 });
     });
 
+    it("paints nothing for a zero-length axis, as Canvas2D does", () => {
+        // Sampling a zero-length axis gives t = 0, which would paint the
+        // first stop flat
+        const { draw, render } = setup();
+        const { gl, shapes, ramps, paths } = makeRecordingGL();
+        const point = { x: 0.5, y: 0.5 };
+        const zeroBox = { ...topToBottom, from: point, to: point };
+        const zeroWorld = { ...topToBottom, units: "world" as const, from: point, to: point };
+        const single = { ...zeroBox, stops: [{ offset: 0.5, color: "#0f0" }] };
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, style: { fillStyle: zeroBox } },
+                { x: 4, y: 2, rotate: 30, style: { fillStyle: zeroWorld } },
+            ],
+            1,
+        );
+        draw.drawCircle([{ x: 6, y: 2, style: { fillStyle: single } }], 1);
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 1, y: 1 },
+                        { x: 3, y: 1 },
+                        { x: 3, y: 2 },
+                    ],
+                    closed: true,
+                    style: { fillStyle: zeroWorld },
+                },
+            ],
+            1,
+        );
+        render(gl);
+
+        expect(shapes).toHaveLength(3);
+        for (const shape of shapes) {
+            expect(shape.color).toEqual([0, 0, 0, 0]);
+            expect(shape.gradient).toBeUndefined();
+        }
+        expect(paths).toEqual([{ color: [0, 0, 0, 0], gradient: undefined }]);
+        expect(ramps).toHaveLength(0);
+    });
+
     it("leaves a solid fill without a gradient", () => {
         const { draw, render } = setup();
         const { gl, shapes, ramps } = makeRecordingGL();

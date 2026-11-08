@@ -22,7 +22,8 @@ export type ColorStop = {
  * Stops are normalized before painting: offsets are clamped to `0..1` and
  * sorted ascending, with stops sharing an offset keeping their authored order
  * so a hard color break stays a hard break. An empty list paints nothing; a
- * single stop paints that color flat.
+ * single stop paints that color flat. A zero-length axis (`from` and `to` on
+ * the same point) paints nothing, as in Canvas2D, whatever the stops.
  */
 export type LinearGradient = {
     type: "linear";

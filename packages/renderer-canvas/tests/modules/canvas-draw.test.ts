@@ -1555,4 +1555,28 @@ describe("CanvasDraw gradient fills", () => {
         expect(gradients).toHaveLength(0);
         expect(fills).toEqual(["rgba(0, 0, 0, 0)"]);
     });
+
+    it("fills transparent for a zero-length axis, in either unit", () => {
+        // The Canvas2D spec paints nothing for one; @napi-rs/canvas would
+        // paint the last stop flat
+        const { draw, render } = setup();
+        const { ctx, gradients, fills } = makeGradientRecordingCtx();
+        const point = { x: 0.5, y: 0.5 };
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, style: { fillStyle: { ...topToBottom, from: point, to: point } } },
+                {
+                    x: 4,
+                    y: 2,
+                    style: { fillStyle: { ...topToBottom, units: "world" as const, from: point, to: point } },
+                },
+            ],
+            1,
+        );
+        render(ctx);
+
+        expect(gradients).toHaveLength(0);
+        expect(fills).toEqual(["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);
+    });
 });

@@ -1034,12 +1034,17 @@ export class SkiaDraw {
         if (stops.length === 0) {
             return null;
         }
+        // A zero-length axis paints nothing too, as Canvas2D specifies, even
+        // with one stop. Skia would paint the last stop flat.
+        const axis = gradientAxisPx(paint, box, toScreen);
+        if (axis.x0 === axis.x1 && axis.y0 === axis.y1) {
+            return null;
+        }
         if (stops.length === 1) {
             this.fillPaint.setColor(this.color(stops[0].color));
             return () => {};
         }
 
-        const axis = gradientAxisPx(paint, box, toScreen);
         // Skia modulates a shader by the paint's alpha, and every solid or
         // text fill leaves its color's alpha on this shared paint. The RGB is
         // ignored under a shader, so only the alpha needs resetting.

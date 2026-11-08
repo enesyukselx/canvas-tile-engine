@@ -849,7 +849,14 @@ export class CanvasDraw<
             return TRANSPARENT_FILL;
         }
 
+        // A zero-length axis paints nothing either, per the Canvas2D spec,
+        // and a browser honors that. @napi-rs/canvas paints the last stop
+        // flat instead (Skia's degenerate-gradient fallback).
         const axis = gradientAxisPx(paint, box, toScreen);
+        if (axis.x0 === axis.x1 && axis.y0 === axis.y1) {
+            return TRANSPARENT_FILL;
+        }
+
         const key = `${paintKey(paint)}|${axis.x0},${axis.y0},${axis.x1},${axis.y1}`;
         const memoized = perFrame.get(key);
         if (memoized) {

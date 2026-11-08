@@ -231,7 +231,8 @@ pin whose tip sits on the point: `{ mode: "self", x: 0.5, y: 1 }`.
 - `"world"` units: `from`/`to` are item-space coordinates; the ramp spans the
   scene and neighbouring items each show their slice of it.
 - Stops are clamped to `0..1` and sorted; two stops at one offset make a hard
-  break. An empty list paints nothing, a single stop paints flat.
+  break. An empty list paints nothing, a single stop paints flat. A
+  zero-length axis (`from` and `to` on the same point) paints nothing.
 - Identical on all four renderers. `drawStatic*` bakes a `"world"` axis at
   the scale its cache was recorded at.
 - `LinearGradient`, `Paint` and `ColorStop` are core types, also
