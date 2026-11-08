@@ -137,3 +137,43 @@ describe("gradient fills with a zero-length axis", () => {
         expect(pixel(32, 32)).toEqual(WHITE);
     });
 });
+
+// Parity pin for a short but non-zero axis, matching Chrome's Canvas2D (and
+// WebGL, which follows it): a hard step at the axis position, until the axis
+// drops to Skia's degenerate threshold (1/32768 px), where the last stop
+// paints flat.
+describe("gradient fills with a very short axis", () => {
+    const redToBlue = (to: number): LinearGradient => ({
+        ...gradient([
+            { offset: 0, color: "#ff0000" },
+            { offset: 1, color: "#0000ff" },
+        ]),
+        units: "world",
+        from: { x: 0, y: 0 },
+        to: { x: to, y: 0 },
+    });
+
+    it("steps from the first stop to the last at the axis", () => {
+        const { engine, pixel } = setup();
+
+        // World x = 0 is px 32, the middle of the rect; 1e-4 world units is 0.002px
+        engine.drawRect({ x: 0, y: 0, size: 2, style: { fillStyle: redToBlue(1e-4) } });
+        engine.render();
+
+        expect(pixel(13, 32)).toEqual([255, 0, 0, 255]);
+        expect(pixel(31, 32)).toEqual([255, 0, 0, 255]);
+        expect(pixel(32, 32)).toEqual([0, 0, 255, 255]);
+        expect(pixel(51, 32)).toEqual([0, 0, 255, 255]);
+    });
+
+    it("paints the last stop flat once the axis is degenerate", () => {
+        const { engine, pixel } = setup();
+
+        // 1e-7 world units is 2e-6px, under 1/32768 px
+        engine.drawRect({ x: 0, y: 0, size: 2, style: { fillStyle: redToBlue(1e-7) } });
+        engine.render();
+
+        expect(pixel(13, 32)).toEqual([0, 0, 255, 255]);
+        expect(pixel(51, 32)).toEqual([0, 0, 255, 255]);
+    });
+});

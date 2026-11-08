@@ -1,5 +1,6 @@
-import { gradientT, type Coords } from "@canvas-tile-engine/core";
+import { type Coords } from "@canvas-tile-engine/core";
 import { RGBA } from "../../utils/color";
+import { boundedGradientT, maxVertexGradientT } from "./gradientParam";
 import {
     LINE_FRAGMENT_SHADER,
     LINE_VERTEX_SHADER,
@@ -465,11 +466,12 @@ export class GLRenderer {
             // The gradient axis lives in this same local frame, so t comes
             // from the unrotated corner and the ramp turns with the shape.
             const grad = s.gradient;
+            const cornerT = grad ? boundedGradientT(grad.axis, corners, this.gradientTLimit()) : undefined;
             const verts: number[][] = [];
-            for (const [lx, ly] of corners) {
+            for (const [i, [lx, ly]] of corners.entries()) {
                 const px = s.cx + lx * cos - ly * sin;
                 const py = s.cy + lx * sin + ly * cos;
-                verts.push([px, py, lx, ly, grad ? gradientT(grad.axis, lx, ly) : 0]);
+                verts.push([px, py, lx, ly, cornerT ? cornerT[i] : 0]);
             }
 
             // Two triangles: TL, TR, BR and TL, BR, BL
@@ -520,6 +522,18 @@ export class GLRenderer {
         this.disableAttrib(this.shape.a_color);
         this.disableAttrib(this.shape.a_gradT);
         this.disableAttrib(this.shape.a_gradRow);
+    }
+
+    /** Cached {@link maxVertexGradientT} for this context's mediump floats. */
+    private vertexGradientTLimit?: number;
+
+    private gradientTLimit(): number {
+        if (this.vertexGradientTLimit === undefined) {
+            const gl = this.gl;
+            const format = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT);
+            this.vertexGradientTLimit = maxVertexGradientT(format?.rangeMax);
+        }
+        return this.vertexGradientTLimit;
     }
 
     // ─── Lines ───
@@ -740,24 +754,26 @@ export class GLRenderer {
         gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
 
         const quad = new Float32Array(6 * LINE_FLOATS_PER_VERTEX);
-        let o = 0;
-        for (const [x, y] of [
+        const cover = [
             [minX, minY],
             [maxX, minY],
             [minX, maxY],
             [minX, maxY],
             [maxX, minY],
             [maxX, maxY],
-        ]) {
+        ];
+        // The cover quad is in screen space and unrotated, so the axis it
+        // is projected against is screen space too.
+        const coverT = gradient ? boundedGradientT(gradient.axis, cover, this.gradientTLimit()) : undefined;
+        let o = 0;
+        for (const [i, [x, y]] of cover.entries()) {
             quad[o++] = x;
             quad[o++] = y;
             quad[o++] = color[0];
             quad[o++] = color[1];
             quad[o++] = color[2];
             quad[o++] = color[3];
-            // The cover quad is in screen space and unrotated, so the axis it
-            // is projected against is screen space too.
-            quad[o++] = gradient ? gradientT(gradient.axis, x, y) : 0;
+            quad[o++] = coverT ? coverT[i] : 0;
             quad[o++] = gradient ? gradient.row : NO_GRADIENT;
         }
         this.flatTriangles(quad, 6);

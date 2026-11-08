@@ -365,6 +365,33 @@ describe("gradients with a zero-length axis", () => {
     });
 });
 
+// Parity pin for a short but non-zero axis. Chrome's Canvas2D paints a hard
+// step at the axis position, and below Skia's degenerate threshold
+// (1/32768 px) the last stop flat. Native Skia does both itself (checked on
+// CanvasKit), so the axis has to reach MakeLinearGradient exactly as
+// projected: not dropped as zero-length, not flattened.
+describe("gradients with a very short axis", () => {
+    it.each([
+        ["a step regime axis", 1e-4],
+        ["a degenerate axis", 1e-7],
+    ])("hands %s to Skia unchanged", (_name, length) => {
+        const { draw, render } = setup(); // scale 10
+        const { canvas, fills } = makeCanvas();
+        const fillStyle: LinearGradient = { ...worldRamp, from: { x: 2, y: 2 }, to: { x: 2 + length, y: 2 } };
+
+        // World x = 2 is the middle of this size-2 rect
+        draw.drawRect({ x: 2, y: 2, size: 2, style: { fillStyle } });
+        render(canvas);
+
+        expect(gradientCalls).toHaveLength(1);
+        expect(gradientCalls[0].start).toEqual({ x: 25, y: 25 });
+        expect(gradientCalls[0].end.x).toBeCloseTo(25 + length * 10, 12);
+        expect(gradientCalls[0].end.y).toBe(25);
+        expect(fills).toHaveLength(1);
+        expect(fills[0].shader).toBeTruthy();
+    });
+});
+
 // A static picture is recorded as if the camera sat at the origin and replay
 // adds the live camera offset back, so a world axis has to be recorded in that
 // same picture space. Projecting it with the registration-time camera bakes

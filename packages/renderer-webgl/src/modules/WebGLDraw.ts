@@ -60,6 +60,7 @@ import {
 } from "@canvas-tile-engine/renderer-shared/geometry";
 import { CanvasTextBounds } from "@canvas-tile-engine/renderer-shared/canvas2d";
 import { GLRenderer } from "./gl/GLRenderer";
+import { DEGENERATE_AXIS_PX } from "./gl/gradientParam";
 import { ImageInstance, LineInstance, ShapeInstance, type ShapeGradient } from "./gl/GLRenderer";
 import { ColorParser, RGBA } from "../utils/color";
 
@@ -175,6 +176,14 @@ export class WebGLDraw {
         const axis = gradientAxisPx(paint, box, toScreen);
         if (axis.x0 === axis.x1 && axis.y0 === axis.y1) {
             return { color: TRANSPARENT };
+        }
+        // A very short axis is a hard step at the axis, as on Canvas2D, until
+        // it drops under Skia's degenerate threshold. Canvas2D (browser and
+        // server) and React Native all paint through Skia, which then paints
+        // the last stop flat, so WebGL does too.
+        if (Math.hypot(axis.x1 - axis.x0, axis.y1 - axis.y0) <= DEGENERATE_AXIS_PX) {
+            const last = normalizeStops(paint.stops).at(-1);
+            return { color: last ? this.colorParser.parse(last.color) : TRANSPARENT };
         }
 
         const stops = normalizeStops(paint.stops).map((stop) => ({
