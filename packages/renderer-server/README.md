@@ -147,6 +147,25 @@ engine.addDrawFunction((ctx) => {
 }, 2);
 ```
 
+## Command-Line Preview
+
+`cte-render` renders a preview module to an image, so you can look at a scene from any project, including browser and React Native apps:
+
+```bash
+npx -y @canvas-tile-engine/renderer-server@latest map.preview.mjs -o map.png --grid --coords
+```
+
+```js
+// map.preview.mjs: config, center and draw, as in renderToBuffer
+export const config = { scale: 40, size: { width: 480, height: 320 } };
+export const center = { x: 1.5, y: 1.5 };
+export function draw(engine) {
+    engine.drawRect({ x: 0, y: 0, size: 0.9, style: { fillStyle: "#4ade80" } }, 1);
+}
+```
+
+`--grid` draws cell boundaries above the scene, `--coords` numbers the cells, and the command prints the final camera and visible range. Run `cte-render --help` for every option, or see the [server rendering docs](https://canvastileengine.dev/docs/server/rendering#command-line-preview).
+
 ## Documentation
 
 For contributors, `pnpm test:package` from the repository root builds and packs

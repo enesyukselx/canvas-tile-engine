@@ -13,6 +13,7 @@ Contents:
 - [Fonts](#fonts)
 - [Behavior notes (differences from browser renderers)](#behavior-notes-differences-from-browser-renderers)
 - [Pattern: HTTP image endpoint](#pattern-http-image-endpoint)
+- [Preview a scene from the command line](#preview-a-scene-from-the-command-line)
 
 ## Install and types
 
@@ -185,3 +186,98 @@ Same shape works in a Next.js route handler:
 `return new Response(png, { headers: { "Content-Type": "image/png" } })`.
 Use `engine.getVisibleBounds()` inside `draw` to fetch/draw only the region
 the image will show.
+
+## Preview a scene from the command line
+
+The package ships a `cte-render` bin that renders a preview module to an
+image, so you can look at what a scene draws in any project: browser,
+React, React Native or server. The usual workflow is in
+[SKILL.md: Verify by rendering](../SKILL.md#verify-by-rendering).
+
+```bash
+# Any project: npx fetches the latest package (and its core peer) on the fly.
+# Keep @latest: without it, an older renderer-server installed in the project
+# (no bin before the core 0.12 release) shadows the download.
+npx -y @canvas-tile-engine/renderer-server@latest map.preview.mjs -o /tmp/map.png --grid --coords
+
+# A project that depends on renderer-server (core >= 0.12): use its own copy.
+# --no stops npx from downloading an unrelated package if the bin is missing.
+npx --no cte-render map.preview.mjs -o /tmp/map.png --grid --coords
+pnpm exec cte-render map.preview.mjs -o /tmp/map.png --grid --coords
+```
+
+The preview module is an ES module that exports `config`, `center` and
+`draw`, either as named exports or as one default-exported object. They mean
+the same as the `renderToBuffer` options; the pixel ratio, format and
+quality come from the flags instead (a module export for them is ignored
+with a note).
+
+```js
+// map.preview.mjs
+export const config = { scale: 40, size: { width: 480, height: 320 }, backgroundColor: "#0f172a" };
+export const center = { x: 1.5, y: 1.5 }; // item space, default { x: 0, y: 0 }
+const tiles = [{ x: 0, y: 0, size: 1, style: { fillStyle: "#22c55e" } }]; // the app's items
+export async function draw(engine) {
+    engine.drawGridLines(1, 1, "#1e293b", 0);
+    engine.drawRect(tiles, 1);
+    const marker = await engine.images.load("./assets/marker.png"); // relative to the working directory
+    engine.drawImage({ x: 2, y: 1, size: 1, img: marker }, 2);
+}
+```
+
+- `.mjs` always works, and `.mts` works on Node 22.18 or newer (23.6+ on
+  the 23 line), which strips the types itself: erasable syntax only,
+  type-only names imported with `import type`, and relative imports with
+  their file extension. `.js` and `.ts` follow the nearest package.json
+  `type`, so they load as ES modules only in a `"type": "module"` package.
+  Prefer `.mjs` or `.mts`.
+- A preview that imports the app's own data needs those modules to load in
+  plain Node under the same rules: no path aliases, no CSS/asset imports, no
+  browser globals at import time. When that fails, copy the items into the
+  preview module.
+- `draw` receives a server engine: use the imperative draw calls. A React
+  `<CanvasTileEngine.Rect items={tiles} layer={1} />` becomes
+  `engine.drawRect(tiles, 1)`; the other components map the same way.
+  Use `export function draw`, not `export default function draw`.
+
+The engine starts from the module's `config` and `center`, as the app does,
+so `config.bounds` clamping and `gridAligned` snapping of the initial
+center match the app. The camera flags then apply before `draw` runs (so
+`draw` sees them, e.g. in `getVisibleBounds()`) and again after it, so they
+win over `fitBounds` / `setCenter` / `setScale` calls inside `draw`.
+
+| Option | Effect |
+| :-- | :-- |
+| `-o, --out <file>` | Output path; the extension picks the format (`.png`, `.jpg`/`.jpeg`, `.webp`). Default `<module name>.png` in the working directory. |
+| `--grid` | One-cell grid lines above every layer: shows which cell each item sits in. |
+| `--coords` | Coordinate overlay with cell numbers on the edges, at any scale. |
+| `--center <x,y>` | Moves the camera like `engine.setCenter` (item space): `config.bounds` still clamps it, `gridAligned` does not snap it. Negative x: `--center=-3,4`. |
+| `--scale <px>` | Zooms like `engine.setScale`, even outside the zoom limits (a note says the app cannot zoom that far). |
+| `--size <WxH>` | Resizes the viewport (CSS pixels) and keeps the center. Works on a `responsive` config too. |
+| `--pixel-ratio <n>` | Output pixel ratio, default 1. |
+| `--quality <0-100>` | JPEG/WebP quality. |
+| `--font <file[=family]>` | Register a font before rendering; repeatable. |
+
+On success it prints the file, the final camera and the visible range in
+item space:
+
+```text
+Wrote /tmp/map.png (480x320 px, png)
+Center (1.5, 1.5), scale 40 px per unit (limits 20 to 80)
+Visible x -4.5 to 7.5, y -2.5 to 5.5 (item space: integers are cell centers)
+```
+
+A `note:` on stderr flags a module center that `config.bounds` or
+`config.gridAligned` moved, a `--center` that `config.bounds` clamped, and
+a `--scale` outside the zoom limits (`minScale`/`maxScale`, by default half
+and twice `scale`). Exit codes: `0` rendered, `1` the module or the render
+failed (config validation errors, a rejected promise in `draw`, or a `draw`
+that never finishes), `2` bad command line. The command exits after
+writing the image even if the module left timers or sockets open.
+
+Limits: the image comes from the Canvas2D drawing code that
+`renderer-canvas` also uses. WebGL draws text and custom drawing above all
+shapes, and React Native Skia can differ in details. Nothing interactive
+runs: no events, no animation (a `SpriteAnimator` shows its first frame),
+and `styleOf` / `visibleOf` see the state the module sets up. Text needs
+fonts: on a machine without system fonts pass `--font`.
