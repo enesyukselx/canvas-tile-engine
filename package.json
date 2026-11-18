@@ -36,7 +36,7 @@
         "node": ">=20.19.0"
     },
     "dependencies": {
-        "concurrently": "^10.0.5",
+        "concurrently": "^10.0.6",
         "tsup": "^8.5.1",
         "typescript": "^5.9.3"
     },
@@ -44,9 +44,9 @@
         "@changesets/cli": "^2.31.0",
         "@types/node": "^25.3.3",
         "@vitest/coverage-v8": "^4.1.9",
-        "oxfmt": "^0.71.0",
-        "oxlint": "^1.86.0",
-        "turbo": "^2.11.5",
+        "oxfmt": "^0.75.0",
+        "oxlint": "^1.90.0",
+        "turbo": "^2.11.10",
         "vitest": "^4.1.9"
     }
 }
