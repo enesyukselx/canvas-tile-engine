@@ -235,6 +235,57 @@ describe("draw components", () => {
         expect(styleA).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ["Rect", "drawRect", 2, () => <Rect items={TILE} />],
+        ["Circle", "drawCircle", 2, () => <Circle items={{ x: 1, y: 1 }} />],
+        ["Line", "drawLine", 3, () => <Line items={{ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }} />],
+        ["Text", "drawText", 2, () => <Text items={{ x: 0, y: 0, text: "hi" }} />],
+        [
+            "Path",
+            "drawPath",
+            2,
+            () => (
+                <Path
+                    items={{
+                        points: [
+                            { x: 0, y: 0 },
+                            { x: 1, y: 1 },
+                        ],
+                    }}
+                />
+            ),
+        ],
+    ] as const)(
+        "%s passes styleOf as undefined when omitted so renderers keep spatial indexing enabled",
+        (_name, method, optionsIndex, makeUi) => {
+            const engine = createFakeHandle();
+            renderWith(engine, makeUi());
+
+            const calls = engine[method].mock.calls as unknown[][];
+            const options = calls[0][optionsIndex] as { styleOf?: unknown } | undefined;
+            expect(options?.styleOf).toBeUndefined();
+        },
+    );
+
+    it("re-registers when styleOf toggles between omitted and provided", () => {
+        const engine = createFakeHandle();
+        const items = [TILE];
+        const styleA = vi.fn(() => ({ fillStyle: "a" }));
+
+        const { rerender } = renderWith(engine, <Rect items={items} />);
+        expect(engine.drawRect).toHaveBeenCalledTimes(1);
+        expect(engine.drawRect.mock.calls[0][2]?.styleOf).toBeUndefined();
+
+        rerender(<Rect items={items} styleOf={styleA} />);
+        expect(engine.drawRect).toHaveBeenCalledTimes(2);
+        const options = engine.drawRect.mock.calls[1][2];
+        expect(options?.styleOf?.(TILE)).toEqual({ fillStyle: "a" });
+
+        rerender(<Rect items={items} />);
+        expect(engine.drawRect).toHaveBeenCalledTimes(3);
+        expect(engine.drawRect.mock.calls[2][2]?.styleOf).toBeUndefined();
+    });
+
     it("reads interactiveOf through a ref: identity changes neither re-register nor repaint", () => {
         const engine = createFakeHandle();
         const items = [TILE];

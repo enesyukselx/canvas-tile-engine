@@ -84,6 +84,9 @@ export const Rect = memo(function Rect({
     const styleOfRef = useRef(styleOf);
     const visibleOfRef = useRef(visibleOf);
     const interactiveOfRef = useRef(interactiveOf);
+    // Track presence separately so omitting `styleOf` passes `undefined` to the
+    // engine and keeps the renderer's spatial index enabled.
+    const hasStyleOf = Boolean(styleOf);
 
     useEffect(() => {
         styleOfRef.current = styleOf;
@@ -100,7 +103,7 @@ export const Rect = memo(function Rect({
 
     useEffect(() => {
         const handle = engine.drawRect(items, layer, {
-            styleOf: (item) => styleOfRef.current?.(item),
+            styleOf: hasStyleOf ? (item) => styleOfRef.current?.(item) : undefined,
             visibleOf: (item) => visibleOfRef.current?.(item),
             interactiveOf: (item) => interactiveOfRef.current?.(item),
             hitTest,
@@ -115,7 +118,7 @@ export const Rect = memo(function Rect({
                 requestRender();
             }
         };
-    }, [engine, items, layer, hitTest, requestRender, clipKey]);
+    }, [engine, items, layer, hasStyleOf, hitTest, requestRender, clipKey]);
 
     return null;
 });
