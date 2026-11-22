@@ -70,6 +70,9 @@ export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf, c
     // Read through refs so callback identity changes never re-register.
     const styleOfRef = useRef(styleOf);
     const visibleOfRef = useRef(visibleOf);
+    // Track presence separately so omitting `styleOf` passes `undefined` to the
+    // engine and keeps the renderer's spatial index enabled.
+    const hasStyleOf = Boolean(styleOf);
 
     useEffect(() => {
         styleOfRef.current = styleOf;
@@ -81,7 +84,7 @@ export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf, c
 
     useEffect(() => {
         const handle = engine.drawText(items, layer, {
-            styleOf: (item) => styleOfRef.current?.(item),
+            styleOf: hasStyleOf ? (item) => styleOfRef.current?.(item) : undefined,
             visibleOf: (item) => visibleOfRef.current?.(item),
             clip,
         });
@@ -94,7 +97,7 @@ export const Text = memo(function Text({ items, layer = 2, styleOf, visibleOf, c
                 requestRender();
             }
         };
-    }, [engine, items, layer, requestRender, clipKey]);
+    }, [engine, items, layer, hasStyleOf, requestRender, clipKey]);
 
     return null;
 });
