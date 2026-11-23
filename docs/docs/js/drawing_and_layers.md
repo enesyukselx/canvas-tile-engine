@@ -346,6 +346,8 @@ type PathCommand =
     | { type: "closePath" };
 ```
 
+Every number must be finite, and an arc's `radius` must be zero or positive. A path whose commands break either rule paints nothing and never hits, on every renderer, including items added later through an `ItemCollection` and commands edited in place. Canvas2D's own `arc()` would throw on a negative radius and abort the frame.
+
 Each `moveTo` starts a new subpath, so one item can be an outline plus holes. Under `"evenodd"` any overlapping subpath punches a hole; under `"nonzero"` (default) a hole must wind in the opposite direction of its outer ring — exactly Canvas2D `fill()` semantics, on every renderer.
 
 ```typescript

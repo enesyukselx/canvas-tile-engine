@@ -237,7 +237,7 @@ Draw free-form paths: open polylines, closed outlines, and filled shapes. Each `
 | `visibleOf` | `(item) => boolean \| undefined` | -          | Per-item show/hide: `false` skips the item (not painted, not hit-testable).                                           |
 | `interactiveOf` | `(item) => boolean \| undefined` | -      | Per-item hit-test opt-out: `false` keeps the item painted but transparent to hit queries.                             |
 
-**`PathItem`:** `{ commands?, points?, closed?, fillRule?, style?, data? }` — `commands` is a Canvas2D-style command list (curves, arcs, multiple subpaths, holes); `points` is the polyline form. See the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full `PathCommand`, property, and `PathStyle` tables. Filled paths hit-test on their interior (holes excluded), unfilled ones on the stroke itself.
+**`PathItem`:** `{ commands?, points?, closed?, fillRule?, style?, data? }` — `commands` is a Canvas2D-style command list (curves, arcs, multiple subpaths, holes); `points` is the polyline form. See the [core drawing docs](../js/drawing_and_layers.md#drawpath) for the full `PathCommand`, property, and `PathStyle` tables. Filled paths hit-test on their interior (holes excluded), unfilled ones on the stroke itself. Command values must be finite and arc radii zero or positive; a path that breaks this paints nothing and never hits.
 
 ```tsx
 {

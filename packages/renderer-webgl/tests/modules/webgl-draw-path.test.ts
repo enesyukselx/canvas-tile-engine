@@ -284,6 +284,37 @@ describe("WebGLDraw command paths", () => {
         render(high.gl);
         expect(high.lines.length).toBeGreaterThan(lowCount * 2);
     });
+
+    // Same empty-path contract as Canvas2D and Skia. Flattened as given, a
+    // negative radius filled a coarse slice mirrored through the center and
+    // a non-finite value submitted NaN/Infinity vertices.
+    it.each([
+        ["a negative arc radius", { radius: -2 }],
+        ["a NaN arc center", { x: NaN }],
+        ["an infinite arc radius", { radius: Infinity }],
+        ["a NaN arc angle", { startAngle: NaN }],
+    ])("submits nothing for a command path with %s", (_case, arc) => {
+        const { draw, render } = setup();
+        const { gl, fills, lines } = makeRecordingGL();
+
+        draw.drawPath(
+            [
+                {
+                    commands: [
+                        { type: "moveTo", x: 4, y: 4 },
+                        { type: "arc", x: 4, y: 4, radius: 2, startAngle: 0, endAngle: 90, ...arc },
+                        { type: "closePath" },
+                    ],
+                    style: { fillStyle: "#f00", strokeStyle: "#0f0" },
+                },
+            ],
+            1,
+        );
+        render(gl);
+
+        expect(fills).toEqual([]);
+        expect(lines).toEqual([]);
+    });
 });
 
 describe("smuggled decoration geometry", () => {

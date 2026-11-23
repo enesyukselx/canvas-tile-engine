@@ -387,7 +387,10 @@ engine.drawPath({ commands: [
   (`cp1x, cp1y, cp2x, cp2y, x, y`) | `closePath`; `closed` and
   `cornerRadius` do not apply. Each `moveTo` starts a subpath, so one item
   can carry holes: with `evenodd` any overlapping subpath punches one, with
-  `nonzero` the inner ring must wind opposite the outer.
+  `nonzero` the inner ring must wind opposite the outer. Every value must be
+  finite and an arc `radius` >= 0: otherwise (core >= 0.12) the WHOLE item
+  paints nothing and never hits, on every renderer. Older cores pass it
+  through, and Canvas2D's `arc()` throws on a negative radius every frame.
 - `PathStyle` = `LineStyle` + `fillStyle?` (color or gradient) +
   `cornerRadius?`/`cornerRadiusPx?`. Fill-only items draw no outline;
   unstyled items stroke a hairline. Fills are exact on every renderer.
