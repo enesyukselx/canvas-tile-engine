@@ -111,6 +111,27 @@ interface TextLayout {
  */
 export const COLOR_CACHE_LIMIT = 8192;
 
+/** Projects world coordinates into the canvas space an item paints in. */
+type ToScreen = (x: number, y: number) => Coords;
+
+/**
+ * Map a point into the frame a shape paints in under
+ * `canvas.rotate(degrees, cx, cy)`: the inverse of that rotation. Skia rotates
+ * about the pivot without moving the origin, so the frame keeps canvas
+ * coordinates and the pivot is added back, unlike the center-origin frame
+ * Canvas2D and WebGL paint a rotated shape in. Only world-unit gradients need
+ * it: their axis is projected unrotated, but Skia reads a shader's points in
+ * the rotated frame, so without it the ramp would turn with the shape.
+ */
+function unrotateAbout(point: Coords, cx: number, cy: number, degrees: number): Coords {
+    const radians = (-degrees * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    const dx = point.x - cx;
+    const dy = point.y - cy;
+    return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+}
+
 /**
  * Skia implementation of the engine draw API.
  *
@@ -128,6 +149,8 @@ export class SkiaDraw {
         worldToScreen: (x, y) => this.transformer.worldToScreen(x, y),
         screenToWorld: (x, y) => this.transformer.screenToWorld(x, y),
     };
+    /** The live camera projection the dynamic draw methods paint through. */
+    private liveToScreen: ToScreen = (x, y) => this.transformer.worldToScreen(x, y);
     // Reusable paints, mutated per draw call (draws are immediate within a frame).
     private fillPaint: SkPaint;
     private strokePaint: SkPaint;
@@ -218,7 +241,7 @@ export class SkiaDraw {
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintRect(canvas, item, pos, this.camera.scale, true, deco);
+                this.paintRect(canvas, item, pos, this.camera.scale, true, this.liveToScreen, deco);
             }
         });
         this.drawChanges.add(handle, culler.applyChanges.bind(culler));
@@ -228,6 +251,8 @@ export class SkiaDraw {
     /** Paint a single rect at a resolved position; `cellSize` is the pixel
      * size of one world cell. `useSizePx` is false on the static picture path,
      * which replays at a recorded scale where a screen size cannot hold.
+     * `toScreen` is the world projection `pos` was resolved with (the live
+     * camera, or picture space when recording), for a world-unit gradient.
      * `deco` is dynamic-path only — the static path records without
      * decorations. */
     private paintRect(
@@ -236,6 +261,7 @@ export class SkiaDraw {
         pos: Coords,
         cellSize: number,
         useSizePx: boolean,
+        toScreen: ToScreen,
         deco?: ShapeDecorationStyle,
     ) {
         const size = item.size ?? 1;
@@ -257,13 +283,26 @@ export class SkiaDraw {
         const rect = Skia.XYWHRect(drawX, drawY, pxW, pxH);
         const rounded = this.hasRadius(radius);
         if (style?.fillStyle) {
-            const resetFill = this.applyFill(style.fillStyle, { x: drawX, y: drawY, width: pxW, height: pxH });
-            if (rounded) {
-                canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
-            } else {
-                canvas.drawRect(rect, this.fillPaint);
+            // The box is in the rotated frame, so a box-unit ramp turns with
+            // the shape; a world-unit axis is un-rotated into that frame so it
+            // stays put in the world, as on Canvas2D and WebGL.
+            const fillToScreen =
+                rotation !== 0
+                    ? (wx: number, wy: number) => unrotateAbout(toScreen(wx, wy), cx, cy, rotation)
+                    : toScreen;
+            const resetFill = this.applyFill(
+                style.fillStyle,
+                { x: drawX, y: drawY, width: pxW, height: pxH },
+                fillToScreen,
+            );
+            if (resetFill) {
+                if (rounded) {
+                    canvas.drawRRect(this.makeRRect(rect, radius), this.fillPaint);
+                } else {
+                    canvas.drawRect(rect, this.fillPaint);
+                }
+                resetFill();
             }
-            resetFill();
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
@@ -318,7 +357,7 @@ export class SkiaDraw {
                 }
 
                 const pos = this.transformer.worldToScreen(item.x, item.y);
-                this.paintCircle(canvas, item, pos, this.camera.scale, true, deco);
+                this.paintCircle(canvas, item, pos, this.camera.scale, true, this.liveToScreen, deco);
             }
         });
         this.drawChanges.add(handle, culler.applyChanges.bind(culler));
@@ -328,13 +367,16 @@ export class SkiaDraw {
     /** Paint a single circle at a resolved position; `cellSize` is the pixel
      * size of one world cell. `useSizePx` is false on the static picture
      * path, which records at a fixed scale where pixel sizing cannot hold.
-     * `deco` is dynamic-path only — static pictures record undecorated. */
+     * `toScreen` is the world projection `pos` was resolved with, as on
+     * {@link paintRect}. `deco` is dynamic-path only — static pictures record
+     * undecorated. */
     private paintCircle(
         canvas: SkCanvas,
         item: Circle,
         pos: Coords,
         cellSize: number,
         useSizePx: boolean,
+        toScreen: ToScreen,
         deco?: ShapeDecorationStyle,
     ) {
         const origin = resolveOrigin(item.origin);
@@ -346,14 +388,20 @@ export class SkiaDraw {
         const cy = drawY + radius;
 
         if (style?.fillStyle) {
-            const resetFill = this.applyFill(style.fillStyle, {
-                x: cx - radius,
-                y: cy - radius,
-                width: radius * 2,
-                height: radius * 2,
-            });
-            canvas.drawCircle(cx, cy, radius, this.fillPaint);
-            resetFill();
+            const resetFill = this.applyFill(
+                style.fillStyle,
+                {
+                    x: cx - radius,
+                    y: cy - radius,
+                    width: radius * 2,
+                    height: radius * 2,
+                },
+                toScreen,
+            );
+            if (resetFill) {
+                canvas.drawCircle(cx, cy, radius, this.fillPaint);
+                resetFill();
+            }
         }
         if (style?.strokeStyle) {
             this.strokePaint.setColor(this.color(style.strokeStyle));
@@ -580,18 +628,26 @@ export class SkiaDraw {
 
                 if (filled) {
                     path.setFillType(item.fillRule === "evenodd" ? FillType.EvenOdd : FillType.Winding);
-                    // A path's box is its bounding box on screen, matching the
-                    // Canvas2D and WebGL paths.
+                    // A path's box is its conservative box on screen (every
+                    // vertex and control point, plus each arc's full circle),
+                    // matching the Canvas2D and WebGL paths. Curves and
+                    // partial arcs can sit well inside it.
                     const topLeftPx = this.transformer.worldToScreen(bounds.minX, bounds.minY);
                     const bottomRightPx = this.transformer.worldToScreen(bounds.maxX, bounds.maxY);
-                    const resetFill = this.applyFill(style!.fillStyle!, {
-                        x: topLeftPx.x,
-                        y: topLeftPx.y,
-                        width: bottomRightPx.x - topLeftPx.x,
-                        height: bottomRightPx.y - topLeftPx.y,
-                    });
-                    canvas.drawPath(path, this.fillPaint);
-                    resetFill();
+                    const resetFill = this.applyFill(
+                        style!.fillStyle!,
+                        {
+                            x: topLeftPx.x,
+                            y: topLeftPx.y,
+                            width: bottomRightPx.x - topLeftPx.x,
+                            height: bottomRightPx.y - topLeftPx.y,
+                        },
+                        this.liveToScreen,
+                    );
+                    if (resetFill) {
+                        canvas.drawPath(path, this.fillPaint);
+                        resetFill();
+                    }
                 }
                 // A fill-only item draws no outline; everything else strokes
                 // (defaulting to a hairline, matching the legacy behavior).
@@ -791,7 +847,7 @@ export class SkiaDraw {
             items,
             layer,
             staticRectPaintBounds,
-            (canvas, item, pos, cellSize) => this.paintRect(canvas, item, pos, cellSize, false),
+            (canvas, item, pos, cellSize, toScreen) => this.paintRect(canvas, item, pos, cellSize, false, toScreen),
             options,
         );
     }
@@ -807,7 +863,7 @@ export class SkiaDraw {
             items,
             layer,
             staticCirclePaintBounds,
-            (canvas, item, pos, cellSize) => this.paintCircle(canvas, item, pos, cellSize, false),
+            (canvas, item, pos, cellSize, toScreen) => this.paintCircle(canvas, item, pos, cellSize, false, toScreen),
             options,
         );
     }
@@ -856,7 +912,7 @@ export class SkiaDraw {
         items: T[],
         layer: number,
         boundsOf: (item: T, scale: number) => Bounds | null,
-        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
+        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number, toScreen: ToScreen) => void,
         options?: RendererClipOptions,
     ): DrawHandle {
         if (items.length === 0) {
@@ -885,7 +941,7 @@ export class SkiaDraw {
     private recordStaticPicture<T extends AnchoredItem>(
         items: T[],
         boundsOf: (item: T, scale: number) => Bounds | null,
-        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number) => void,
+        paintItem: (canvas: SkCanvas, item: T, pos: Coords, cellSize: number, toScreen: ToScreen) => void,
     ): { picture: SkPicture; recordScale: number } {
         const recordScale = this.camera.scale;
 
@@ -909,12 +965,18 @@ export class SkiaDraw {
             ),
         );
 
+        // Picture-space equivalent of worldToScreen (the camera fixed at the
+        // origin), the mapping replay undoes. Items are placed with it, and it
+        // is handed on so world-space geometry (a world-unit gradient axis)
+        // lands in the same space instead of being projected with the live
+        // camera, whose offset replay would then apply a second time.
+        const toPictureSpace: ToScreen = (wx, wy) => ({
+            x: (wx + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+            y: (wy + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
+        });
+
         for (const item of items) {
-            const pos = {
-                x: (item.x + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
-                y: (item.y + DEFAULT_VALUES.CELL_CENTER_OFFSET) * recordScale,
-            };
-            paintItem(canvas, item, pos, recordScale);
+            paintItem(canvas, item, toPictureSpace(item.x, item.y), recordScale, toPictureSpace);
         }
 
         return { picture: recorder.finishRecordingAsPicture(), recordScale };
@@ -949,32 +1011,44 @@ export class SkiaDraw {
     // ─── Helpers ───
 
     /**
-     * Parse a CSS color string once and reuse the result — `Skia.Color` is a
-     * native parse per call, which adds up over thousands of items per frame.
-     *
-     * The cache is bounded: a `styleOf` that computes a color string per frame
-     * would otherwise add a permanent entry for every value it ever produced.
-     */
-    /**
-     * Point `fillPaint` at a {@link Paint} and hand back a reset function.
+     * Point `fillPaint` at a {@link Paint} and hand back a reset function, or
+     * `null` when the paint draws nothing and the caller must skip the fill.
      *
      * The paint is shared across every item of a frame, so a gradient shader
      * has to be cleared again afterwards — a leaked shader would tint every
-     * later solid fill. `box` is the item's drawn box in canvas pixels;
-     * `toScreen` is only consulted for world units.
+     * later solid fill. `box` is the item's drawn box in the space the fill
+     * paints in; `toScreen` projects world coordinates into that same space
+     * and is only consulted for world units.
      */
-    private applyFill(
-        paint: Paint,
-        box: PaintBox,
-        toScreen: (x: number, y: number) => Coords = (x, y) => this.transformer.worldToScreen(x, y),
-    ): () => void {
+    private applyFill(paint: Paint, box: PaintBox, toScreen: ToScreen): (() => void) | null {
         if (!isGradient(paint)) {
             this.fillPaint.setColor(this.color(paint));
             return () => {};
         }
 
-        const axis = gradientAxisPx(paint, box, toScreen);
+        // Native `MakeLinearGradient` throws for fewer than two colors, and
+        // nothing above a layer callback catches it, so the whole frame would
+        // abort. Paint those the way Canvas2D and WebGL do instead: no stops
+        // paints nothing, one stop paints its color flat.
         const stops = normalizeStops(paint.stops);
+        if (stops.length === 0) {
+            return null;
+        }
+        // A zero-length axis paints nothing too, as Canvas2D specifies, even
+        // with one stop. Skia would paint the last stop flat.
+        const axis = gradientAxisPx(paint, box, toScreen);
+        if (axis.x0 === axis.x1 && axis.y0 === axis.y1) {
+            return null;
+        }
+        if (stops.length === 1) {
+            this.fillPaint.setColor(this.color(stops[0].color));
+            return () => {};
+        }
+
+        // Skia modulates a shader by the paint's alpha, and every solid or
+        // text fill leaves its color's alpha on this shared paint. The RGB is
+        // ignored under a shader, so only the alpha needs resetting.
+        this.fillPaint.setAlphaf(1);
         this.fillPaint.setShader(
             Skia.Shader.MakeLinearGradient(
                 { x: axis.x0, y: axis.y0 },
@@ -987,6 +1061,13 @@ export class SkiaDraw {
         return () => this.fillPaint.setShader(null);
     }
 
+    /**
+     * Parse a CSS color string once and reuse the result — `Skia.Color` is a
+     * native parse per call, which adds up over thousands of items per frame.
+     *
+     * The cache is bounded: a `styleOf` that computes a color string per frame
+     * would otherwise add a permanent entry for every value it ever produced.
+     */
     private color(value: string): SkColor {
         let parsed = this.colorCache.get(value);
         if (!parsed) {

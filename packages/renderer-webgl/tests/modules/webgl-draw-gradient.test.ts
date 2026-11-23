@@ -5,6 +5,33 @@ import { WebGLDraw, type WebGLDrawContext } from "../../src/modules/WebGLDraw";
 import { GLRenderer, type LineInstance, type ShapeInstance } from "../../src/modules/gl/GLRenderer";
 import type { RGBA } from "../../src/utils/color";
 
+/**
+ * Round to the nearest IEEE half float (ties to even), as `Math.f16round` does.
+ * `Math.f16round` only exists from Node 24/25, and CI runs Node 22.
+ */
+function f16round(x: number): number {
+    if (!Number.isFinite(x) || x === 0) {
+        return x;
+    }
+    const a = Math.abs(x);
+    // Subnormals share the smallest normal exponent's 2^-24 spacing.
+    let e = Math.max(-14, Math.floor(Math.log2(a)));
+    if (e > -14 && 2 ** e > a) {
+        e--;
+    } else if (2 ** (e + 1) <= a) {
+        e++;
+    }
+    const q = 2 ** (e - 10);
+    const m = a / q;
+    let r = Math.floor(m);
+    const diff = m - r;
+    if (diff > 0.5 || (diff === 0.5 && r % 2 === 1)) {
+        r++;
+    }
+    const rounded = r * q;
+    return Math.sign(x) * (rounded > 65504 ? Infinity : rounded);
+}
+
 // Fake GL renderer that records shapes and every ramp registered against it.
 function makeRecordingGL() {
     const shapes: ShapeInstance[] = [];
@@ -146,6 +173,49 @@ describe("WebGLDraw gradient fills", () => {
 
         // The cover quad is unrotated screen space: bounds (1,1)-(3,2) -> (15,15)-(35,25)
         expect(paths[0].gradient).toEqual({ axis: { x0: 15, y0: 15, x1: 15, y1: 25 }, row: 0 });
+    });
+
+    it("paints nothing for a zero-length axis, as Canvas2D does", () => {
+        // Sampling a zero-length axis gives t = 0, which would paint the
+        // first stop flat
+        const { draw, render } = setup();
+        const { gl, shapes, ramps, paths } = makeRecordingGL();
+        const point = { x: 0.5, y: 0.5 };
+        const zeroBox = { ...topToBottom, from: point, to: point };
+        const zeroWorld = { ...topToBottom, units: "world" as const, from: point, to: point };
+        const single = { ...zeroBox, stops: [{ offset: 0.5, color: "#0f0" }] };
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, style: { fillStyle: zeroBox } },
+                { x: 4, y: 2, rotate: 30, style: { fillStyle: zeroWorld } },
+            ],
+            1,
+        );
+        draw.drawCircle([{ x: 6, y: 2, style: { fillStyle: single } }], 1);
+        draw.drawPath(
+            [
+                {
+                    points: [
+                        { x: 1, y: 1 },
+                        { x: 3, y: 1 },
+                        { x: 3, y: 2 },
+                    ],
+                    closed: true,
+                    style: { fillStyle: zeroWorld },
+                },
+            ],
+            1,
+        );
+        render(gl);
+
+        expect(shapes).toHaveLength(3);
+        for (const shape of shapes) {
+            expect(shape.color).toEqual([0, 0, 0, 0]);
+            expect(shape.gradient).toBeUndefined();
+        }
+        expect(paths).toEqual([{ color: [0, 0, 0, 0], gradient: undefined }]);
+        expect(ramps).toHaveLength(0);
     });
 
     it("leaves a solid fill without a gradient", () => {
@@ -292,5 +362,134 @@ describe("GLRenderer gradient ramps", () => {
         const data = uploads.at(-1)!;
         expect(data[15]).toBe(-1);
         expect(data[14]).toBe(0);
+    });
+});
+
+// Short gradient axes. The reference is Canvas2D in Chrome, cross-checked on
+// @napi-rs/canvas and CanvasKit (the same Skia underneath both): a short axis
+// is a hard step at the axis position, first stop before it and last stop
+// after, until its length drops to Skia's degenerate threshold (1/32768 px),
+// where the last stop paints flat.
+describe("short gradient axes", () => {
+    const LINE_FLOATS_PER_VERTEX = 8;
+
+    /**
+     * Fragment-side emulation of a `mediump` varying on a GPU that stores it
+     * as a half float: round each vertex value to fp16, interpolate between
+     * two vertices, clamp the way the shader does.
+     */
+    function sampleMediump(t0: number, t1: number, w: number): number {
+        const t = f16round(t0) * (1 - w) + f16round(t1) * w;
+        return Math.min(Math.max(t, 0), 1);
+    }
+
+    /** The fake GL, reporting a mediump float range of `rangeMax` (15: half floats, 127: full). */
+    function fakeGLWithMediump(rangeMax: number) {
+        const fake = makeFakeGL();
+        Object.assign(fake.gl, { getShaderPrecisionFormat: () => ({ rangeMin: rangeMax, rangeMax, precision: 10 }) });
+        return fake;
+    }
+
+    // A 400px-wide shape with a 0.001px axis through its middle: raw t at its
+    // corners is about +-2e5, far past a half float's range.
+    const wideShape: ShapeInstance = {
+        cx: 200,
+        cy: 10,
+        halfW: 200,
+        halfH: 5,
+        radius: [0, 0, 0, 0],
+        rotation: 0,
+        color: [1, 0, 0, 1],
+        gradient: { axis: { x0: 0, y0: 0, x1: 0.001, y1: 0 }, row: 0 },
+    };
+
+    it("paints the last stop flat at or below Skia's degenerate threshold", () => {
+        const { draw, render } = setup(); // scale 10
+        const { gl, shapes, ramps } = makeRecordingGL();
+        // 1e-7 world units at scale 10: a 1e-6px axis
+        const degenerate = {
+            ...topToBottom,
+            units: "world" as const,
+            from: { x: 0.5, y: 0.5 },
+            to: { x: 0.5 + 1e-7, y: 0.5 },
+        };
+        // 1e-5 world units: a 1e-4px axis, above the threshold, so a step
+        const short = { ...degenerate, to: { x: 0.5 + 1e-5, y: 0.5 } };
+
+        draw.drawRect(
+            [
+                { x: 2, y: 2, style: { fillStyle: degenerate } },
+                { x: 4, y: 2, style: { fillStyle: short } },
+            ],
+            1,
+        );
+        render(gl);
+
+        expect(shapes[0].color).toEqual([0, 0, 1, 1]);
+        expect(shapes[0].gradient).toBeUndefined();
+        expect(shapes[1].gradient).toBeDefined();
+        expect(ramps).toHaveLength(1);
+    });
+
+    it("keeps a shape's vertex parameter in half-float range with the step at the axis", () => {
+        const { gl, uploads } = fakeGLWithMediump(15);
+        const renderer = new GLRenderer(gl);
+
+        renderer.drawShapes([wideShape]);
+
+        const data = uploads.at(-1)!;
+        const gradT = (vertex: number) => data[vertex * FLOATS_PER_SHAPE_VERTEX + 14];
+        for (let v = 0; v < 6; v++) {
+            expect(Number.isFinite(f16round(gradT(v)))).toBe(true);
+        }
+
+        // Vertex 0 is TL and vertex 1 TR, local x -201 and 201 (1px skirt).
+        // Sample pixel centers along the top edge.
+        for (const x of [-150.5, -1.5, -0.5]) {
+            expect(sampleMediump(gradT(0), gradT(1), (x + 201) / 402)).toBe(0);
+        }
+        for (const x of [0.5, 1.5, 150.5]) {
+            expect(sampleMediump(gradT(0), gradT(1), (x + 201) / 402)).toBe(1);
+        }
+    });
+
+    it("keeps a path cover quad's parameter in half-float range with the step at the axis", () => {
+        const { gl, uploads } = fakeGLWithMediump(15);
+        const renderer = new GLRenderer(gl);
+
+        renderer.fillPath(
+            [
+                [
+                    { x: 0, y: 0 },
+                    { x: 400, y: 0 },
+                    { x: 400, y: 20 },
+                    { x: 0, y: 20 },
+                ],
+            ],
+            [1, 0, 0, 1],
+            false,
+            { axis: { x0: 200, y0: 0, x1: 200.001, y1: 0 }, row: 0 },
+        );
+
+        // The last upload is the cover quad: (minX,minY), (maxX,minY), ...
+        const quad = uploads.at(-1)!;
+        const gradT = (vertex: number) => quad[vertex * LINE_FLOATS_PER_VERTEX + 6];
+        for (let v = 0; v < 6; v++) {
+            expect(Number.isFinite(f16round(gradT(v)))).toBe(true);
+        }
+        expect(sampleMediump(gradT(0), gradT(1), 199.5 / 400)).toBe(0);
+        expect(sampleMediump(gradT(0), gradT(1), 200.5 / 400)).toBe(1);
+    });
+
+    it("leaves the parameter exact where mediump is a full float", () => {
+        const { gl, uploads } = fakeGLWithMediump(127);
+        const renderer = new GLRenderer(gl);
+
+        renderer.drawShapes([wideShape]);
+
+        // TL and TR at local x -201 and 201: t = x / 0.001, unscaled
+        const data = uploads.at(-1)!;
+        expect(data[14]).toBe(Math.fround(-201 / 0.001));
+        expect(data[FLOATS_PER_SHAPE_VERTEX + 14]).toBe(Math.fround(201 / 0.001));
     });
 });
